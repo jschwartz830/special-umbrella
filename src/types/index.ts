@@ -15,6 +15,7 @@ export type PlanStatus = 'active' | 'inactive' | 'archived'
 export type OverrideType = 'advance' | 'go_back' | 'jump' | 'swap_slot'
 
 export type DayStatus =
+  | 'past_unlogged'
   | 'past_complete'
   | 'past_skip'
   | 'past_day_off'

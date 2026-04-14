@@ -94,6 +94,7 @@ export function CalendarPage() {
               <div key={wi} className="grid grid-cols-7 gap-0.5">
                 {week.map(cell => {
                   const rd = cell.resolvedDay
+                  const isUnlogged = rd?.status === 'past_unlogged'
                   const isComplete = rd?.status === 'past_complete' || rd?.status === 'today_complete'
                   const isSkip = rd?.status === 'past_skip' || rd?.status === 'today_skip'
                   const isDayOff = rd?.status === 'past_day_off' || rd?.status === 'today_day_off'
@@ -112,7 +113,9 @@ export function CalendarPage() {
                             ? 'bg-yellow-500/10 text-yellow-400'
                             : rd?.status === 'future'
                               ? 'bg-slate-800/50 text-slate-400'
-                              : 'bg-slate-800/30 text-slate-600'
+                              : isUnlogged
+                                ? 'bg-slate-800/20 text-slate-600'
+                                : 'bg-slate-800/30 text-slate-600'
 
                   return (
                     <button
@@ -123,7 +126,7 @@ export function CalendarPage() {
                       <span className="text-xs font-semibold leading-none">
                         {new Date(cell.date + 'T00:00').getDate()}
                       </span>
-                      {rd && cell.isCurrentMonth && !isDayOff && !hasFutureDayOff && (
+                      {rd && cell.isCurrentMonth && !isUnlogged && !isDayOff && !hasFutureDayOff && (
                         <div className="flex gap-0.5 mt-0.5">
                           {rd.planDay.slots.map(slot => (
                             <span key={slot.id} className={`w-1 h-1 rounded-full ${isComplete ? 'bg-emerald-400' : isSkip ? 'bg-slate-600' : 'bg-slate-500'}`} />

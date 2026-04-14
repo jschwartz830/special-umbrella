@@ -202,7 +202,7 @@ export function getResolvedDaysRange(
       else if (entry.action === 'skip') status = 'today_skip'
       else status = 'today_day_off'
     } else if (date < today) {
-      if (!entry) status = 'past_skip'
+      if (!entry) status = 'past_unlogged'
       else if (entry.action === 'complete') status = 'past_complete'
       else if (entry.action === 'skip') status = 'past_skip'
       else status = 'past_day_off'
