@@ -27,6 +27,8 @@
   input, textarea, select {
     -webkit-appearance: none;
     appearance: none;
+    /* Prevent iOS Safari auto-zoom on focus (requires >= 16px) */
+    font-size: 16px;
   }
 }
 

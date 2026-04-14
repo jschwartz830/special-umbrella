@@ -17,7 +17,9 @@ function applyOverridesForDate(
   planLength: number,
 ): number {
   for (const ov of sortedOverrides) {
-    if (ov.appliedAt.slice(0, 10) !== date) continue
+    // Extract LOCAL date — appliedAt is UTC ISO, but we compare against local date strings
+    const ovLocalDate = format(new Date(ov.appliedAt), 'yyyy-MM-dd')
+    if (ovLocalDate !== date) continue
     if (ov.type === 'advance') pointer = mod(pointer + 1, planLength)
     else if (ov.type === 'go_back') pointer = mod(pointer - 1, planLength)
     else if (ov.type === 'jump' && ov.targetDayIndex !== undefined)
