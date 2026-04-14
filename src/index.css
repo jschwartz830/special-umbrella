@@ -27,9 +27,16 @@
   input, textarea, select {
     -webkit-appearance: none;
     appearance: none;
-    /* Prevent iOS Safari auto-zoom on focus (requires >= 16px) */
-    font-size: 16px;
   }
+}
+
+/*
+ * Prevent iOS Safari auto-zoom on input focus.
+ * iOS zooms when font-size < 16px. This must live OUTSIDE @layer base
+ * so it isn't overridden by Tailwind utility classes like text-sm.
+ */
+input, textarea, select {
+  font-size: 16px !important;
 }
 
 @layer utilities {
