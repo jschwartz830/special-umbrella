@@ -197,7 +197,7 @@ function SlotEditor({
               return (
                 <button
                   key={wt}
-                  onClick={() => { set('type', wt); set('name', m.label); setShowTypePicker(false) }}
+                  onClick={() => { onChange({ ...slot, type: wt, name: m.label }); setShowTypePicker(false) }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${
                     slot.type === wt ? 'bg-slate-600' : 'bg-slate-700 hover:bg-slate-600'
                   }`}

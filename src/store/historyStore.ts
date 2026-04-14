@@ -36,6 +36,7 @@ interface HistoryState {
   ) => void
 
   clearPlanHistory: (planId: string) => void
+  removeEntry: (planId: string, calendarDate: string) => void
 }
 
 export const useHistoryStore = create<HistoryState>()(
@@ -93,6 +94,14 @@ export const useHistoryStore = create<HistoryState>()(
         set(s => ({
           entries: s.entries.filter(e => e.planId !== planId),
           overrides: s.overrides.filter(o => o.planId !== planId),
+        }))
+      },
+
+      removeEntry(planId, calendarDate) {
+        set(s => ({
+          entries: s.entries.filter(
+            e => !(e.planId === planId && e.calendarDate === calendarDate),
+          ),
         }))
       },
     }),
