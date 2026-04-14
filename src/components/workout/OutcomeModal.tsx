@@ -24,7 +24,6 @@ import { isRunType } from '../../modules/workout-metadata/types'
 interface Props {
   planId: string
   calendarDate: string
-  planDayIndex: number
   planDay: PlanDay
   existingOutcome?: WorkoutOutcome | null
   onConfirm: (outcome: WorkoutOutcome) => void
@@ -85,7 +84,6 @@ function getRunSlot(planDay: PlanDay): WorkoutSlot | null {
 export function OutcomeModal({
   planId,
   calendarDate,
-  planDayIndex,
   planDay,
   existingOutcome,
   onConfirm,

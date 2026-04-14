@@ -15,6 +15,14 @@ import { WORKOUT_META, WORKOUT_TYPES } from '../lib/constants'
 import { Modal } from '../components/shared/Modal'
 import { nanoid } from '../engine/rotationEngine'
 import type { Plan, PlanDay, WorkoutSlot } from '../types'
+import type { WorkoutTag, WorkoutDifficulty, RunWorkoutSubtype, RunWorkoutConfig } from '../modules/workout-metadata/types'
+import {
+  ALL_WORKOUT_TAGS,
+  TAG_LABELS,
+  RUN_SUBTYPE_LABELS,
+  isRunType,
+  defaultRunSubtype,
+} from '../modules/workout-metadata/types'
 import { format } from 'date-fns'
 
 // ── Slot editor ──────────────────────────────────────────────────────────────
@@ -33,10 +41,31 @@ function SlotEditor({
   const [showTypePicker, setShowTypePicker] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const meta = WORKOUT_META[slot.type]
+  const isRun = isRunType(slot.type)
 
   function set<K extends keyof WorkoutSlot>(key: K, val: WorkoutSlot[K]) {
     onChange({ ...slot, [key]: val })
   }
+
+  function setRunConfig(patch: Partial<RunWorkoutConfig>) {
+    const existing: RunWorkoutConfig = slot.runConfig ?? {
+      subtype: defaultRunSubtype(slot.type),
+    }
+    onChange({ ...slot, runConfig: { ...existing, ...patch } })
+  }
+
+  function toggleTag(tag: WorkoutTag) {
+    const current = slot.tags ?? []
+    const next = current.includes(tag)
+      ? current.filter(t => t !== tag)
+      : [...current, tag]
+    set('tags', next)
+  }
+
+  const DIFFICULTIES: WorkoutDifficulty[] = ['easy', 'moderate', 'hard']
+  const SUBTYPES: RunWorkoutSubtype[] = [
+    'easy_run', 'recovery_run', 'long_run', 'tempo', 'intervals', 'race_pace', 'walk_run', 'other',
+  ]
 
   return (
     <div className="bg-slate-700/50 rounded-xl p-3 space-y-2">
@@ -81,9 +110,9 @@ function SlotEditor({
       </div>
 
       {expanded && (
-        <div className="space-y-2 pt-1">
+        <div className="space-y-3 pt-1">
           {/* Type-specific fields */}
-          {(slot.type === 'long_run' || slot.type === 'recovery_run') && (
+          {isRun && (
             <div className="grid grid-cols-3 gap-2">
               <label className="space-y-1">
                 <span className="text-xs text-slate-400">Distance (mi)</span>
@@ -169,6 +198,131 @@ function SlotEditor({
                   />
                 </label>
               )}
+            </div>
+          )}
+
+          {/* ── Run config (progression) ────────────────────────────────── */}
+          {isRun && (
+            <div className="space-y-2 border border-slate-600/50 rounded-lg p-2.5">
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Run Config</p>
+
+              {/* Subtype */}
+              <label className="space-y-1 block">
+                <span className="text-xs text-slate-400">Subtype</span>
+                <select
+                  value={slot.runConfig?.subtype ?? defaultRunSubtype(slot.type)}
+                  onChange={e => setRunConfig({ subtype: e.target.value as RunWorkoutSubtype })}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  {SUBTYPES.map(st => (
+                    <option key={st} value={st}>{RUN_SUBTYPE_LABELS[st]}</option>
+                  ))}
+                </select>
+              </label>
+
+              {/* Structure text */}
+              <label className="block space-y-1">
+                <span className="text-xs text-slate-400">Structure / intervals description</span>
+                <input
+                  type="text"
+                  value={slot.runConfig?.targetStructureText ?? ''}
+                  onChange={e => setRunConfig({ targetStructureText: e.target.value || null })}
+                  placeholder="e.g. 3×1 mi @ tempo pace"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                />
+              </label>
+
+              {/* Progression enabled */}
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={slot.runConfig?.progressionEligible ?? false}
+                  onChange={e => setRunConfig({ progressionEligible: e.target.checked })}
+                  className="w-4 h-4 rounded accent-sky-500"
+                />
+                <span className="text-sm text-slate-300">Enable adaptive progression</span>
+              </label>
+
+              {slot.runConfig?.progressionEligible && (
+                <div className="space-y-2 pl-2">
+                  <label className="block space-y-1">
+                    <span className="text-xs text-slate-400">Progression group ID</span>
+                    <input
+                      type="text"
+                      value={slot.runConfig?.progressionGroupId ?? ''}
+                      onChange={e => setRunConfig({ progressionGroupId: e.target.value || null })}
+                      placeholder="e.g. long-run or easy-run"
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    />
+                  </label>
+                  <label className="space-y-1 block">
+                    <span className="text-xs text-slate-400">Step size (mi, default 0.5)</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={slot.runConfig?.defaultStepMiles ?? 0.5}
+                      onChange={e => setRunConfig({ defaultStepMiles: parseFloat(e.target.value) || 0.5 })}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Difficulty ──────────────────────────────────────────────── */}
+          {slot.type !== 'rest' && (
+            <div>
+              <p className="text-xs text-slate-400 mb-1.5">Difficulty</p>
+              <div className="flex gap-2">
+                {DIFFICULTIES.map(d => {
+                  const active = slot.difficulty === d
+                  const colors: Record<WorkoutDifficulty, string> = {
+                    easy: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400',
+                    moderate: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400',
+                    hard: 'bg-red-500/20 border-red-500/50 text-red-400',
+                  }
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => set('difficulty', active ? undefined : d)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium capitalize transition-colors ${
+                        active ? colors[d] : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── Tags ────────────────────────────────────────────────────── */}
+          {slot.type !== 'rest' && (
+            <div>
+              <p className="text-xs text-slate-400 mb-1.5">Tags</p>
+              <div className="flex flex-wrap gap-1.5">
+                {ALL_WORKOUT_TAGS.map(tag => {
+                  const active = (slot.tags ?? []).includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${
+                        active
+                          ? 'bg-sky-500/20 border-sky-500/50 text-sky-400'
+                          : 'bg-slate-700 border-slate-600 text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      {TAG_LABELS[tag]}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
 
@@ -272,42 +426,22 @@ function DayEditor({
           className="flex-1 bg-transparent text-sm font-semibold text-white placeholder-slate-500 focus:outline-none min-w-0"
         />
         <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={onMoveUp}
-            disabled={index === 0}
-            className="p-1 rounded text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-          >
+          <button type="button" onClick={onMoveUp} disabled={index === 0}
+            className="p-1 rounded text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed">
             <ChevronUp size={14} />
           </button>
-          <button
-            type="button"
-            onClick={onMoveDown}
-            disabled={index === total - 1}
-            className="p-1 rounded text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
-          >
+          <button type="button" onClick={onMoveDown} disabled={index === total - 1}
+            className="p-1 rounded text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed">
             <ChevronDown size={14} />
           </button>
-          <button
-            type="button"
-            onClick={onDuplicate}
-            className="p-1 rounded text-slate-500 hover:text-white"
-          >
+          <button type="button" onClick={onDuplicate} className="p-1 rounded text-slate-500 hover:text-white">
             <Copy size={13} />
           </button>
-          <button
-            type="button"
-            onClick={() => setExpanded(e => !e)}
-            className="p-1 rounded text-slate-500 hover:text-white"
-          >
+          <button type="button" onClick={() => setExpanded(e => !e)} className="p-1 rounded text-slate-500 hover:text-white">
             {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            disabled={total <= 1}
-            className="p-1 rounded text-red-400/60 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
+          <button type="button" onClick={onRemove} disabled={total <= 1}
+            className="p-1 rounded text-red-400/60 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed">
             <Trash2 size={13} />
           </button>
         </div>
@@ -357,12 +491,8 @@ export function PlanBuilderPage() {
   const [durationType, setDurationType] = useState<'rotations' | 'weeks'>(
     existing?.duration.type ?? 'rotations',
   )
-  const [durationValue, setDurationValue] = useState(
-    existing?.duration.value ?? 4,
-  )
-  const [days, setDays] = useState<PlanDay[]>(
-    existing?.days ?? [makeDay('Day 1')],
-  )
+  const [durationValue, setDurationValue] = useState(existing?.duration.value ?? 4)
+  const [days, setDays] = useState<PlanDay[]>(existing?.days ?? [makeDay('Day 1')])
   const [saved, setSaved] = useState(false)
 
   function updateDay(i: number, d: PlanDay) {
@@ -422,24 +552,17 @@ export function PlanBuilderPage() {
     <div className="px-4 pt-safe pb-8">
       {/* Header */}
       <div className="pt-6 pb-4 flex items-center gap-3">
-        <button
-          onClick={() => navigate('/plans')}
-          className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-        >
+        <button onClick={() => navigate('/plans')}
+          className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
           <ArrowLeft size={18} />
         </button>
         <h1 className="text-xl font-bold text-white flex-1">
           {isNew ? 'New Plan' : 'Edit Plan'}
         </h1>
-        <button
-          onClick={handleSave}
-          disabled={!name.trim()}
+        <button onClick={handleSave} disabled={!name.trim()}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
-            saved
-              ? 'bg-emerald-500 text-white'
-              : 'bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40'
-          }`}
-        >
+            saved ? 'bg-emerald-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40'
+          }`}>
           {saved ? <><Check size={14} /> Saved</> : 'Save'}
         </button>
       </div>
@@ -449,47 +572,28 @@ export function PlanBuilderPage() {
         <div className="space-y-3">
           <div>
             <label className="text-xs text-slate-400 font-medium block mb-1.5">Plan name *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
               placeholder="e.g. 5-Day Upper/Lower"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500" />
           </div>
           <div>
             <label className="text-xs text-slate-400 font-medium block mb-1.5">Description</label>
-            <input
-              type="text"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
+            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
               placeholder="Optional description"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500" />
           </div>
           <div>
             <label className="text-xs text-slate-400 font-medium block mb-1.5">Duration</label>
             <div className="flex gap-2">
-              <input
-                type="number"
-                min="1"
-                max="52"
-                value={durationValue}
+              <input type="number" min="1" max="52" value={durationValue}
                 onChange={e => setDurationValue(parseInt(e.target.value) || 1)}
-                className="w-20 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-              />
+                className="w-20 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500" />
               <div className="flex rounded-xl bg-slate-800 border border-slate-700 overflow-hidden">
                 {(['rotations', 'weeks'] as const).map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setDurationType(t)}
+                  <button key={t} type="button" onClick={() => setDurationType(t)}
                     className={`px-3 py-2.5 text-sm font-medium transition-colors capitalize ${
-                      durationType === t
-                        ? 'bg-sky-500 text-white'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
+                      durationType === t ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'
+                    }`}>
                     {t}
                   </button>
                 ))}
@@ -504,11 +608,8 @@ export function PlanBuilderPage() {
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Workout Days ({days.length})
             </h2>
-            <button
-              type="button"
-              onClick={() => setDays(d => [...d, makeDay(`Day ${d.length + 1}`)])}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition-colors"
-            >
+            <button type="button" onClick={() => setDays(d => [...d, makeDay(`Day ${d.length + 1}`)])}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition-colors">
               <Plus size={12} /> Add Day
             </button>
           </div>
@@ -530,15 +631,10 @@ export function PlanBuilderPage() {
         </div>
 
         {/* Save button (bottom) */}
-        <button
-          onClick={handleSave}
-          disabled={!name.trim()}
+        <button onClick={handleSave} disabled={!name.trim()}
           className={`w-full py-3 rounded-xl text-base font-semibold transition-all active:scale-[0.98] ${
-            saved
-              ? 'bg-emerald-500 text-white'
-              : 'bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40'
-          }`}
-        >
+            saved ? 'bg-emerald-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40'
+          }`}>
           {saved ? '✓ Saved' : isNew ? 'Create Plan' : 'Save Changes'}
         </button>
       </div>
