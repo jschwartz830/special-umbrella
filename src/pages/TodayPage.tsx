@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  CheckCircle2,
   SkipForward,
   Coffee,
   ChevronRight,
@@ -10,27 +9,37 @@ import {
   Pencil,
   ListPlus,
   RotateCcw,
+  TrendingUp,
+  Info,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
 import { useHistoryStore } from '../store/historyStore'
+import { useOutcomeStore, makeWorkoutInstanceId } from '../store/outcomeStore'
 import { WorkoutDayCard } from '../components/workout/WorkoutDayCard'
+import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
+import { completionStateToAction } from '../modules/workout-outcomes/types'
+import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../modules/recommendation/explanation'
+import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
+import { isRunType } from '../modules/workout-metadata/types'
+import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 
 export function TodayPage() {
   const navigate = useNavigate()
   const { plan, todayResolved, upcoming } = useActivePlan()
   const actions = usePlanActions(plan?.id ?? null)
-  const updateNotes = useHistoryStore(s => s.updateEntryNotes)
+  const logAction = useHistoryStore(s => s.logAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
-  const today = new Intl.DateTimeFormat('en-CA').format(new Date()) // YYYY-MM-DD local
+  const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
+  const getOutcome = useOutcomeStore(s => s.getOutcome)
+  const getProgressionState = useOutcomeStore(s => s.getProgressionState)
+  const today = new Intl.DateTimeFormat('en-CA').format(new Date())
 
-  const [showNotes, setShowNotes] = useState(false)
-  const [notesText, setNotesText] = useState('')
+  const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
   const [showJump, setShowJump] = useState(false)
-  const [pendingAction, setPendingAction] = useState<'complete' | 'skip' | 'day_off' | null>(null)
 
   if (!plan || !todayResolved) {
     return (
@@ -56,38 +65,71 @@ export function TodayPage() {
   const isPending = todayResolved.status === 'today_pending'
   const isResolved = !isPending
 
-  function handleAction(type: 'complete' | 'skip' | 'day_off') {
-    if (type === 'day_off') {
-      actions.dayOff()
-      return
-    }
-    setPendingAction(type)
-    setNotesText(todayResolved?.historyEntry?.notes ?? '')
-    setShowNotes(true)
+  const instanceId = makeWorkoutInstanceId(plan.id, today)
+  const existingOutcome = getOutcome(instanceId)
+
+  // Resolve run adaptation note for today's workout
+  const todayRunSlot = todayResolved.planDay.slots.find(s => isRunType(s.type))
+  const todayProgressionState = todayRunSlot?.runConfig?.progressionGroupId
+    ? getProgressionState(todayRunSlot.runConfig.progressionGroupId)
+    : null
+  const todayAdaptationNote = todayRunSlot
+    ? generateRunAdaptationNote(todayRunSlot, todayProgressionState)
+    : null
+
+  // Difficulty spacing warning (today vs tomorrow)
+  const tomorrowSlot = upcoming[0]?.planDay?.slots[0]
+  const spacingWarning = generateDifficultySpacingWarning(
+    todayResolved.planDay.slots[0]?.difficulty,
+    tomorrowSlot?.difficulty,
+  )
+
+  function handleCompleteClick() {
+    setShowOutcomeModal(true)
   }
 
-  function confirmAction() {
+  function handleOutcomeConfirm(outcome: WorkoutOutcome) {
+    // Map completionState to ActionType for the rotation engine
+    const action = completionStateToAction(outcome.completionState)
+
+    // Log to history store (drives rotation)
+    logAction(
+      plan!.id,
+      today,
+      todayResolved!.planDayIndex,
+      action,
+      outcome.notes ?? undefined,
+    )
+
+    // Store rich outcome + update run progression
+    if (todayRunSlot) {
+      logOutcomeWithProgression(outcome, todayRunSlot)
+    } else {
+      // Non-run: just store the outcome
+      useOutcomeStore.getState().setOutcome(outcome)
+    }
+
+    setShowOutcomeModal(false)
+  }
+
+  function handleSkip() {
     if (!todayResolved) return
-    if (pendingAction === 'complete') {
-      actions.complete(todayResolved.planDayIndex, notesText || undefined)
-    } else if (pendingAction === 'skip') {
-      actions.skip(todayResolved.planDayIndex)
+    actions.skip(todayResolved.planDayIndex)
+    // Store a minimal skipped outcome
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: instanceId,
+      completionState: 'skipped',
+      completedAt: new Date().toISOString(),
     }
-    setShowNotes(false)
-    setPendingAction(null)
+    useOutcomeStore.getState().setOutcome(outcome)
   }
 
-  function handleEditNotes() {
-    if (!todayResolved?.historyEntry) return
-    setNotesText(todayResolved.historyEntry.notes ?? '')
-    setPendingAction(null)
-    setShowNotes(true)
+  function handleDayOff() {
+    actions.dayOff()
   }
 
-  function saveNotes() {
-    if (!todayResolved?.historyEntry) return
-    updateNotes(todayResolved.historyEntry.id, notesText)
-    setShowNotes(false)
+  function handleEditOutcome() {
+    setShowOutcomeModal(true)
   }
 
   return (
@@ -103,6 +145,22 @@ export function TodayPage() {
         </p>
       </div>
 
+      {/* Adaptation note for today's run */}
+      {todayAdaptationNote && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
+          <TrendingUp size={14} className="text-sky-400 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-sky-300">{todayAdaptationNote}</p>
+        </div>
+      )}
+
+      {/* Difficulty spacing warning */}
+      {spacingWarning && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20">
+          <Info size={14} className="text-orange-400 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-orange-300">{spacingWarning}</p>
+        </div>
+      )}
+
       {/* Today's workout */}
       <WorkoutDayCard resolved={todayResolved} isToday />
 
@@ -110,21 +168,21 @@ export function TodayPage() {
       {isPending && (
         <div className="grid grid-cols-3 gap-2">
           <button
-            onClick={() => handleAction('complete')}
+            onClick={handleCompleteClick}
             className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 transition-colors active:scale-95"
           >
-            <CheckCircle2 size={22} />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             <span className="text-xs font-semibold">Complete</span>
           </button>
           <button
-            onClick={() => handleAction('skip')}
+            onClick={handleSkip}
             className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 transition-colors active:scale-95"
           >
             <SkipForward size={22} />
             <span className="text-xs font-semibold">Skip</span>
           </button>
           <button
-            onClick={() => handleAction('day_off')}
+            onClick={handleDayOff}
             className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 transition-colors active:scale-95"
           >
             <Coffee size={22} />
@@ -137,10 +195,10 @@ export function TodayPage() {
       {isResolved && (
         <div className="flex gap-2">
           <button
-            onClick={handleEditNotes}
+            onClick={handleEditOutcome}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
           >
-            <Pencil size={13} /> Edit notes
+            <Pencil size={13} /> Edit outcome
           </button>
           <button
             onClick={() => removeEntry(plan.id, today)}
@@ -168,50 +226,48 @@ export function TodayPage() {
             Upcoming
           </h2>
           <div className="space-y-2">
-            {upcoming.slice(0, 5).map(rd => (
-              <div key={rd.calendarDate} className="flex items-center gap-3">
-                <div className="w-10 text-center flex-shrink-0">
-                  <p className="text-xs text-slate-500 font-medium">
-                    {new Date(rd.calendarDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' })}
-                  </p>
+            {upcoming.slice(0, 5).map(rd => {
+              // Show adaptation note for upcoming run slots
+              const upcomingRunSlot = rd.planDay.slots.find(s => isRunType(s.type))
+              const upcomingGroupId = upcomingRunSlot?.runConfig?.progressionGroupId
+              const upcomingProgression = upcomingGroupId ? getProgressionState(upcomingGroupId) : null
+              const upcomingTarget = upcomingRunSlot
+                ? resolveWorkoutDisplayTarget(upcomingRunSlot, upcomingProgression)
+                : null
+              const upcomingNote = upcomingTarget?.adaptationNote
+
+              return (
+                <div key={rd.calendarDate} className="flex items-center gap-3">
+                  <div className="w-10 text-center flex-shrink-0">
+                    <p className="text-xs text-slate-500 font-medium">
+                      {new Date(rd.calendarDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' })}
+                    </p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <WorkoutDayCard resolved={rd} />
+                    {upcomingNote && (
+                      <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
+                        <TrendingUp size={10} />{upcomingNote}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <WorkoutDayCard resolved={rd} />
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       )}
 
-      {/* Notes modal */}
-      {showNotes && (
-        <Modal
-          title={pendingAction ? `${pendingAction === 'complete' ? 'Complete' : 'Skip'} workout` : 'Edit notes'}
-          onClose={() => setShowNotes(false)}
-          footer={
-            <button
-              onClick={pendingAction ? confirmAction : saveNotes}
-              className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold transition-colors"
-            >
-              {pendingAction === 'complete' ? 'Mark Complete' : pendingAction === 'skip' ? 'Skip Workout' : 'Save Notes'}
-            </button>
-          }
-        >
-          <div className="space-y-3">
-            {pendingAction && (
-              <p className="text-sm text-slate-400">
-                Add optional notes before logging.
-              </p>
-            )}
-            <textarea
-              autoFocus
-              value={notesText}
-              onChange={e => setNotesText(e.target.value)}
-              placeholder="How did it feel? Any notes..."
-              rows={4}
-              className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
-            />
-          </div>
-        </Modal>
+      {/* Outcome modal */}
+      {showOutcomeModal && (
+        <OutcomeModal
+          planId={plan.id}
+          calendarDate={today}
+          planDay={todayResolved.planDay}
+          existingOutcome={existingOutcome}
+          onConfirm={handleOutcomeConfirm}
+          onClose={() => setShowOutcomeModal(false)}
+        />
       )}
 
       {/* Override modal */}
@@ -259,10 +315,7 @@ export function TodayPage() {
             {plan.days.map((day, idx) => (
               <button
                 key={day.id}
-                onClick={() => {
-                  actions.jumpTo(idx)
-                  setShowJump(false)
-                }}
+                onClick={() => { actions.jumpTo(idx); setShowJump(false) }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors ${
                   idx === todayResolved.planDayIndex
                     ? 'bg-sky-500/20 border border-sky-500/50'
@@ -274,9 +327,7 @@ export function TodayPage() {
                 </span>
                 <div>
                   <p className="text-sm font-medium text-white">{day.label}</p>
-                  <p className="text-xs text-slate-400">
-                    {day.slots.map(s => s.name).join(' + ')}
-                  </p>
+                  <p className="text-xs text-slate-400">{day.slots.map(s => s.name).join(' + ')}</p>
                 </div>
                 {idx === todayResolved.planDayIndex && (
                   <span className="ml-auto text-xs text-sky-400 font-medium">Current</span>

@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  test: {
+    environment: 'node',
+    include: ['src/**/__tests__/**/*.test.ts'],
+  },
   base: '/special-umbrella/',
   plugins: [
     react(),

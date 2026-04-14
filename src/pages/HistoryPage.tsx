@@ -1,11 +1,31 @@
 import { useState } from 'react'
 import { format, parseISO } from 'date-fns'
-import { CheckCircle2, SkipForward, Coffee, Pencil, Trash2, X } from 'lucide-react'
+import {
+  CheckCircle2,
+  MinusCircle,
+  SkipForward,
+  Coffee,
+  Pause,
+  Shuffle,
+  Pencil,
+  Trash2,
+  X,
+  Ruler,
+  Zap,
+  Timer,
+} from 'lucide-react'
 import { useHistoryStore } from '../store/historyStore'
 import { usePlanStore } from '../store/planStore'
+import { useOutcomeStore, makeWorkoutInstanceId } from '../store/outcomeStore'
 import { Modal } from '../components/shared/Modal'
+import { DifficultyBadge } from '../components/workout/DifficultyBadge'
 import { EmptyState } from '../components/shared/EmptyState'
 import type { ActionType, HistoryEntry } from '../types'
+import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+import {
+  COMPLETION_STATE_LABELS,
+  formatPace,
+} from '../modules/workout-outcomes/types'
 
 export function HistoryPage() {
   const plans = usePlanStore(s => s.plans)
@@ -13,6 +33,7 @@ export function HistoryPage() {
   const updateNotes = useHistoryStore(s => s.updateEntryNotes)
   const updateAction = useHistoryStore(s => s.updateEntryAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
+  const outcomes = useOutcomeStore(s => s.outcomes)
 
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
@@ -20,6 +41,11 @@ export function HistoryPage() {
 
   // Sort entries newest first
   const sorted = [...entries].sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
+
+  function getOutcome(entry: HistoryEntry): WorkoutOutcome | null {
+    const id = makeWorkoutInstanceId(entry.planId, entry.calendarDate)
+    return outcomes[id] ?? null
+  }
 
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')
@@ -69,22 +95,37 @@ export function HistoryPage() {
         {sorted.map(entry => {
           const plan = plans[entry.planId]
           const planDay = plan?.days.find((_, idx) => idx === entry.planDayIndex)
+          const outcome = getOutcome(entry)
+          const completionState = outcome?.completionState ?? null
 
-          const actionIcon =
-            entry.action === 'complete' ? (
-              <CheckCircle2 size={18} className="text-emerald-400" />
-            ) : entry.action === 'skip' ? (
-              <SkipForward size={18} className="text-slate-500" />
-            ) : (
-              <Coffee size={18} className="text-amber-400" />
-            )
+          // Icon and colour based on richer completion state if available
+          const actionIcon = completionState === 'partially_completed'
+            ? <MinusCircle size={18} className="text-yellow-400" />
+            : completionState === 'deferred'
+              ? <Pause size={18} className="text-purple-400" />
+              : completionState === 'swapped'
+                ? <Shuffle size={18} className="text-sky-400" />
+                : entry.action === 'complete'
+                  ? <CheckCircle2 size={18} className="text-emerald-400" />
+                  : entry.action === 'skip'
+                    ? <SkipForward size={18} className="text-slate-500" />
+                    : <Coffee size={18} className="text-amber-400" />
 
-          const actionColor =
-            entry.action === 'complete'
-              ? 'text-emerald-400'
-              : entry.action === 'skip'
-                ? 'text-slate-400'
-                : 'text-amber-400'
+          const actionColor = completionState === 'partially_completed'
+            ? 'text-yellow-400'
+            : completionState === 'deferred'
+              ? 'text-purple-400'
+              : completionState === 'swapped'
+                ? 'text-sky-400'
+                : entry.action === 'complete'
+                  ? 'text-emerald-400'
+                  : entry.action === 'skip'
+                    ? 'text-slate-400'
+                    : 'text-amber-400'
+
+          const stateLabel = completionState
+            ? COMPLETION_STATE_LABELS[completionState]
+            : entry.action.replace('_', ' ')
 
           return (
             <div
@@ -95,7 +136,7 @@ export function HistoryPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     {actionIcon}
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-xs text-slate-500 font-medium">
                         {format(parseISO(entry.calendarDate), 'EEE, MMM d, yyyy')}
                       </p>
@@ -105,10 +146,77 @@ export function HistoryPage() {
                     </div>
                   </div>
 
+                  {/* Slot name + plan name + difficulty badges */}
                   {planDay && (
-                    <p className="text-xs text-slate-500 mt-1 ml-6">
-                      {planDay.slots.map(s => s.name).join(' + ')} · {plan?.name}
-                    </p>
+                    <div className="mt-1 ml-6">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="text-xs text-slate-500">
+                          {planDay.slots.map(s => s.name).join(' + ')} · {plan?.name}
+                        </p>
+                        {planDay.slots.map(s => s.difficulty && (
+                          <DifficultyBadge key={s.id} difficulty={s.difficulty} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Outcome actuals */}
+                  {outcome && (
+                    <div className="mt-2 ml-6 space-y-1">
+                      {/* Effort */}
+                      {outcome.perceivedEffort != null && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-slate-500">Effort:</span>
+                          <div className="flex gap-0.5">
+                            {([1,2,3,4,5] as const).map(e => (
+                              <span
+                                key={e}
+                                className={`w-3 h-3 rounded-full ${
+                                  e <= outcome.perceivedEffort!
+                                    ? e <= 2
+                                      ? 'bg-emerald-400'
+                                      : e === 3
+                                        ? 'bg-yellow-400'
+                                        : e === 4
+                                          ? 'bg-orange-400'
+                                          : 'bg-red-400'
+                                    : 'bg-slate-600'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-xs text-slate-500">{outcome.perceivedEffort}/5</span>
+                        </div>
+                      )}
+
+                      {/* Run actuals */}
+                      {outcome.runActual && (
+                        <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+                          {outcome.runActual.actualDistanceMiles != null && (
+                            <span className="flex items-center gap-0.5">
+                              <Ruler size={10} /> {outcome.runActual.actualDistanceMiles} mi
+                            </span>
+                          )}
+                          {outcome.runActual.actualDurationMin != null && (
+                            <span className="flex items-center gap-0.5">
+                              <Timer size={10} /> {outcome.runActual.actualDurationMin} min
+                            </span>
+                          )}
+                          {outcome.runActual.averagePaceSecondsPerMile != null && (
+                            <span className="flex items-center gap-0.5">
+                              <Zap size={10} /> {formatPace(outcome.runActual.averagePaceSecondsPerMile)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Duration actual (non-run) */}
+                      {!outcome.runActual && outcome.durationActualMin != null && (
+                        <p className="text-xs text-slate-500">
+                          {outcome.durationActualMin} min
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   {entry.notes && (
@@ -118,7 +226,7 @@ export function HistoryPage() {
 
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <span className={`text-xs font-medium capitalize ${actionColor}`}>
-                    {entry.action.replace('_', ' ')}
+                    {stateLabel}
                   </span>
                   <button
                     onClick={() => openEdit(entry)}

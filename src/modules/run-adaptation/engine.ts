@@ -139,7 +139,7 @@ export function applyRunProgressionDecision(
     progressionGroupId,
     currentTargetDistanceMiles: decision.nextTargetDistanceMiles ?? previousState?.currentTargetDistanceMiles ?? null,
     lastCompletedWorkoutInstanceId: workoutInstanceId,
-    lastResult: decision.action === 'none' ? null : decision.action,
+    lastResult: decision.action,
     updatedAt: now,
   }
 }
