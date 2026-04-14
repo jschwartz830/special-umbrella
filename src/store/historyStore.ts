@@ -35,6 +35,7 @@ interface HistoryState {
     },
   ) => void
 
+  updateEntryAction: (planId: string, calendarDate: string, action: ActionType) => void
   clearPlanHistory: (planId: string) => void
   removeEntry: (planId: string, calendarDate: string) => void
 }
@@ -94,6 +95,16 @@ export const useHistoryStore = create<HistoryState>()(
         set(s => ({
           entries: s.entries.filter(e => e.planId !== planId),
           overrides: s.overrides.filter(o => o.planId !== planId),
+        }))
+      },
+
+      updateEntryAction(planId, calendarDate, action) {
+        set(s => ({
+          entries: s.entries.map(e =>
+            e.planId === planId && e.calendarDate === calendarDate
+              ? { ...e, action, planDayIndex: action === 'day_off' ? undefined : e.planDayIndex }
+              : e,
+          ),
         }))
       },
 

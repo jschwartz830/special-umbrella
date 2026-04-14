@@ -13,7 +13,7 @@ interface PlanState {
   duplicatePlan: (id: string) => string
   archivePlan: (id: string) => void
   deletePlan: (id: string) => void
-  setActivePlan: (id: string) => void
+  setActivePlan: (id: string, opts?: { startDate?: string; startDayIndex?: number }) => void
   deactivatePlan: () => void
 }
 
@@ -109,9 +109,8 @@ export const usePlanStore = create<PlanState>()(
         })
       },
 
-      setActivePlan(id) {
+      setActivePlan(id, opts = {}) {
         set(s => {
-          // Deactivate any currently active plan
           const updated = { ...s.plans }
           for (const pid of Object.keys(updated)) {
             if (updated[pid].status === 'active') {
@@ -125,8 +124,8 @@ export const usePlanStore = create<PlanState>()(
           updated[id] = {
             ...updated[id],
             status: 'active',
-            startDate: format(new Date(), 'yyyy-MM-dd'),
-            startDayIndex: 0,
+            startDate: opts.startDate ?? format(new Date(), 'yyyy-MM-dd'),
+            startDayIndex: opts.startDayIndex ?? 0,
             updatedAt: new Date().toISOString(),
           }
           return { plans: updated, activePlanId: id }

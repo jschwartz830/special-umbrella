@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Dumbbell,
 } from 'lucide-react'
+import { format } from 'date-fns'
 import { usePlanStore } from '../store/planStore'
 import { useHistoryStore } from '../store/historyStore'
 import { Modal } from '../components/shared/Modal'
@@ -27,11 +28,26 @@ export function PlansPage() {
   const clearHistory = useHistoryStore(s => s.clearPlanHistory)
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [activatingPlan, setActivatingPlan] = useState<Plan | null>(null)
+  const [startDate, setStartDate] = useState('')
+  const [startDayIndex, setStartDayIndex] = useState(0)
 
   const allPlans = Object.values(plans)
   const active = allPlans.filter(p => p.status === 'active')
   const inactive = allPlans.filter(p => p.status === 'inactive')
   const archived = allPlans.filter(p => p.status === 'archived')
+
+  function openActivateModal(plan: Plan) {
+    setStartDate(format(new Date(), 'yyyy-MM-dd'))
+    setStartDayIndex(0)
+    setActivatingPlan(plan)
+  }
+
+  function confirmActivate() {
+    if (!activatingPlan) return
+    setActivePlan(activatingPlan.id, { startDate, startDayIndex })
+    setActivatingPlan(null)
+  }
 
   function PlanCard({ plan }: { plan: Plan }) {
     const isActive = plan.status === 'active'
@@ -81,7 +97,7 @@ export function PlansPage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setActivePlan(plan.id)}
+                  onClick={() => openActivateModal(plan)}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 text-xs font-medium transition-colors"
                 >
                   <Play size={12} /> Activate
@@ -174,6 +190,60 @@ export function PlansPage() {
             {archived.map(p => <PlanCard key={p.id} plan={p} />)}
           </div>
         </section>
+      )}
+
+      {/* Activate modal */}
+      {activatingPlan && (
+        <Modal
+          title={`Activate "${activatingPlan.name}"`}
+          onClose={() => setActivatingPlan(null)}
+          footer={
+            <button
+              onClick={confirmActivate}
+              className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold transition-colors"
+            >
+              Activate
+            </button>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-400">
+              Set when you started (or are starting) this plan. Use a past date and a day offset to load an in-progress program.
+            </p>
+
+            <div>
+              <label className="block text-xs text-slate-500 uppercase tracking-wide font-medium mb-1.5">
+                Start date
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-500 uppercase tracking-wide font-medium mb-1.5">
+                Starting rotation day
+              </label>
+              <select
+                value={startDayIndex}
+                onChange={e => setStartDayIndex(Number(e.target.value))}
+                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                {activatingPlan.days.map((day, idx) => (
+                  <option key={day.id} value={idx}>
+                    Day {idx + 1} — {day.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500 mt-1.5">
+                Already mid-program? Pick the day you were on when your chosen start date began.
+              </p>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Delete confirm modal */}
