@@ -10,6 +10,11 @@ export type WorkoutType =
 
 export type ActionType = 'complete' | 'skip' | 'day_off'
 
+// Re-export new metadata/outcome/adaptation types for convenience
+export type { WorkoutTag, WorkoutDifficulty, RunWorkoutConfig, RunWorkoutSubtype, PaceRange } from '../modules/workout-metadata/types'
+export type { WorkoutCompletionState, PerceivedEffort, WorkoutOutcome, RunWorkoutActual } from '../modules/workout-outcomes/types'
+export type { RunProgressionState, RunProgressionDecision, ResolvedWorkoutTarget } from '../modules/run-adaptation/types'
+
 export type PlanStatus = 'active' | 'inactive' | 'archived'
 
 export type OverrideType = 'advance' | 'go_back' | 'jump' | 'swap_slot'
@@ -42,6 +47,14 @@ export interface WorkoutSlot {
   // Swim
   targetDuration?: number  // minutes
   // (targetDistance reused for swim)
+
+  // ── New metadata fields (all optional — backward compatible) ──────────────
+  /** Display/sequencing tags */
+  tags?: import('../modules/workout-metadata/types').WorkoutTag[]
+  /** Difficulty level — used by recommendation spacing logic */
+  difficulty?: import('../modules/workout-metadata/types').WorkoutDifficulty
+  /** Rich run configuration; only meaningful when type = long_run | recovery_run */
+  runConfig?: import('../modules/workout-metadata/types').RunWorkoutConfig | null
 }
 
 /** One entry in the repeating day sequence */
