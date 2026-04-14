@@ -7,78 +7,74 @@ export function mod(n: number, m: number): number {
 }
 
 /**
- * Pure function: derive the current rotation pointer (planDayIndex) for `today`.
- *
- * Algorithm:
- *  1. Walk calendar dates from plan.startDate to yesterday.
- *  2. For each date, apply any overrides (advance/go_back/jump), then
- *     check if there's a history entry.
- *     - day_off  → pointer does NOT advance
- *     - complete / skip → pointer advances by 1
- *     - no entry (unresolved past) → pointer does NOT advance
- *  3. The result is the planDayIndex for today.
+ * Apply all overrides whose appliedAt date == `date`, in chronological order.
+ * Returns the updated pointer.
+ */
+function applyOverridesForDate(
+  pointer: number,
+  sortedOverrides: OverrideEntry[],
+  date: string,
+  planLength: number,
+): number {
+  for (const ov of sortedOverrides) {
+    if (ov.appliedAt.slice(0, 10) !== date) continue
+    if (ov.type === 'advance') pointer = mod(pointer + 1, planLength)
+    else if (ov.type === 'go_back') pointer = mod(pointer - 1, planLength)
+    else if (ov.type === 'jump' && ov.targetDayIndex !== undefined)
+      pointer = mod(ov.targetDayIndex, planLength)
+    // swap_slot does not affect the pointer
+  }
+  return pointer
+}
+
+/**
+ * Pure function: derive the rotation pointer at the START of `targetDate`.
+ * Processes all dates strictly before `targetDate` (startDate → targetDate-1).
+ * Does NOT apply overrides for `targetDate` itself — callers handle that.
  */
 export function computeCurrentDayIndex(
   plan: Plan,
   entries: HistoryEntry[],
   overrides: OverrideEntry[],
-  today: string,
+  targetDate: string,
 ): number {
   if (plan.days.length === 0) return 0
 
-  // Index entries and overrides by date for O(1) lookup
   const entryByDate = new Map<string, HistoryEntry>()
   for (const e of entries) {
-    // If duplicate entries for same date, keep the latest (by createdAt)
     const existing = entryByDate.get(e.calendarDate)
     if (!existing || e.createdAt > existing.createdAt) {
       entryByDate.set(e.calendarDate, e)
     }
   }
 
-  // Sort overrides ascending by appliedAt
   const sortedOverrides = [...overrides].sort((a, b) =>
     a.appliedAt.localeCompare(b.appliedAt),
   )
 
-  const startDate = plan.startDate
-  const dayCount = differenceInCalendarDays(parseISO(today), parseISO(startDate))
-
+  const dayCount = differenceInCalendarDays(parseISO(targetDate), parseISO(plan.startDate))
   let pointer = plan.startDayIndex
 
   for (let i = 0; i < dayCount; i++) {
-    const date = format(addDays(parseISO(startDate), i), 'yyyy-MM-dd')
+    const date = format(addDays(parseISO(plan.startDate), i), 'yyyy-MM-dd')
 
-    // Apply overrides that were applied on this calendar date
-    for (const ov of sortedOverrides) {
-      const ovDate = ov.appliedAt.slice(0, 10) // extract YYYY-MM-DD
-      if (ovDate !== date) continue
-      if (ov.type === 'advance') {
-        pointer = mod(pointer + 1, plan.days.length)
-      } else if (ov.type === 'go_back') {
-        pointer = mod(pointer - 1, plan.days.length)
-      } else if (ov.type === 'jump' && ov.targetDayIndex !== undefined) {
-        pointer = mod(ov.targetDayIndex, plan.days.length)
-      }
-      // swap_slot does not affect the pointer
-    }
+    // Overrides first — they change what workout was shown on this day
+    pointer = applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)
 
-    // Check history entry for this date
+    // Then advance based on history entry
     const entry = entryByDate.get(date)
-    if (entry) {
-      if (entry.action === 'complete' || entry.action === 'skip') {
-        pointer = mod(pointer + 1, plan.days.length)
-      }
-      // day_off: pointer stays
+    if (entry && (entry.action === 'complete' || entry.action === 'skip')) {
+      pointer = mod(pointer + 1, plan.days.length)
     }
-    // no entry: pointer stays (pending/unresolved)
+    // day_off or no entry: pointer stays
   }
 
   return pointer
 }
 
 /**
- * Resolve today's workout day given the current plan state.
+ * Resolve today's workout day.
+ * Applies today's overrides on top of the base pointer (they take immediate effect).
  */
 export function getTodayResolvedDay(
   plan: Plan,
@@ -86,7 +82,14 @@ export function getTodayResolvedDay(
   overrides: OverrideEntry[],
   today: string,
 ): ResolvedDay {
-  const idx = computeCurrentDayIndex(plan, entries, overrides, today)
+  const sortedOverrides = [...overrides].sort((a, b) =>
+    a.appliedAt.localeCompare(b.appliedAt),
+  )
+
+  // Base pointer (everything before today) + today's overrides
+  let idx = computeCurrentDayIndex(plan, entries, overrides, today)
+  idx = applyOverridesForDate(idx, sortedOverrides, today, plan.days.length)
+
   const planDay = plan.days[idx]
   const entry = entries.find(e => e.calendarDate === today)
 
@@ -101,8 +104,8 @@ export function getTodayResolvedDay(
 }
 
 /**
- * Get upcoming workout days (starting from tomorrow).
- * Returns `count` days projected forward (no overrides applied to future).
+ * Get upcoming workout days (tomorrow + next `count` days).
+ * Applies today's overrides before projecting forward.
  */
 export function getUpcomingDays(
   plan: Plan,
@@ -113,9 +116,15 @@ export function getUpcomingDays(
 ): ResolvedDay[] {
   if (plan.days.length === 0) return []
 
-  let pointer = computeCurrentDayIndex(plan, entries, overrides, today)
+  const sortedOverrides = [...overrides].sort((a, b) =>
+    a.appliedAt.localeCompare(b.appliedAt),
+  )
 
-  // If today is resolved (complete or skip), advance pointer for tomorrow
+  // Start from today's pointer (with today's overrides applied)
+  let pointer = computeCurrentDayIndex(plan, entries, overrides, today)
+  pointer = applyOverridesForDate(pointer, sortedOverrides, today, plan.days.length)
+
+  // If today is already resolved, advance for tomorrow
   const todayEntry = entries.find(e => e.calendarDate === today)
   if (todayEntry && (todayEntry.action === 'complete' || todayEntry.action === 'skip')) {
     pointer = mod(pointer + 1, plan.days.length)
@@ -139,7 +148,12 @@ export function getUpcomingDays(
 }
 
 /**
- * Compute resolved days for a range of past dates (for history/calendar).
+ * Compute resolved days for a date range (calendar view).
+ *
+ * Key rules:
+ *  - Overrides applied on a date affect what's SHOWN on that date (applied before reading planDay)
+ *  - Past dates: pointer advances only on complete/skip entries; no entry = pending (stuck)
+ *  - Today + future: pointer always advances unless a day_off entry is logged
  */
 export function getResolvedDaysRange(
   plan: Plan,
@@ -150,14 +164,6 @@ export function getResolvedDaysRange(
   toDate: string,
 ): ResolvedDay[] {
   if (plan.days.length === 0) return []
-
-  // Build pointer replay from startDate up to fromDate to get initial pointer
-  const startPointer = computeCurrentDayIndex(
-    plan,
-    entries,
-    overrides,
-    fromDate,
-  )
 
   const entryByDate = new Map<string, HistoryEntry>()
   for (const e of entries) {
@@ -171,26 +177,30 @@ export function getResolvedDaysRange(
     a.appliedAt.localeCompare(b.appliedAt),
   )
 
+  // Pointer at the start of fromDate (processes everything before fromDate)
+  let pointer = computeCurrentDayIndex(plan, entries, overrides, fromDate)
+
   const result: ResolvedDay[] = []
   const days = differenceInCalendarDays(parseISO(toDate), parseISO(fromDate)) + 1
-  let pointer = startPointer
 
   for (let i = 0; i < days; i++) {
     const date = format(addDays(parseISO(fromDate), i), 'yyyy-MM-dd')
     const entry = entryByDate.get(date)
+
+    // ── Fix: apply overrides BEFORE reading planDay ──────────────────────
+    pointer = applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)
+
     const planDay = plan.days[pointer]
 
+    // Determine status
     let status: DayStatus
-    const isPast = date < today
-    const isToday = date === today
-
-    if (isToday) {
+    if (date === today) {
       if (!entry) status = 'today_pending'
       else if (entry.action === 'complete') status = 'today_complete'
       else if (entry.action === 'skip') status = 'today_skip'
       else status = 'today_day_off'
-    } else if (isPast) {
-      if (!entry) status = 'past_skip' // unresolved past → show as skipped visually
+    } else if (date < today) {
+      if (!entry) status = 'past_skip'
       else if (entry.action === 'complete') status = 'past_complete'
       else if (entry.action === 'skip') status = 'past_skip'
       else status = 'past_day_off'
@@ -198,26 +208,15 @@ export function getResolvedDaysRange(
       status = 'future'
     }
 
-    result.push({
-      calendarDate: date,
-      planDayIndex: pointer,
-      planDay,
-      status,
-      historyEntry: entry,
-    })
+    result.push({ calendarDate: date, planDayIndex: pointer, planDay, status, historyEntry: entry })
 
-    // Advance pointer for next day
-    // Apply overrides for this date
-    for (const ov of sortedOverrides) {
-      const ovDate = ov.appliedAt.slice(0, 10)
-      if (ovDate !== date) continue
-      if (ov.type === 'advance') pointer = mod(pointer + 1, plan.days.length)
-      else if (ov.type === 'go_back') pointer = mod(pointer - 1, plan.days.length)
-      else if (ov.type === 'jump' && ov.targetDayIndex !== undefined)
-        pointer = mod(ov.targetDayIndex, plan.days.length)
-    }
+    // ── Fix: advance pointer for future projection ───────────────────────
+    const entryAdvances = !!entry && (entry.action === 'complete' || entry.action === 'skip')
+    // Past with no entry: rotation is stuck (missed day). Today/future: always advance
+    // unless a day_off is explicitly logged.
+    const projectForward = date >= today && entry?.action !== 'day_off' && !entryAdvances
 
-    if (entry && (entry.action === 'complete' || entry.action === 'skip')) {
+    if (entryAdvances || projectForward) {
       pointer = mod(pointer + 1, plan.days.length)
     }
   }
@@ -235,18 +234,13 @@ export function isPlanExpired(
 ): boolean {
   const { type, value } = plan.duration
   if (type === 'weeks') {
-    const endDate = format(
-      addDays(parseISO(plan.startDate), value * 7),
-      'yyyy-MM-dd',
-    )
+    const endDate = format(addDays(parseISO(plan.startDate), value * 7), 'yyyy-MM-dd')
     return today >= endDate
   }
-  // rotations: count how many full rotations have been completed
   const completeSkip = entries.filter(
     e => e.planId === plan.id && (e.action === 'complete' || e.action === 'skip'),
   )
-  const rotationsCompleted = Math.floor(completeSkip.length / plan.days.length)
-  return rotationsCompleted >= value
+  return Math.floor(completeSkip.length / plan.days.length) >= value
 }
 
 /** Generate a short unique id */
