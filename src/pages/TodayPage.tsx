@@ -9,6 +9,7 @@ import {
   Shuffle,
   Pencil,
   ListPlus,
+  RotateCcw,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
@@ -22,6 +23,8 @@ export function TodayPage() {
   const { plan, todayResolved, upcoming } = useActivePlan()
   const actions = usePlanActions(plan?.id ?? null)
   const updateNotes = useHistoryStore(s => s.updateEntryNotes)
+  const removeEntry = useHistoryStore(s => s.removeEntry)
+  const today = new Intl.DateTimeFormat('en-CA').format(new Date()) // YYYY-MM-DD local
 
   const [showNotes, setShowNotes] = useState(false)
   const [notesText, setNotesText] = useState('')
@@ -138,6 +141,12 @@ export function TodayPage() {
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
           >
             <Pencil size={13} /> Edit notes
+          </button>
+          <button
+            onClick={() => removeEntry(plan.id, today)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 text-xs font-medium transition-colors"
+          >
+            <RotateCcw size={13} /> Undo
           </button>
         </div>
       )}
