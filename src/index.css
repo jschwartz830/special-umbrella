@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Prevent iOS text size adjustment */
+    -webkit-text-size-adjust: 100%;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-slate-950 text-white;
+    /* Prevent pull-to-refresh interference */
+    overscroll-behavior: none;
+    /* Safe area insets for iPhone notch/home indicator */
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Prevent double-tap zoom on buttons */
+  button, a {
+    touch-action: manipulation;
+  }
+
+  /* Remove iOS input styling */
+  input, textarea, select {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+}
