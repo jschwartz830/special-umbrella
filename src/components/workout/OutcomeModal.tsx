@@ -2,10 +2,7 @@ import { useState } from 'react'
 import {
   CheckCircle2,
   MinusCircle,
-  SkipForward,
   Clock3,
-  Shuffle,
-  Pause,
   Ruler,
   Timer,
   Zap,
@@ -30,7 +27,7 @@ interface Props {
   onClose: () => void
 }
 
-// State picker options
+// State picker options — only completion states reachable via the Complete button
 const STATE_OPTIONS: {
   state: WorkoutCompletionState
   label: string
@@ -48,24 +45,6 @@ const STATE_OPTIONS: {
     label: 'Partial',
     icon: <MinusCircle size={16} />,
     activeClass: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400',
-  },
-  {
-    state: 'skipped',
-    label: 'Skipped',
-    icon: <SkipForward size={16} />,
-    activeClass: 'bg-slate-600 border-slate-500 text-slate-200',
-  },
-  {
-    state: 'deferred',
-    label: 'Deferred',
-    icon: <Pause size={16} />,
-    activeClass: 'bg-purple-500/20 border-purple-500/50 text-purple-400',
-  },
-  {
-    state: 'swapped',
-    label: 'Swapped',
-    icon: <Shuffle size={16} />,
-    activeClass: 'bg-sky-500/20 border-sky-500/50 text-sky-400',
   },
 ]
 
@@ -92,8 +71,11 @@ export function OutcomeModal({
   const runSlot = getRunSlot(planDay)
   const hasRun = runSlot != null
 
+  const existingState = existingOutcome?.completionState
   const [completionState, setCompletionState] = useState<WorkoutCompletionState>(
-    existingOutcome?.completionState ?? 'completed',
+    existingState === 'completed' || existingState === 'partially_completed'
+      ? existingState
+      : 'completed',
   )
   const [effort, setEffort] = useState<PerceivedEffort | null>(
     existingOutcome?.perceivedEffort ?? null,
@@ -114,7 +96,7 @@ export function OutcomeModal({
     existingOutcome?.runActual?.completedAsPlanned ?? null,
   )
 
-  const isActive = completionState !== 'skipped' && completionState !== 'deferred'
+  const isActive = true // both remaining states (completed, partial) show all fields
 
   // Derived average pace
   const dist = parseFloat(distanceMiles)
@@ -152,15 +134,7 @@ export function OutcomeModal({
   }
 
   const stateLabel =
-    completionState === 'completed'
-      ? 'Mark Complete'
-      : completionState === 'partially_completed'
-        ? 'Log Partial'
-        : completionState === 'skipped'
-          ? 'Skip Workout'
-          : completionState === 'deferred'
-            ? 'Defer Workout'
-            : 'Log Swap'
+    completionState === 'partially_completed' ? 'Log Partial' : 'Mark Complete'
 
   return (
     <Modal
@@ -181,7 +155,7 @@ export function OutcomeModal({
           <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">
             Status
           </p>
-          <div className="grid grid-cols-5 gap-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
             {STATE_OPTIONS.map(opt => (
               <button
                 key={opt.state}

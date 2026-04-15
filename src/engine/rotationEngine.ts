@@ -63,12 +63,12 @@ export function computeCurrentDayIndex(
     // Overrides first — they change what workout was shown on this day
     pointer = applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)
 
-    // Then advance based on history entry
+    // Then advance based on history entry — all logged actions advance the rotation
     const entry = entryByDate.get(date)
-    if (entry && (entry.action === 'complete' || entry.action === 'skip')) {
+    if (entry && (entry.action === 'complete' || entry.action === 'skip' || entry.action === 'day_off')) {
       pointer = mod(pointer + 1, plan.days.length)
     }
-    // day_off or no entry: pointer stays
+    // No entry (past unlogged day): pointer stays
   }
 
   return pointer
@@ -126,12 +126,9 @@ export function getUpcomingDays(
   let pointer = computeCurrentDayIndex(plan, entries, overrides, today)
   pointer = applyOverridesForDate(pointer, sortedOverrides, today, plan.days.length)
 
-  // Advance pointer for tomorrow's projection — always, unless today has an
-  // explicit day_off entry (which holds the rotation in place).
-  const todayEntry = entries.find(e => e.calendarDate === today)
-  if (todayEntry?.action !== 'day_off') {
-    pointer = mod(pointer + 1, plan.days.length)
-  }
+  // Always advance past today for tomorrow's projection — every logged action
+  // (complete, skip, day_off) or a pending day all move the rotation forward.
+  pointer = mod(pointer + 1, plan.days.length)
 
   const result: ResolvedDay[] = []
   const todayParsed = parseISO(today)
@@ -155,8 +152,8 @@ export function getUpcomingDays(
  *
  * Key rules:
  *  - Overrides applied on a date affect what's SHOWN on that date (applied before reading planDay)
- *  - Past dates: pointer advances only on complete/skip entries; no entry = pending (stuck)
- *  - Today + future: pointer always advances unless a day_off entry is logged
+ *  - Past dates: pointer advances on complete/skip/day_off entries; no entry = stuck (unlogged day)
+ *  - Today + future: pointer always advances (any entry or no entry)
  */
 export function getResolvedDaysRange(
   plan: Plan,
@@ -213,11 +210,14 @@ export function getResolvedDaysRange(
 
     result.push({ calendarDate: date, planDayIndex: pointer, planDay, status, historyEntry: entry })
 
-    // ── Fix: advance pointer for future projection ───────────────────────
-    const entryAdvances = !!entry && (entry.action === 'complete' || entry.action === 'skip')
-    // Past with no entry: rotation is stuck (missed day). Today/future: always advance
-    // unless a day_off is explicitly logged.
-    const projectForward = date >= today && entry?.action !== 'day_off' && !entryAdvances
+    // ── Advance pointer ───────────────────────────────────────────────────
+    // Any logged action (complete, skip, day_off) advances the rotation.
+    // Past days with no entry: rotation stays put (missed/unlogged day).
+    // Today and future with no entry: always project forward.
+    const entryAdvances = !!entry && (
+      entry.action === 'complete' || entry.action === 'skip' || entry.action === 'day_off'
+    )
+    const projectForward = date >= today && !entryAdvances
 
     if (entryAdvances || projectForward) {
       pointer = mod(pointer + 1, plan.days.length)

@@ -93,22 +93,16 @@ export function TodayPage() {
   }
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
-    if (outcome.completionState === 'deferred') {
-      // Deferred: just advance the rotation without logging a history entry
-      actions.advance()
-      useOutcomeStore.getState().setOutcome(outcome)
+    const action = completionStateToAction(outcome.completionState)
+    logAction(plan!.id, today, todayResolved!.planDayIndex, action, outcome.notes ?? undefined)
+
+    // Double-day: advance one extra step so tomorrow skips past the bonus workout
+    if (doubleDay) actions.advance()
+
+    if (todayRunSlot) {
+      logOutcomeWithProgression(outcome, todayRunSlot)
     } else {
-      const action = completionStateToAction(outcome.completionState)
-      logAction(plan!.id, today, todayResolved!.planDayIndex, action, outcome.notes ?? undefined)
-
-      // Double-day: advance one extra step so tomorrow skips past the bonus workout
-      if (doubleDay) actions.advance()
-
-      if (todayRunSlot) {
-        logOutcomeWithProgression(outcome, todayRunSlot)
-      } else {
-        useOutcomeStore.getState().setOutcome(outcome)
-      }
+      useOutcomeStore.getState().setOutcome(outcome)
     }
 
     setDoubleDay(false)
@@ -120,7 +114,7 @@ export function TodayPage() {
   }
 
   function handleDayOff() {
-    actions.advance()
+    actions.dayOff()
   }
 
   function handleEditOutcome() {
@@ -156,8 +150,18 @@ export function TodayPage() {
         </div>
       )}
 
-      {/* Today's workout */}
-      <WorkoutDayCard resolved={todayResolved} isToday />
+      {/* Today's workout — or rest card if day off */}
+      {todayResolved.status === 'today_day_off' ? (
+        <div className="w-full rounded-xl border border-slate-700 bg-slate-800/80 p-4 flex items-center gap-3">
+          <Coffee size={22} className="text-slate-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-slate-400">Rest Day</p>
+            <p className="text-xs text-slate-600 mt-0.5">No workout logged — rotation continues tomorrow</p>
+          </div>
+        </div>
+      ) : (
+        <WorkoutDayCard resolved={todayResolved} isToday />
+      )}
 
       {/* Double-day bonus workout */}
       {doubleDay && upcoming[0] && (
