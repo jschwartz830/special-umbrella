@@ -11,6 +11,8 @@ import {
   RotateCcw,
   TrendingUp,
   Info,
+  PlusCircle,
+  X,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
@@ -40,6 +42,7 @@ export function TodayPage() {
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
   const [showJump, setShowJump] = useState(false)
+  const [doubleDay, setDoubleDay] = useState(false)
 
   if (!plan || !todayResolved) {
     return (
@@ -77,9 +80,10 @@ export function TodayPage() {
     ? generateRunAdaptationNote(todayRunSlot, todayProgressionState)
     : null
 
-  // Difficulty spacing warning (today vs tomorrow)
-  const tomorrowSlot = upcoming[0]?.planDay?.slots[0]
-  const spacingWarning = generateDifficultySpacingWarning(
+  // Difficulty spacing warning (today vs tomorrow) — suppressed in double-day mode
+  // since the user is intentionally stacking workouts
+  const tomorrowSlot = upcoming[doubleDay ? 1 : 0]?.planDay?.slots[0]
+  const spacingWarning = !doubleDay && generateDifficultySpacingWarning(
     todayResolved.planDay.slots[0]?.difficulty,
     tomorrowSlot?.difficulty,
   )
@@ -89,26 +93,25 @@ export function TodayPage() {
   }
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
-    // Map completionState to ActionType for the rotation engine
-    const action = completionStateToAction(outcome.completionState)
-
-    // Log to history store (drives rotation)
-    logAction(
-      plan!.id,
-      today,
-      todayResolved!.planDayIndex,
-      action,
-      outcome.notes ?? undefined,
-    )
-
-    // Store rich outcome + update run progression
-    if (todayRunSlot) {
-      logOutcomeWithProgression(outcome, todayRunSlot)
-    } else {
-      // Non-run: just store the outcome
+    if (outcome.completionState === 'deferred') {
+      // Deferred: just advance the rotation without logging a history entry
+      actions.advance()
       useOutcomeStore.getState().setOutcome(outcome)
+    } else {
+      const action = completionStateToAction(outcome.completionState)
+      logAction(plan!.id, today, todayResolved!.planDayIndex, action, outcome.notes ?? undefined)
+
+      // Double-day: advance one extra step so tomorrow skips past the bonus workout
+      if (doubleDay) actions.advance()
+
+      if (todayRunSlot) {
+        logOutcomeWithProgression(outcome, todayRunSlot)
+      } else {
+        useOutcomeStore.getState().setOutcome(outcome)
+      }
     }
 
+    setDoubleDay(false)
     setShowOutcomeModal(false)
   }
 
@@ -117,7 +120,7 @@ export function TodayPage() {
   }
 
   function handleDayOff() {
-    actions.dayOff()
+    actions.advance()
   }
 
   function handleEditOutcome() {
@@ -156,6 +159,16 @@ export function TodayPage() {
       {/* Today's workout */}
       <WorkoutDayCard resolved={todayResolved} isToday />
 
+      {/* Double-day bonus workout */}
+      {doubleDay && upcoming[0] && (
+        <div>
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <PlusCircle size={11} /> Also today
+          </p>
+          <WorkoutDayCard resolved={upcoming[0]} />
+        </div>
+      )}
+
       {/* Action buttons — only show if pending */}
       {isPending && (
         <div className="grid grid-cols-3 gap-2">
@@ -181,6 +194,25 @@ export function TodayPage() {
             <span className="text-xs font-semibold">Day Off</span>
           </button>
         </div>
+      )}
+
+      {/* Double-day toggle — only when pending and there's a next workout */}
+      {isPending && upcoming.length > 0 && (
+        doubleDay ? (
+          <button
+            onClick={() => setDoubleDay(false)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 text-xs font-medium transition-colors"
+          >
+            <X size={13} /> Cancel double day
+          </button>
+        ) : (
+          <button
+            onClick={() => setDoubleDay(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-sky-400 text-xs font-medium transition-colors"
+          >
+            <PlusCircle size={13} /> Also do {upcoming[0].planDay.label} today
+          </button>
+        )
       )}
 
       {/* Resolved actions */}
@@ -218,7 +250,7 @@ export function TodayPage() {
             Upcoming
           </h2>
           <div className="space-y-2">
-            {upcoming.slice(0, 5).map(rd => {
+            {upcoming.slice(doubleDay ? 1 : 0, doubleDay ? 6 : 5).map(rd => {
               // Show adaptation note for upcoming run slots
               const upcomingRunSlot = rd.planDay.slots.find(s => isRunType(s.type))
               const upcomingGroupId = upcomingRunSlot?.runConfig?.progressionGroupId
