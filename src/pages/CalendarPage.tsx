@@ -7,7 +7,7 @@ import { buildMonthGrid } from '../engine/calendarProjection'
 import { WorkoutBadge } from '../components/workout/WorkoutBadge'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
-import type { ResolvedDay, ActionType } from '../types'
+import type { Plan, ResolvedDay, ActionType } from '../types'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -22,6 +22,8 @@ export function CalendarPage() {
   const overrides = useHistoryStore(s => s.overrides)
   const addEntry = useHistoryStore(s => s.addEntry)
   const removeEntry = useHistoryStore(s => s.removeEntry)
+  const addOverride = useHistoryStore(s => s.addOverride)
+  const removeRetroJumpForDate = useHistoryStore(s => s.removeRetroJumpForDate)
 
   const weeks = useMemo(
     () => buildMonthGrid(year, month, plan, entries, overrides, today),
@@ -38,20 +40,36 @@ export function CalendarPage() {
     else setMonth(m => m + 1)
   }
 
-  function logForDate(rd: ResolvedDay, action: ActionType) {
+  function logForDate(rd: ResolvedDay, action: ActionType, selectedPlanDayIdx: number) {
     if (!plan) return
+
+    // Clear any previously-written retroactive jump override for this date
+    removeRetroJumpForDate(plan.id, rd.calendarDate)
+
+    // If the user chose a different workout than the rotation computed, pin it
+    // with a jump override so the engine shows (and propagates from) that day.
+    if (action !== 'day_off' && selectedPlanDayIdx !== rd.planDayIndex) {
+      addOverride({
+        planId: plan.id,
+        type: 'jump',
+        targetDayIndex: selectedPlanDayIdx,
+        // Noon local time — converts back to the same local date in all timezones
+        appliedAt: `${rd.calendarDate}T12:00:00.000`,
+      })
+    }
+
     addEntry({
       planId: plan.id,
       calendarDate: rd.calendarDate,
-      planDayIndex: action === 'day_off' ? undefined : rd.planDayIndex,
+      planDayIndex: action === 'day_off' ? undefined : selectedPlanDayIdx,
       action,
     })
-    // Update selected to show new state
     setSelected(null)
   }
 
   function clearDate(rd: ResolvedDay) {
     if (!plan) return
+    removeRetroJumpForDate(plan.id, rd.calendarDate)
     removeEntry(plan.id, rd.calendarDate)
     setSelected(null)
   }
@@ -159,7 +177,8 @@ export function CalendarPage() {
         <DayDetailModal
           resolved={selected}
           today={today}
-          onLog={(action) => logForDate(selected, action)}
+          plan={plan}
+          onLog={(action, idx) => logForDate(selected, action, idx)}
           onClear={() => clearDate(selected)}
           onClose={() => setSelected(null)}
         />
@@ -171,17 +190,19 @@ export function CalendarPage() {
 function DayDetailModal({
   resolved,
   today,
+  plan,
   onLog,
   onClear,
   onClose,
 }: {
   resolved: ResolvedDay
   today: string
-  onLog: (action: ActionType) => void
+  plan: Plan
+  onLog: (action: ActionType, selectedPlanDayIdx: number) => void
   onClear: () => void
   onClose: () => void
 }) {
-  const { calendarDate, planDay, status, historyEntry } = resolved
+  const { calendarDate, planDayIndex, status, historyEntry } = resolved
   const isPast = calendarDate < today
   const isToday = calendarDate === today
   const isFuture = calendarDate > today
@@ -190,18 +211,62 @@ function DayDetailModal({
   const isComplete = status === 'past_complete' || status === 'today_complete'
   const isSkipped = status === 'past_skip' || status === 'today_skip'
 
-  const dateLabel = format(new Date(calendarDate + 'T00:00'), 'EEEE, MMMM d')
   const canLog = isPast || isToday
   const canDayOff = isToday || isFuture
+
+  // Which plan day the user wants to log — defaults to the computed rotation index
+  const [selectedIdx, setSelectedIdx] = useState(planDayIndex)
+  const selectedPlanDay = plan.days[selectedIdx]
+
+  const dateLabel = format(new Date(calendarDate + 'T00:00'), 'EEEE, MMMM d')
 
   return (
     <Modal title={dateLabel} onClose={onClose}>
       <div className="space-y-4">
-        {/* Workout info */}
-        {!isDayOff && (
+        {/* Workout picker — shown whenever the user can log */}
+        {canLog && (
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">
+              Which workout?
+            </p>
+            <div className="space-y-1 max-h-52 overflow-y-auto pr-0.5">
+              {plan.days.map((day, idx) => (
+                <button
+                  key={day.id}
+                  onClick={() => setSelectedIdx(idx)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                    selectedIdx === idx
+                      ? 'bg-sky-500/15 border-sky-500/50'
+                      : 'bg-slate-700/60 border-slate-700 hover:border-slate-600'
+                  }`}
+                >
+                  <span className={`w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${
+                    selectedIdx === idx ? 'bg-sky-500 text-white' : 'bg-slate-600 text-slate-300'
+                  }`}>
+                    {idx + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium truncate ${selectedIdx === idx ? 'text-sky-300' : 'text-slate-300'}`}>
+                      {day.label}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {day.slots.map(s => s.name).join(' + ')}
+                    </p>
+                  </div>
+                  {selectedIdx === idx && (
+                    <CheckCircle2 size={14} className="flex-shrink-0 text-sky-400" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Static workout details for future days (no picker shown there) */}
+        {!canLog && (
           <div className="space-y-3">
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{planDay.label}</p>
-            {planDay.slots.map((slot, i) => (
+            <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{resolved.planDay.label}</p>
+            {resolved.planDay.slots.map((slot, i) => (
               <div key={slot.id} className={i > 0 ? 'pt-3 border-t border-slate-700' : ''}>
                 <WorkoutBadge type={slot.type} />
                 <p className="text-sm font-medium text-slate-200 mt-1">{slot.name}</p>
@@ -213,6 +278,20 @@ function DayDetailModal({
                   {slot.isDeload && <span className="text-yellow-400">Deload</span>}
                 </div>
                 {slot.notes && <p className="text-xs text-slate-500 italic mt-1">{slot.notes}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Selected workout details shown below the picker for past/today */}
+        {canLog && selectedPlanDay && (
+          <div className="space-y-1.5 px-1">
+            {selectedPlanDay.slots.map((slot, i) => (
+              <div key={slot.id} className={`flex items-center gap-2 ${i > 0 ? 'pt-1.5 border-t border-slate-700/50' : ''}`}>
+                <WorkoutBadge type={slot.type} size="sm" />
+                <span className="text-xs text-slate-300 truncate">{slot.name}</span>
+                {slot.targetDistance && <span className="text-xs text-slate-500 ml-auto flex-shrink-0">{slot.targetDistance} mi</span>}
+                {slot.targetTime && !slot.targetDistance && <span className="text-xs text-slate-500 ml-auto flex-shrink-0">{slot.targetTime} min</span>}
               </div>
             ))}
           </div>
@@ -249,7 +328,6 @@ function DayDetailModal({
 
         {/* Log actions */}
         <div className="space-y-2">
-          {/* Past/today: can log complete or skip */}
           {canLog && (
             <>
               <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">
@@ -257,13 +335,13 @@ function DayDetailModal({
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => onLog('complete')}
+                  onClick={() => onLog('complete', selectedIdx)}
                   className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors active:scale-95"
                 >
                   <CheckCircle2 size={16} /> Complete
                 </button>
                 <button
-                  onClick={() => onLog('skip')}
+                  onClick={() => onLog('skip', selectedIdx)}
                   className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-sm font-medium transition-colors active:scale-95"
                 >
                   <SkipForward size={16} /> Skip
@@ -272,10 +350,9 @@ function DayDetailModal({
             </>
           )}
 
-          {/* Day off: available for today + future */}
           {canDayOff && !isDayOff && (
             <button
-              onClick={() => onLog('day_off')}
+              onClick={() => onLog('day_off', selectedIdx)}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium transition-colors active:scale-95"
             >
               <Coffee size={16} /> Mark Day Off

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { format } from 'date-fns'
 import type { HistoryEntry, OverrideEntry, ActionType, OverrideType, WorkoutType } from '../types'
 import { nanoid } from '../engine/rotationEngine'
 
@@ -11,8 +12,9 @@ interface HistoryState {
     payload: Omit<HistoryEntry, 'id' | 'createdAt'>,
   ) => void
   updateEntryNotes: (id: string, notes: string) => void
+  /** appliedAt defaults to now; pass an ISO string to back-date (e.g. retroactive calendar edits) */
   addOverride: (
-    payload: Omit<OverrideEntry, 'id' | 'appliedAt'>,
+    payload: Omit<OverrideEntry, 'id' | 'appliedAt'> & { appliedAt?: string },
   ) => void
 
   // Convenience action wrappers
@@ -34,6 +36,13 @@ interface HistoryState {
       delta?: number
     },
   ) => void
+
+  /**
+   * Remove any `jump` overrides whose local date matches calendarDate.
+   * Called before writing a retroactive calendar entry so stale jump overrides
+   * don't accumulate.
+   */
+  removeRetroJumpForDate: (planId: string, calendarDate: string) => void
 
   updateEntryAction: (planId: string, calendarDate: string, action: ActionType) => void
   clearPlanHistory: (planId: string) => void
@@ -69,10 +78,11 @@ export const useHistoryStore = create<HistoryState>()(
       },
 
       addOverride(payload) {
+        const { appliedAt, ...rest } = payload
         const override: OverrideEntry = {
           id: nanoid(),
-          appliedAt: new Date().toISOString(),
-          ...payload,
+          appliedAt: appliedAt ?? new Date().toISOString(),
+          ...rest,
         }
         set(s => ({ overrides: [...s.overrides, override] }))
       },
@@ -105,6 +115,16 @@ export const useHistoryStore = create<HistoryState>()(
               ? { ...e, action, planDayIndex: action === 'day_off' ? undefined : e.planDayIndex }
               : e,
           ),
+        }))
+      },
+
+      removeRetroJumpForDate(planId, calendarDate) {
+        set(s => ({
+          overrides: s.overrides.filter(o => {
+            if (o.planId !== planId || o.type !== 'jump') return true
+            const ovLocalDate = format(new Date(o.appliedAt), 'yyyy-MM-dd')
+            return ovLocalDate !== calendarDate
+          }),
         }))
       },
 
