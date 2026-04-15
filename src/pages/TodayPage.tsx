@@ -113,15 +113,7 @@ export function TodayPage() {
   }
 
   function handleSkip() {
-    if (!todayResolved) return
-    actions.skip(todayResolved.planDayIndex)
-    // Store a minimal skipped outcome
-    const outcome: WorkoutOutcome = {
-      workoutInstanceId: instanceId,
-      completionState: 'skipped',
-      completedAt: new Date().toISOString(),
-    }
-    useOutcomeStore.getState().setOutcome(outcome)
+    actions.advance()
   }
 
   function handleDayOff() {

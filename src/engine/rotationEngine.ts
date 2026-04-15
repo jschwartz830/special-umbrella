@@ -126,9 +126,10 @@ export function getUpcomingDays(
   let pointer = computeCurrentDayIndex(plan, entries, overrides, today)
   pointer = applyOverridesForDate(pointer, sortedOverrides, today, plan.days.length)
 
-  // If today is already resolved, advance for tomorrow
+  // Advance pointer for tomorrow's projection — always, unless today has an
+  // explicit day_off entry (which holds the rotation in place).
   const todayEntry = entries.find(e => e.calendarDate === today)
-  if (todayEntry && (todayEntry.action === 'complete' || todayEntry.action === 'skip')) {
+  if (todayEntry?.action !== 'day_off') {
     pointer = mod(pointer + 1, plan.days.length)
   }
 
