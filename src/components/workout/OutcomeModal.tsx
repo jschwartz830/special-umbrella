@@ -17,6 +17,7 @@ import type {
 } from '../../modules/workout-outcomes/types'
 import { derivePaceSecondsPerMile, formatPace } from '../../modules/workout-outcomes/types'
 import { isRunType } from '../../modules/workout-metadata/types'
+import { makeWorkoutInstanceId } from '../../store/outcomeStore'
 
 interface Props {
   planId: string
@@ -104,10 +105,6 @@ export function OutcomeModal({
       ? derivePaceSecondsPerMile(dist, dur)
       : null
 
-  function buildWorkoutInstanceId() {
-    return `${planId}_${calendarDate}`
-  }
-
   function handleConfirm() {
     const runActual: RunWorkoutActual | null = hasRun
       ? {
@@ -119,7 +116,7 @@ export function OutcomeModal({
       : null
 
     const outcome: WorkoutOutcome = {
-      workoutInstanceId: buildWorkoutInstanceId(),
+      workoutInstanceId: makeWorkoutInstanceId(planId, calendarDate),
       completionState,
       completedAt: new Date().toISOString(),
       durationActualMin: parseFloat(durationMin) || null,
