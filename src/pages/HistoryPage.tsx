@@ -34,6 +34,7 @@ export function HistoryPage() {
   const updateAction = useHistoryStore(s => s.updateEntryAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
   const outcomes = useOutcomeStore(s => s.outcomes)
+  const updateOutcomeNotes = useOutcomeStore(s => s.updateOutcomeNotes)
 
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
@@ -64,6 +65,9 @@ export function HistoryPage() {
   function saveAndClose() {
     if (!editingEntry) return
     updateNotes(editingEntry.id, notesText)
+    // Keep outcome.notes in sync so the OutcomeModal shows current notes if reopened
+    const instanceId = makeWorkoutInstanceId(editingEntry.planId, editingEntry.calendarDate)
+    updateOutcomeNotes(instanceId, notesText)
     setEditingEntry(null)
   }
 
