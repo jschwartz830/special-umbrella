@@ -33,6 +33,12 @@ interface OutcomeState {
    */
   updateOutcomeNotes: (workoutInstanceId: string, notes: string) => void
 
+  /**
+   * Merge a partial update into an existing outcome, or create a new one.
+   * Used by the history editor to save effort, duration, run actuals, etc.
+   */
+  updateOutcome: (workoutInstanceId: string, patch: Partial<Omit<WorkoutOutcome, 'workoutInstanceId'>>) => void
+
   /** Remove all outcomes associated with a plan (called when plan is cleared) */
   clearPlanOutcomes: (planId: string) => void
 }
@@ -95,6 +101,32 @@ export const useOutcomeStore = create<OutcomeState>()(
             outcomes: {
               ...s.outcomes,
               [workoutInstanceId]: { ...existing, notes: notes || null },
+            },
+          }
+        })
+      },
+
+      updateOutcome(workoutInstanceId, patch) {
+        set(s => {
+          const existing = s.outcomes[workoutInstanceId]
+          if (existing) {
+            return {
+              outcomes: {
+                ...s.outcomes,
+                [workoutInstanceId]: { ...existing, ...patch },
+              },
+            }
+          }
+          // No existing outcome — create one from scratch
+          return {
+            outcomes: {
+              ...s.outcomes,
+              [workoutInstanceId]: {
+                workoutInstanceId,
+                completionState: 'completed',
+                completedAt: new Date().toISOString(),
+                ...patch,
+              } as WorkoutOutcome,
             },
           }
         })
