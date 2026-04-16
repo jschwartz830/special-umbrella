@@ -36,29 +36,32 @@ export function buildMonthGrid(
 
   const allDays = eachDayOfInterval({ start: gridStart, end: gridEnd })
 
-  // Get resolved days for the entire grid range if we have an active plan
+  // Get resolved days for the entire grid range if we have an active plan.
+  // Clamp fromDate to plan.startDate so dates before the plan began are left
+  // without a resolvedDay (the calendar renders them as neutral/inactive cells).
   let resolvedMap = new Map<string, ResolvedDay>()
   if (plan) {
     const planEntries = entries.filter(e => e.planId === plan.id)
     const planOverrides = overrides.filter(o => o.planId === plan.id)
-    const fromDate = format(gridStart, 'yyyy-MM-dd')
+    const rawFromDate = format(gridStart, 'yyyy-MM-dd')
     const toDate = format(gridEnd, 'yyyy-MM-dd')
 
-    // For future days (after today), generate projection
-    const resolvedDays = getResolvedDaysRange(
-      plan,
-      planEntries,
-      planOverrides,
-      today,
-      fromDate,
-      toDate,
-    )
-    for (const rd of resolvedDays) {
-      resolvedMap.set(rd.calendarDate, rd)
-    }
+    // Only fetch days the plan has actually started for — skip pre-start dates
+    const fromDate = rawFromDate < plan.startDate ? plan.startDate : rawFromDate
 
-    // Fill future days beyond what getResolvedDaysRange covers
-    // (it handles past+today+future via status logic, so this is already done)
+    if (fromDate <= toDate) {
+      const resolvedDays = getResolvedDaysRange(
+        plan,
+        planEntries,
+        planOverrides,
+        today,
+        fromDate,
+        toDate,
+      )
+      for (const rd of resolvedDays) {
+        resolvedMap.set(rd.calendarDate, rd)
+      }
+    }
   }
 
   const weeks: CalendarWeek[] = []

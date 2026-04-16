@@ -260,19 +260,20 @@ describe('getResolvedDaysRange', () => {
   })
 
   describe('edge case: fromDate before plan.startDate', () => {
-    it('shows past_unlogged for dates before plan.startDate (known limitation)', () => {
-      // The plan starts on Jan 10, but the calendar grid includes Jan 1–9.
-      // These dates are before the plan started, but the engine currently shows
-      // them as past_unlogged rather than excluding them.
+    it('shows past_unlogged for dates before plan.startDate when queried directly', () => {
+      // getResolvedDaysRange itself does not filter by plan.startDate — it starts
+      // at startDayIndex and processes whatever date range is given. When the
+      // range includes dates before plan.startDate, those days are returned with
+      // status=past_unlogged (no entry → unlogged). Callers like buildMonthGrid
+      // are responsible for not passing dates before plan.startDate.
       const plan = makePlan(4, { startDate: '2026-01-10' })
       const result = getResolvedDaysRange(
         plan, [], [], '2026-01-15',
         '2026-01-01', // before startDate
         '2026-01-09',
       )
-      // All 9 days before startDate show as past_unlogged
+      // All 9 days come back as past_unlogged at startDayIndex
       expect(result.every(r => r.status === 'past_unlogged')).toBe(true)
-      // And all point to startDayIndex (day 0), showing the wrong planDay
       expect(result.every(r => r.planDayIndex === 0)).toBe(true)
     })
   })
@@ -313,12 +314,25 @@ describe('buildMonthGrid', () => {
     expect(todayCells[0].date).toBe(today)
   })
 
-  it('attaches resolvedDay to cells when plan is provided', () => {
-    const plan = makePlan(4)
+  it('attaches resolvedDay to cells on or after plan.startDate', () => {
+    // plan.startDate = '2026-01-01'. The Jan grid starts Dec 28, 2025 (Sunday).
+    // Dec 28–31 are before the plan start → no resolvedDay.
+    // Jan 1–31 are on or after start → resolvedDay present.
+    const plan = makePlan(4) // startDate = '2026-01-01'
     const weeks = buildMonthGrid(2026, 0, plan, [], [], '2026-01-15')
     const allCells = weeks.flat()
-    // Every cell should have a resolvedDay (since the plan is active)
-    expect(allCells.every(c => c.resolvedDay !== undefined)).toBe(true)
+    const preStart = allCells.filter(c => c.date < plan.startDate)
+    const postStart = allCells.filter(c => c.date >= plan.startDate)
+    expect(preStart.every(c => c.resolvedDay === undefined)).toBe(true)
+    expect(postStart.every(c => c.resolvedDay !== undefined)).toBe(true)
+  })
+
+  it('leaves all cells without resolvedDay when plan starts after the entire month', () => {
+    // Plan starts Feb 1, viewing January → no resolved days for any cell
+    const plan = makePlan(4, { startDate: '2026-02-01' })
+    const weeks = buildMonthGrid(2026, 0, plan, [], [], '2026-01-15')
+    const allCells = weeks.flat()
+    expect(allCells.every(c => c.resolvedDay === undefined)).toBe(true)
   })
 
   it('leaves resolvedDay undefined when no plan is provided', () => {
