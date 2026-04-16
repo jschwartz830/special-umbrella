@@ -110,7 +110,8 @@ export function TodayPage() {
   }
 
   function handleSkip() {
-    actions.advance()
+    if (!todayResolved) return
+    actions.skip(todayResolved.planDayIndex)
   }
 
   function handleDayOff() {
