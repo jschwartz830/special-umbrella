@@ -1,0 +1,286 @@
+/**
+ * Tests for historyStore business logic.
+ *
+ * The persist middleware is mocked as a pass-through so the store works
+ * in a Node test environment without localStorage.
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+
+// Mock zustand/middleware before any store imports so the store
+// initialises without persistence.
+vi.mock('zustand/middleware', () => ({
+  persist: (fn: unknown) => fn,
+}))
+
+// eslint-disable-next-line import/first
+import { useHistoryStore } from '../historyStore'
+import type { HistoryEntry, OverrideEntry } from '../../types'
+
+// ── Fixtures ──────────────────────────────────────────────────────────────────
+
+function makeEntry(
+  calendarDate: string,
+  action: 'complete' | 'skip' | 'day_off',
+  opts: Partial<HistoryEntry> = {},
+): Omit<HistoryEntry, 'id' | 'createdAt'> {
+  return {
+    planId: 'plan-1',
+    calendarDate,
+    planDayIndex: action === 'day_off' ? undefined : 0,
+    action,
+    ...opts,
+  }
+}
+
+function makeOverride(
+  appliedAt: string,
+  type: OverrideEntry['type'],
+  opts: Partial<OverrideEntry> = {},
+): Omit<OverrideEntry, 'id' | 'appliedAt'> & { appliedAt?: string } {
+  return {
+    planId: 'plan-1',
+    type,
+    appliedAt,
+    ...opts,
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function getState() {
+  return useHistoryStore.getState()
+}
+
+// ── Reset between tests ───────────────────────────────────────────────────────
+
+beforeEach(() => {
+  useHistoryStore.setState({ entries: [], overrides: [] })
+})
+
+// ── addEntry ──────────────────────────────────────────────────────────────────
+
+describe('addEntry', () => {
+  it('adds an entry to an empty store', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].action).toBe('complete')
+    expect(getState().entries[0].calendarDate).toBe('2026-01-01')
+  })
+
+  it('assigns a unique id and createdAt timestamp', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))
+    const e = getState().entries[0]
+    expect(typeof e.id).toBe('string')
+    expect(e.id.length).toBeGreaterThan(0)
+    expect(typeof e.createdAt).toBe('string')
+  })
+
+  it('deduplicates: a second entry for the same (planId, calendarDate) replaces the first', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 0 }))
+    getState().addEntry(makeEntry('2026-01-01', 'skip', { planDayIndex: 0 }))
+    const entries = getState().entries
+    expect(entries).toHaveLength(1)
+    expect(entries[0].action).toBe('skip')
+  })
+
+  it('keeps entries for different calendar dates', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))
+    getState().addEntry(makeEntry('2026-01-02', 'skip'))
+    expect(getState().entries).toHaveLength(2)
+  })
+
+  it('keeps entries for different plans on the same date', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planId: 'plan-a' }))
+    getState().addEntry(makeEntry('2026-01-01', 'skip', { planId: 'plan-b' }))
+    expect(getState().entries).toHaveLength(2)
+  })
+})
+
+// ── logAction ─────────────────────────────────────────────────────────────────
+
+describe('logAction', () => {
+  it('stores planDayIndex for complete entries', () => {
+    getState().logAction('plan-1', '2026-01-01', 2, 'complete')
+    expect(getState().entries[0].planDayIndex).toBe(2)
+  })
+
+  it('stores planDayIndex for skip entries', () => {
+    getState().logAction('plan-1', '2026-01-01', 3, 'skip')
+    expect(getState().entries[0].planDayIndex).toBe(3)
+  })
+
+  it('stores undefined planDayIndex for day_off entries', () => {
+    getState().logAction('plan-1', '2026-01-01', 5, 'day_off')
+    expect(getState().entries[0].planDayIndex).toBeUndefined()
+  })
+
+  it('stores notes when provided', () => {
+    getState().logAction('plan-1', '2026-01-01', 0, 'complete', 'Great session')
+    expect(getState().entries[0].notes).toBe('Great session')
+  })
+
+  it('stores undefined notes when not provided', () => {
+    getState().logAction('plan-1', '2026-01-01', 0, 'complete')
+    expect(getState().entries[0].notes).toBeUndefined()
+  })
+})
+
+// ── updateEntryAction ─────────────────────────────────────────────────────────
+
+describe('updateEntryAction', () => {
+  it('changes action from complete to skip', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 1 }))
+    const id = getState().entries[0].id
+    getState().updateEntryAction('plan-1', '2026-01-01', 'skip')
+    const updated = getState().entries.find(e => e.id === id)!
+    expect(updated.action).toBe('skip')
+  })
+
+  it('preserves existing planDayIndex when changing complete → skip without providing index', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 3 }))
+    getState().updateEntryAction('plan-1', '2026-01-01', 'skip')
+    expect(getState().entries[0].planDayIndex).toBe(3)
+  })
+
+  it('sets planDayIndex to undefined when changing to day_off', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 2 }))
+    getState().updateEntryAction('plan-1', '2026-01-01', 'day_off')
+    expect(getState().entries[0].planDayIndex).toBeUndefined()
+    expect(getState().entries[0].action).toBe('day_off')
+  })
+
+  it('restores planDayIndex when changing day_off → complete with provided index', () => {
+    // First, create a day_off entry (planDayIndex=undefined)
+    getState().addEntry(makeEntry('2026-01-01', 'day_off'))
+    expect(getState().entries[0].planDayIndex).toBeUndefined()
+
+    // Change to complete and provide the planDayIndex
+    getState().updateEntryAction('plan-1', '2026-01-01', 'complete', 4)
+    expect(getState().entries[0].action).toBe('complete')
+    expect(getState().entries[0].planDayIndex).toBe(4)
+  })
+
+  it('restores planDayIndex when changing day_off → skip with provided index', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'day_off'))
+    getState().updateEntryAction('plan-1', '2026-01-01', 'skip', 2)
+    expect(getState().entries[0].action).toBe('skip')
+    expect(getState().entries[0].planDayIndex).toBe(2)
+  })
+
+  it('uses provided planDayIndex over existing when explicitly passed', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 1 }))
+    getState().updateEntryAction('plan-1', '2026-01-01', 'complete', 7)
+    expect(getState().entries[0].planDayIndex).toBe(7)
+  })
+
+  it('does not affect entries on different dates', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 0 }))
+    getState().addEntry(makeEntry('2026-01-02', 'complete', { planDayIndex: 1 }))
+    getState().updateEntryAction('plan-1', '2026-01-01', 'skip')
+    expect(getState().entries.find(e => e.calendarDate === '2026-01-02')!.action).toBe('complete')
+  })
+
+  it('does not affect entries for different plans', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planId: 'plan-1', planDayIndex: 0 }))
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planId: 'plan-2', planDayIndex: 0 }))
+    getState().updateEntryAction('plan-1', '2026-01-01', 'skip')
+    expect(getState().entries.find(e => e.planId === 'plan-2')!.action).toBe('complete')
+  })
+})
+
+// ── removeRetroJumpForDate ────────────────────────────────────────────────────
+
+describe('removeRetroJumpForDate', () => {
+  it('removes a jump override whose local date matches calendarDate', () => {
+    // Use a mid-day UTC time so the date is the same in all common timezones
+    getState().addOverride(makeOverride('2026-01-15T12:00:00.000Z', 'jump', { targetDayIndex: 2 }))
+    expect(getState().overrides).toHaveLength(1)
+
+    getState().removeRetroJumpForDate('plan-1', '2026-01-15')
+    expect(getState().overrides).toHaveLength(0)
+  })
+
+  it('keeps a jump override whose date does NOT match calendarDate', () => {
+    getState().addOverride(makeOverride('2026-01-14T12:00:00.000Z', 'jump', { targetDayIndex: 2 }))
+    getState().removeRetroJumpForDate('plan-1', '2026-01-15')
+    expect(getState().overrides).toHaveLength(1)
+  })
+
+  it('only removes jump type overrides, leaves advance/go_back intact', () => {
+    getState().addOverride(makeOverride('2026-01-15T12:00:00.000Z', 'advance'))
+    getState().addOverride(makeOverride('2026-01-15T12:00:00.000Z', 'go_back'))
+    getState().addOverride(makeOverride('2026-01-15T12:00:00.000Z', 'jump', { targetDayIndex: 1 }))
+    expect(getState().overrides).toHaveLength(3)
+
+    getState().removeRetroJumpForDate('plan-1', '2026-01-15')
+    expect(getState().overrides).toHaveLength(2)
+    expect(getState().overrides.every(o => o.type !== 'jump')).toBe(true)
+  })
+
+  it('only removes overrides for the matching planId', () => {
+    getState().addOverride(makeOverride('2026-01-15T12:00:00.000Z', 'jump', { planId: 'plan-1', targetDayIndex: 0 }))
+    getState().addOverride(makeOverride('2026-01-15T12:00:00.000Z', 'jump', { planId: 'plan-2', targetDayIndex: 0 }))
+    getState().removeRetroJumpForDate('plan-1', '2026-01-15')
+    expect(getState().overrides).toHaveLength(1)
+    expect(getState().overrides[0].planId).toBe('plan-2')
+  })
+
+  it('removes all jump overrides for the same date (not just the first)', () => {
+    getState().addOverride(makeOverride('2026-01-15T10:00:00.000Z', 'jump', { targetDayIndex: 1 }))
+    getState().addOverride(makeOverride('2026-01-15T14:00:00.000Z', 'jump', { targetDayIndex: 2 }))
+    getState().removeRetroJumpForDate('plan-1', '2026-01-15')
+    expect(getState().overrides).toHaveLength(0)
+  })
+
+  it('is a no-op when there are no overrides', () => {
+    expect(() => {
+      getState().removeRetroJumpForDate('plan-1', '2026-01-15')
+    }).not.toThrow()
+    expect(getState().overrides).toHaveLength(0)
+  })
+})
+
+// ── removeEntry ───────────────────────────────────────────────────────────────
+
+describe('removeEntry', () => {
+  it('removes the entry matching (planId, calendarDate)', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))
+    getState().addEntry(makeEntry('2026-01-02', 'skip'))
+    getState().removeEntry('plan-1', '2026-01-01')
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].calendarDate).toBe('2026-01-02')
+  })
+
+  it('does not remove entries for different plans', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planId: 'plan-1' }))
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planId: 'plan-2' }))
+    getState().removeEntry('plan-1', '2026-01-01')
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].planId).toBe('plan-2')
+  })
+})
+
+// ── clearPlanHistory ──────────────────────────────────────────────────────────
+
+describe('clearPlanHistory', () => {
+  it('removes all entries and overrides for a plan', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planId: 'plan-1' }))
+    getState().addEntry(makeEntry('2026-01-02', 'skip', { planId: 'plan-1' }))
+    getState().addOverride(makeOverride('2026-01-01T12:00:00Z', 'advance', { planId: 'plan-1' }))
+    getState().clearPlanHistory('plan-1')
+    expect(getState().entries).toHaveLength(0)
+    expect(getState().overrides).toHaveLength(0)
+  })
+
+  it('keeps history for other plans intact', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planId: 'plan-1' }))
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planId: 'plan-2' }))
+    getState().addOverride(makeOverride('2026-01-01T12:00:00Z', 'advance', { planId: 'plan-1' }))
+    getState().addOverride(makeOverride('2026-01-01T12:00:00Z', 'advance', { planId: 'plan-2' }))
+    getState().clearPlanHistory('plan-1')
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].planId).toBe('plan-2')
+    expect(getState().overrides).toHaveLength(1)
+    expect(getState().overrides[0].planId).toBe('plan-2')
+  })
+})
