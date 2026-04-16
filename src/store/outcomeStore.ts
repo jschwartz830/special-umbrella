@@ -27,6 +27,12 @@ interface OutcomeState {
   logOutcomeWithProgression: (outcome: WorkoutOutcome, slot: WorkoutSlot) => void
 
   /**
+   * Patch an existing outcome record with arbitrary fields.
+   * Creates a new outcome if none exists for the given instanceId.
+   */
+  updateOutcome: (workoutInstanceId: string, patch: Partial<WorkoutOutcome>) => void
+
+  /**
    * Patch the notes field on an existing outcome record.
    * Called by the history editor so outcome.notes stays in sync with HistoryEntry.notes.
    * No-op when no outcome exists for the given instanceId.
@@ -85,6 +91,31 @@ export const useOutcomeStore = create<OutcomeState>()(
           prevState,
         )
         get().setProgressionState(nextState)
+      },
+
+      updateOutcome(workoutInstanceId, patch) {
+        set(s => {
+          const existing = s.outcomes[workoutInstanceId]
+          if (existing) {
+            return {
+              outcomes: {
+                ...s.outcomes,
+                [workoutInstanceId]: { ...existing, ...patch },
+              },
+            }
+          }
+          return {
+            outcomes: {
+              ...s.outcomes,
+              [workoutInstanceId]: {
+                workoutInstanceId,
+                completionState: 'completed',
+                completedAt: new Date().toISOString(),
+                ...patch,
+              } as WorkoutOutcome,
+            },
+          }
+        })
       },
 
       updateOutcomeNotes(workoutInstanceId, notes) {

@@ -13,6 +13,7 @@ import {
   Ruler,
   Zap,
   Timer,
+  Clock3,
 } from 'lucide-react'
 import { useHistoryStore } from '../store/historyStore'
 import { usePlanStore } from '../store/planStore'
@@ -20,12 +21,23 @@ import { useOutcomeStore, makeWorkoutInstanceId } from '../store/outcomeStore'
 import { Modal } from '../components/shared/Modal'
 import { DifficultyBadge } from '../components/workout/DifficultyBadge'
 import { EmptyState } from '../components/shared/EmptyState'
-import type { ActionType, HistoryEntry } from '../types'
-import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+import type { HistoryEntry } from '../types'
+import type { WorkoutOutcome, WorkoutCompletionState, PerceivedEffort } from '../modules/workout-outcomes/types'
 import {
   COMPLETION_STATE_LABELS,
+  completionStateToAction,
   formatPace,
+  derivePaceSecondsPerMile,
 } from '../modules/workout-outcomes/types'
+import { isRunType } from '../modules/workout-metadata/types'
+
+const EFFORT_LABELS: Record<PerceivedEffort, string> = {
+  1: 'Very Easy',
+  2: 'Easy',
+  3: 'Moderate',
+  4: 'Hard',
+  5: 'Max Effort',
+}
 
 export function HistoryPage() {
   const plans = usePlanStore(s => s.plans)
@@ -34,20 +46,24 @@ export function HistoryPage() {
   const updateAction = useHistoryStore(s => s.updateEntryAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
   const outcomes = useOutcomeStore(s => s.outcomes)
+  const updateOutcome = useOutcomeStore(s => s.updateOutcome)
   const updateOutcomeNotes = useOutcomeStore(s => s.updateOutcomeNotes)
 
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
+  const [completionStateEdit, setCompletionStateEdit] = useState<WorkoutCompletionState | null>(null)
+  const [effortEdit, setEffortEdit] = useState<PerceivedEffort | null>(null)
+  const [durationEdit, setDurationEdit] = useState('')
+  const [distanceEdit, setDistanceEdit] = useState('')
+  const [runDurationEdit, setRunDurationEdit] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [filterPlanId, setFilterPlanId] = useState<string | 'all'>('all')
 
-  // Plans that actually have history entries (for the filter dropdown)
   const plansWithHistory = Object.values(plans).filter(p =>
     entries.some(e => e.planId === p.id),
   )
   const showPlanFilter = plansWithHistory.length > 1
 
-  // Sort entries newest first, then apply plan filter
   const sorted = [...entries]
     .sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
     .filter(e => filterPlanId === 'all' || e.planId === filterPlanId)
@@ -58,23 +74,68 @@ export function HistoryPage() {
   }
 
   function openEdit(entry: HistoryEntry) {
+    const outcome = getOutcome(entry)
     setNotesText(entry.notes ?? '')
+    if (entry.action === 'complete') {
+      const cs = outcome?.completionState
+      setCompletionStateEdit(
+        cs === 'partially_completed' ? 'partially_completed' : 'completed',
+      )
+    } else if (entry.action === 'skip') {
+      setCompletionStateEdit(null)
+    } else {
+      setCompletionStateEdit(null)
+    }
+    setEffortEdit(outcome?.perceivedEffort ?? null)
+    setDurationEdit(outcome?.durationActualMin?.toString() ?? '')
+    setDistanceEdit(outcome?.runActual?.actualDistanceMiles?.toString() ?? '')
+    setRunDurationEdit(outcome?.runActual?.actualDurationMin?.toString() ?? '')
     setEditingEntry(entry)
   }
 
   function saveAndClose() {
     if (!editingEntry) return
-    updateNotes(editingEntry.id, notesText)
-    // Keep outcome.notes in sync so the OutcomeModal shows current notes if reopened
-    const instanceId = makeWorkoutInstanceId(editingEntry.planId, editingEntry.calendarDate)
-    updateOutcomeNotes(instanceId, notesText)
-    setEditingEntry(null)
-  }
 
-  function changeAction(action: ActionType) {
-    if (!editingEntry) return
-    updateAction(editingEntry.planId, editingEntry.calendarDate, action)
-    setEditingEntry(prev => prev ? { ...prev, action } : null)
+    const instanceId = makeWorkoutInstanceId(editingEntry.planId, editingEntry.calendarDate)
+    const plan = plans[editingEntry.planId]
+    const planDay = editingEntry.planDayIndex !== undefined
+      ? plan?.days[editingEntry.planDayIndex]
+      : undefined
+    const hasRun = planDay?.slots.some(s => isRunType(s.type)) ?? false
+
+    updateNotes(editingEntry.id, notesText)
+
+    if (completionStateEdit != null) {
+      const newAction = completionStateToAction(completionStateEdit)
+      if (newAction !== editingEntry.action) {
+        updateAction(editingEntry.planId, editingEntry.calendarDate, newAction, editingEntry.planDayIndex)
+      }
+
+      const dist = parseFloat(distanceEdit)
+      const runDur = parseFloat(runDurationEdit)
+      const runActual = hasRun ? {
+        actualDistanceMiles: isFinite(dist) && dist > 0 ? dist : null,
+        actualDurationMin: isFinite(runDur) && runDur > 0 ? runDur : null,
+        averagePaceSecondsPerMile:
+          isFinite(dist) && dist > 0 && isFinite(runDur) && runDur > 0
+            ? derivePaceSecondsPerMile(dist, runDur)
+            : null,
+        completedAsPlanned: null,
+      } : null
+
+      const durMin = parseFloat(durationEdit)
+      updateOutcome(instanceId, {
+        completionState: completionStateEdit,
+        perceivedEffort: effortEdit,
+        durationActualMin: isFinite(durMin) && durMin > 0 ? durMin : null,
+        notes: notesText.trim() || null,
+        ...(hasRun ? { runActual } : {}),
+      })
+    } else {
+      updateOutcomeNotes(instanceId, notesText)
+    }
+
+    setEditingEntry(null)
   }
 
   function deleteEntry(entry: HistoryEntry) {
@@ -133,12 +194,16 @@ export function HistoryPage() {
           const outcome = getOutcome(entry)
           const completionState = outcome?.completionState ?? null
 
-          // Icon and colour based on richer completion state if available
-          const actionIcon = completionState === 'partially_completed'
+          // Only apply completionState to the display when it's consistent with entry.action
+          const displayState = completionState && completionStateToAction(completionState) === entry.action
+            ? completionState
+            : null
+
+          const actionIcon = displayState === 'partially_completed'
             ? <MinusCircle size={18} className="text-yellow-400" />
-            : completionState === 'deferred'
+            : displayState === 'deferred'
               ? <Pause size={18} className="text-purple-400" />
-              : completionState === 'swapped'
+              : displayState === 'swapped'
                 ? <Shuffle size={18} className="text-sky-400" />
                 : entry.action === 'complete'
                   ? <CheckCircle2 size={18} className="text-emerald-400" />
@@ -146,11 +211,11 @@ export function HistoryPage() {
                     ? <SkipForward size={18} className="text-slate-500" />
                     : <Coffee size={18} className="text-amber-400" />
 
-          const actionColor = completionState === 'partially_completed'
+          const actionColor = displayState === 'partially_completed'
             ? 'text-yellow-400'
-            : completionState === 'deferred'
+            : displayState === 'deferred'
               ? 'text-purple-400'
-              : completionState === 'swapped'
+              : displayState === 'swapped'
                 ? 'text-sky-400'
                 : entry.action === 'complete'
                   ? 'text-emerald-400'
@@ -158,9 +223,11 @@ export function HistoryPage() {
                     ? 'text-slate-400'
                     : 'text-amber-400'
 
-          const stateLabel = completionState
-            ? COMPLETION_STATE_LABELS[completionState]
-            : entry.action.replace('_', ' ')
+          const stateLabel = displayState
+            ? COMPLETION_STATE_LABELS[displayState]
+            : entry.action === 'complete'
+              ? 'Completed'
+              : entry.action.replace('_', ' ')
 
           return (
             <div
@@ -181,7 +248,6 @@ export function HistoryPage() {
                     </div>
                   </div>
 
-                  {/* Slot name + plan name + difficulty badges */}
                   {planDay && (
                     <div className="mt-1 ml-6">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -195,10 +261,8 @@ export function HistoryPage() {
                     </div>
                   )}
 
-                  {/* Outcome actuals */}
                   {outcome && (
                     <div className="mt-2 ml-6 space-y-1">
-                      {/* Effort */}
                       {outcome.perceivedEffort != null && (
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-slate-500">Effort:</span>
@@ -224,7 +288,6 @@ export function HistoryPage() {
                         </div>
                       )}
 
-                      {/* Run actuals */}
                       {outcome.runActual && (
                         <div className="flex flex-wrap gap-3 text-xs text-slate-400">
                           {outcome.runActual.actualDistanceMiles != null && (
@@ -245,7 +308,6 @@ export function HistoryPage() {
                         </div>
                       )}
 
-                      {/* Duration actual (non-run) */}
                       {!outcome.runActual && outcome.durationActualMin != null && (
                         <p className="text-xs text-slate-500">
                           {outcome.durationActualMin} min
@@ -277,82 +339,193 @@ export function HistoryPage() {
       </div>
 
       {/* Edit modal */}
-      {editingEntry && (
-        <Modal
-          title={format(parseISO(editingEntry.calendarDate), 'EEE, MMM d, yyyy')}
-          onClose={saveAndClose}
-          footer={
-            <button
-              onClick={saveAndClose}
-              className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold transition-colors"
-            >
-              Save
-            </button>
-          }
-        >
-          <div className="space-y-4">
-            {/* Change action */}
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Status</p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => changeAction('complete')}
-                  className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
-                    editingEntry.action === 'complete'
-                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                      : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <CheckCircle2 size={16} />
-                  Complete
-                </button>
-                <button
-                  onClick={() => changeAction('skip')}
-                  className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
-                    editingEntry.action === 'skip'
-                      ? 'bg-slate-600 border-slate-500 text-slate-200'
-                      : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <SkipForward size={16} />
-                  Skip
-                </button>
-                <button
-                  onClick={() => changeAction('day_off')}
-                  className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
-                    editingEntry.action === 'day_off'
-                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
-                      : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  <Coffee size={16} />
-                  Day Off
-                </button>
+      {editingEntry && (() => {
+        const plan = plans[editingEntry.planId]
+        const planDay = editingEntry.planDayIndex !== undefined
+          ? plan?.days[editingEntry.planDayIndex]
+          : undefined
+        const hasRun = planDay?.slots.some(s => isRunType(s.type)) ?? false
+        const showOutcomeFields = completionStateEdit != null
+        const isSkipEntry = editingEntry.action === 'skip'
+        const isDayOffEntry = editingEntry.action === 'day_off'
+
+        const dist = parseFloat(distanceEdit)
+        const runDur = parseFloat(runDurationEdit)
+        const derivedPace =
+          isFinite(dist) && dist > 0 && isFinite(runDur) && runDur > 0
+            ? derivePaceSecondsPerMile(dist, runDur)
+            : null
+
+        return (
+          <Modal
+            title={format(parseISO(editingEntry.calendarDate), 'EEE, MMM d, yyyy')}
+            onClose={saveAndClose}
+            footer={
+              <button
+                onClick={saveAndClose}
+                className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold transition-colors"
+              >
+                Save
+              </button>
+            }
+          >
+            <div className="space-y-4">
+              {/* Status — only for complete and skip entries */}
+              {!isDayOffEntry && (
+                <div>
+                  <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">
+                    {isSkipEntry ? 'Change to' : 'Status'}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setCompletionStateEdit('completed')}
+                      className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+                        completionStateEdit === 'completed'
+                          ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                          : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <CheckCircle2 size={16} />
+                      Completed
+                    </button>
+                    <button
+                      onClick={() => setCompletionStateEdit('partially_completed')}
+                      className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-medium transition-colors ${
+                        completionStateEdit === 'partially_completed'
+                          ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400'
+                          : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <MinusCircle size={16} />
+                      Partial
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Outcome fields — shown when a completion state is selected */}
+              {showOutcomeFields && (
+                <>
+                  {/* Perceived effort */}
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">
+                      Perceived Effort
+                    </p>
+                    <div className="flex gap-1.5">
+                      {([1, 2, 3, 4, 5] as PerceivedEffort[]).map(e => (
+                        <button
+                          key={e}
+                          onClick={() => setEffortEdit(prev => prev === e ? null : e)}
+                          className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-colors ${
+                            effortEdit === e
+                              ? e <= 2
+                                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                                : e === 3
+                                  ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400'
+                                  : e === 4
+                                    ? 'bg-orange-500/20 border-orange-500/50 text-orange-400'
+                                    : 'bg-red-500/20 border-red-500/50 text-red-400'
+                              : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                    {effortEdit && (
+                      <p className="text-xs text-slate-500 mt-1 text-center">{EFFORT_LABELS[effortEdit]}</p>
+                    )}
+                  </div>
+
+                  {/* Duration */}
+                  {!hasRun && (
+                    <div>
+                      <label className="text-xs text-slate-500 uppercase tracking-wide font-medium block mb-2">
+                        <Clock3 size={11} className="inline mr-1" />
+                        Duration (min)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={durationEdit}
+                        onChange={e => setDurationEdit(e.target.value)}
+                        placeholder="Optional"
+                        className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      />
+                    </div>
+                  )}
+
+                  {/* Run actuals */}
+                  {hasRun && (
+                    <div className="space-y-3 border border-slate-700 rounded-xl p-3">
+                      <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">
+                        Run Actuals
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="space-y-1">
+                          <span className="flex items-center gap-1 text-xs text-slate-400">
+                            <Ruler size={11} /> Distance (mi)
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={distanceEdit}
+                            onChange={e => setDistanceEdit(e.target.value)}
+                            placeholder="0.0"
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="flex items-center gap-1 text-xs text-slate-400">
+                            <Timer size={11} /> Time (min)
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={runDurationEdit}
+                            onChange={e => setRunDurationEdit(e.target.value)}
+                            placeholder="0"
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          />
+                        </label>
+                      </div>
+                      {derivedPace != null && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-700/50 rounded-lg px-3 py-2">
+                          <Zap size={11} className="text-sky-400" />
+                          <span>Avg pace: <strong className="text-sky-300">{formatPace(derivedPace)}</strong></span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Notes */}
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Notes</p>
+                <textarea
+                  value={notesText}
+                  onChange={e => setNotesText(e.target.value)}
+                  placeholder="Add notes..."
+                  rows={3}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+                />
               </div>
-            </div>
 
-            {/* Notes */}
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Notes</p>
-              <textarea
-                value={notesText}
-                onChange={e => setNotesText(e.target.value)}
-                placeholder="Add notes..."
-                rows={3}
-                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
-              />
+              {/* Delete */}
+              <button
+                onClick={() => setConfirmDeleteId(editingEntry.id)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm font-medium transition-colors"
+              >
+                <Trash2 size={15} /> Delete entry
+              </button>
             </div>
-
-            {/* Delete */}
-            <button
-              onClick={() => setConfirmDeleteId(editingEntry.id)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm font-medium transition-colors"
-            >
-              <Trash2 size={15} /> Delete entry
-            </button>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        )
+      })()}
 
       {/* Delete confirm */}
       {confirmDeleteId && editingEntry && (

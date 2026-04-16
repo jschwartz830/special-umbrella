@@ -314,25 +314,27 @@ describe('buildMonthGrid', () => {
     expect(todayCells[0].date).toBe(today)
   })
 
-  it('attaches resolvedDay to cells on or after plan.startDate', () => {
+  it('attaches resolvedDay to all cells when a plan is present', () => {
     // plan.startDate = '2026-01-01'. The Jan grid starts Dec 28, 2025 (Sunday).
-    // Dec 28–31 are before the plan start → no resolvedDay.
-    // Jan 1–31 are on or after start → resolvedDay present.
+    // Pre-plan cells (Dec 28–31) now get resolvedDay too, with status 'past_unlogged'.
+    // Post-plan cells (Jan 1–31) also have resolvedDay present.
     const plan = makePlan(4) // startDate = '2026-01-01'
     const weeks = buildMonthGrid(2026, 0, plan, [], [], '2026-01-15')
     const allCells = weeks.flat()
     const preStart = allCells.filter(c => c.date < plan.startDate)
     const postStart = allCells.filter(c => c.date >= plan.startDate)
-    expect(preStart.every(c => c.resolvedDay === undefined)).toBe(true)
+    expect(preStart.every(c => c.resolvedDay !== undefined)).toBe(true)
+    expect(preStart.every(c => c.resolvedDay?.status === 'past_unlogged')).toBe(true)
     expect(postStart.every(c => c.resolvedDay !== undefined)).toBe(true)
   })
 
-  it('leaves all cells without resolvedDay when plan starts after the entire month', () => {
-    // Plan starts Feb 1, viewing January → no resolved days for any cell
+  it('still attaches resolvedDay when plan starts after the entire viewed month', () => {
+    // Plan starts Feb 1, viewing January — all cells get resolvedDay with past_unlogged or future
+    // status so the user can log retroactive workouts before the plan officially started.
     const plan = makePlan(4, { startDate: '2026-02-01' })
     const weeks = buildMonthGrid(2026, 0, plan, [], [], '2026-01-15')
     const allCells = weeks.flat()
-    expect(allCells.every(c => c.resolvedDay === undefined)).toBe(true)
+    expect(allCells.every(c => c.resolvedDay !== undefined)).toBe(true)
   })
 
   it('leaves resolvedDay undefined when no plan is provided', () => {

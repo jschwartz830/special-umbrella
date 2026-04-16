@@ -37,17 +37,12 @@ export function buildMonthGrid(
   const allDays = eachDayOfInterval({ start: gridStart, end: gridEnd })
 
   // Get resolved days for the entire grid range if we have an active plan.
-  // Clamp fromDate to plan.startDate so dates before the plan began are left
-  // without a resolvedDay (the calendar renders them as neutral/inactive cells).
   let resolvedMap = new Map<string, ResolvedDay>()
   if (plan) {
     const planEntries = entries.filter(e => e.planId === plan.id)
     const planOverrides = overrides.filter(o => o.planId === plan.id)
-    const rawFromDate = format(gridStart, 'yyyy-MM-dd')
+    const fromDate = format(gridStart, 'yyyy-MM-dd')
     const toDate = format(gridEnd, 'yyyy-MM-dd')
-
-    // Only fetch days the plan has actually started for — skip pre-start dates
-    const fromDate = rawFromDate < plan.startDate ? plan.startDate : rawFromDate
 
     if (fromDate <= toDate) {
       const resolvedDays = getResolvedDaysRange(

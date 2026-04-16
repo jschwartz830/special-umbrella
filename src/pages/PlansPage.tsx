@@ -16,7 +16,122 @@ import { useHistoryStore } from '../store/historyStore'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
-import type { Plan } from '../types'
+import type { Plan, HistoryEntry } from '../types'
+
+// ── PlanCard ─────────────────────────────────────────────────────────────────
+
+function PlanCard({
+  plan,
+  entries,
+  today,
+  onActivate,
+  onDeactivate,
+  onDuplicate,
+  onArchive,
+  onDelete,
+}: {
+  plan: Plan
+  entries: HistoryEntry[]
+  today: string
+  onActivate: (plan: Plan) => void
+  onDeactivate: () => void
+  onDuplicate: (id: string) => void
+  onArchive: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const navigate = useNavigate()
+  const isActive = plan.status === 'active'
+  const isArchived = plan.status === 'archived'
+  const planEntries = entries.filter(e => e.planId === plan.id)
+  const expired = isActive && isPlanExpired(plan, planEntries, today)
+
+  return (
+    <div
+      className={`rounded-xl border bg-slate-800/80 transition-colors ${
+        isActive ? 'border-sky-500/50' : 'border-slate-700/50'
+      }`}
+    >
+      <button
+        onClick={() => navigate(`/plans/${plan.id}/edit`)}
+        className="w-full text-left px-4 pt-4 pb-3"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold text-slate-200 truncate">{plan.name}</h3>
+              {isActive && !expired && (
+                <span className="flex-shrink-0 text-xs bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded-full font-medium">
+                  Active
+                </span>
+              )}
+              {expired && (
+                <span className="flex-shrink-0 text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-medium">
+                  Complete
+                </span>
+              )}
+            </div>
+            {plan.description && (
+              <p className="text-xs text-slate-500 mt-0.5 truncate">{plan.description}</p>
+            )}
+            <p className="text-xs text-slate-500 mt-1">
+              {plan.days.length} days · {plan.duration.value} {plan.duration.type}
+            </p>
+          </div>
+          <ChevronRight size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
+        </div>
+      </button>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 px-3 pb-3 border-t border-slate-700/50 pt-2 mt-0">
+        {!isArchived && (
+          <>
+            {isActive ? (
+              <button
+                onClick={onDeactivate}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white text-xs font-medium transition-colors"
+              >
+                <Pause size={12} /> Deactivate
+              </button>
+            ) : (
+              <button
+                onClick={() => onActivate(plan)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 text-xs font-medium transition-colors"
+              >
+                <Play size={12} /> Activate
+              </button>
+            )}
+          </>
+        )}
+        <button
+          onClick={() => onDuplicate(plan.id)}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white text-xs font-medium transition-colors"
+        >
+          <Copy size={12} /> Copy
+        </button>
+        {!isActive && (
+          <>
+            {!isArchived && (
+              <button
+                onClick={() => onArchive(plan.id)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white text-xs font-medium transition-colors"
+              >
+                <Archive size={12} /> Archive
+              </button>
+            )}
+            <button
+              onClick={() => onDelete(plan.id)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-medium transition-colors ml-auto"
+            >
+              <Trash2 size={12} />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── PlansPage ─────────────────────────────────────────────────────────────────
 
 export function PlansPage() {
   const navigate = useNavigate()
@@ -52,99 +167,9 @@ export function PlansPage() {
     setActivatingPlan(null)
   }
 
-  function PlanCard({ plan }: { plan: Plan }) {
-    const isActive = plan.status === 'active'
-    const isArchived = plan.status === 'archived'
-    const planEntries = entries.filter(e => e.planId === plan.id)
-    const expired = isActive && isPlanExpired(plan, planEntries, today)
-
-    return (
-      <div
-        className={`rounded-xl border bg-slate-800/80 transition-colors ${
-          isActive ? 'border-sky-500/50' : 'border-slate-700/50'
-        }`}
-      >
-        <button
-          onClick={() => navigate(`/plans/${plan.id}/edit`)}
-          className="w-full text-left px-4 pt-4 pb-3"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm font-semibold text-slate-200 truncate">{plan.name}</h3>
-                {isActive && !expired && (
-                  <span className="flex-shrink-0 text-xs bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded-full font-medium">
-                    Active
-                  </span>
-                )}
-                {expired && (
-                  <span className="flex-shrink-0 text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-medium">
-                    Complete
-                  </span>
-                )}
-              </div>
-              {plan.description && (
-                <p className="text-xs text-slate-500 mt-0.5 truncate">{plan.description}</p>
-              )}
-              <p className="text-xs text-slate-500 mt-1">
-                {plan.days.length} days · {plan.duration.value} {plan.duration.type}
-              </p>
-            </div>
-            <ChevronRight size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
-          </div>
-        </button>
-
-        {/* Actions */}
-        <div className="flex items-center gap-1 px-3 pb-3 border-t border-slate-700/50 pt-2 mt-0">
-          {!isArchived && (
-            <>
-              {isActive ? (
-                <button
-                  onClick={deactivatePlan}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white text-xs font-medium transition-colors"
-                >
-                  <Pause size={12} /> Deactivate
-                </button>
-              ) : (
-                <button
-                  onClick={() => openActivateModal(plan)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 text-xs font-medium transition-colors"
-                >
-                  <Play size={12} /> Activate
-                </button>
-              )}
-            </>
-          )}
-          <button
-            onClick={() => {
-              const newId = duplicatePlan(plan.id)
-              navigate(`/plans/${newId}/edit`)
-            }}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white text-xs font-medium transition-colors"
-          >
-            <Copy size={12} /> Copy
-          </button>
-          {!isActive && (
-            <>
-              {!isArchived && (
-                <button
-                  onClick={() => archivePlan(plan.id)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white text-xs font-medium transition-colors"
-                >
-                  <Archive size={12} /> Archive
-                </button>
-              )}
-              <button
-                onClick={() => setConfirmDelete(plan.id)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-xs font-medium transition-colors ml-auto"
-              >
-                <Trash2 size={12} />
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    )
+  function handleDuplicate(id: string) {
+    const newId = duplicatePlan(id)
+    navigate(`/plans/${newId}/edit`)
   }
 
   return (
@@ -179,7 +204,19 @@ export function PlansPage() {
         <section className="mb-6">
           <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Active</h2>
           <div className="space-y-3">
-            {active.map(p => <PlanCard key={p.id} plan={p} />)}
+            {active.map(p => (
+              <PlanCard
+                key={p.id}
+                plan={p}
+                entries={entries}
+                today={today}
+                onActivate={openActivateModal}
+                onDeactivate={deactivatePlan}
+                onDuplicate={handleDuplicate}
+                onArchive={archivePlan}
+                onDelete={setConfirmDelete}
+              />
+            ))}
           </div>
         </section>
       )}
@@ -188,7 +225,19 @@ export function PlansPage() {
         <section className="mb-6">
           <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Inactive</h2>
           <div className="space-y-3">
-            {inactive.map(p => <PlanCard key={p.id} plan={p} />)}
+            {inactive.map(p => (
+              <PlanCard
+                key={p.id}
+                plan={p}
+                entries={entries}
+                today={today}
+                onActivate={openActivateModal}
+                onDeactivate={deactivatePlan}
+                onDuplicate={handleDuplicate}
+                onArchive={archivePlan}
+                onDelete={setConfirmDelete}
+              />
+            ))}
           </div>
         </section>
       )}
@@ -197,7 +246,19 @@ export function PlansPage() {
         <section className="mb-6">
           <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Archived</h2>
           <div className="space-y-3">
-            {archived.map(p => <PlanCard key={p.id} plan={p} />)}
+            {archived.map(p => (
+              <PlanCard
+                key={p.id}
+                plan={p}
+                entries={entries}
+                today={today}
+                onActivate={openActivateModal}
+                onDeactivate={deactivatePlan}
+                onDuplicate={handleDuplicate}
+                onArchive={archivePlan}
+                onDelete={setConfirmDelete}
+              />
+            ))}
           </div>
         </section>
       )}
