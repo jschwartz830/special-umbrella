@@ -26,6 +26,13 @@ interface OutcomeState {
    */
   logOutcomeWithProgression: (outcome: WorkoutOutcome, slot: WorkoutSlot) => void
 
+  /**
+   * Patch the notes field on an existing outcome record.
+   * Called by the history editor so outcome.notes stays in sync with HistoryEntry.notes.
+   * No-op when no outcome exists for the given instanceId.
+   */
+  updateOutcomeNotes: (workoutInstanceId: string, notes: string) => void
+
   /** Remove all outcomes associated with a plan (called when plan is cleared) */
   clearPlanOutcomes: (planId: string) => void
 }
@@ -78,6 +85,19 @@ export const useOutcomeStore = create<OutcomeState>()(
           prevState,
         )
         get().setProgressionState(nextState)
+      },
+
+      updateOutcomeNotes(workoutInstanceId, notes) {
+        set(s => {
+          const existing = s.outcomes[workoutInstanceId]
+          if (!existing) return s
+          return {
+            outcomes: {
+              ...s.outcomes,
+              [workoutInstanceId]: { ...existing, notes: notes || null },
+            },
+          }
+        })
       },
 
       clearPlanOutcomes(planId) {

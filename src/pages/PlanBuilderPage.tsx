@@ -494,15 +494,34 @@ export function PlanBuilderPage() {
   const [durationValue, setDurationValue] = useState(existing?.duration.value ?? 4)
   const [days, setDays] = useState<PlanDay[]>(existing?.days ?? [makeDay('Day 1')])
   const [saved, setSaved] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [pendingNav, setPendingNav] = useState<string | null>(null)
+
+  function markDirty() {
+    if (!isDirty) setIsDirty(true)
+    if (saved) setSaved(false)
+  }
+
+  function safeNavigate(to: string) {
+    if (isDirty && !saved) {
+      setPendingNav(to)
+      setShowLeaveConfirm(true)
+    } else {
+      navigate(to)
+    }
+  }
 
   function updateDay(i: number, d: PlanDay) {
     const next = [...days]
     next[i] = d
     setDays(next)
+    markDirty()
   }
 
   function removeDay(i: number) {
     setDays(days.filter((_, idx) => idx !== i))
+    markDirty()
   }
 
   function moveDay(i: number, dir: -1 | 1) {
@@ -511,6 +530,7 @@ export function PlanBuilderPage() {
     if (j < 0 || j >= next.length) return
     ;[next[i], next[j]] = [next[j], next[i]]
     setDays(next)
+    markDirty()
   }
 
   function duplicateDay(i: number) {
@@ -523,6 +543,7 @@ export function PlanBuilderPage() {
     const next = [...days]
     next.splice(i + 1, 0, copy)
     setDays(next)
+    markDirty()
   }
 
   function handleSave() {
@@ -540,10 +561,12 @@ export function PlanBuilderPage() {
     if (isNew) {
       const newId = createPlan(payload)
       setSaved(true)
+      setIsDirty(false)
       setTimeout(() => navigate(`/plans/${newId}/edit`), 600)
     } else if (id) {
       updatePlan(id, payload)
       setSaved(true)
+      setIsDirty(false)
       setTimeout(() => setSaved(false), 2000)
     }
   }
@@ -552,7 +575,7 @@ export function PlanBuilderPage() {
     <div className="px-4 pt-safe pb-8">
       {/* Header */}
       <div className="pt-6 pb-4 flex items-center gap-3">
-        <button onClick={() => navigate('/plans')}
+        <button onClick={() => safeNavigate('/plans')}
           className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
           <ArrowLeft size={18} />
         </button>
@@ -572,13 +595,13 @@ export function PlanBuilderPage() {
         <div className="space-y-3">
           <div>
             <label className="text-xs text-slate-400 font-medium block mb-1.5">Plan name *</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
+            <input type="text" value={name} onChange={e => { setName(e.target.value); markDirty() }}
               placeholder="e.g. 5-Day Upper/Lower"
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500" />
           </div>
           <div>
             <label className="text-xs text-slate-400 font-medium block mb-1.5">Description</label>
-            <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+            <input type="text" value={description} onChange={e => { setDescription(e.target.value); markDirty() }}
               placeholder="Optional description"
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500" />
           </div>
@@ -586,11 +609,11 @@ export function PlanBuilderPage() {
             <label className="text-xs text-slate-400 font-medium block mb-1.5">Duration</label>
             <div className="flex gap-2">
               <input type="number" min="1" max="52" value={durationValue}
-                onChange={e => setDurationValue(parseInt(e.target.value) || 1)}
+                onChange={e => { setDurationValue(parseInt(e.target.value) || 1); markDirty() }}
                 className="w-20 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500" />
               <div className="flex rounded-xl bg-slate-800 border border-slate-700 overflow-hidden">
                 {(['rotations', 'weeks'] as const).map(t => (
-                  <button key={t} type="button" onClick={() => setDurationType(t)}
+                  <button key={t} type="button" onClick={() => { setDurationType(t); markDirty() }}
                     className={`px-3 py-2.5 text-sm font-medium transition-colors capitalize ${
                       durationType === t ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'
                     }`}>
@@ -608,7 +631,7 @@ export function PlanBuilderPage() {
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
               Workout Days ({days.length})
             </h2>
-            <button type="button" onClick={() => setDays(d => [...d, makeDay(`Day ${d.length + 1}`)])}
+            <button type="button" onClick={() => { setDays(d => [...d, makeDay(`Day ${d.length + 1}`)]); markDirty() }}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-medium text-slate-300 hover:text-white transition-colors">
               <Plus size={12} /> Add Day
             </button>
@@ -638,6 +661,31 @@ export function PlanBuilderPage() {
           {saved ? '✓ Saved' : isNew ? 'Create Plan' : 'Save Changes'}
         </button>
       </div>
+
+      {/* Leave without saving confirmation */}
+      {showLeaveConfirm && (
+        <Modal title="Unsaved changes" onClose={() => setShowLeaveConfirm(false)}>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-400">
+              You have unsaved changes. Leave without saving?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold transition-colors"
+              >
+                Keep editing
+              </button>
+              <button
+                onClick={() => { setShowLeaveConfirm(false); navigate(pendingNav ?? '/plans') }}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

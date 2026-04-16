@@ -13,6 +13,7 @@ import type { WorkoutDifficulty } from '../modules/workout-metadata/types'
 export interface WorkoutMeta {
   label: string
   bgColor: string
+  borderColor: string
   textColor: string
   ringColor: string
   icon: LucideIcon
@@ -22,6 +23,7 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
   weightlifting: {
     label: 'Weights',
     bgColor: 'bg-orange-500',
+    borderColor: 'border-orange-500',
     textColor: 'text-orange-600',
     ringColor: 'ring-orange-400',
     icon: Dumbbell,
@@ -29,6 +31,7 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
   long_run: {
     label: 'Long Run',
     bgColor: 'bg-emerald-500',
+    borderColor: 'border-emerald-500',
     textColor: 'text-emerald-600',
     ringColor: 'ring-emerald-400',
     icon: Footprints,
@@ -36,6 +39,7 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
   recovery_run: {
     label: 'Recovery Run',
     bgColor: 'bg-teal-500',
+    borderColor: 'border-teal-500',
     textColor: 'text-teal-600',
     ringColor: 'ring-teal-400',
     icon: Wind,
@@ -43,6 +47,7 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
   swim: {
     label: 'Swim',
     bgColor: 'bg-sky-500',
+    borderColor: 'border-sky-500',
     textColor: 'text-sky-600',
     ringColor: 'ring-sky-400',
     icon: Waves,
@@ -50,6 +55,7 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
   yoga: {
     label: 'Yoga',
     bgColor: 'bg-purple-500',
+    borderColor: 'border-purple-500',
     textColor: 'text-purple-600',
     ringColor: 'ring-purple-400',
     icon: Flower2,
@@ -57,6 +63,7 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
   rest: {
     label: 'Rest',
     bgColor: 'bg-slate-400',
+    borderColor: 'border-slate-400',
     textColor: 'text-slate-500',
     ringColor: 'ring-slate-300',
     icon: Moon,

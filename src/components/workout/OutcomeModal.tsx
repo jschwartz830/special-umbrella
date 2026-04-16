@@ -17,6 +17,7 @@ import type {
 } from '../../modules/workout-outcomes/types'
 import { derivePaceSecondsPerMile, formatPace } from '../../modules/workout-outcomes/types'
 import { isRunType } from '../../modules/workout-metadata/types'
+import { makeWorkoutInstanceId } from '../../store/outcomeStore'
 
 interface Props {
   planId: string
@@ -96,8 +97,6 @@ export function OutcomeModal({
     existingOutcome?.runActual?.completedAsPlanned ?? null,
   )
 
-  const isActive = true // both remaining states (completed, partial) show all fields
-
   // Derived average pace
   const dist = parseFloat(distanceMiles)
   const dur = parseFloat(runDurationMin)
@@ -105,10 +104,6 @@ export function OutcomeModal({
     isFinite(dist) && dist > 0 && isFinite(dur) && dur > 0
       ? derivePaceSecondsPerMile(dist, dur)
       : null
-
-  function buildWorkoutInstanceId() {
-    return `${planId}_${calendarDate}`
-  }
 
   function handleConfirm() {
     const runActual: RunWorkoutActual | null = hasRun
@@ -121,7 +116,7 @@ export function OutcomeModal({
       : null
 
     const outcome: WorkoutOutcome = {
-      workoutInstanceId: buildWorkoutInstanceId(),
+      workoutInstanceId: makeWorkoutInstanceId(planId, calendarDate),
       completionState,
       completedAt: new Date().toISOString(),
       durationActualMin: parseFloat(durationMin) || null,
@@ -173,62 +168,58 @@ export function OutcomeModal({
           </div>
         </div>
 
-        {/* Effort picker — only for completed/partial */}
-        {isActive && (
-          <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">
-              Perceived Effort
-            </p>
-            <div className="flex gap-1.5">
-              {([1, 2, 3, 4, 5] as PerceivedEffort[]).map(e => (
-                <button
-                  key={e}
-                  onClick={() => setEffort(prev => (prev === e ? null : e))}
-                  className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-colors ${
-                    effort === e
-                      ? e <= 2
-                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                        : e === 3
-                          ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400'
-                          : e === 4
-                            ? 'bg-orange-500/20 border-orange-500/50 text-orange-400'
-                            : 'bg-red-500/20 border-red-500/50 text-red-400'
-                      : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-            {effort && (
-              <p className="text-xs text-slate-500 mt-1 text-center">
-                {EFFORT_LABELS[effort]}
-              </p>
-            )}
+        {/* Effort picker */}
+        <div>
+          <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">
+            Perceived Effort
+          </p>
+          <div className="flex gap-1.5">
+            {([1, 2, 3, 4, 5] as PerceivedEffort[]).map(e => (
+              <button
+                key={e}
+                onClick={() => setEffort(prev => (prev === e ? null : e))}
+                className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-colors ${
+                  effort === e
+                    ? e <= 2
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                      : e === 3
+                        ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400'
+                        : e === 4
+                          ? 'bg-orange-500/20 border-orange-500/50 text-orange-400'
+                          : 'bg-red-500/20 border-red-500/50 text-red-400'
+                    : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
+                }`}
+              >
+                {e}
+              </button>
+            ))}
           </div>
-        )}
+          {effort && (
+            <p className="text-xs text-slate-500 mt-1 text-center">
+              {EFFORT_LABELS[effort]}
+            </p>
+          )}
+        </div>
 
         {/* Duration */}
-        {isActive && (
-          <div>
-            <label className="text-xs text-slate-500 uppercase tracking-wide font-medium block mb-2">
-              <Clock3 size={11} className="inline mr-1" />
-              Duration (min)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={durationMin}
-              onChange={e => setDurationMin(e.target.value)}
-              placeholder="Optional"
-              className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
-            />
-          </div>
-        )}
+        <div>
+          <label className="text-xs text-slate-500 uppercase tracking-wide font-medium block mb-2">
+            <Clock3 size={11} className="inline mr-1" />
+            Duration (min)
+          </label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={durationMin}
+            onChange={e => setDurationMin(e.target.value)}
+            placeholder="Optional"
+            className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
+        </div>
 
         {/* Run-specific actuals */}
-        {hasRun && isActive && (
+        {hasRun && (
           <div className="space-y-3 border border-slate-700 rounded-xl p-3">
             <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">
               Run Actuals

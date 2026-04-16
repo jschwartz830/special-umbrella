@@ -13,6 +13,7 @@ import {
 import { format } from 'date-fns'
 import { usePlanStore } from '../store/planStore'
 import { useHistoryStore } from '../store/historyStore'
+import { isPlanExpired } from '../engine/rotationEngine'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
 import type { Plan } from '../types'
@@ -26,6 +27,8 @@ export function PlansPage() {
   const archivePlan = usePlanStore(s => s.archivePlan)
   const deletePlan = usePlanStore(s => s.deletePlan)
   const clearHistory = useHistoryStore(s => s.clearPlanHistory)
+  const entries = useHistoryStore(s => s.entries)
+  const today = format(new Date(), 'yyyy-MM-dd')
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [activatingPlan, setActivatingPlan] = useState<Plan | null>(null)
@@ -52,6 +55,8 @@ export function PlansPage() {
   function PlanCard({ plan }: { plan: Plan }) {
     const isActive = plan.status === 'active'
     const isArchived = plan.status === 'archived'
+    const planEntries = entries.filter(e => e.planId === plan.id)
+    const expired = isActive && isPlanExpired(plan, planEntries, today)
 
     return (
       <div
@@ -65,11 +70,16 @@ export function PlansPage() {
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-semibold text-slate-200 truncate">{plan.name}</h3>
-                {isActive && (
+                {isActive && !expired && (
                   <span className="flex-shrink-0 text-xs bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded-full font-medium">
                     Active
+                  </span>
+                )}
+                {expired && (
+                  <span className="flex-shrink-0 text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-medium">
+                    Complete
                   </span>
                 )}
               </div>

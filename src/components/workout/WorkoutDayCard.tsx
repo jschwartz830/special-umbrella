@@ -134,7 +134,7 @@ export function WorkoutDayCard({ resolved, isToday, onClick }: Props) {
       : isDayOff
         ? 'border-slate-600'
         : isPending
-          ? `border-l-4 border-${meta.bgColor.replace('bg-', '')}`
+          ? `border-l-4 ${meta.borderColor}`
           : 'border-slate-700/50'
 
   const opacity = isSkipped || isDayOff ? 'opacity-50' : ''

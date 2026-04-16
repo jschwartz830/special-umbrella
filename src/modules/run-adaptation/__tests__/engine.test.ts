@@ -313,4 +313,17 @@ describe('resolveWorkoutDisplayTarget', () => {
     expect(result.adaptationNote).toContain('5.5')
     expect(result.adaptationNote).toContain('Progressed')
   })
+
+  it('isFromProgression is false when progression distance equals template distance', () => {
+    // Intentional design: if the progression state has the same target as the
+    // runConfig template, we treat it as "not from progression" (no visual indicator).
+    // This happens when progression is initialised but hasn't changed the target yet,
+    // or after a reset to the baseline distance.
+    const slot = makeSlot({ targetDistanceMiles: 5 })
+    const state = makeState({ currentTargetDistanceMiles: 5 }) // same as template
+    const result = resolveWorkoutDisplayTarget(slot, state)
+    expect(result.targetDistanceMiles).toBe(5)
+    expect(result.isFromProgression).toBe(false) // distance unchanged → no indicator
+    expect(result.adaptationNote).toBeNull()     // no note either
+  })
 })
