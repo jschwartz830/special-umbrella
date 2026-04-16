@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useBlocker } from 'react-router-dom'
 import {
   ArrowLeft,
   Plus,
@@ -495,21 +495,15 @@ export function PlanBuilderPage() {
   const [days, setDays] = useState<PlanDay[]>(existing?.days ?? [makeDay('Day 1')])
   const [saved, setSaved] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
-  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
-  const [pendingNav, setPendingNav] = useState<string | null>(null)
+
+  // Block ALL router navigation (back button, bottom nav tabs, browser back)
+  // whenever there are unsaved changes. useBlocker intercepts at the router
+  // level so no manual safeNavigate wrapper is needed.
+  const blocker = useBlocker(isDirty && !saved)
 
   function markDirty() {
     if (!isDirty) setIsDirty(true)
     if (saved) setSaved(false)
-  }
-
-  function safeNavigate(to: string) {
-    if (isDirty && !saved) {
-      setPendingNav(to)
-      setShowLeaveConfirm(true)
-    } else {
-      navigate(to)
-    }
   }
 
   function updateDay(i: number, d: PlanDay) {
@@ -575,7 +569,7 @@ export function PlanBuilderPage() {
     <div className="px-4 pt-safe pb-8">
       {/* Header */}
       <div className="pt-6 pb-4 flex items-center gap-3">
-        <button onClick={() => safeNavigate('/plans')}
+        <button onClick={() => navigate('/plans')}
           className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
           <ArrowLeft size={18} />
         </button>
@@ -662,22 +656,22 @@ export function PlanBuilderPage() {
         </button>
       </div>
 
-      {/* Leave without saving confirmation */}
-      {showLeaveConfirm && (
-        <Modal title="Unsaved changes" onClose={() => setShowLeaveConfirm(false)}>
+      {/* Leave without saving confirmation — fires for all navigation including bottom nav tabs */}
+      {blocker.state === 'blocked' && (
+        <Modal title="Unsaved changes" onClose={() => blocker.reset()}>
           <div className="space-y-4">
             <p className="text-sm text-slate-400">
               You have unsaved changes. Leave without saving?
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => setShowLeaveConfirm(false)}
+                onClick={() => blocker.reset()}
                 className="flex-1 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold transition-colors"
               >
                 Keep editing
               </button>
               <button
-                onClick={() => { setShowLeaveConfirm(false); navigate(pendingNav ?? '/plans') }}
+                onClick={() => blocker.proceed()}
                 className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
               >
                 Discard
