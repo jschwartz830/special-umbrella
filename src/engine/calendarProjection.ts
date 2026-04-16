@@ -5,11 +5,9 @@ import {
   format,
   startOfWeek,
   endOfWeek,
-  addDays,
-  parseISO,
 } from 'date-fns'
 import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay } from '../types'
-import { getResolvedDaysRange, computeCurrentDayIndex, mod } from './rotationEngine'
+import { getResolvedDaysRange, getUpcomingDays, mod } from './rotationEngine'
 
 export interface CalendarCell {
   date: string           // YYYY-MM-DD
@@ -92,6 +90,17 @@ export function buildMonthGrid(
 // Re-export mod so calendarProjection users don't need to import engine internals
 export { mod }
 
+/**
+ * Generate a future projection starting from tomorrow.
+ *
+ * Delegates to getUpcomingDays (the canonical engine function) after
+ * filtering entries and overrides to the given plan. Previously this
+ * function had its own projection loop that diverged from getUpcomingDays
+ * by not applying today's overrides and not advancing for day_off entries.
+ *
+ * Currently unused by active pages (TodayPage uses getUpcomingDays directly
+ * via useActivePlan hook), but kept as a convenience wrapper.
+ */
 export function getFutureProjection(
   plan: Plan,
   entries: HistoryEntry[],
@@ -101,23 +110,5 @@ export function getFutureProjection(
 ): ResolvedDay[] {
   const planEntries = entries.filter(e => e.planId === plan.id)
   const planOverrides = overrides.filter(o => o.planId === plan.id)
-
-  let pointer = computeCurrentDayIndex(plan, planEntries, planOverrides, today)
-  const todayEntry = planEntries.find(e => e.calendarDate === today)
-  if (todayEntry && (todayEntry.action === 'complete' || todayEntry.action === 'skip')) {
-    pointer = mod(pointer + 1, plan.days.length)
-  }
-
-  const result: ResolvedDay[] = []
-  for (let i = 1; i <= days; i++) {
-    const date = format(addDays(parseISO(today), i), 'yyyy-MM-dd')
-    result.push({
-      calendarDate: date,
-      planDayIndex: pointer,
-      planDay: plan.days[pointer],
-      status: 'future',
-    })
-    pointer = mod(pointer + 1, plan.days.length)
-  }
-  return result
+  return getUpcomingDays(plan, planEntries, planOverrides, today, days)
 }
