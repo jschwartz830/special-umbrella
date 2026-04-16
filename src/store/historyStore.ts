@@ -44,7 +44,7 @@ interface HistoryState {
    */
   removeRetroJumpForDate: (planId: string, calendarDate: string) => void
 
-  updateEntryAction: (planId: string, calendarDate: string, action: ActionType) => void
+  updateEntryAction: (planId: string, calendarDate: string, action: ActionType, planDayIndex?: number) => void
   clearPlanHistory: (planId: string) => void
   removeEntry: (planId: string, calendarDate: string) => void
 }
@@ -108,13 +108,18 @@ export const useHistoryStore = create<HistoryState>()(
         }))
       },
 
-      updateEntryAction(planId, calendarDate, action) {
+      updateEntryAction(planId, calendarDate, action, planDayIndex?: number) {
         set(s => ({
-          entries: s.entries.map(e =>
-            e.planId === planId && e.calendarDate === calendarDate
-              ? { ...e, action, planDayIndex: action === 'day_off' ? undefined : e.planDayIndex }
-              : e,
-          ),
+          entries: s.entries.map(e => {
+            if (e.planId !== planId || e.calendarDate !== calendarDate) return e
+            if (action === 'day_off') {
+              return { ...e, action, planDayIndex: undefined }
+            }
+            // When changing away from day_off, use the provided index or keep the existing one.
+            // e.planDayIndex may be undefined if the original entry was a day_off.
+            const nextIndex = planDayIndex ?? e.planDayIndex
+            return { ...e, action, planDayIndex: nextIndex }
+          }),
         }))
       },
 
