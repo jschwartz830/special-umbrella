@@ -215,9 +215,13 @@ export function HistoryPage() {
                     ? 'text-slate-400'
                     : 'text-amber-400'
 
-          const stateLabel = completionState
-            ? COMPLETION_STATE_LABELS[completionState]
-            : entry.action.replace('_', ' ')
+          const stateLabel =
+            completionState === 'partially_completed' ? 'Partially Completed'
+            : completionState === 'deferred' ? 'Deferred'
+            : completionState === 'swapped' ? 'Swapped'
+            : entry.action === 'complete' ? 'Completed'
+            : entry.action === 'skip' ? 'Skipped'
+            : 'Day Off'
 
           return (
             <div
