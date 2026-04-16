@@ -13,6 +13,7 @@ import {
   Info,
   PlusCircle,
   X,
+  PartyPopper,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
@@ -26,11 +27,12 @@ import { completionStateToAction } from '../modules/workout-outcomes/types'
 import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../modules/recommendation/explanation'
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
+import { isPlanExpired } from '../engine/rotationEngine'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 
 export function TodayPage() {
   const navigate = useNavigate()
-  const { plan, todayResolved, upcoming } = useActivePlan()
+  const { plan, todayResolved, upcoming, planEntries } = useActivePlan()
   const actions = usePlanActions(plan?.id ?? null)
   const logAction = useHistoryStore(s => s.logAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
@@ -67,6 +69,7 @@ export function TodayPage() {
 
   const isPending = todayResolved.status === 'today_pending'
   const isResolved = !isPending
+  const planExpired = isPlanExpired(plan, planEntries, today)
 
   const instanceId = makeWorkoutInstanceId(plan.id, today)
   const existingOutcome = getOutcome(instanceId)
@@ -134,6 +137,26 @@ export function TodayPage() {
           Day {todayResolved.planDayIndex + 1} of {plan.days.length} in rotation
         </p>
       </div>
+
+      {/* Plan completion / expiry banner */}
+      {planExpired && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
+          <PartyPopper size={14} className="text-purple-400 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-purple-300 font-medium">Plan complete!</p>
+            <p className="text-xs text-purple-400/70 mt-0.5">
+              You've finished all {plan.duration.value} {plan.duration.type} of this plan.
+              Consider activating a new plan or cycling this one.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/plans')}
+            className="text-xs text-purple-400 hover:text-purple-200 font-medium flex-shrink-0 ml-1"
+          >
+            Plans →
+          </button>
+        </div>
+      )}
 
       {/* Adaptation note for today's run */}
       {todayAdaptationNote && (
