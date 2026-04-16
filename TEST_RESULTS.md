@@ -72,16 +72,46 @@ Generated: 2026-04-16
 
 ---
 
+## Tests Added (Second Pass)
+
+### `src/store/__tests__/historyStore.test.ts`
+
+- **28 tests** across six suites:
+  - `addEntry` — 5 tests (deduplication, id/timestamp assignment, cross-plan/cross-date isolation)
+  - `logAction` — 5 tests (planDayIndex for each action type, notes storage)
+  - `updateEntryAction` — 8 tests (action changes, planDayIndex preservation, day_off↔complete restoration)
+  - `removeRetroJumpForDate` — 6 tests (match/no-match, type filter, planId filter, multiple removals, no-op)
+  - `removeEntry` — 2 tests
+  - `clearPlanHistory` — 2 tests
+
+### `src/store/__tests__/outcomeStore.test.ts`
+
+- **17 tests** across five suites:
+  - `makeWorkoutInstanceId` — 1 test
+  - `setOutcome / getOutcome` — 3 tests (store/retrieve, unknown id, overwrite)
+  - `updateOutcomeNotes` — 4 tests (patch, empty → null, no-op for missing, field isolation)
+  - `logOutcomeWithProgression` — 5 tests (non-run slot, ineligible run, full progression path, group id, no-error guarantee)
+  - `clearPlanOutcomes` — 3 tests (prefix filter, no-op, progressionStates untouched)
+
+### `src/engine/__tests__/calendarProjection.test.ts`
+
+- **31 tests** across three suites:
+  - `getResolvedDaysRange` — 21 tests (structure, status assignment for all 9 status values, pointer advancement rules, override ordering, historyEntry attachment, pre-startDate edge case)
+  - `buildMonthGrid` — 7 tests (week count, isCurrentMonth accuracy, isToday marker, resolvedDay presence pre/post startDate, no-plan behavior, total cell count divisibility)
+  - `resolveWorkoutDisplayTarget` isFromProgression edge case — added to existing engine.test.ts
+
+---
+
 ## Tests Run
 
 ```
-Test Files  2 passed (2)
-     Tests  64 passed (64)
-  Start at  02:53:47
-  Duration  1.80s
+Test Files  5 passed (5)
+     Tests  141 passed (141)
+  Start at  03:09:33
+  Duration  2.05s
 ```
 
-All 64 tests pass. Zero failures.
+All 141 tests pass. Zero failures.
 
 ---
 
@@ -93,43 +123,37 @@ All 64 tests pass. Zero failures.
 | `applyRunProgressionDecision` | 2 | ✅ All pass |
 | `derivePaceSecondsPerMile` | 2 | ✅ All pass |
 | `formatPace` | 2 | ✅ All pass |
-| `resolveWorkoutDisplayTarget` | 5 | ✅ All pass |
+| `resolveWorkoutDisplayTarget` | 6 | ✅ All pass |
 | `mod` | 2 | ✅ All pass |
 | `computeCurrentDayIndex` | 14 | ✅ All pass |
 | `getTodayResolvedDay` | 5 | ✅ All pass |
 | `getUpcomingDays` | 8 | ✅ All pass |
 | `isPlanExpired` | 7 | ✅ All pass |
+| `addEntry` | 5 | ✅ All pass |
+| `logAction` | 5 | ✅ All pass |
+| `updateEntryAction` | 8 | ✅ All pass |
+| `removeRetroJumpForDate` | 6 | ✅ All pass |
+| `removeEntry` | 2 | ✅ All pass |
+| `clearPlanHistory` | 2 | ✅ All pass |
+| `makeWorkoutInstanceId` | 1 | ✅ All pass |
+| `setOutcome / getOutcome` | 3 | ✅ All pass |
+| `updateOutcomeNotes` | 4 | ✅ All pass |
+| `logOutcomeWithProgression` | 5 | ✅ All pass |
+| `clearPlanOutcomes` | 3 | ✅ All pass |
+| `getResolvedDaysRange` | 21 | ✅ All pass |
+| `buildMonthGrid` | 7 | ✅ All pass |
 
 ---
 
 ## Important Logic Still Untested
 
-### High priority (most failure-prone)
-
-1. **historyStore** — `logAction`, `updateEntryAction`, `addOverride`, `removeRetroJumpForDate`
-   - The `removeRetroJumpForDate` function does date string parsing to match override dates; the timezone handling here is subtle.
-   - `updateEntryAction` (just fixed) — the planDayIndex restoration logic needs test coverage.
-
-2. **outcomeStore** — `logOutcomeWithProgression`, `updateOutcomeNotes`
-   - The `logOutcomeWithProgression` function orchestrates evaluation + application of run progression. Should have integration-style tests verifying the state is persisted correctly.
-
-3. **`getResolvedDaysRange`** — the calendar grid workhorse
-   - The advance logic at the end of each day (entryAdvances vs projectForward) is subtle and critical for calendar rendering.
-   - Edge case: `fromDate` before plan's `startDate` — calendar would show unlogged past days before the plan started.
-
-4. **`buildMonthGrid`** — the calendar grid builder
-   - Relies on `getResolvedDaysRange` correctness; should verify the 6×7 grid structure.
-
-5. **`resolveWorkoutDisplayTarget` isFromProgression edge case**
-   - When progression distance equals template distance, `isFromProgression = false` even though a progression state exists. This is intentional but worth documenting in tests.
-
 ### Medium priority
 
-6. **planStore** — `setActivePlan` (deactivates previously active plan), `duplicatePlan`
-7. **Double-day rotation behavior** — advance override + complete entry on the same day, verifying tomorrow starts 2 positions ahead
+1. **planStore** — `setActivePlan` (deactivates previously active plan), `duplicatePlan`
+2. **Double-day rotation behavior** — advance override + complete entry on the same day, verifying tomorrow starts 2 positions ahead
 
 ### Lower priority
 
-8. **CalendarPage retroactive logging flow** — integration behavior of `removeRetroJumpForDate` + `addOverride` + `addEntry`
-9. **PlanBuilderPage unsaved-changes guard** — UI behavior testing
-10. **TodayPage action handlers** — completion flow, skip flow, day-off flow
+3. **CalendarPage retroactive logging flow** — integration behavior of `removeRetroJumpForDate` + `addOverride` + `addEntry`
+4. **PlanBuilderPage unsaved-changes guard** — UI behavior testing
+5. **TodayPage action handlers** — completion flow, skip flow, day-off flow

@@ -65,6 +65,12 @@ PlanBuilderPage let users navigate away without warning, losing all edits.
 | 8 | History page: plan filter + empty state fix | `467e225` |
 | 9 | Fix notes drift between two stores | `435d983` |
 | 10 | Remove duplicated makeWorkoutInstanceId | `0863e99` |
+| 11 | Add historyStore test suite (28 tests) | `cfd4c36` |
+| 12 | Add outcomeStore test suite (17 tests) | `efe89fb` |
+| 13 | Add getResolvedDaysRange + buildMonthGrid tests (31 tests) | `e0d5eba` |
+| 14 | Fix WorkoutDayCard dynamic Tailwind border class | `2053931` |
+| 15 | Document isFromProgression=false edge case in tests | `6893e35` |
+| 16 | Fix buildMonthGrid: don't show pre-plan dates as past_unlogged | `f1971d2` |
 
 ---
 
@@ -105,7 +111,7 @@ PlanBuilderPage let users navigate away without warning, losing all edits.
 
 ### High Value, Low Risk
 
-1. **`getResolvedDaysRange` edge case**: For calendar dates before `plan.startDate`, the engine returns resolved days using `startDayIndex` as the pointer, showing workout days as `past_unlogged` even though the plan hadn't started yet. These should probably be excluded or shown differently in the calendar.
+1. ~~**`getResolvedDaysRange` edge case**~~ **FIXED** (`f1971d2`): `buildMonthGrid` now clamps the range to `plan.startDate`, so pre-plan cells are neutral/non-interactive.
 
 2. **History edit → day_off → complete**: When changing a day_off entry to complete via the history editor, `planDayIndex` stays `undefined` because it was never set. The user should be shown a picker to select which plan day was completed. Currently shows "Unknown day".
 
@@ -121,7 +127,7 @@ PlanBuilderPage let users navigate away without warning, losing all edits.
 
 7. **Progression state reset mechanism**: The `reset` action exists in `ProgressionAction` type but nothing in the UI triggers it. If a user wants to reset progression (e.g., after an injury), they'd need to clear all plan outcomes.
 
-8. **WorkoutDayCard dynamic border color**: `border-${meta.bgColor.replace('bg-', '')}` generates dynamic Tailwind class names that may not be included in the production CSS bundle. Should be replaced with a static switch or explicit safelist.
+8. ~~**WorkoutDayCard dynamic border color**~~ **FIXED** (`2053931`): Added static `borderColor` to `WorkoutMeta`.
 
 9. **Override menu after completion**: The Override button row is shown even after a workout is completed for the day. Applying overrides post-completion affects tomorrow's rotation, which is useful but confusing. Consider adding a tooltip or secondary label clarifying this.
 
@@ -145,7 +151,7 @@ PlanBuilderPage let users navigate away without warning, losing all edits.
 
 1. **History edit: day_off → complete loses planDayIndex** (documented, not fixed): Changing a day_off entry to complete via the history editor leaves `planDayIndex = undefined`. The entry displays "Unknown day". To fix properly, the history editor needs a plan day picker for this transition.
 
-2. **Calendar: dates before plan.startDate show as past_unlogged**: The rotation engine extends backward in time before the plan's start date, showing workout days as unlogged. The calendar should show these as empty/N/A.
+2. ~~**Calendar: dates before plan.startDate show as past_unlogged**~~ **FIXED** (`f1971d2`): `buildMonthGrid` now clamps `fromDate` to `plan.startDate`, so pre-plan cells render as neutral/inactive instead of showing incorrect `past_unlogged` workout data.
 
 3. **Double-day second workout outcome not captured**: When double-day mode is used, only the primary workout's outcome is logged. The bonus workout advances the rotation but has no outcome record.
 
@@ -153,7 +159,7 @@ PlanBuilderPage let users navigate away without warning, losing all edits.
 
 5. **`swap_slot` override type is dead code in the UI**: The override type exists in the schema and is processed by the engine, but no user-facing control exists to create one.
 
-6. **WorkoutDayCard dynamic border class**: `border-${meta.bgColor.replace('bg-', '')}` may not be included in the Tailwind production CSS bundle since it's constructed dynamically.
+6. ~~**WorkoutDayCard dynamic border class**~~ **FIXED** (`2053931`): Added a static `borderColor` field to `WorkoutMeta` in `constants.ts`. `WorkoutDayCard` now uses `meta.borderColor` directly — Tailwind can safely scan it.
 
 ---
 

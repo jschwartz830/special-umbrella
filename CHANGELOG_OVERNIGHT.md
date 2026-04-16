@@ -163,3 +163,99 @@ Changes are listed in commit order (oldest first).
 **Risk**: None. Behavioral identity — same output, one less definition.
 
 **Rollback**: `git revert 0863e99`
+
+---
+
+## 11. Add historyStore test suite (28 tests)
+
+**Commit**: `cfd4c36`
+
+**Summary**: Added comprehensive tests for `historyStore` covering: `addEntry` deduplication, `logAction` planDayIndex semantics for day_off vs complete/skip, `updateEntryAction` planDayIndex restoration (the bug fixed in commit `3fa7753`), `removeRetroJumpForDate` override filtering by type and planId, `removeEntry`, and `clearPlanHistory`. The persist middleware is mocked as a pass-through so tests run in the Node environment without localStorage.
+
+**Why it mattered**: The historyStore contains business-critical state mutations. The `updateEntryAction` fix (commit `3fa7753`) had no test coverage — this suite now verifies both the happy path and the bug-fixed day_off → complete transition.
+
+**Files changed**: `src/store/__tests__/historyStore.test.ts` (new file)
+
+**Risk**: None. Tests only.
+
+**Rollback**: `git revert cfd4c36`
+
+---
+
+## 12. Add outcomeStore test suite (17 tests)
+
+**Commit**: `efe89fb`
+
+**Summary**: Added tests for `outcomeStore` covering: `makeWorkoutInstanceId` format, `setOutcome`/`getOutcome` deduplication, `updateOutcomeNotes` (including the no-op when outcome is absent and the empty-string → null coercion), `logOutcomeWithProgression` for non-run slots, progression-ineligible run slots, and the full progression advancement path, plus `clearPlanOutcomes` prefix filtering.
+
+**Why it mattered**: `updateOutcomeNotes` was newly added to fix notes drift (commit `435d983`). Testing it validates the new path and documents that it is a no-op when no outcome record exists.
+
+**Files changed**: `src/store/__tests__/outcomeStore.test.ts` (new file)
+
+**Risk**: None. Tests only.
+
+**Rollback**: `git revert efe89fb`
+
+---
+
+## 13. Add getResolvedDaysRange and buildMonthGrid tests (30 tests)
+
+**Commit**: `e0d5eba`
+
+**Summary**: Added tests for `getResolvedDaysRange` (the calendar grid's core function) covering: status assignment for past/today/future, pointer advancement rules (past unlogged = no advance, logged entry = advance, today/future always advance), override application order, rotation boundary wrap, historyEntry attachment, and the documented edge case where dates before `plan.startDate` are passed directly to the engine. Also covers `buildMonthGrid` grid structure (complete weeks × 7 cells, `isCurrentMonth` accuracy, single `isToday` marker, `resolvedDay` attachment).
+
+**Why it mattered**: `getResolvedDaysRange` is the most complex function in the codebase with subtle pointer-advancement rules. Two test assertions had to be corrected during writing, which helped clarify how advance overrides interact with past unlogged days.
+
+**Files changed**: `src/engine/__tests__/calendarProjection.test.ts` (new file)
+
+**Risk**: None. Tests only.
+
+**Rollback**: `git revert e0d5eba`
+
+---
+
+## 14. Fix WorkoutDayCard dynamic Tailwind border class
+
+**Commit**: `2053931`
+
+**Summary**: `WorkoutDayCard` constructed the border color class name at runtime using `border-${meta.bgColor.replace('bg-', '')}`. Tailwind's CSS purger scans source files for complete class name strings — dynamically constructed names (e.g. `border-orange-500`) can be omitted from the production CSS bundle, making the pending-state left border invisible. Fixed by adding a static `borderColor` field to `WorkoutMeta` in `constants.ts` and using `meta.borderColor` directly.
+
+**Why it mattered**: Silent production CSS failure. The pending-state card border (the only visible difference between "today's workout" and a generic future day) could disappear in production builds.
+
+**Files changed**: `src/lib/constants.ts`, `src/components/workout/WorkoutDayCard.tsx`
+
+**Risk**: None. Same visual behavior, now guaranteed to be included in the CSS bundle.
+
+**Rollback**: `git revert 2053931`
+
+---
+
+## 15. Document resolveWorkoutDisplayTarget isFromProgression=false edge case
+
+**Commit**: `6893e35`
+
+**Summary**: Added a test to `engine.test.ts` documenting that when a progression state's `currentTargetDistanceMiles` equals the template's `targetDistanceMiles`, `isFromProgression` is `false` and no adaptation note is shown. This is intentional design (target unchanged → no indicator) but was undocumented.
+
+**Why it mattered**: The edge case was noted in TEST_RESULTS.md as "worth documenting in tests". Now documented with an explanation of when it occurs (progression initialised at baseline or reset to baseline).
+
+**Files changed**: `src/modules/run-adaptation/__tests__/engine.test.ts`
+
+**Risk**: None. Tests only.
+
+**Rollback**: `git revert 6893e35`
+
+---
+
+## 16. Fix buildMonthGrid: don't show pre-plan dates as past_unlogged
+
+**Commit**: `f1971d2`
+
+**Summary**: When viewing a calendar month in which a plan started mid-month (e.g., plan starts Jan 15 but the grid spans from Dec 28), dates before `plan.startDate` were passed to `getResolvedDaysRange`, which returned them as `past_unlogged` with the `startDayIndex` workout shown. Those dates pre-date the plan and should not display workout data. Fixed by clamping `fromDate` to `plan.startDate` before calling `getResolvedDaysRange`. Pre-start cells now have `resolvedDay = undefined` and render as neutral/inactive (the `CalendarPage` already handles this gracefully). Also added a guard for the case where the entire viewed month is before the plan started.
+
+**Why it mattered**: Users viewing the month their plan started would see incorrect workout labels and `past_unlogged` indicators on days before they'd ever used the app.
+
+**Files changed**: `src/engine/calendarProjection.ts`
+
+**Risk**: Low. The CalendarPage already handles `resolvedDay = undefined` (non-interactive neutral cell). The fix is additive — it only restricts the range passed to `getResolvedDaysRange`, not the range of cells rendered.
+
+**Rollback**: `git revert f1971d2`
