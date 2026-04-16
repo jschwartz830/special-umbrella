@@ -38,9 +38,18 @@ export function HistoryPage() {
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [filterPlanId, setFilterPlanId] = useState<string | 'all'>('all')
 
-  // Sort entries newest first
-  const sorted = [...entries].sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
+  // Plans that actually have history entries (for the filter dropdown)
+  const plansWithHistory = Object.values(plans).filter(p =>
+    entries.some(e => e.planId === p.id),
+  )
+  const showPlanFilter = plansWithHistory.length > 1
+
+  // Sort entries newest first, then apply plan filter
+  const sorted = [...entries]
+    .sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
+    .filter(e => filterPlanId === 'all' || e.planId === filterPlanId)
 
   function getOutcome(entry: HistoryEntry): WorkoutOutcome | null {
     const id = makeWorkoutInstanceId(entry.planId, entry.calendarDate)
@@ -70,7 +79,7 @@ export function HistoryPage() {
     setEditingEntry(null)
   }
 
-  if (sorted.length === 0) {
+  if (entries.length === 0) {
     return (
       <div className="px-4 pt-safe">
         <div className="pt-6 pb-4">
@@ -87,9 +96,31 @@ export function HistoryPage() {
   return (
     <div className="px-4 pt-safe">
       <div className="pt-6 pb-4">
-        <h1 className="text-2xl font-bold text-white">History</h1>
-        <p className="text-sm text-slate-400 mt-0.5">{sorted.length} logged days</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-bold text-white">History</h1>
+            <p className="text-sm text-slate-400 mt-0.5">{sorted.length} logged days</p>
+          </div>
+          {showPlanFilter && (
+            <select
+              value={filterPlanId}
+              onChange={e => setFilterPlanId(e.target.value)}
+              className="mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:ring-1 focus:ring-sky-500 max-w-[140px] truncate"
+            >
+              <option value="all">All plans</option>
+              {plansWithHistory.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
+
+      {sorted.length === 0 && filterPlanId !== 'all' && (
+        <p className="text-sm text-slate-500 text-center py-8">
+          No entries for this plan.
+        </p>
+      )}
 
       <div className="space-y-2 pb-4">
         {sorted.map(entry => {
