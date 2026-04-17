@@ -31,6 +31,7 @@ import {
 
 export function HistoryPage() {
   const plans = usePlanStore(s => s.plans)
+  const activePlanId = usePlanStore(s => s.activePlanId)
   const entries = useHistoryStore(s => s.entries)
   const updateNotes = useHistoryStore(s => s.updateEntryNotes)
   const updateAction = useHistoryStore(s => s.updateEntryAction)
@@ -44,13 +45,18 @@ export function HistoryPage() {
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [filterPlanId, setFilterPlanId] = useState<string | 'all'>('all')
 
   // Plans that actually have history entries (for the filter dropdown)
   const plansWithHistory = Object.values(plans).filter(p =>
     entries.some(e => e.planId === p.id),
   )
   const showPlanFilter = plansWithHistory.length > 1
+
+  // Default filter to the active plan when it has entries; otherwise show all.
+  const activePlanHasEntries = !!activePlanId && plansWithHistory.some(p => p.id === activePlanId)
+  const [filterPlanId, setFilterPlanId] = useState<string | 'all'>(
+    activePlanHasEntries ? activePlanId! : 'all',
+  )
 
   // Sort entries newest first, then apply plan filter
   const sorted = [...entries]
