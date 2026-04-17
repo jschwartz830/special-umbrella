@@ -20,6 +20,8 @@ import { useOutcomeStore, makeWorkoutInstanceId } from '../store/outcomeStore'
 import { Modal } from '../components/shared/Modal'
 import { DifficultyBadge } from '../components/workout/DifficultyBadge'
 import { EmptyState } from '../components/shared/EmptyState'
+import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
+import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
 import type { ActionType, HistoryEntry } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import {
@@ -33,8 +35,10 @@ export function HistoryPage() {
   const updateNotes = useHistoryStore(s => s.updateEntryNotes)
   const updateAction = useHistoryStore(s => s.updateEntryAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
+  const importEntries = useHistoryStore(s => s.importEntries)
   const outcomes = useOutcomeStore(s => s.outcomes)
   const updateOutcomeNotes = useOutcomeStore(s => s.updateOutcomeNotes)
+  const importOutcomes = useOutcomeStore(s => s.importOutcomes)
 
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
@@ -83,11 +87,37 @@ export function HistoryPage() {
     setEditingEntry(null)
   }
 
+  function handleExport() {
+    const csv = historyToCsv(entries, plans, outcomes)
+    const stamp = format(new Date(), 'yyyy-MM-dd')
+    downloadCsv(`workout-history-${stamp}.csv`, csv)
+  }
+
+  async function handleImport(file: File): Promise<ImportResult> {
+    const text = await file.text()
+    const existingPlanIds = new Set(Object.keys(plans))
+    const { entries: newEntries, outcomes: newOutcomes, warnings } = historyFromCsv(
+      text,
+      existingPlanIds,
+    )
+    importEntries(newEntries)
+    importOutcomes(newOutcomes)
+    return {
+      summary: `Imported ${newEntries.length} history ${newEntries.length === 1 ? 'entry' : 'entries'}${newOutcomes.length ? ` and ${newOutcomes.length} outcome record${newOutcomes.length === 1 ? '' : 's'}` : ''}.`,
+      warnings,
+    }
+  }
+
   if (entries.length === 0) {
     return (
       <div className="px-4 pt-safe">
-        <div className="pt-6 pb-4">
+        <div className="pt-6 pb-4 flex items-start justify-between gap-2">
           <h1 className="text-2xl font-bold text-white">History</h1>
+          <CsvToolbar
+            canExport={false}
+            onExport={handleExport}
+            onImport={handleImport}
+          />
         </div>
         <EmptyState
           title="No history yet"
@@ -99,7 +129,7 @@ export function HistoryPage() {
 
   return (
     <div className="px-4 pt-safe">
-      <div className="pt-6 pb-4">
+      <div className="pt-6 pb-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h1 className="text-2xl font-bold text-white">History</h1>
@@ -118,6 +148,11 @@ export function HistoryPage() {
             </select>
           )}
         </div>
+        <CsvToolbar
+          canExport={entries.length > 0}
+          onExport={handleExport}
+          onImport={handleImport}
+        />
       </div>
 
       {sorted.length === 0 && filterPlanId !== 'all' && (

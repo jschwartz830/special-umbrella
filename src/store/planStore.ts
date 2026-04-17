@@ -15,6 +15,9 @@ interface PlanState {
   deletePlan: (id: string) => void
   setActivePlan: (id: string, opts?: { startDate?: string; startDayIndex?: number }) => void
   deactivatePlan: () => void
+
+  /** Bulk import fully-formed plans (with new IDs already assigned). */
+  importPlans: (plans: Plan[]) => void
 }
 
 function deepCloneWorkoutSlot(slot: WorkoutSlot): WorkoutSlot {
@@ -129,6 +132,15 @@ export const usePlanStore = create<PlanState>()(
             updatedAt: new Date().toISOString(),
           }
           return { plans: updated, activePlanId: id }
+        })
+      },
+
+      importPlans(incoming) {
+        if (incoming.length === 0) return
+        set(s => {
+          const next = { ...s.plans }
+          for (const p of incoming) next[p.id] = p
+          return { plans: next }
         })
       },
 

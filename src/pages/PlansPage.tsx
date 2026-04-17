@@ -16,6 +16,8 @@ import { useHistoryStore } from '../store/historyStore'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
+import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
+import { downloadCsv, plansToCsv, plansFromCsv } from '../lib/csv'
 import type { Plan } from '../types'
 
 export function PlansPage() {
@@ -26,6 +28,7 @@ export function PlansPage() {
   const duplicatePlan = usePlanStore(s => s.duplicatePlan)
   const archivePlan = usePlanStore(s => s.archivePlan)
   const deletePlan = usePlanStore(s => s.deletePlan)
+  const importPlans = usePlanStore(s => s.importPlans)
   const clearHistory = useHistoryStore(s => s.clearPlanHistory)
   const entries = useHistoryStore(s => s.entries)
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -50,6 +53,22 @@ export function PlansPage() {
     if (!activatingPlan) return
     setActivePlan(activatingPlan.id, { startDate, startDayIndex })
     setActivatingPlan(null)
+  }
+
+  function handleExport() {
+    const csv = plansToCsv(allPlans)
+    const stamp = format(new Date(), 'yyyy-MM-dd')
+    downloadCsv(`workout-plans-${stamp}.csv`, csv)
+  }
+
+  async function handleImport(file: File): Promise<ImportResult> {
+    const text = await file.text()
+    const { plans: newPlans, warnings } = plansFromCsv(text)
+    importPlans(newPlans)
+    return {
+      summary: `Imported ${newPlans.length} plan${newPlans.length === 1 ? '' : 's'}.`,
+      warnings,
+    }
   }
 
   function PlanCard({ plan }: { plan: Plan }) {
@@ -149,14 +168,21 @@ export function PlansPage() {
 
   return (
     <div className="px-4 pt-safe">
-      <div className="pt-6 pb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Plans</h1>
-        <button
-          onClick={() => navigate('/plans/new')}
-          className="flex items-center gap-1.5 px-3 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-semibold transition-colors active:scale-95"
-        >
-          <Plus size={16} /> New Plan
-        </button>
+      <div className="pt-6 pb-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-white">Plans</h1>
+          <button
+            onClick={() => navigate('/plans/new')}
+            className="flex items-center gap-1.5 px-3 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-semibold transition-colors active:scale-95"
+          >
+            <Plus size={16} /> New Plan
+          </button>
+        </div>
+        <CsvToolbar
+          canExport={allPlans.length > 0}
+          onExport={handleExport}
+          onImport={handleImport}
+        />
       </div>
 
       {allPlans.length === 0 && (

@@ -47,6 +47,9 @@ interface HistoryState {
   updateEntryAction: (planId: string, calendarDate: string, action: ActionType, planDayIndex?: number) => void
   clearPlanHistory: (planId: string) => void
   removeEntry: (planId: string, calendarDate: string) => void
+
+  /** Bulk import: replaces any existing entry for the same (planId, calendarDate). */
+  importEntries: (entries: HistoryEntry[]) => void
 }
 
 export const useHistoryStore = create<HistoryState>()(
@@ -139,6 +142,17 @@ export const useHistoryStore = create<HistoryState>()(
             e => !(e.planId === planId && e.calendarDate === calendarDate),
           ),
         }))
+      },
+
+      importEntries(incoming) {
+        if (incoming.length === 0) return
+        set(s => {
+          const keys = new Set(incoming.map(e => `${e.planId}__${e.calendarDate}`))
+          const filtered = s.entries.filter(
+            e => !keys.has(`${e.planId}__${e.calendarDate}`),
+          )
+          return { entries: [...filtered, ...incoming] }
+        })
       },
     }),
     { name: 'wpt_history' },
