@@ -35,6 +35,9 @@ interface OutcomeState {
 
   /** Remove all outcomes associated with a plan (called when plan is cleared) */
   clearPlanOutcomes: (planId: string) => void
+
+  /** Bulk import — replaces any existing outcome for a given workoutInstanceId. */
+  importOutcomes: (incoming: WorkoutOutcome[]) => void
 }
 
 export const useOutcomeStore = create<OutcomeState>()(
@@ -107,6 +110,15 @@ export const useOutcomeStore = create<OutcomeState>()(
             Object.entries(s.outcomes).filter(([k]) => !k.startsWith(prefix)),
           ),
         }))
+      },
+
+      importOutcomes(incoming) {
+        if (incoming.length === 0) return
+        set(s => {
+          const next = { ...s.outcomes }
+          for (const o of incoming) next[o.workoutInstanceId] = o
+          return { outcomes: next }
+        })
       },
     }),
     { name: 'wpt_outcomes' },
