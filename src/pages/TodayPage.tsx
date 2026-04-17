@@ -39,6 +39,7 @@ export function TodayPage() {
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const getOutcome = useOutcomeStore(s => s.getOutcome)
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
+  const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const today = new Intl.DateTimeFormat('en-CA').format(new Date())
 
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
@@ -253,7 +254,10 @@ export function TodayPage() {
             <Pencil size={13} /> Edit outcome
           </button>
           <button
-            onClick={() => removeEntry(plan.id, today)}
+            onClick={() => {
+              removeEntry(plan.id, today)
+              removeOutcome(makeWorkoutInstanceId(plan.id, today))
+            }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 text-xs font-medium transition-colors"
           >
             <RotateCcw size={13} /> Undo

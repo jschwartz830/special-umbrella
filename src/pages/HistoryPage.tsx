@@ -38,6 +38,7 @@ export function HistoryPage() {
   const importEntries = useHistoryStore(s => s.importEntries)
   const outcomes = useOutcomeStore(s => s.outcomes)
   const updateOutcomeNotes = useOutcomeStore(s => s.updateOutcomeNotes)
+  const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const importOutcomes = useOutcomeStore(s => s.importOutcomes)
 
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
@@ -83,6 +84,7 @@ export function HistoryPage() {
 
   function deleteEntry(entry: HistoryEntry) {
     removeEntry(entry.planId, entry.calendarDate)
+    removeOutcome(makeWorkoutInstanceId(entry.planId, entry.calendarDate))
     setConfirmDeleteId(null)
     setEditingEntry(null)
   }

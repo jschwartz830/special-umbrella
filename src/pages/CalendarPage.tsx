@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Coffee, X, CheckCircle2, SkipForward } from 
 import { format } from 'date-fns'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { useHistoryStore } from '../store/historyStore'
+import { useOutcomeStore, makeWorkoutInstanceId } from '../store/outcomeStore'
 import { buildMonthGrid } from '../engine/calendarProjection'
 import { WorkoutBadge } from '../components/workout/WorkoutBadge'
 import { Modal } from '../components/shared/Modal'
@@ -24,6 +25,7 @@ export function CalendarPage() {
   const removeEntry = useHistoryStore(s => s.removeEntry)
   const addOverride = useHistoryStore(s => s.addOverride)
   const removeRetroJumpForDate = useHistoryStore(s => s.removeRetroJumpForDate)
+  const removeOutcome = useOutcomeStore(s => s.removeOutcome)
 
   const weeks = useMemo(
     () => buildMonthGrid(year, month, plan, entries, overrides, today),
@@ -71,6 +73,7 @@ export function CalendarPage() {
     if (!plan) return
     removeRetroJumpForDate(plan.id, rd.calendarDate)
     removeEntry(plan.id, rd.calendarDate)
+    removeOutcome(makeWorkoutInstanceId(plan.id, rd.calendarDate))
     setSelected(null)
   }
 
