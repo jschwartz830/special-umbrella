@@ -140,3 +140,8 @@ export const useOutcomeStore = create<OutcomeState>()(
 export function makeWorkoutInstanceId(planId: string, calendarDate: string): string {
   return `${planId}_${calendarDate}`
 }
+
+/** Build the workoutInstanceId for an extra (ad-hoc) workout entry */
+export function makeExtraWorkoutInstanceId(planId: string, calendarDate: string, extraId: string): string {
+  return `${planId}_${calendarDate}_extra_${extraId}`
+}
