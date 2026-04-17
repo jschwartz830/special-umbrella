@@ -213,6 +213,41 @@ describe('logOutcomeWithProgression', () => {
   })
 })
 
+// ── removeOutcome ─────────────────────────────────────────────────────────────
+
+describe('removeOutcome', () => {
+  it('removes a single outcome by instanceId', () => {
+    const a = makeOutcome('plan-1', '2026-01-01')
+    const b = makeOutcome('plan-1', '2026-01-02')
+    getState().setOutcome(a)
+    getState().setOutcome(b)
+    getState().removeOutcome(a.workoutInstanceId)
+    expect(getState().getOutcome(a.workoutInstanceId)).toBeNull()
+    expect(getState().getOutcome(b.workoutInstanceId)).toEqual(b)
+  })
+
+  it('is a no-op when the outcome does not exist', () => {
+    const a = makeOutcome('plan-1', '2026-01-01')
+    getState().setOutcome(a)
+    expect(() => {
+      getState().removeOutcome('plan-1_2099-12-31')
+    }).not.toThrow()
+    expect(Object.keys(getState().outcomes)).toHaveLength(1)
+  })
+
+  it('does not touch progressionStates', () => {
+    const outcome = makeOutcome('plan-1', '2026-01-01', {
+      perceivedEffort: 2,
+      runActual: { actualDistanceMiles: 5.1, actualDurationMin: 50, completedAsPlanned: true },
+    })
+    const slot = makeRunSlot({ progressionGroupId: 'grp', targetDistanceMiles: 5 })
+    getState().logOutcomeWithProgression(outcome, slot)
+    getState().removeOutcome(outcome.workoutInstanceId)
+    expect(getState().getOutcome(outcome.workoutInstanceId)).toBeNull()
+    expect(getState().progressionStates['grp']).toBeDefined()
+  })
+})
+
 // ── clearPlanOutcomes ─────────────────────────────────────────────────────────
 
 describe('clearPlanOutcomes', () => {
