@@ -13,39 +13,78 @@ import {
   Ruler,
   Zap,
   Timer,
+  ClipboardList,
+  Plus,
 } from 'lucide-react'
 import { useHistoryStore } from '../store/historyStore'
 import { usePlanStore } from '../store/planStore'
-import { useOutcomeStore, makeWorkoutInstanceId } from '../store/outcomeStore'
+import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { Modal } from '../components/shared/Modal'
 import { DifficultyBadge } from '../components/workout/DifficultyBadge'
+import { WorkoutBadge } from '../components/workout/WorkoutBadge'
+import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
 import { computeHistoryStats } from '../lib/historyStats'
-import type { ActionType, HistoryEntry } from '../types'
+import { completionStateToAction } from '../modules/workout-outcomes/types'
+import type { ActionType, HistoryEntry, ExtraWorkoutEntry, WorkoutType, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import {
   COMPLETION_STATE_LABELS,
   formatPace,
 } from '../modules/workout-outcomes/types'
 
+const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
+  { type: 'weightlifting', label: 'Weightlifting' },
+  { type: 'long_run', label: 'Long Run' },
+  { type: 'recovery_run', label: 'Recovery Run' },
+  { type: 'swim', label: 'Swim' },
+  { type: 'yoga', label: 'Yoga' },
+  { type: 'rest', label: 'Rest' },
+]
+
+function extraToPlanDay(extra: ExtraWorkoutEntry): PlanDay {
+  return {
+    id: extra.id,
+    label: extra.workoutName,
+    slots: [{ id: extra.id, type: extra.workoutType, name: extra.workoutName }],
+  }
+}
+
 export function HistoryPage() {
   const plans = usePlanStore(s => s.plans)
   const activePlanId = usePlanStore(s => s.activePlanId)
   const entries = useHistoryStore(s => s.entries)
+  const extraEntries = useHistoryStore(s => s.extraEntries)
   const updateNotes = useHistoryStore(s => s.updateEntryNotes)
   const updateAction = useHistoryStore(s => s.updateEntryAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
   const importEntries = useHistoryStore(s => s.importEntries)
+  const addExtraEntry = useHistoryStore(s => s.addExtraEntry)
+  const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
   const outcomes = useOutcomeStore(s => s.outcomes)
   const updateOutcomeNotes = useOutcomeStore(s => s.updateOutcomeNotes)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const importOutcomes = useOutcomeStore(s => s.importOutcomes)
+  const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
 
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  // Outcome modal state
+  const [outcomeTarget, setOutcomeTarget] = useState<{
+    planId: string
+    calendarDate: string
+    planDay: PlanDay
+    instanceId: string
+  } | null>(null)
+
+  // Extra workout add form (keyed by calendarDate, shown inline)
+  const [addingExtraDate, setAddingExtraDate] = useState<string | null>(null)
+  const [extraType, setExtraType] = useState<WorkoutType>('yoga')
+  const [extraName, setExtraName] = useState('')
 
   // Plans that actually have history entries (for the filter dropdown)
   const plansWithHistory = Object.values(plans).filter(p =>
@@ -53,13 +92,11 @@ export function HistoryPage() {
   )
   const showPlanFilter = plansWithHistory.length > 1
 
-  // Default filter to the active plan when it has entries; otherwise show all.
   const activePlanHasEntries = !!activePlanId && plansWithHistory.some(p => p.id === activePlanId)
   const [filterPlanId, setFilterPlanId] = useState<string | 'all'>(
     activePlanHasEntries ? activePlanId! : 'all',
   )
 
-  // Sort entries newest first, then apply plan filter
   const sorted = [...entries]
     .sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
     .filter(e => filterPlanId === 'all' || e.planId === filterPlanId)
@@ -72,6 +109,10 @@ export function HistoryPage() {
     return outcomes[id] ?? null
   }
 
+  function getExtrasForEntry(entry: HistoryEntry): ExtraWorkoutEntry[] {
+    return extraEntries.filter(e => e.planId === entry.planId && e.calendarDate === entry.calendarDate)
+  }
+
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')
     setEditingEntry(entry)
@@ -80,7 +121,6 @@ export function HistoryPage() {
   function saveAndClose() {
     if (!editingEntry) return
     updateNotes(editingEntry.id, notesText)
-    // Keep outcome.notes in sync so the OutcomeModal shows current notes if reopened
     const instanceId = makeWorkoutInstanceId(editingEntry.planId, editingEntry.calendarDate)
     updateOutcomeNotes(instanceId, notesText)
     setEditingEntry(null)
@@ -97,6 +137,55 @@ export function HistoryPage() {
     removeOutcome(makeWorkoutInstanceId(entry.planId, entry.calendarDate))
     setConfirmDeleteId(null)
     setEditingEntry(null)
+  }
+
+  function openOutcomeForEntry(entry: HistoryEntry) {
+    const plan = plans[entry.planId]
+    if (!plan || entry.planDayIndex === undefined) return
+    const planDay = plan.days[entry.planDayIndex]
+    if (!planDay) return
+    setEditingEntry(null)
+    setOutcomeTarget({
+      planId: entry.planId,
+      calendarDate: entry.calendarDate,
+      planDay,
+      instanceId: makeWorkoutInstanceId(entry.planId, entry.calendarDate),
+    })
+  }
+
+  function openOutcomeForExtra(extra: ExtraWorkoutEntry) {
+    setOutcomeTarget({
+      planId: extra.planId,
+      calendarDate: extra.calendarDate,
+      planDay: extraToPlanDay(extra),
+      instanceId: makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id),
+    })
+  }
+
+  function handleOutcomeConfirm(outcome: WorkoutOutcome) {
+    if (!outcomeTarget) return
+    const slot = outcomeTarget.planDay.slots[0] ?? { id: '', type: 'rest' as WorkoutType, name: '' }
+    logOutcomeWithProgression(outcome, slot)
+
+    // Sync history entry action if this is a main workout outcome
+    const entry = entries.find(
+      e => e.planId === outcomeTarget.planId && e.calendarDate === outcomeTarget.calendarDate,
+    )
+    if (entry && !outcomeTarget.instanceId.includes('_extra_')) {
+      const action = completionStateToAction(outcome.completionState)
+      if (entry.action !== action) {
+        updateAction(entry.planId, entry.calendarDate, action)
+      }
+    }
+    setOutcomeTarget(null)
+  }
+
+  function submitAddExtra(entry: HistoryEntry) {
+    const name = extraName.trim() || WORKOUT_TYPES.find(w => w.type === extraType)?.label || extraType
+    addExtraEntry({ planId: entry.planId, calendarDate: entry.calendarDate, workoutType: extraType, workoutName: name })
+    setAddingExtraDate(null)
+    setExtraName('')
+    setExtraType('yoga')
   }
 
   function handleExport() {
@@ -188,8 +277,9 @@ export function HistoryPage() {
           const planDay = plan?.days.find((_, idx) => idx === entry.planDayIndex)
           const outcome = getOutcome(entry)
           const completionState = outcome?.completionState ?? null
+          const extras = getExtrasForEntry(entry)
+          const isAddingExtra = addingExtraDate === entry.calendarDate
 
-          // Icon and colour based on richer completion state if available
           const actionIcon = completionState === 'partially_completed'
             ? <MinusCircle size={18} className="text-yellow-400" />
             : completionState === 'deferred'
@@ -237,7 +327,6 @@ export function HistoryPage() {
                     </div>
                   </div>
 
-                  {/* Slot name + plan name + difficulty badges */}
                   {planDay && (
                     <div className="mt-1 ml-6">
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -254,7 +343,6 @@ export function HistoryPage() {
                   {/* Outcome actuals */}
                   {outcome && (
                     <div className="mt-2 ml-6 space-y-1">
-                      {/* Effort */}
                       {outcome.perceivedEffort != null && (
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs text-slate-500">Effort:</span>
@@ -280,7 +368,6 @@ export function HistoryPage() {
                         </div>
                       )}
 
-                      {/* Run actuals */}
                       {outcome.runActual && (
                         <div className="flex flex-wrap gap-3 text-xs text-slate-400">
                           {outcome.runActual.actualDistanceMiles != null && (
@@ -301,7 +388,6 @@ export function HistoryPage() {
                         </div>
                       )}
 
-                      {/* Duration actual (non-run) */}
                       {!outcome.runActual && outcome.durationActualMin != null && (
                         <p className="text-xs text-slate-500">
                           {outcome.durationActualMin} min
@@ -319,6 +405,15 @@ export function HistoryPage() {
                   <span className={`text-xs font-medium capitalize ${actionColor}`}>
                     {stateLabel}
                   </span>
+                  {entry.action === 'complete' && (
+                    <button
+                      onClick={() => openOutcomeForEntry(entry)}
+                      className="ml-1 p-1.5 rounded-lg bg-slate-700 hover:bg-sky-500/20 text-slate-400 hover:text-sky-400 transition-colors"
+                      title="Edit workout details"
+                    >
+                      <ClipboardList size={12} />
+                    </button>
+                  )}
                   <button
                     onClick={() => openEdit(entry)}
                     className="ml-1 p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"
@@ -327,6 +422,90 @@ export function HistoryPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Extra workouts for this date */}
+              {(extras.length > 0 || isAddingExtra) && (
+                <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-1.5">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">Additional Workouts</p>
+                  {extras.map(extra => {
+                    const instanceId = makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id)
+                    const extraOutcome = outcomes[instanceId]
+                    return (
+                      <div key={extra.id} className="flex items-center gap-2 bg-slate-700/30 rounded-lg px-2.5 py-1.5">
+                        <WorkoutBadge type={extra.workoutType} size="sm" />
+                        <span className="text-xs text-slate-300 flex-1 truncate">{extra.workoutName}</span>
+                        {extraOutcome?.perceivedEffort != null && (
+                          <span className="text-[10px] text-slate-500">{extraOutcome.perceivedEffort}/5</span>
+                        )}
+                        {extraOutcome?.runActual?.actualDistanceMiles != null && (
+                          <span className="text-[10px] text-slate-500 flex items-center gap-0.5"><Ruler size={9} /> {extraOutcome.runActual.actualDistanceMiles} mi</span>
+                        )}
+                        {extraOutcome?.durationActualMin != null && !extraOutcome.runActual && (
+                          <span className="text-[10px] text-slate-500">{extraOutcome.durationActualMin} min</span>
+                        )}
+                        <button
+                          onClick={() => openOutcomeForExtra(extra)}
+                          className="p-1 rounded text-sky-400 hover:text-sky-300 transition-colors"
+                          title="Log/edit details"
+                        >
+                          <ClipboardList size={11} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            removeExtraEntry(extra.id)
+                            removeOutcome(instanceId)
+                          }}
+                          className="p-1 rounded text-slate-500 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    )
+                  })}
+
+                  {/* Inline add form */}
+                  {isAddingExtra && (
+                    <div className="bg-slate-700/40 rounded-lg p-2.5 space-y-2">
+                      <select
+                        value={extraType}
+                        onChange={e => setExtraType(e.target.value as WorkoutType)}
+                        className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      >
+                        {WORKOUT_TYPES.map(w => (
+                          <option key={w.type} value={w.type}>{w.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={extraName}
+                        onChange={e => setExtraName(e.target.value)}
+                        placeholder="Name (optional)"
+                        className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => submitAddExtra(entry)} className="flex-1 py-1.5 text-xs rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-medium transition-colors">Add</button>
+                        <button onClick={() => { setAddingExtraDate(null); setExtraName(''); }} className="flex-1 py-1.5 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Add extra workout button */}
+              {!isAddingExtra && (
+                <div className="mt-2 pt-2 border-t border-slate-700/30">
+                  <button
+                    onClick={() => {
+                      setAddingExtraDate(entry.calendarDate)
+                      setExtraType('yoga')
+                      setExtraName('')
+                    }}
+                    className="flex items-center gap-1 text-xs text-slate-500 hover:text-sky-400 transition-colors"
+                  >
+                    <Plus size={11} /> Add workout
+                  </button>
+                </div>
+              )}
             </div>
           )
         })}
@@ -387,6 +566,16 @@ export function HistoryPage() {
               </div>
             </div>
 
+            {/* Edit workout details */}
+            {editingEntry.action === 'complete' && editingEntry.planDayIndex !== undefined && (
+              <button
+                onClick={() => openOutcomeForEntry(editingEntry)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 text-sm font-medium transition-colors"
+              >
+                <ClipboardList size={15} /> Edit Workout Details
+              </button>
+            )}
+
             {/* Notes */}
             <div>
               <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Notes</p>
@@ -433,6 +622,18 @@ export function HistoryPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Outcome modal */}
+      {outcomeTarget && (
+        <OutcomeModal
+          planId={outcomeTarget.planId}
+          calendarDate={outcomeTarget.calendarDate}
+          planDay={outcomeTarget.planDay}
+          existingOutcome={outcomes[outcomeTarget.instanceId] ?? null}
+          onConfirm={handleOutcomeConfirm}
+          onClose={() => setOutcomeTarget(null)}
+        />
       )}
     </div>
   )

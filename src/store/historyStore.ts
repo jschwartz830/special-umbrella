@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { format } from 'date-fns'
-import type { HistoryEntry, OverrideEntry, ActionType, OverrideType, WorkoutType } from '../types'
+import type { HistoryEntry, OverrideEntry, ExtraWorkoutEntry, ActionType, OverrideType, WorkoutType } from '../types'
 import { nanoid } from '../engine/rotationEngine'
 
 interface HistoryState {
   entries: HistoryEntry[]
   overrides: OverrideEntry[]
+  extraEntries: ExtraWorkoutEntry[]
 
   addEntry: (
     payload: Omit<HistoryEntry, 'id' | 'createdAt'>,
@@ -50,6 +51,11 @@ interface HistoryState {
 
   /** Bulk import: replaces any existing entry for the same (planId, calendarDate). */
   importEntries: (entries: HistoryEntry[]) => void
+
+  addExtraEntry: (payload: Omit<ExtraWorkoutEntry, 'id' | 'createdAt'>) => string
+  updateExtraEntry: (id: string, patch: Partial<Pick<ExtraWorkoutEntry, 'workoutType' | 'workoutName' | 'notes'>>) => void
+  removeExtraEntry: (id: string) => void
+  clearExtraEntriesForDate: (planId: string, calendarDate: string) => void
 }
 
 export const useHistoryStore = create<HistoryState>()(
@@ -57,6 +63,7 @@ export const useHistoryStore = create<HistoryState>()(
     (set, get) => ({
       entries: [],
       overrides: [],
+      extraEntries: [],
 
       addEntry(payload) {
         const now = new Date().toISOString()
@@ -153,6 +160,35 @@ export const useHistoryStore = create<HistoryState>()(
           )
           return { entries: [...filtered, ...incoming] }
         })
+      },
+
+      addExtraEntry(payload) {
+        const id = nanoid()
+        const entry: ExtraWorkoutEntry = {
+          id,
+          createdAt: new Date().toISOString(),
+          ...payload,
+        }
+        set(s => ({ extraEntries: [...s.extraEntries, entry] }))
+        return id
+      },
+
+      updateExtraEntry(id, patch) {
+        set(s => ({
+          extraEntries: s.extraEntries.map(e => e.id === id ? { ...e, ...patch } : e),
+        }))
+      },
+
+      removeExtraEntry(id) {
+        set(s => ({ extraEntries: s.extraEntries.filter(e => e.id !== id) }))
+      },
+
+      clearExtraEntriesForDate(planId, calendarDate) {
+        set(s => ({
+          extraEntries: s.extraEntries.filter(
+            e => !(e.planId === planId && e.calendarDate === calendarDate),
+          ),
+        }))
       },
     }),
     { name: 'wpt_history' },

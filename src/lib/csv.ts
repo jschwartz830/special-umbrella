@@ -288,10 +288,11 @@ export function plansFromCsv(text: string): PlansImportResult {
   const now = new Date().toISOString()
   const plans: Plan[] = []
 
-  for (const [, rows] of byPlan) {
+  for (const [pid, rows] of byPlan) {
     if (rows.length === 0) continue
     const first = rows[0]
-    const newPlanId = nanoid()
+    // Preserve the original planId so exported history CSVs continue to match.
+    const newPlanId = pid
 
     const status = VALID_STATUSES.includes(first.planStatus as PlanStatus)
       ? (first.planStatus as PlanStatus)

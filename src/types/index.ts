@@ -94,6 +94,17 @@ export interface HistoryEntry {
   createdAt: string
 }
 
+/** An ad-hoc workout logged on a day, outside the plan rotation. */
+export interface ExtraWorkoutEntry {
+  id: string
+  planId: string
+  calendarDate: string    // YYYY-MM-DD
+  workoutType: WorkoutType
+  workoutName: string
+  notes?: string
+  createdAt: string
+}
+
 // ── Overrides ────────────────────────────────────────────────────────────────
 
 export interface OverrideEntry {
