@@ -1,5 +1,99 @@
 # Overnight Changelog
 
+## 2026-04-17 run — branch `claude/funny-galileo-6zMOl`
+
+Baseline: 156 tests pass (inherited from 2026-04-16 run).
+End state: **170 tests pass**, `npx vite build` succeeds.
+
+All changes are additive or deletions of verified-dead code. The
+rotation engine, calendar projection, run-adaptation engine, and CSV
+import/export paths were **not** modified.
+
+### Commits (oldest → newest)
+
+1. **`a8227ae` — Add IMPLEMENTATION_PLAN.md for 2026-04-17 audit**
+   Dated architecture summary + prioritized plan appended to the file.
+
+2. **`3e83c25` — Clear plan outcomes when deleting a plan**
+   `PlansPage` delete handler now calls `clearPlanOutcomes` alongside
+   `clearPlanHistory`. Fixes orphaned `WorkoutOutcome` records — the
+   function existed and was tested but had never been wired into the UI.
+   - `src/pages/PlansPage.tsx`
+   - **Risk**: none. Adds cleanup; no engine / no projection changes.
+   - **Rollback**: `git revert 3e83c25`.
+
+3. **`2bff88e` — Clear outcome record when history entry is undone or deleted**
+   Adds `removeOutcome(instanceId)` to `outcomeStore`. Wired into:
+   - `TodayPage` Undo
+   - `HistoryPage` entry delete
+   - `CalendarPage` Clear button in the day-detail modal
+   Keeps the history and outcome stores in lockstep so re-opening the
+   OutcomeModal after an Undo no longer pre-populates a stale outcome.
+   - `src/store/outcomeStore.ts`, `src/pages/TodayPage.tsx`,
+     `src/pages/HistoryPage.tsx`, `src/pages/CalendarPage.tsx`
+   - **Risk**: low. The new action is a single Zustand set.
+   - **Rollback**: `git revert 2bff88e`.
+
+4. **`32de834` — Remove unused uiStore**
+   `useUIStore` had zero importers anywhere in `src/`. Deleted.
+   - `src/store/uiStore.ts` (deleted)
+   - **Risk**: none. Verified by grep.
+   - **Rollback**: `git revert 32de834`.
+
+5. **`78a9152` — Default history plan filter to active plan when available**
+   When `activePlanId` is set AND that plan has at least one logged
+   entry, `HistoryPage` opens with its filter pre-selected to the active
+   plan instead of "All plans". Falls back to "all" otherwise.
+   - `src/pages/HistoryPage.tsx`
+   - **Risk**: low; UX-only default change. User can still switch filters.
+   - **Rollback**: `git revert 78a9152`.
+
+6. **`ddc93d6` — Add tests for removeOutcome and plan-delete cleanup**
+   - `removeOutcome` unit tests (single removal, no-op on missing id,
+     progressionStates isolation) appended to `outcomeStore.test.ts`.
+   - New `planDeleteCleanup.test.ts` — integration-style test that seeds
+     two plans, deletes one, and asserts cleanup cascades across the
+     three stores and leaves the sibling plan untouched.
+   - +137 lines of test code.
+   - **Rollback**: `git revert ddc93d6`.
+
+7. **`724ca92` — Add history stats summary to HistoryPage**
+   Selected medium-complexity feature, narrow slice:
+   - New pure helper `src/lib/historyStats.ts` (`computeHistoryStats`).
+   - 9 unit tests covering totals, inclusive windows (7-day, 30-day),
+     streak definition (complete or day_off; skip or gap breaks it).
+   - 4 stat tiles (Streak / 7-day / 30-day / Total) rendered above the
+     entry list in `HistoryPage`. Respects the plan filter — stats
+     recompute when the user changes the dropdown.
+   - **Risk**: low. Pure derivation, zero engine changes, no new deps.
+   - **Rollback**: `git revert 724ca92`.
+
+### Tests
+
+- Before: 156 pass.
+- After: 170 pass (+14).
+- New files:
+  - `src/lib/__tests__/historyStats.test.ts` (9 tests)
+  - `src/store/__tests__/planDeleteCleanup.test.ts` (2 tests)
+- Additions to existing:
+  - `src/store/__tests__/outcomeStore.test.ts` (+3 `removeOutcome` tests)
+
+### User-visible behavior changes
+
+1. Plan delete now truly removes everything — previously outcomes
+   leaked into localStorage indefinitely.
+2. Undo on Today (and Delete / Clear on History & Calendar) also clears
+   the saved outcome — previously re-opening an entry after undoing it
+   would re-populate stale outcome fields.
+3. HistoryPage opens pre-filtered to the active plan when possible.
+4. A 4-tile stats summary now sits above the entry list.
+
+Nothing here affects CSV export/import or the PWA manifest.
+
+---
+
+## 2026-04-16 run
+
 Generated: 2026-04-16
 
 Changes are listed in commit order (oldest first).

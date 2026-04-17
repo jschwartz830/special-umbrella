@@ -1,5 +1,69 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-17 run — branch `claude/funny-galileo-6zMOl`
+
+### Executive Summary
+
+Third-pass audit, building on the 2026-04-16 run. 7 commits: 4 fixes,
+1 deletion of dead code, 1 test-only addition, 1 small feature.
+
+**Review first** — the two real correctness fixes:
+
+1. **Orphaned outcomes on plan delete (`3e83c25`)** — `PlansPage` delete
+   handler now calls `clearPlanOutcomes` alongside `clearPlanHistory`.
+   The `clearPlanOutcomes` function existed and had its own test but
+   was never wired into the UI. A high-confidence one-line fix.
+2. **Stale outcome after Undo / Delete / Clear (`2bff88e`)** — added
+   `removeOutcome(instanceId)` to outcomeStore and called from the three
+   entry-removal paths (TodayPage Undo, HistoryPage delete entry,
+   CalendarPage clearDate). Keeps the two stores in lockstep; a user
+   who undoes a completion and re-opens the OutcomeModal no longer sees
+   stale fields.
+
+**Low-risk supporting changes**:
+
+- **Default the History plan filter to active plan (`78a9152`)** —
+  pure UX default. Falls back to "all" when no active plan exists or it
+  has no entries. Verify by opening HistoryPage with multiple plans.
+- **Remove dead `uiStore.ts` (`32de834`)** — verified by grep: zero
+  importers anywhere under `src/`.
+- **+14 tests (`ddc93d6`, `724ca92`)** — removeOutcome, plan-delete
+  cascade, historyStats helper. All green.
+
+**Feature**:
+
+- **History stats row (`724ca92`)** — 4 pure-derived tiles (Streak,
+  7-day, 30-day, Total) at the top of HistoryPage. Zero engine
+  coupling; recomputed on every render from the currently-filtered
+  entries. Streak definition: consecutive days ending today with a
+  `complete` or `day_off` entry. Skip or a gap breaks it.
+
+### Open questions / worth reviewing carefully
+
+- **Streak definition**. I chose `complete || day_off` breaks on `skip`.
+  That matches "stayed on program" semantics but another valid choice
+  is `complete` only. Easy to change via `historyStats.ts`.
+- **Active-plan default for HistoryPage filter**. Reasonable for most
+  users but a user reviewing all-time history across multiple plans
+  will now have to select "All plans" each visit.
+
+### Nothing is risky or destructive
+
+No rotation-engine logic changed. No migration needed. No persisted
+storage schema changes. The `removeOutcome` action mirrors the existing
+`clearPlanOutcomes` pattern.
+
+### Not implemented (from IMPLEMENTATION_PLAN.md)
+
+- Double-day bonus outcome capture — needs UX design.
+- Swap-slot override UI — needs UX design.
+- Progression reset button — small UX scope decision.
+- Plan ID preservation across CSV import — would change import semantics.
+
+---
+
+## 2026-04-16 run
+
 Generated: 2026-04-16
 
 ---
