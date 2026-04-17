@@ -14,6 +14,7 @@ import {
   PlusCircle,
   X,
   PartyPopper,
+  CheckCircle2,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
@@ -28,6 +29,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
+import type { ResolvedDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 
 export function TodayPage() {
@@ -46,6 +48,8 @@ export function TodayPage() {
   const [showOverride, setShowOverride] = useState(false)
   const [showJump, setShowJump] = useState(false)
   const [doubleDay, setDoubleDay] = useState(false)
+  const [loggingUpcoming, setLoggingUpcoming] = useState<ResolvedDay | null>(null)
+  const [showUpcomingOutcome, setShowUpcomingOutcome] = useState(false)
 
   if (!plan || !todayResolved) {
     return (
@@ -124,6 +128,33 @@ export function TodayPage() {
 
   function handleEditOutcome() {
     setShowOutcomeModal(true)
+  }
+
+  function handleUpcomingLog(rd: ResolvedDay, action: 'complete' | 'skip' | 'day_off') {
+    logAction(plan!.id, rd.calendarDate, rd.planDayIndex, action)
+    if (action === 'complete') {
+      setShowUpcomingOutcome(true)
+    } else {
+      setLoggingUpcoming(null)
+    }
+  }
+
+  function handleUpcomingOutcomeConfirm(outcome: WorkoutOutcome) {
+    if (!loggingUpcoming) return
+    const runSlot = loggingUpcoming.planDay.slots.find(s => isRunType(s.type))
+    if (runSlot) {
+      logOutcomeWithProgression(outcome, runSlot)
+    } else {
+      useOutcomeStore.getState().setOutcome(outcome)
+    }
+    setShowUpcomingOutcome(false)
+    setLoggingUpcoming(null)
+  }
+
+  function handleUpcomingClear(rd: ResolvedDay) {
+    removeEntry(plan!.id, rd.calendarDate)
+    removeOutcome(makeWorkoutInstanceId(plan!.id, rd.calendarDate))
+    setLoggingUpcoming(null)
   }
 
   return (
@@ -300,7 +331,7 @@ export function TodayPage() {
                     </p>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <WorkoutDayCard resolved={rd} />
+                    <WorkoutDayCard resolved={rd} onClick={() => setLoggingUpcoming(rd)} />
                     {upcomingNote && (
                       <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
                         <TrendingUp size={10} />{upcomingNote}
@@ -323,6 +354,98 @@ export function TodayPage() {
           existingOutcome={existingOutcome}
           onConfirm={handleOutcomeConfirm}
           onClose={() => setShowOutcomeModal(false)}
+        />
+      )}
+
+      {/* Log upcoming workout modal */}
+      {loggingUpcoming && !showUpcomingOutcome && (
+        <Modal
+          title={new Date(loggingUpcoming.calendarDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          onClose={() => setLoggingUpcoming(null)}
+        >
+          <div className="space-y-4">
+            {/* Workout summary */}
+            <div className="space-y-1.5">
+              {loggingUpcoming.planDay.slots.map(slot => (
+                <div key={slot.id} className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-slate-200">{slot.name}</span>
+                  {slot.targetDistance && <span className="text-xs text-slate-500 ml-auto">{slot.targetDistance} mi</span>}
+                  {slot.targetTime && !slot.targetDistance && <span className="text-xs text-slate-500 ml-auto">{slot.targetTime} min</span>}
+                </div>
+              ))}
+            </div>
+
+            {loggingUpcoming.historyEntry ? (
+              /* Already logged — show status + edit/clear */
+              <div className="space-y-3">
+                <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl ${
+                  loggingUpcoming.historyEntry.action === 'complete' ? 'bg-emerald-500/10 border border-emerald-500/20' :
+                  loggingUpcoming.historyEntry.action === 'skip' ? 'bg-slate-700 border border-slate-600' :
+                  'bg-amber-500/10 border border-amber-500/20'
+                }`}>
+                  {loggingUpcoming.historyEntry.action === 'complete' && <CheckCircle2 size={16} className="text-emerald-400" />}
+                  {loggingUpcoming.historyEntry.action === 'skip' && <SkipForward size={16} className="text-slate-400" />}
+                  {loggingUpcoming.historyEntry.action === 'day_off' && <Coffee size={16} className="text-amber-400" />}
+                  <span className={`text-sm font-medium capitalize ${
+                    loggingUpcoming.historyEntry.action === 'complete' ? 'text-emerald-400' :
+                    loggingUpcoming.historyEntry.action === 'skip' ? 'text-slate-300' : 'text-amber-400'
+                  }`}>
+                    {loggingUpcoming.historyEntry.action.replace('_', ' ')}
+                  </span>
+                </div>
+                {loggingUpcoming.historyEntry.action === 'complete' && (
+                  <button
+                    onClick={() => setShowUpcomingOutcome(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 text-sm font-medium transition-colors"
+                  >
+                    <Pencil size={14} /> Edit workout details
+                  </button>
+                )}
+                <button
+                  onClick={() => handleUpcomingClear(loggingUpcoming)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm font-medium transition-colors"
+                >
+                  <X size={14} /> Clear entry
+                </button>
+              </div>
+            ) : (
+              /* Not yet logged — show action buttons */
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleUpcomingLog(loggingUpcoming, 'complete')}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors active:scale-95"
+                  >
+                    <CheckCircle2 size={16} /> Complete
+                  </button>
+                  <button
+                    onClick={() => handleUpcomingLog(loggingUpcoming, 'skip')}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-sm font-medium transition-colors active:scale-95"
+                  >
+                    <SkipForward size={16} /> Skip
+                  </button>
+                </div>
+                <button
+                  onClick={() => handleUpcomingLog(loggingUpcoming, 'day_off')}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium transition-colors active:scale-95"
+                >
+                  <Coffee size={16} /> Day Off
+                </button>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Outcome modal for upcoming workout */}
+      {loggingUpcoming && showUpcomingOutcome && (
+        <OutcomeModal
+          planId={plan.id}
+          calendarDate={loggingUpcoming.calendarDate}
+          planDay={loggingUpcoming.planDay}
+          existingOutcome={getOutcome(makeWorkoutInstanceId(plan.id, loggingUpcoming.calendarDate))}
+          onConfirm={handleUpcomingOutcomeConfirm}
+          onClose={() => { setShowUpcomingOutcome(false); setLoggingUpcoming(null) }}
         />
       )}
 
