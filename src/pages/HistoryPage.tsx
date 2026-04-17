@@ -22,6 +22,7 @@ import { DifficultyBadge } from '../components/workout/DifficultyBadge'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
+import { computeHistoryStats } from '../lib/historyStats'
 import type { ActionType, HistoryEntry } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import {
@@ -62,6 +63,9 @@ export function HistoryPage() {
   const sorted = [...entries]
     .sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
     .filter(e => filterPlanId === 'all' || e.planId === filterPlanId)
+
+  const todayKey = format(new Date(), 'yyyy-MM-dd')
+  const stats = computeHistoryStats(sorted, todayKey)
 
   function getOutcome(entry: HistoryEntry): WorkoutOutcome | null {
     const id = makeWorkoutInstanceId(entry.planId, entry.calendarDate)
@@ -161,6 +165,15 @@ export function HistoryPage() {
           onExport={handleExport}
           onImport={handleImport}
         />
+
+        {sorted.length > 0 && (
+          <div className="grid grid-cols-4 gap-2">
+            <StatTile label="Streak" value={stats.currentStreak} suffix={stats.currentStreak === 1 ? 'day' : 'days'} />
+            <StatTile label="7-day" value={stats.last7Completed} />
+            <StatTile label="30-day" value={stats.last30Completed} />
+            <StatTile label="Total" value={stats.totalCompleted} />
+          </div>
+        )}
       </div>
 
       {sorted.length === 0 && filterPlanId !== 'all' && (
@@ -421,6 +434,16 @@ export function HistoryPage() {
           </div>
         </Modal>
       )}
+    </div>
+  )
+}
+
+function StatTile({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
+  return (
+    <div className="bg-slate-800/80 border border-slate-700/50 rounded-xl px-2 py-2 text-center">
+      <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{label}</p>
+      <p className="text-lg font-bold text-slate-100 leading-tight mt-0.5">{value}</p>
+      {suffix && <p className="text-[10px] text-slate-500 leading-tight">{suffix}</p>}
     </div>
   )
 }
