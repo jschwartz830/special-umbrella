@@ -1,5 +1,64 @@
 # Test Results
 
+## 2026-04-17 run — branch `claude/funny-galileo-6zMOl`
+
+### Suite totals
+
+| Stage       | Files | Tests |
+|-------------|-------|-------|
+| Baseline    | 6     | 156   |
+| After run   | 8     | 170   |
+| Delta       | +2    | +14   |
+
+All green. Run with `npx vitest run`.
+
+Production build: `npx vite build` succeeds — `dist/assets/index-*.js`
+~308 kB (89 kB gzip), `dist/assets/index-*.css` ~24 kB (5 kB gzip).
+
+### Files added
+
+#### `src/lib/__tests__/historyStats.test.ts` — 9 tests
+
+- empty-entry-list returns all zeros
+- totals vs. completed counts
+- 7-day window is inclusive of today (day −6 in, day −7 out)
+- 30-day window is inclusive of today (day −29 in, day −30 out)
+- skip entries are excluded from window counts
+- streak counts consecutive complete/day_off days ending today
+- streak is 0 when today has no qualifying entry
+- skip on an intermediate day breaks the streak
+- a gap day breaks the streak
+
+#### `src/store/__tests__/planDeleteCleanup.test.ts` — 2 tests
+
+- deleting plan A purges its history entries and outcomes from both
+  stores, and leaves plan B entirely untouched
+- deleting the currently active plan resets `activePlanId` to null
+
+### File additions (new tests within existing file)
+
+#### `src/store/__tests__/outcomeStore.test.ts`
+
+Added a `removeOutcome` describe block:
+
+- removes a single outcome by instanceId (doesn't touch siblings)
+- no-op when instanceId is unknown
+- does not affect `progressionStates` (progression state keyed by
+  group id, not plan id — should survive single-outcome removal)
+
+### Behaviors now guaranteed by tests
+
+1. Deleting a plan with 2 history entries + 2 outcomes leaves 0 of
+   either in the stores; sibling plans unaffected.
+2. Undoing a single entry removes its outcome but keeps all other
+   outcomes and the progression state.
+3. History stats helper is timezone-safe (UTC shift) and respects
+   inclusive N-day windows.
+
+---
+
+## 2026-04-16 run
+
 Generated: 2026-04-16
 
 ---

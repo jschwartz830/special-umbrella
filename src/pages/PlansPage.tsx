@@ -13,6 +13,7 @@ import {
 import { format } from 'date-fns'
 import { usePlanStore } from '../store/planStore'
 import { useHistoryStore } from '../store/historyStore'
+import { useOutcomeStore } from '../store/outcomeStore'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
@@ -30,6 +31,7 @@ export function PlansPage() {
   const deletePlan = usePlanStore(s => s.deletePlan)
   const importPlans = usePlanStore(s => s.importPlans)
   const clearHistory = useHistoryStore(s => s.clearPlanHistory)
+  const clearOutcomes = useOutcomeStore(s => s.clearPlanOutcomes)
   const entries = useHistoryStore(s => s.entries)
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -299,6 +301,7 @@ export function PlansPage() {
               <button
                 onClick={() => {
                   clearHistory(confirmDelete)
+                  clearOutcomes(confirmDelete)
                   deletePlan(confirmDelete)
                   setConfirmDelete(null)
                 }}

@@ -22,6 +22,7 @@ import { DifficultyBadge } from '../components/workout/DifficultyBadge'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
+import { computeHistoryStats } from '../lib/historyStats'
 import type { ActionType, HistoryEntry } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import {
@@ -31,6 +32,7 @@ import {
 
 export function HistoryPage() {
   const plans = usePlanStore(s => s.plans)
+  const activePlanId = usePlanStore(s => s.activePlanId)
   const entries = useHistoryStore(s => s.entries)
   const updateNotes = useHistoryStore(s => s.updateEntryNotes)
   const updateAction = useHistoryStore(s => s.updateEntryAction)
@@ -38,12 +40,12 @@ export function HistoryPage() {
   const importEntries = useHistoryStore(s => s.importEntries)
   const outcomes = useOutcomeStore(s => s.outcomes)
   const updateOutcomeNotes = useOutcomeStore(s => s.updateOutcomeNotes)
+  const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const importOutcomes = useOutcomeStore(s => s.importOutcomes)
 
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [filterPlanId, setFilterPlanId] = useState<string | 'all'>('all')
 
   // Plans that actually have history entries (for the filter dropdown)
   const plansWithHistory = Object.values(plans).filter(p =>
@@ -51,10 +53,19 @@ export function HistoryPage() {
   )
   const showPlanFilter = plansWithHistory.length > 1
 
+  // Default filter to the active plan when it has entries; otherwise show all.
+  const activePlanHasEntries = !!activePlanId && plansWithHistory.some(p => p.id === activePlanId)
+  const [filterPlanId, setFilterPlanId] = useState<string | 'all'>(
+    activePlanHasEntries ? activePlanId! : 'all',
+  )
+
   // Sort entries newest first, then apply plan filter
   const sorted = [...entries]
     .sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
     .filter(e => filterPlanId === 'all' || e.planId === filterPlanId)
+
+  const todayKey = format(new Date(), 'yyyy-MM-dd')
+  const stats = computeHistoryStats(sorted, todayKey)
 
   function getOutcome(entry: HistoryEntry): WorkoutOutcome | null {
     const id = makeWorkoutInstanceId(entry.planId, entry.calendarDate)
@@ -83,6 +94,7 @@ export function HistoryPage() {
 
   function deleteEntry(entry: HistoryEntry) {
     removeEntry(entry.planId, entry.calendarDate)
+    removeOutcome(makeWorkoutInstanceId(entry.planId, entry.calendarDate))
     setConfirmDeleteId(null)
     setEditingEntry(null)
   }
@@ -153,6 +165,15 @@ export function HistoryPage() {
           onExport={handleExport}
           onImport={handleImport}
         />
+
+        {sorted.length > 0 && (
+          <div className="grid grid-cols-4 gap-2">
+            <StatTile label="Streak" value={stats.currentStreak} suffix={stats.currentStreak === 1 ? 'day' : 'days'} />
+            <StatTile label="7-day" value={stats.last7Completed} />
+            <StatTile label="30-day" value={stats.last30Completed} />
+            <StatTile label="Total" value={stats.totalCompleted} />
+          </div>
+        )}
       </div>
 
       {sorted.length === 0 && filterPlanId !== 'all' && (
@@ -413,6 +434,16 @@ export function HistoryPage() {
           </div>
         </Modal>
       )}
+    </div>
+  )
+}
+
+function StatTile({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
+  return (
+    <div className="bg-slate-800/80 border border-slate-700/50 rounded-xl px-2 py-2 text-center">
+      <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{label}</p>
+      <p className="text-lg font-bold text-slate-100 leading-tight mt-0.5">{value}</p>
+      {suffix && <p className="text-[10px] text-slate-500 leading-tight">{suffix}</p>}
     </div>
   )
 }

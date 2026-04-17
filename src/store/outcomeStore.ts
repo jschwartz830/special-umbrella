@@ -33,6 +33,9 @@ interface OutcomeState {
    */
   updateOutcomeNotes: (workoutInstanceId: string, notes: string) => void
 
+  /** Remove a single outcome by instanceId — used when a history entry is undone/deleted. */
+  removeOutcome: (workoutInstanceId: string) => void
+
   /** Remove all outcomes associated with a plan (called when plan is cleared) */
   clearPlanOutcomes: (planId: string) => void
 
@@ -100,6 +103,14 @@ export const useOutcomeStore = create<OutcomeState>()(
               [workoutInstanceId]: { ...existing, notes: notes || null },
             },
           }
+        })
+      },
+
+      removeOutcome(workoutInstanceId) {
+        set(s => {
+          if (!(workoutInstanceId in s.outcomes)) return s
+          const { [workoutInstanceId]: _removed, ...rest } = s.outcomes
+          return { outcomes: rest }
         })
       },
 
