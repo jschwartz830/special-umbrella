@@ -7,9 +7,11 @@ import {
   CheckCircle2,
   SkipForward,
   Plus,
-  Pencil,
   Trash2,
   ClipboardList,
+  Ruler,
+  Zap,
+  Timer,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useActivePlan } from '../hooks/useActivePlan'
@@ -20,7 +22,7 @@ import { WorkoutBadge } from '../components/workout/WorkoutBadge'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
-import { completionStateToAction } from '../modules/workout-outcomes/types'
+import { completionStateToAction, formatPace } from '../modules/workout-outcomes/types'
 import type { Plan, ResolvedDay, ActionType, WorkoutType, ExtraWorkoutEntry, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 
@@ -67,7 +69,6 @@ export function CalendarPage() {
   const addOverride = useHistoryStore(s => s.addOverride)
   const removeRetroJumpForDate = useHistoryStore(s => s.removeRetroJumpForDate)
   const addExtraEntry = useHistoryStore(s => s.addExtraEntry)
-  const updateExtraEntry = useHistoryStore(s => s.updateExtraEntry)
   const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
   const outcomes = useOutcomeStore(s => s.outcomes)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
@@ -305,7 +306,6 @@ export function CalendarPage() {
             if (!plan) return
             addExtraEntry({ planId: plan.id, calendarDate: selected.calendarDate, workoutType: type, workoutName: name })
           }}
-          onUpdateExtra={(id, patch) => updateExtraEntry(id, patch)}
           onDeleteExtra={(extra) => {
             removeExtraEntry(extra.id)
             removeOutcome(makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id))
@@ -340,7 +340,6 @@ function DayDetailModal({
   onEditOutcome,
   onEditExtraOutcome,
   onAddExtra,
-  onUpdateExtra,
   onDeleteExtra,
   onClose,
 }: {
@@ -354,7 +353,6 @@ function DayDetailModal({
   onEditOutcome: () => void
   onEditExtraOutcome: (extra: ExtraWorkoutEntry) => void
   onAddExtra: (type: WorkoutType, name: string) => void
-  onUpdateExtra: (id: string, patch: Partial<Pick<ExtraWorkoutEntry, 'workoutType' | 'workoutName' | 'notes'>>) => void
   onDeleteExtra: (extra: ExtraWorkoutEntry) => void
   onClose: () => void
 }) {
@@ -366,20 +364,20 @@ function DayDetailModal({
   const isDayOff = historyEntry?.action === 'day_off' || status === 'past_day_off' || status === 'today_day_off'
   const isComplete = status === 'past_complete' || status === 'today_complete'
   const isSkipped = status === 'past_skip' || status === 'today_skip'
-
   const canLog = isPast || isToday
   const canDayOff = isToday || isFuture
 
+  const [detailTarget, setDetailTarget] = useState<
+    | { kind: 'rotation' }
+    | { kind: 'extra'; extraId: string }
+    | null
+  >(null)
   const [selectedIdx, setSelectedIdx] = useState(planDayIndex)
-  const selectedPlanDay = plan.days[selectedIdx]
-
-  // Extra workout add form state
+  const [showPicker, setShowPicker] = useState(false)
   const [showAddExtra, setShowAddExtra] = useState(false)
   const [extraType, setExtraType] = useState<WorkoutType>('yoga')
   const [extraName, setExtraName] = useState('')
-  const [editingExtraId, setEditingExtraId] = useState<string | null>(null)
-  const [editingExtraName, setEditingExtraName] = useState('')
-  const [editingExtraType, setEditingExtraType] = useState<WorkoutType>('yoga')
+  const [confirmDeleteExtraId, setConfirmDeleteExtraId] = useState<string | null>(null)
 
   const dateLabel = format(new Date(calendarDate + 'T00:00'), 'EEEE, MMMM d')
 
@@ -391,285 +389,346 @@ function DayDetailModal({
     setShowAddExtra(false)
   }
 
-  function startEditExtra(extra: ExtraWorkoutEntry) {
-    setEditingExtraId(extra.id)
-    setEditingExtraName(extra.workoutName)
-    setEditingExtraType(extra.workoutType)
+  // ─── Level 1: Overview ───────────────────────────────────────────────────
+  if (!detailTarget) {
+    const statusInfo = isDayOff
+      ? { label: 'Day Off', cls: 'text-amber-400 bg-amber-400/10' }
+      : isComplete
+        ? { label: 'Done', cls: 'text-emerald-400 bg-emerald-400/10' }
+        : isSkipped
+          ? { label: 'Skipped', cls: 'text-slate-400 bg-slate-700' }
+          : status === 'today_pending'
+            ? { label: 'Today', cls: 'text-sky-400 bg-sky-400/10' }
+            : status === 'future'
+              ? { label: 'Upcoming', cls: 'text-slate-500 bg-slate-700/50' }
+              : { label: 'Unlogged', cls: 'text-rose-400 bg-rose-400/10' }
+
+    return (
+      <Modal title={dateLabel} onClose={onClose}>
+        <div className="space-y-2">
+          {/* Rotation entry row */}
+          <button
+            onClick={() => setDetailTarget({ kind: 'rotation' })}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-700/40 border border-slate-700 hover:border-slate-600 text-left transition-colors active:scale-[0.98]"
+          >
+            {resolved.planDay.slots[0] && !isDayOff && (
+              <WorkoutBadge type={resolved.planDay.slots[0].type} size="sm" />
+            )}
+            {isDayOff && <Coffee size={14} className="text-amber-400 flex-shrink-0" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-200 truncate">
+                {isDayOff ? 'Day Off' : resolved.planDay.slots.map(s => s.name).join(' + ')}
+              </p>
+            </div>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${statusInfo.cls}`}>
+              {statusInfo.label}
+            </span>
+            <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
+          </button>
+
+          {/* Extra entries */}
+          {extras.map(extra => {
+            const iid = makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id)
+            const hasOutcome = !!outcomes[iid]
+            return (
+              <button
+                key={extra.id}
+                onClick={() => setDetailTarget({ kind: 'extra', extraId: extra.id })}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-700/30 border border-slate-700/50 hover:border-slate-600 text-left transition-colors active:scale-[0.98]"
+              >
+                <WorkoutBadge type={extra.workoutType} size="sm" />
+                <span className="flex-1 text-sm text-slate-200 truncate">{extra.workoutName}</span>
+                <span className="text-[10px] text-sky-400 bg-sky-400/10 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Extra</span>
+                {hasOutcome && <CheckCircle2 size={12} className="text-emerald-400 flex-shrink-0" />}
+                <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
+              </button>
+            )
+          })}
+
+          {/* Add workout */}
+          {!showAddExtra ? (
+            <button
+              onClick={() => setShowAddExtra(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed border-slate-600 hover:border-sky-500/50 text-slate-500 hover:text-sky-400 text-sm transition-colors"
+            >
+              <Plus size={14} /> Add workout for this day
+            </button>
+          ) : (
+            <div className="bg-slate-700/60 border border-slate-600 rounded-xl p-3 space-y-2">
+              <p className="text-xs text-slate-400 font-medium">New workout</p>
+              <select
+                value={extraType}
+                onChange={e => setExtraType(e.target.value as WorkoutType)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+              >
+                {WORKOUT_TYPES.map(w => <option key={w.type} value={w.type}>{w.label}</option>)}
+              </select>
+              <input
+                type="text"
+                value={extraName}
+                onChange={e => setExtraName(e.target.value)}
+                placeholder="Name (optional)"
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              />
+              <div className="flex gap-2">
+                <button onClick={submitAddExtra} className="flex-1 py-1.5 text-xs rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-medium transition-colors">Add</button>
+                <button onClick={() => { setShowAddExtra(false); setExtraName('') }} className="flex-1 py-1.5 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+    )
   }
 
-  function saveEditExtra() {
-    if (!editingExtraId) return
-    onUpdateExtra(editingExtraId, { workoutType: editingExtraType, workoutName: editingExtraName.trim() || editingExtraType })
-    setEditingExtraId(null)
+  // ─── Level 2: Extra detail ────────────────────────────────────────────────
+  if (detailTarget.kind === 'extra') {
+    const extra = extras.find(e => e.id === detailTarget.extraId)
+    if (!extra) { setDetailTarget(null); return null }
+    const iid = makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id)
+    const extraOutcome = outcomes[iid] ?? null
+
+    return (
+      <Modal title={dateLabel} onClose={onClose}>
+        <div className="space-y-4">
+          <button
+            onClick={() => { setDetailTarget(null); setConfirmDeleteExtraId(null) }}
+            className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors"
+          >
+            <ChevronLeft size={16} /> Back
+          </button>
+
+          <div className="flex items-center gap-2">
+            <WorkoutBadge type={extra.workoutType} size="sm" />
+            <span className="text-sm font-semibold text-slate-200 flex-1">{extra.workoutName}</span>
+            <span className="text-[10px] text-sky-400 bg-sky-400/10 px-1.5 py-0.5 rounded-full font-medium">Extra</span>
+          </div>
+
+          {extraOutcome && <OutcomeMetrics outcome={extraOutcome} />}
+
+          <button
+            onClick={() => onEditExtraOutcome(extra)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 text-sm font-medium transition-colors"
+          >
+            <ClipboardList size={15} /> {extraOutcome ? 'Edit Details' : 'Log Details'}
+          </button>
+
+          {confirmDeleteExtraId === extra.id ? (
+            <div className="space-y-2 pt-1">
+              <p className="text-sm text-slate-400 text-center">Delete this workout?</p>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmDeleteExtraId(null)} className="flex-1 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium transition-colors">
+                  Cancel
+                </button>
+                <button onClick={() => { onDeleteExtra(extra); setDetailTarget(null) }} className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors">
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDeleteExtraId(extra.id)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm font-medium transition-colors"
+            >
+              <Trash2 size={15} /> Delete
+            </button>
+          )}
+        </div>
+      </Modal>
+    )
   }
+
+  // ─── Level 2: Rotation detail ─────────────────────────────────────────────
+  const rotOutcome = outcomes[makeWorkoutInstanceId(plan.id, calendarDate)] ?? null
+  const displayDay = plan.days[selectedIdx] ?? resolved.planDay
 
   return (
     <Modal title={dateLabel} onClose={onClose}>
       <div className="space-y-4">
-        {/* Workout picker — shown whenever the user can log */}
-        {canLog && (
-          <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">
-              Which workout?
-            </p>
-            <div className="space-y-1 max-h-52 overflow-y-auto pr-0.5">
-              {plan.days.map((day, idx) => (
-                <button
-                  key={day.id}
-                  onClick={() => setSelectedIdx(idx)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-left transition-colors ${
-                    selectedIdx === idx
-                      ? 'bg-sky-500/15 border-sky-500/50'
-                      : 'bg-slate-700/60 border-slate-700 hover:border-slate-600'
-                  }`}
-                >
-                  <span className={`w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${
-                    selectedIdx === idx ? 'bg-sky-500 text-white' : 'bg-slate-600 text-slate-300'
-                  }`}>
-                    {idx + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${selectedIdx === idx ? 'text-sky-300' : 'text-slate-300'}`}>
-                      {day.label}
-                    </p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {day.slots.map(s => s.name).join(' + ')}
-                    </p>
-                  </div>
-                  {selectedIdx === idx && (
-                    <CheckCircle2 size={14} className="flex-shrink-0 text-sky-400" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <button
+          onClick={() => { setDetailTarget(null); setShowPicker(false) }}
+          className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors"
+        >
+          <ChevronLeft size={16} /> Back
+        </button>
 
-        {/* Static workout details for future days */}
-        {!canLog && (
-          <div className="space-y-3">
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">{resolved.planDay.label}</p>
-            {resolved.planDay.slots.map((slot, i) => (
-              <div key={slot.id} className={i > 0 ? 'pt-3 border-t border-slate-700' : ''}>
-                <WorkoutBadge type={slot.type} />
-                <p className="text-sm font-medium text-slate-200 mt-1">{slot.name}</p>
-                <div className="flex flex-wrap gap-3 text-xs text-slate-400 mt-1">
-                  {slot.targetDistance && <span>{slot.targetDistance} mi</span>}
-                  {slot.targetPace && <span>{slot.targetPace} min/mi</span>}
-                  {slot.targetTime && <span>{slot.targetTime} min</span>}
-                  {slot.targetDuration && <span>{slot.targetDuration} min</span>}
-                  {slot.isDeload && <span className="text-yellow-400">Deload</span>}
-                </div>
-                {slot.notes && <p className="text-xs text-slate-500 italic mt-1">{slot.notes}</p>}
-              </div>
-            ))}
+        {/* Workout slots */}
+        {isDayOff ? (
+          <div className="flex items-center gap-2">
+            <Coffee size={16} className="text-amber-400" />
+            <span className="text-sm font-medium text-amber-400">Day Off</span>
           </div>
-        )}
-
-        {/* Selected workout details shown below picker */}
-        {canLog && selectedPlanDay && (
-          <div className="space-y-1.5 px-1">
-            {selectedPlanDay.slots.map((slot, i) => (
-              <div key={slot.id} className={`flex items-center gap-2 ${i > 0 ? 'pt-1.5 border-t border-slate-700/50' : ''}`}>
+        ) : (
+          <div className="space-y-2">
+            {displayDay.slots.map((slot, i) => (
+              <div key={slot.id} className={`flex items-center gap-2 ${i > 0 ? 'pt-2 border-t border-slate-700/50' : ''}`}>
                 <WorkoutBadge type={slot.type} size="sm" />
-                <span className="text-xs text-slate-300 truncate">{slot.name}</span>
-                {slot.targetDistance && <span className="text-xs text-slate-500 ml-auto flex-shrink-0">{slot.targetDistance} mi</span>}
-                {slot.targetTime && !slot.targetDistance && <span className="text-xs text-slate-500 ml-auto flex-shrink-0">{slot.targetTime} min</span>}
+                <span className="text-sm font-medium text-slate-200">{slot.name}</span>
               </div>
             ))}
           </div>
         )}
 
-        {/* Current status + edit outcome */}
-        {hasEntry && (
-          <div className={`flex items-center justify-between py-2 px-3 rounded-xl ${
-            isComplete ? 'bg-emerald-500/10 border border-emerald-500/20' :
-            isSkipped ? 'bg-slate-700/50 border border-slate-600' :
-            'bg-amber-500/10 border border-amber-500/20'
-          }`}>
-            <div className="flex items-center gap-2">
+        {/* Already logged */}
+        {hasEntry && !isDayOff && (
+          <div className="space-y-3">
+            <div className={`flex items-center gap-2 py-2 px-3 rounded-xl ${
+              isComplete ? 'bg-emerald-500/10 border border-emerald-500/20'
+                : 'bg-slate-700/50 border border-slate-600'
+            }`}>
               {isComplete && <CheckCircle2 size={16} className="text-emerald-400" />}
               {isSkipped && <SkipForward size={16} className="text-slate-400" />}
-              {isDayOff && <Coffee size={16} className="text-amber-400" />}
-              <span className={`text-sm font-medium capitalize ${
-                isComplete ? 'text-emerald-400' : isSkipped ? 'text-slate-300' : 'text-amber-400'
-              }`}>
+              <span className={`text-sm font-medium capitalize ${isComplete ? 'text-emerald-400' : 'text-slate-300'}`}>
                 {historyEntry?.action.replace('_', ' ')}
               </span>
             </div>
-            <div className="flex items-center gap-1">
+
+            {rotOutcome && <OutcomeMetrics outcome={rotOutcome} />}
+
+            <div className="flex gap-2">
               {isComplete && (
                 <button
                   onClick={onEditOutcome}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-xs transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 text-sm font-medium transition-colors"
                 >
-                  <ClipboardList size={11} /> Details
+                  <ClipboardList size={15} /> Edit Details
                 </button>
               )}
               <button
                 onClick={onClear}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-700 hover:bg-red-500/20 text-slate-400 hover:text-red-400 text-xs transition-colors"
+                className={`${isComplete ? '' : 'flex-1 '}flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-700 hover:bg-red-500/20 border border-slate-600 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-sm font-medium transition-colors`}
               >
-                <X size={12} /> Clear
+                <X size={14} /> Clear
               </button>
             </div>
           </div>
         )}
-        {historyEntry?.notes && (
-          <p className="text-sm text-slate-400 italic">"{historyEntry.notes}"</p>
+
+        {/* Logged day off */}
+        {isDayOff && hasEntry && (
+          <button
+            onClick={onClear}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium transition-colors"
+          >
+            <X size={14} /> Cancel Day Off
+          </button>
         )}
 
-        {/* Log actions */}
-        <div className="space-y-2">
-          {canLog && (
-            <>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">
-                {hasEntry ? 'Change to' : 'Log as'}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
+        {/* Not yet logged */}
+        {!hasEntry && (canLog || canDayOff) && (
+          <div className="space-y-2">
+            {canLog && (
+              <>
                 <button
-                  onClick={() => onLog('complete', selectedIdx)}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors active:scale-95"
+                  onClick={() => setShowPicker(v => !v)}
+                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
                 >
-                  <CheckCircle2 size={16} /> Complete
+                  <ChevronRight size={12} className={`transition-transform ${showPicker ? 'rotate-90' : ''}`} />
+                  Change rotation day
                 </button>
-                <button
-                  onClick={() => onLog('skip', selectedIdx)}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-sm font-medium transition-colors active:scale-95"
-                >
-                  <SkipForward size={16} /> Skip
-                </button>
-              </div>
-            </>
-          )}
-
-          {canDayOff && !isDayOff && (
-            <button
-              onClick={() => onLog('day_off', selectedIdx)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium transition-colors active:scale-95"
-            >
-              <Coffee size={16} /> Mark Day Off
-            </button>
-          )}
-          {isDayOff && (
-            <button
-              onClick={onClear}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium transition-colors"
-            >
-              <X size={16} /> Cancel Day Off
-            </button>
-          )}
-        </div>
-
-        {/* ── Additional workouts ─────────────────────────────── */}
-        {(canLog || extras.length > 0) && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">
-                Additional Workouts
-              </p>
-              {canLog && !showAddExtra && (
-                <button
-                  onClick={() => setShowAddExtra(true)}
-                  className="flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 transition-colors"
-                >
-                  <Plus size={12} /> Add
-                </button>
-              )}
-            </div>
-
-            {/* Existing extra workouts */}
-            {extras.length > 0 && (
-              <div className="space-y-2 mb-2">
-                {extras.map(extra => {
-                  const instanceId = makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id)
-                  const outcome = outcomes[instanceId]
-                  const isEditing = editingExtraId === extra.id
-                  if (isEditing) {
-                    return (
-                      <div key={extra.id} className="bg-slate-700/60 border border-slate-600 rounded-xl p-3 space-y-2">
-                        <select
-                          value={editingExtraType}
-                          onChange={e => setEditingExtraType(e.target.value as WorkoutType)}
-                          className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
-                        >
-                          {WORKOUT_TYPES.map(w => (
-                            <option key={w.type} value={w.type}>{w.label}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="text"
-                          value={editingExtraName}
-                          onChange={e => setEditingExtraName(e.target.value)}
-                          placeholder="Workout name"
-                          className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                        />
-                        <div className="flex gap-2">
-                          <button onClick={saveEditExtra} className="flex-1 py-1.5 text-xs rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-medium transition-colors">Save</button>
-                          <button onClick={() => setEditingExtraId(null)} className="flex-1 py-1.5 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">Cancel</button>
-                        </div>
-                      </div>
-                    )
-                  }
-                  return (
-                    <div key={extra.id} className="flex items-center gap-2 bg-slate-700/40 rounded-xl px-3 py-2 border border-slate-700">
-                      <WorkoutBadge type={extra.workoutType} size="sm" />
-                      <span className="text-xs text-slate-300 flex-1 truncate">{extra.workoutName}</span>
-                      {outcome && <span className="text-[10px] text-emerald-400">✓</span>}
+                {showPicker && (
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {plan.days.map((day, idx) => (
                       <button
-                        onClick={() => onEditExtraOutcome(extra)}
-                        className="p-1 rounded text-sky-400 hover:text-sky-300 transition-colors"
-                        title="Log/edit details"
+                        key={day.id}
+                        onClick={() => setSelectedIdx(idx)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-left text-sm transition-colors ${
+                          selectedIdx === idx
+                            ? 'bg-sky-500/15 border-sky-500/50 text-sky-300'
+                            : 'bg-slate-700/60 border-slate-700 hover:border-slate-600 text-slate-300'
+                        }`}
                       >
-                        <ClipboardList size={12} />
+                        <span className={`w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${
+                          selectedIdx === idx ? 'bg-sky-500 text-white' : 'bg-slate-600 text-slate-300'
+                        }`}>{idx + 1}</span>
+                        {day.slots.map(s => s.name).join(' + ')}
+                        {selectedIdx === idx && <CheckCircle2 size={12} className="ml-auto text-sky-400" />}
                       </button>
-                      <button
-                        onClick={() => startEditExtra(extra)}
-                        className="p-1 rounded text-slate-400 hover:text-white transition-colors"
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        onClick={() => onDeleteExtra(extra)}
-                        className="p-1 rounded text-slate-500 hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Add extra workout form */}
-            {showAddExtra && (
-              <div className="bg-slate-700/60 border border-slate-600 rounded-xl p-3 space-y-2">
-                <p className="text-xs text-slate-400 font-medium">New workout</p>
-                <select
-                  value={extraType}
-                  onChange={e => setExtraType(e.target.value as WorkoutType)}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
-                >
-                  {WORKOUT_TYPES.map(w => (
-                    <option key={w.type} value={w.type}>{w.label}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={extraName}
-                  onChange={e => setExtraName(e.target.value)}
-                  placeholder="Name (optional)"
-                  className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                />
-                <div className="flex gap-2">
-                  <button onClick={submitAddExtra} className="flex-1 py-1.5 text-xs rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-medium transition-colors">Add</button>
-                  <button onClick={() => { setShowAddExtra(false); setExtraName(''); }} className="flex-1 py-1.5 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">Cancel</button>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => onLog('complete', selectedIdx)}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors active:scale-95"
+                  >
+                    <CheckCircle2 size={16} /> Complete
+                  </button>
+                  <button
+                    onClick={() => onLog('skip', selectedIdx)}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-sm font-medium transition-colors active:scale-95"
+                  >
+                    <SkipForward size={16} /> Skip
+                  </button>
                 </div>
-              </div>
+              </>
+            )}
+            {canDayOff && (
+              <button
+                onClick={() => onLog('day_off', selectedIdx)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium transition-colors active:scale-95"
+              >
+                <Coffee size={16} /> Mark Day Off
+              </button>
             )}
           </div>
         )}
+
+        {/* Future with no actions (shouldn't happen since canDayOff covers future) */}
+        {!hasEntry && !canLog && !canDayOff && (
+          <div className="space-y-1">
+            {resolved.planDay.slots.map(slot => (
+              <div key={slot.id} className="flex flex-wrap gap-3 text-xs text-slate-400">
+                {slot.targetDistance && <span>{slot.targetDistance} mi</span>}
+                {slot.targetPace && <span>{slot.targetPace} min/mi</span>}
+                {slot.targetTime && <span>{slot.targetTime} min</span>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {historyEntry?.notes && (
+          <p className="text-sm text-slate-400 italic">"{historyEntry.notes}"</p>
+        )}
       </div>
     </Modal>
+  )
+}
+
+function OutcomeMetrics({ outcome }: { outcome: WorkoutOutcome }) {
+  return (
+    <div className="space-y-1.5 py-1">
+      {outcome.perceivedEffort != null && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-500 w-10">Effort</span>
+          <div className="flex gap-0.5">
+            {([1, 2, 3, 4, 5] as const).map(e => (
+              <span key={e} className={`w-3 h-3 rounded-full ${
+                e <= outcome.perceivedEffort!
+                  ? e <= 2 ? 'bg-emerald-400' : e === 3 ? 'bg-yellow-400' : e === 4 ? 'bg-orange-400' : 'bg-red-400'
+                  : 'bg-slate-600'
+              }`} />
+            ))}
+          </div>
+          <span className="text-xs text-slate-500">{outcome.perceivedEffort}/5</span>
+        </div>
+      )}
+      {outcome.runActual && (
+        <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+          {outcome.runActual.actualDistanceMiles != null && (
+            <span className="flex items-center gap-0.5"><Ruler size={10} /> {outcome.runActual.actualDistanceMiles} mi</span>
+          )}
+          {outcome.runActual.actualDurationMin != null && (
+            <span className="flex items-center gap-0.5"><Timer size={10} /> {outcome.runActual.actualDurationMin} min</span>
+          )}
+          {outcome.runActual.averagePaceSecondsPerMile != null && (
+            <span className="flex items-center gap-0.5"><Zap size={10} /> {formatPace(outcome.runActual.averagePaceSecondsPerMile)}</span>
+          )}
+        </div>
+      )}
+      {!outcome.runActual && outcome.durationActualMin != null && (
+        <p className="text-xs text-slate-500">{outcome.durationActualMin} min</p>
+      )}
+    </div>
   )
 }

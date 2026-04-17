@@ -41,6 +41,9 @@ interface OutcomeState {
 
   /** Bulk import — replaces any existing outcome for a given workoutInstanceId. */
   importOutcomes: (incoming: WorkoutOutcome[]) => void
+
+  /** Move an outcome record to a new instanceId key (for date changes). */
+  moveOutcome: (oldInstanceId: string, newInstanceId: string) => void
 }
 
 export const useOutcomeStore = create<OutcomeState>()(
@@ -129,6 +132,20 @@ export const useOutcomeStore = create<OutcomeState>()(
           const next = { ...s.outcomes }
           for (const o of incoming) next[o.workoutInstanceId] = o
           return { outcomes: next }
+        })
+      },
+
+      moveOutcome(oldInstanceId, newInstanceId) {
+        set(s => {
+          const existing = s.outcomes[oldInstanceId]
+          if (!existing) return s
+          const { [oldInstanceId]: _removed, ...rest } = s.outcomes
+          return {
+            outcomes: {
+              ...rest,
+              [newInstanceId]: { ...existing, workoutInstanceId: newInstanceId },
+            },
+          }
         })
       },
     }),
