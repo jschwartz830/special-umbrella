@@ -69,6 +69,10 @@ export function HistoryPage() {
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const importOutcomes = useOutcomeStore(s => s.importOutcomes)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
+  const moveOutcome = useOutcomeStore(s => s.moveOutcome)
+  const updateEntryDate = useHistoryStore(s => s.updateEntryDate)
+  const updateExtraEntryDate = useHistoryStore(s => s.updateExtraEntryDate)
+  const updateExtraEntry = useHistoryStore(s => s.updateExtraEntry)
 
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
@@ -85,6 +89,14 @@ export function HistoryPage() {
   const [addingExtraDate, setAddingExtraDate] = useState<string | null>(null)
   const [extraType, setExtraType] = useState<WorkoutType>('yoga')
   const [extraName, setExtraName] = useState('')
+
+  const [editingEntryDate, setEditingEntryDate] = useState('')
+  const [dateConflict, setDateConflict] = useState(false)
+
+  const [editingExtra, setEditingExtra] = useState<ExtraWorkoutEntry | null>(null)
+  const [editingExtraDate, setEditingExtraDate] = useState('')
+  const [editingExtraType, setEditingExtraType] = useState<WorkoutType>('yoga')
+  const [editingExtraName, setEditingExtraName] = useState('')
 
   const plansWithHistory = Object.values(plans).filter(p =>
     entries.some(e => e.planId === p.id),
@@ -127,15 +139,30 @@ export function HistoryPage() {
 
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')
+    setEditingEntryDate(entry.calendarDate)
+    setDateConflict(false)
     setEditingEntry(entry)
   }
 
   function saveAndClose() {
     if (!editingEntry) return
+    const oldDate = editingEntry.calendarDate
+    const newDate = editingEntryDate
+    if (newDate !== oldDate) {
+      const conflict = entries.some(
+        e => e.id !== editingEntry.id && e.planId === editingEntry.planId && e.calendarDate === newDate,
+      )
+      if (conflict) { setDateConflict(true); return }
+      moveOutcome(
+        makeWorkoutInstanceId(editingEntry.planId, oldDate),
+        makeWorkoutInstanceId(editingEntry.planId, newDate),
+      )
+      updateEntryDate(editingEntry.id, newDate)
+    }
     updateNotes(editingEntry.id, notesText)
-    const instanceId = makeWorkoutInstanceId(editingEntry.planId, editingEntry.calendarDate)
-    updateOutcomeNotes(instanceId, notesText)
+    updateOutcomeNotes(makeWorkoutInstanceId(editingEntry.planId, newDate), notesText)
     setEditingEntry(null)
+    setDateConflict(false)
   }
 
   function changeAction(action: ActionType) {
@@ -186,6 +213,30 @@ export function HistoryPage() {
       if (entry.action !== action) updateAction(entry.planId, entry.calendarDate, action)
     }
     setOutcomeTarget(null)
+  }
+
+  function openExtraEdit(extra: ExtraWorkoutEntry) {
+    setEditingExtra(extra)
+    setEditingExtraDate(extra.calendarDate)
+    setEditingExtraType(extra.workoutType)
+    setEditingExtraName(extra.workoutName)
+  }
+
+  function saveAndCloseExtra() {
+    if (!editingExtra) return
+    const oldDate = editingExtra.calendarDate
+    const newDate = editingExtraDate
+    if (newDate !== oldDate) {
+      moveOutcome(
+        makeExtraWorkoutInstanceId(editingExtra.planId, oldDate, editingExtra.id),
+        makeExtraWorkoutInstanceId(editingExtra.planId, newDate, editingExtra.id),
+      )
+      updateExtraEntryDate(editingExtra.id, newDate)
+    }
+    if (editingExtraType !== editingExtra.workoutType || editingExtraName !== editingExtra.workoutName) {
+      updateExtraEntry(editingExtra.id, { workoutType: editingExtraType, workoutName: editingExtraName })
+    }
+    setEditingExtra(null)
   }
 
   function submitAddExtra(planId: string, calendarDate: string) {
@@ -491,6 +542,13 @@ export function HistoryPage() {
                       <ClipboardList size={12} />
                     </button>
                     <button
+                      onClick={() => openExtraEdit(extra)}
+                      className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"
+                      title="Edit"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
                       onClick={() => { removeExtraEntry(extra.id); removeOutcome(instanceId) }}
                       className="p-1.5 rounded-lg bg-slate-700 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
                     >
@@ -547,6 +605,18 @@ export function HistoryPage() {
           }
         >
           <div className="space-y-4">
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Date</p>
+              <input
+                type="date"
+                value={editingEntryDate}
+                onChange={e => { setEditingEntryDate(e.target.value); setDateConflict(false) }}
+                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+              {dateConflict && (
+                <p className="text-xs text-red-400 mt-1">A workout is already logged for that date.</p>
+              )}
+            </div>
             <div>
               <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Status</p>
               <div className="grid grid-cols-3 gap-2">
@@ -613,6 +683,61 @@ export function HistoryPage() {
                 Delete
               </button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {editingExtra && (
+        <Modal
+          title="Edit Workout"
+          onClose={() => setEditingExtra(null)}
+          footer={
+            <button onClick={saveAndCloseExtra} className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold transition-colors">
+              Save
+            </button>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Date</p>
+              <input
+                type="date"
+                value={editingExtraDate}
+                onChange={e => setEditingExtraDate(e.target.value)}
+                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Type</p>
+              <select
+                value={editingExtraType}
+                onChange={e => setEditingExtraType(e.target.value as WorkoutType)}
+                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+              >
+                {WORKOUT_TYPES.map(w => <option key={w.type} value={w.type}>{w.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Name</p>
+              <input
+                type="text"
+                value={editingExtraName}
+                onChange={e => setEditingExtraName(e.target.value)}
+                placeholder="Workout name"
+                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+            </div>
+            <button
+              onClick={() => {
+                const iid = makeExtraWorkoutInstanceId(editingExtra.planId, editingExtra.calendarDate, editingExtra.id)
+                removeExtraEntry(editingExtra.id)
+                removeOutcome(iid)
+                setEditingExtra(null)
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm font-medium transition-colors"
+            >
+              <Trash2 size={15} /> Delete
+            </button>
           </div>
         </Modal>
       )}

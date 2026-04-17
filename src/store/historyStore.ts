@@ -56,6 +56,11 @@ interface HistoryState {
   updateExtraEntry: (id: string, patch: Partial<Pick<ExtraWorkoutEntry, 'workoutType' | 'workoutName' | 'notes'>>) => void
   removeExtraEntry: (id: string) => void
   clearExtraEntriesForDate: (planId: string, calendarDate: string) => void
+
+  /** Move a rotation entry to a new calendarDate (caller must also call moveOutcome). */
+  updateEntryDate: (id: string, newDate: string) => void
+  /** Move an extra entry to a new calendarDate (caller must also call moveOutcome). */
+  updateExtraEntryDate: (id: string, newDate: string) => void
 }
 
 export const useHistoryStore = create<HistoryState>()(
@@ -188,6 +193,18 @@ export const useHistoryStore = create<HistoryState>()(
           extraEntries: s.extraEntries.filter(
             e => !(e.planId === planId && e.calendarDate === calendarDate),
           ),
+        }))
+      },
+
+      updateEntryDate(id, newDate) {
+        set(s => ({
+          entries: s.entries.map(e => e.id === id ? { ...e, calendarDate: newDate } : e),
+        }))
+      },
+
+      updateExtraEntryDate(id, newDate) {
+        set(s => ({
+          extraEntries: s.extraEntries.map(e => e.id === id ? { ...e, calendarDate: newDate } : e),
         }))
       },
     }),
