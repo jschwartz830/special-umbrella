@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useParams, useBlocker } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Plus,
@@ -495,12 +495,21 @@ export function PlanBuilderPage() {
   const [days, setDays] = useState<PlanDay[]>(existing?.days ?? [makeDay('Day 1')])
   const [saved, setSaved] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
-
-  const blocker = useBlocker(isDirty && !saved)
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
+  const [pendingNav, setPendingNav] = useState<string | null>(null)
 
   function markDirty() {
     if (!isDirty) setIsDirty(true)
     if (saved) setSaved(false)
+  }
+
+  function safeNavigate(to: string) {
+    if (isDirty && !saved) {
+      setPendingNav(to)
+      setShowLeaveConfirm(true)
+    } else {
+      navigate(to)
+    }
   }
 
   function updateDay(i: number, d: PlanDay) {
@@ -566,7 +575,7 @@ export function PlanBuilderPage() {
     <div className="px-4 pt-safe pb-8">
       {/* Header */}
       <div className="pt-6 pb-4 flex items-center gap-3">
-        <button onClick={() => navigate('/plans')}
+        <button onClick={() => safeNavigate('/plans')}
           className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
           <ArrowLeft size={18} />
         </button>
@@ -654,21 +663,21 @@ export function PlanBuilderPage() {
       </div>
 
       {/* Leave without saving confirmation */}
-      {blocker.state === 'blocked' && (
-        <Modal title="Unsaved changes" onClose={() => blocker.reset()}>
+      {showLeaveConfirm && (
+        <Modal title="Unsaved changes" onClose={() => setShowLeaveConfirm(false)}>
           <div className="space-y-4">
             <p className="text-sm text-slate-400">
               You have unsaved changes. Leave without saving?
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => blocker.reset()}
+                onClick={() => setShowLeaveConfirm(false)}
                 className="flex-1 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold transition-colors"
               >
                 Keep editing
               </button>
               <button
-                onClick={() => blocker.proceed()}
+                onClick={() => { setShowLeaveConfirm(false); navigate(pendingNav ?? '/plans') }}
                 className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
               >
                 Discard
