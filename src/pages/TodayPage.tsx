@@ -19,7 +19,7 @@ import {
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
 import { useHistoryStore } from '../store/historyStore'
-import { useOutcomeStore, makeWorkoutInstanceId } from '../store/outcomeStore'
+import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { WorkoutDayCard } from '../components/workout/WorkoutDayCard'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { Modal } from '../components/shared/Modal'
@@ -38,6 +38,7 @@ export function TodayPage() {
   const actions = usePlanActions(plan?.id ?? null)
   const logAction = useHistoryStore(s => s.logAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
+  const addExtraEntry = useHistoryStore(s => s.addExtraEntry)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const getOutcome = useOutcomeStore(s => s.getOutcome)
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
@@ -50,6 +51,10 @@ export function TodayPage() {
   const [doubleDay, setDoubleDay] = useState(false)
   const [loggingUpcoming, setLoggingUpcoming] = useState<ResolvedDay | null>(null)
   const [showUpcomingOutcome, setShowUpcomingOutcome] = useState(false)
+  // After the primary double-day workout is confirmed, we open a second
+  // OutcomeModal for the bonus. State carries the bonus's ResolvedDay plus the
+  // ExtraWorkoutEntry id assigned when it was persisted.
+  const [bonusOutcome, setBonusOutcome] = useState<{ rd: ResolvedDay; extraId: string } | null>(null)
 
   if (!plan || !todayResolved) {
     return (
@@ -104,17 +109,49 @@ export function TodayPage() {
     const action = completionStateToAction(outcome.completionState)
     logAction(plan!.id, today, todayResolved!.planDayIndex, action, outcome.notes ?? undefined)
 
-    // Double-day: advance one extra step so tomorrow skips past the bonus workout
-    if (doubleDay) actions.advance()
-
     if (todayRunSlot) {
       logOutcomeWithProgression(outcome, todayRunSlot)
     } else {
       useOutcomeStore.getState().setOutcome(outcome)
     }
 
+    // Double-day: persist the bonus workout as an ExtraWorkoutEntry on today's
+    // date (the rotation's HistoryEntry is already taken by the primary), then
+    // open a second OutcomeModal so the user can log the bonus outcome. The
+    // rotation pointer is also advanced so tomorrow projects past the bonus.
+    if (doubleDay && upcoming[0]) {
+      const bonus = upcoming[0]
+      const bonusSlot = bonus.planDay.slots[0]
+      const extraId = addExtraEntry({
+        planId: plan!.id,
+        calendarDate: today,
+        workoutType: bonusSlot?.type ?? 'rest',
+        workoutName: bonus.planDay.label,
+      })
+      actions.advance()
+      setBonusOutcome({ rd: bonus, extraId })
+    }
+
     setDoubleDay(false)
     setShowOutcomeModal(false)
+  }
+
+  function handleBonusOutcomeConfirm(outcome: WorkoutOutcome) {
+    if (!bonusOutcome) return
+    const runSlot = bonusOutcome.rd.planDay.slots.find(s => isRunType(s.type))
+    if (runSlot) {
+      logOutcomeWithProgression(outcome, runSlot)
+    } else {
+      useOutcomeStore.getState().setOutcome(outcome)
+    }
+    setBonusOutcome(null)
+  }
+
+  function handleBonusOutcomeDismiss() {
+    // Closing without confirming keeps the ExtraWorkoutEntry (the workout
+    // happened) but leaves the outcome blank — matches how ad-hoc extras
+    // created from the History page behave until the user fills them in.
+    setBonusOutcome(null)
   }
 
   function handleSkip() {
@@ -446,6 +483,23 @@ export function TodayPage() {
           existingOutcome={getOutcome(makeWorkoutInstanceId(plan.id, loggingUpcoming.calendarDate))}
           onConfirm={handleUpcomingOutcomeConfirm}
           onClose={() => { setShowUpcomingOutcome(false); setLoggingUpcoming(null) }}
+        />
+      )}
+
+      {/* Outcome modal for the double-day bonus workout.
+          Opens automatically after the primary outcome is confirmed when
+          double-day was on. The bonus is already persisted as an
+          ExtraWorkoutEntry; the outcome is keyed by the extra's instance id
+          so it doesn't collide with the primary entry's outcome. */}
+      {bonusOutcome && (
+        <OutcomeModal
+          planId={plan.id}
+          calendarDate={today}
+          planDay={bonusOutcome.rd.planDay}
+          workoutInstanceId={makeExtraWorkoutInstanceId(plan.id, today, bonusOutcome.extraId)}
+          existingOutcome={getOutcome(makeExtraWorkoutInstanceId(plan.id, today, bonusOutcome.extraId))}
+          onConfirm={handleBonusOutcomeConfirm}
+          onClose={handleBonusOutcomeDismiss}
         />
       )}
 
