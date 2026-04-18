@@ -1,5 +1,82 @@
 # Test Results
 
+## 2026-04-18 (fifth pass) — branch `claude/add-bonus-workout-outcomes-c1H1R`
+
+### Suite totals
+
+| Metric | Entry | Exit |
+| --- | ---: | ---: |
+| Test files | 8 | 8 |
+| Tests | 171 | **176** |
+| Failing | 0 | 0 |
+
+Final run: `npx vitest run`
+
+```
+ Test Files  8 passed (8)
+      Tests  176 passed (176)
+```
+
+Type-check: `npx tsc --noEmit` — clean (only the pre-existing
+`baseUrl` deprecation warning surfaced; unrelated to this run).
+
+### Tests reviewed
+
+- `src/store/__tests__/historyStore.test.ts` — passed at baseline; the
+  `beforeEach` reset was silently leaking `extraEntries` across tests
+  (the bucket was added to the store after the reset was written).
+  Caught when my new tests first failed with unexpectedly-large array
+  lengths.
+- `src/store/__tests__/outcomeStore.test.ts` — passed at baseline.
+  Added one new `describe` block.
+- `src/store/__tests__/planDeleteCleanup.test.ts` — passed, not
+  modified. Already covers plan-delete cascade including extras.
+- Other suites (engine, run-adaptation, lib) — passed, not touched.
+
+### Tests added / updated
+
+1. **`historyStore.test.ts` — new `describe` "addExtraEntry alongside
+   a primary HistoryEntry"** (3 tests):
+   - Primary `HistoryEntry` and `ExtraWorkoutEntry` coexist on the
+     same `(planId, calendarDate)`.
+   - Multiple extras on the same date accumulate with distinct ids.
+   - `removeEntry` does not touch extras.
+2. **`historyStore.test.ts` — `beforeEach` reset**: now also resets
+   `extraEntries: []`.
+3. **`outcomeStore.test.ts` — new `describe` "primary and extra
+   outcomes for the same (planId, date)"** (2 tests):
+   - Both outcomes coexist under distinct keys.
+   - `clearPlanOutcomes` wipes both.
+
+### Results
+
+All 176 tests pass. New tests directly exercise the invariants the
+double-day fix depends on:
+- `HistoryEntry` + `ExtraWorkoutEntry` on the same date survive
+  together.
+- `WorkoutOutcome` under `makeWorkoutInstanceId(planId, date)` and
+  under `makeExtraWorkoutInstanceId(planId, date, extraId)` do not
+  collide.
+- Cleanup (`removeEntry`, `clearPlanOutcomes`) behaves predictably.
+
+### Important areas still untested
+
+- UI-level test of the double-day flow in `TodayPage` (clicking
+  Complete with double-day on → primary modal confirms → bonus modal
+  appears → bonus persists as extra). No React testing setup exists
+  in this codebase; adding one was out of scope. The store-level
+  tests cover the data-model half of the contract.
+- `HistoryPage` extra-entry outcome edit round-trip — the fix in
+  `7969378` is a one-line wiring change that relies on the new
+  `OutcomeModal.workoutInstanceId` prop, which is itself exercised
+  indirectly by the new store tests. A direct UI test would be
+  valuable but is also blocked on the lack of React test setup.
+- The `completionStateToAction` documentation bug (noted in the prior
+  audit) still has no test guarding the actual rotation-advance
+  behaviour for `day_off`. Not expected to close this run.
+
+---
+
 ## 2026-04-18 run — branch `claude/system-improvements-m4b4f`
 
 ### Suite totals
