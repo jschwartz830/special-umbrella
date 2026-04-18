@@ -1,5 +1,94 @@
 # Implementation Plan
 
+## 2026-04-18 — Overnight Audit (fourth pass)
+
+Branch: `claude/system-improvements-m4b4f`.
+Follow-up to the 2026-04-17 audit.
+Baseline on entry: **169 passing, 1 failing** (1 stale assertion in `csv.test.ts`).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering are identical to the 2026-04-17 write-up:
+- `planStore` / `historyStore` / `outcomeStore`, all Zustand + localStorage
+- Pure `rotationEngine` + `calendarProjection`
+- Pure `run-adaptation/engine` for per-group run progression
+- React Router, Vite, Tailwind, PWA via `vite-plugin-pwa`
+
+Single new wrinkle since the last pass: `historyStore` now also owns an
+`extraEntries` array (ad-hoc workouts logged on any day outside the rotation).
+
+### What appears strong and well-designed
+
+- Test suite is now comprehensive across engine/stores/adaptation (170 total).
+- Rotation engine and calendar projection are still pure and clearly tested.
+- Outcome cleanup on plan delete + entry removal is wired up in most paths
+  (added in the 2026-04-17 pass).
+
+### Key issues or risks
+
+1. **Stale test expectation in `csv.test.ts`** (correctness-of-tests). The
+   existing test `'generates fresh IDs on import'` expects `plans[0].id` to
+   differ from the source planId. But commit `d16e8c2` intentionally changed
+   the CSV import to **preserve planId** so exported history CSVs stay
+   cross-referenceable. Day and slot IDs are still regenerated. The test was
+   not updated to match — it now fails. Suite is green except for this one.
+
+2. **Plan delete leaves `extraEntries` orphaned** (real data-correctness bug).
+   `clearPlanHistory(planId)` only filters `entries` and `overrides` — not
+   `extraEntries`. When a user deletes a plan, any ad-hoc workouts they
+   logged for it remain in `localStorage` forever. Orphaned extras will
+   never surface in the UI (they're scoped by planId that no longer exists)
+   but they leak storage and are inconsistent with the existing cleanup
+   pattern applied to entries, overrides, and outcomes.
+
+3. **Misleading comment in `completionStateToAction`** (documentation bug).
+   The JSDoc claims `'deferred → day_off (does NOT advance rotation)'`, but
+   `rotationEngine.computeCurrentDayIndex` advances the pointer on all three
+   action types (`complete`, `skip`, `day_off`). A reader debugging the
+   progression semantics would be actively misled. Cheap to correct.
+
+4. **Unused `minStepMiles` / `maxStepMiles` on `RunWorkoutConfig`** (not a
+   bug). They round-trip through CSV but the adaptation engine doesn't read
+   them. Intentional future-compat; leave alone.
+
+5. **Still open from prior audits** (recommendations only):
+   - `swap_slot` override type has no UI trigger (dead code path in engine).
+   - Double-day bonus workout has no outcome capture.
+   - No progression-reset UI.
+   - Plan-expiry banner shows every day once expired (no dismiss).
+
+### Prioritized plan (this run)
+
+**Safe to implement:**
+
+1. **[SAFE]** Fix the stale `csv.test.ts` assertion to match current intent:
+   planId preserved, day & slot IDs regenerated. Restores green baseline.
+2. **[SAFE]** Extend `clearPlanHistory` (or add `clearPlanExtraEntries`) so
+   the Plan-delete flow removes orphaned extra entries too. Wire it up in
+   `PlansPage`. Mirror of the fix done last pass for outcomes.
+3. **[SAFE]** Correct the misleading JSDoc on `completionStateToAction`.
+4. **[SAFE]** Add a small integration test: plan delete removes extras +
+   their outcomes, leaves other plans' extras untouched.
+
+**Recommendations only (not implemented this run):**
+
+- `swap_slot` UI — needs product decision on scope.
+- Double-day bonus outcome — needs UX path for a second OutcomeModal.
+- Progression reset button — scope decision (single group vs. all).
+- Expiry-banner dismiss — trivial but wants a persisted-dismissal design.
+- Medium feature: **deferred** to keep the run narrowly focused on
+  correctness; nothing in the audit suggests the codebase is destabilised.
+
+### Rationale for sequencing
+
+The failing test is both a blocker for a clean run and a 1-line fix; it goes
+first. The extras-cleanup bug mirrors an already-established pattern (outcome
+cleanup from 2026-04-17), has a clear test shape, and is genuinely user-
+visible if someone browses devtools storage. Doc correction is free. Keeping
+the scope tight this run — no new features, no architectural churn.
+
+---
+
 ## 2026-04-17 — Overnight Audit (third pass)
 
 Branch: `claude/funny-galileo-6zMOl`.
