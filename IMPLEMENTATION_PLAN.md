@@ -1,5 +1,103 @@
 # Implementation Plan
 
+## 2026-04-18 — Overnight Audit (sixth pass)
+
+Branch: `claude/overnight-audit-improvements-RzBkA`.
+Follow-up to the 2026-04-18 fifth-pass audit.
+Baseline on entry: **176 passing, 0 failing**.
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the fifth pass.
+
+### What appears strong and well-designed (unchanged)
+
+- 176-test suite covers engine/stores/adaptation/lib.
+- Double-day bonus persistence is now complete end-to-end (fifth pass).
+- OutcomeModal's `workoutInstanceId` prop makes it a safe caller contract.
+- `historyStore.clearPlanHistory` now correctly handles entries, overrides,
+  and extraEntries in a single sweep.
+
+### Key issues or risks this pass
+
+1. **CalendarPage OutcomeModal missing `workoutInstanceId` prop**
+   (real data-correctness bug). When the user opens an extra-workout
+   outcome from the Calendar day-detail modal — via `openExtraOutcome` —
+   the correct `makeExtraWorkoutInstanceId(...)` key is stored in
+   `outcomeTarget.instanceId`. But the `OutcomeModal` is rendered without
+   `workoutInstanceId={outcomeTarget.instanceId}`, so inside
+   `handleConfirm` the modal falls back to
+   `makeWorkoutInstanceId(planId, calendarDate)` — the PRIMARY slot's key.
+   Result: saving an extra-entry outcome from the Calendar overwrites the
+   primary entry's outcome for that date. This is the exact same bug fixed
+   in HistoryPage in commit `7969378` (fifth pass); Calendar was missed.
+   **Fix: one-line addition identical to the HistoryPage fix.**
+
+2. **TodayPage date string uses `Intl.DateTimeFormat('en-CA')` while every
+   other file uses `format(new Date(), 'yyyy-MM-dd')` from date-fns.**
+   Both reliably produce `YYYY-MM-DD`, but the inconsistency makes the
+   codebase harder to scan and leaves a latent "what if locale changes"
+   concern. Cheap to normalise.
+
+3. **`updateEntryDate` / `updateExtraEntryDate` / `clearExtraEntriesForDate`
+   have zero store-level tests.** These three actions were added for the
+   calendar date-editing feature (fourth pass) but weren't covered in the
+   same round. They're used in production flows (Calendar date picker,
+   Undo on Today).
+
+4. **ExtraWorkoutEntry has no `source` field** — open question from the
+   fifth-pass review. Undo on Today currently wipes ALL of today's extras
+   for this plan (including ones manually added from the History or
+   Calendar page) because there's no way to distinguish double-day extras
+   from user-created ones. Adding an optional `source: 'history' |
+   'double_day'` field is a backward-compatible schema change that lets
+   Undo be scoped correctly.
+
+5. **`progressionStates` are not cleared when a plan is deleted** — noted
+   by the audit agent; orphaned states accumulate in localStorage. Fixing
+   this properly requires a plan→progressionGroup mapping that doesn't
+   currently exist in the schema. **Documenting only this pass.**
+
+### Prioritized plan (this pass)
+
+**Safe to implement:**
+
+1. **[SAFE]** Fix CalendarPage OutcomeModal — add `workoutInstanceId` prop
+   (mirror of the HistoryPage fix; additive, no existing behavior change).
+2. **[SAFE]** Normalize TodayPage date string to `format(new Date(), 'yyyy-MM-dd')`.
+3. **[SAFE]** Add store tests for `updateEntryDate`, `updateExtraEntryDate`,
+   `clearExtraEntriesForDate`.
+
+**Medium-complexity feature (selected):**
+
+4. **[FEATURE]** Add `source?: 'history' | 'double_day'` to
+   `ExtraWorkoutEntry`. Update the two creation paths (double-day in
+   TodayPage, "add workout for this day" in HistoryPage and CalendarPage).
+   Update the Undo handler in TodayPage to only remove extras where
+   `source === 'double_day'` (or source is undefined for old data) instead
+   of clearing all extras for the date. Add tests for the new scoping.
+
+**Recommendations only (not implemented):**
+
+- `progressionStates` orphaning on plan delete — documented above.
+- Outcome metrics component is duplicated in CalendarPage and HistoryPage
+  — could be extracted, but purely cosmetic; not blocking.
+- `swap_slot` override type still has no UI trigger (unchanged from all
+  prior audits).
+- Plan-expiry banner still shows every day with no dismiss.
+
+### Rationale for sequencing
+
+The CalendarPage bug is an exact peer of the HistoryPage fix from the
+fifth pass — doing it first keeps the two pages consistent and is a
+pure correctness win with no design judgment. Date normalisation is free.
+Tests come before the feature to establish a clean baseline. The source-
+field feature goes last because it depends on the tests establishing the
+right mental model of the extra-entry lifecycle.
+
+---
+
 ## 2026-04-18 — Overnight Audit (fifth pass)
 
 Branch: `claude/add-bonus-workout-outcomes-c1H1R`.
