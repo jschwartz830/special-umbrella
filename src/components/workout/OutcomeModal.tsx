@@ -24,6 +24,14 @@ interface Props {
   calendarDate: string
   planDay: PlanDay
   existingOutcome?: WorkoutOutcome | null
+  /**
+   * Optional override for the outcome's workoutInstanceId. Callers logging a
+   * non-primary record for the date (e.g. an ExtraWorkoutEntry or a
+   * double-day bonus) must pass the appropriate id so the outcome doesn't
+   * collide with the primary's key. Defaults to
+   * `makeWorkoutInstanceId(planId, calendarDate)`.
+   */
+  workoutInstanceId?: string
   onConfirm: (outcome: WorkoutOutcome) => void
   onClose: () => void
 }
@@ -66,6 +74,7 @@ export function OutcomeModal({
   calendarDate,
   planDay,
   existingOutcome,
+  workoutInstanceId,
   onConfirm,
   onClose,
 }: Props) {
@@ -116,7 +125,7 @@ export function OutcomeModal({
       : null
 
     const outcome: WorkoutOutcome = {
-      workoutInstanceId: makeWorkoutInstanceId(planId, calendarDate),
+      workoutInstanceId: workoutInstanceId ?? makeWorkoutInstanceId(planId, calendarDate),
       completionState,
       completedAt: new Date().toISOString(),
       durationActualMin: parseFloat(durationMin) || null,
