@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { format } from 'date-fns'
 import {
   SkipForward,
   Coffee,
@@ -45,7 +46,7 @@ export function TodayPage() {
   const getOutcome = useOutcomeStore(s => s.getOutcome)
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
-  const today = new Intl.DateTimeFormat('en-CA').format(new Date())
+  const today = format(new Date(), 'yyyy-MM-dd')
 
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
