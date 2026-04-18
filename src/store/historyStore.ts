@@ -120,6 +120,7 @@ export const useHistoryStore = create<HistoryState>()(
         set(s => ({
           entries: s.entries.filter(e => e.planId !== planId),
           overrides: s.overrides.filter(o => o.planId !== planId),
+          extraEntries: s.extraEntries.filter(e => e.planId !== planId),
         }))
       },
 
