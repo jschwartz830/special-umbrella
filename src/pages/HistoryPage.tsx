@@ -241,7 +241,7 @@ export function HistoryPage() {
 
   function submitAddExtra(planId: string, calendarDate: string) {
     const name = extraName.trim() || WORKOUT_TYPES.find(w => w.type === extraType)?.label || extraType
-    addExtraEntry({ planId, calendarDate, workoutType: extraType, workoutName: name })
+    addExtraEntry({ planId, calendarDate, workoutType: extraType, workoutName: name, source: 'history' })
     setAddingExtraDate(null)
     setExtraName('')
     setExtraType('yoga')
