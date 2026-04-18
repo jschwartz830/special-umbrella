@@ -131,7 +131,10 @@ export function TodayPage() {
   }
 
   function handleUpcomingLog(rd: ResolvedDay, action: 'complete' | 'skip' | 'day_off') {
-    logAction(plan!.id, rd.calendarDate, rd.planDayIndex, action)
+    // A 'complete' on a future-dated upcoming workout records the session on
+    // today — the day it was actually performed — instead of the scheduled date.
+    const logDate = action === 'complete' ? today : rd.calendarDate
+    logAction(plan!.id, logDate, rd.planDayIndex, action)
     if (action === 'complete') {
       setShowUpcomingOutcome(true)
     } else {
@@ -437,17 +440,21 @@ export function TodayPage() {
         </Modal>
       )}
 
-      {/* Outcome modal for upcoming workout */}
-      {loggingUpcoming && showUpcomingOutcome && (
-        <OutcomeModal
-          planId={plan.id}
-          calendarDate={loggingUpcoming.calendarDate}
-          planDay={loggingUpcoming.planDay}
-          existingOutcome={getOutcome(makeWorkoutInstanceId(plan.id, loggingUpcoming.calendarDate))}
-          onConfirm={handleUpcomingOutcomeConfirm}
-          onClose={() => { setShowUpcomingOutcome(false); setLoggingUpcoming(null) }}
-        />
-      )}
+      {/* Outcome modal for upcoming workout — new completes attach to today;
+          edits of pre-existing entries stay on the entry's original date. */}
+      {loggingUpcoming && showUpcomingOutcome && (() => {
+        const outcomeDate = loggingUpcoming.historyEntry ? loggingUpcoming.calendarDate : today
+        return (
+          <OutcomeModal
+            planId={plan.id}
+            calendarDate={outcomeDate}
+            planDay={loggingUpcoming.planDay}
+            existingOutcome={getOutcome(makeWorkoutInstanceId(plan.id, outcomeDate))}
+            onConfirm={handleUpcomingOutcomeConfirm}
+            onClose={() => { setShowUpcomingOutcome(false); setLoggingUpcoming(null) }}
+          />
+        )
+      })()}
 
       {/* Override modal */}
       {showOverride && (
