@@ -11,7 +11,7 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { useOutcomeStore, makeWorkoutInstanceId } from '../outcomeStore'
+import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../outcomeStore'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import type { WorkoutSlot } from '../../types'
 
@@ -278,5 +278,43 @@ describe('clearPlanOutcomes', () => {
     expect(getState().outcomes).toEqual({})
     // Progression state is keyed by group id, not plan id — should be kept
     expect(getState().progressionStates['grp']).toBeDefined()
+  })
+})
+
+// ── Primary + extra outcomes on the same date ────────────────────────────────
+// The double-day bonus relies on primary and extra outcomes living under
+// distinct instance-id keys so they don't overwrite each other. This exercises
+// that invariant directly on the outcome store.
+
+describe('primary and extra outcomes for the same (planId, date)', () => {
+  it('coexist under distinct keys', () => {
+    const primaryId = makeWorkoutInstanceId('plan-1', '2026-01-01')
+    const extraId = makeExtraWorkoutInstanceId('plan-1', '2026-01-01', 'ext-abc')
+
+    expect(primaryId).not.toBe(extraId)
+
+    getState().setOutcome({
+      ...makeOutcome('plan-1', '2026-01-01'),
+      workoutInstanceId: primaryId,
+      perceivedEffort: 3,
+    })
+    getState().setOutcome({
+      ...makeOutcome('plan-1', '2026-01-01'),
+      workoutInstanceId: extraId,
+      perceivedEffort: 5,
+    })
+
+    expect(getState().getOutcome(primaryId)?.perceivedEffort).toBe(3)
+    expect(getState().getOutcome(extraId)?.perceivedEffort).toBe(5)
+    expect(Object.keys(getState().outcomes)).toHaveLength(2)
+  })
+
+  it('clearPlanOutcomes removes both primary and extra keys for the plan', () => {
+    const primaryId = makeWorkoutInstanceId('plan-1', '2026-01-01')
+    const extraId = makeExtraWorkoutInstanceId('plan-1', '2026-01-01', 'ext-abc')
+    getState().setOutcome({ ...makeOutcome('plan-1', '2026-01-01'), workoutInstanceId: primaryId })
+    getState().setOutcome({ ...makeOutcome('plan-1', '2026-01-01'), workoutInstanceId: extraId })
+    getState().clearPlanOutcomes('plan-1')
+    expect(getState().outcomes).toEqual({})
   })
 })

@@ -54,7 +54,7 @@ function getState() {
 // ── Reset between tests ───────────────────────────────────────────────────────
 
 beforeEach(() => {
-  useHistoryStore.setState({ entries: [], overrides: [] })
+  useHistoryStore.setState({ entries: [], overrides: [], extraEntries: [] })
 })
 
 // ── addEntry ──────────────────────────────────────────────────────────────────
@@ -282,5 +282,59 @@ describe('clearPlanHistory', () => {
     expect(getState().entries[0].planId).toBe('plan-2')
     expect(getState().overrides).toHaveLength(1)
     expect(getState().overrides[0].planId).toBe('plan-2')
+  })
+})
+
+// ── extraEntries ──────────────────────────────────────────────────────────────
+// These cover the invariants the double-day bonus logging relies on:
+//   - A primary HistoryEntry and an ExtraWorkoutEntry on the same
+//     (planId, calendarDate) coexist instead of replacing each other.
+//   - Multiple ExtraWorkoutEntries on the same date accumulate and each
+//     returns a distinct id usable for keying outcomes.
+
+describe('addExtraEntry alongside a primary HistoryEntry', () => {
+  it('keeps both records when logged on the same (planId, date)', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 0 }))
+    const extraId = getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'recovery_run',
+      workoutName: 'Bonus Recovery',
+    })
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].action).toBe('complete')
+    expect(getState().extraEntries).toHaveLength(1)
+    expect(getState().extraEntries[0].id).toBe(extraId)
+    expect(getState().extraEntries[0].workoutName).toBe('Bonus Recovery')
+  })
+
+  it('accumulates multiple extras on the same date with distinct ids', () => {
+    const idA = getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'yoga',
+      workoutName: 'Morning Yoga',
+    })
+    const idB = getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'swim',
+      workoutName: 'Evening Swim',
+    })
+    expect(idA).not.toBe(idB)
+    expect(getState().extraEntries).toHaveLength(2)
+  })
+
+  it('removeEntry does not touch extraEntries for the same date', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))
+    getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'yoga',
+      workoutName: 'Bonus',
+    })
+    getState().removeEntry('plan-1', '2026-01-01')
+    expect(getState().entries).toHaveLength(0)
+    expect(getState().extraEntries).toHaveLength(1)
   })
 })

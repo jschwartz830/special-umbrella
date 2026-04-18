@@ -1,5 +1,113 @@
 # Overnight Changelog
 
+## 2026-04-18 (fifth pass) — branch `claude/add-bonus-workout-outcomes-c1H1R`
+
+Baseline on entry: **171 passing, 0 failing** (after `npm install`).
+End state: **176 tests pass**.
+
+Scope: one user-reported bug (double-day bonus workout logging replaced
+the primary instead of adding a second), one latent History-page bug
+uncovered while investigating, plus small supporting changes and tests.
+No engine changes, no schema changes, no new features beyond the
+already-present double-day UI getting full persistence.
+
+### Commits (oldest → newest)
+
+1. **`d13c033` — Plan: 2026-04-18 fifth-pass audit**
+   Dated `IMPLEMENTATION_PLAN.md` section summarising the double-day
+   bug, the OutcomeModal instance-id latent bug, and the prioritized
+   plan. No code changes.
+   - `IMPLEMENTATION_PLAN.md`
+   - **Risk**: none (doc only).
+   - **Rollback**: `git revert d13c033`.
+
+2. **`9b89b44` — OutcomeModal: optional workoutInstanceId override**
+   Added an optional prop so callers logging a non-primary record for
+   a date (ExtraWorkoutEntry, double-day bonus) can pass their own
+   instance id. Backward-compatible — falls through to the existing
+   `makeWorkoutInstanceId(planId, calendarDate)` default when not
+   provided.
+   - `src/components/workout/OutcomeModal.tsx`
+   - **Risk**: low. Additive prop, no behaviour change for existing
+     callers.
+   - **Rollback**: `git revert 9b89b44` (but note this will re-introduce
+     the HistoryPage extra-outcome collision fixed next).
+
+3. **`7969378` — HistoryPage: save extra-entry outcomes under the extra key**
+   Pre-existing bug: `openOutcomeForExtra` tracked the correct
+   `makeExtraWorkoutInstanceId` in `outcomeTarget.instanceId`, but
+   `OutcomeModal` always rebuilt the id from `(planId, calendarDate)`
+   on confirm, so saving an outcome for an ad-hoc extra entry actually
+   wrote to the primary rotation entry's outcome slot for that date.
+   One-line fix now that the modal accepts the override.
+   - `src/pages/HistoryPage.tsx`
+   - **Risk**: low. Fixes a silent data-correctness bug; no new code
+     paths.
+   - **Rollback**: `git revert 7969378`.
+
+4. **`f2fe0af` — TodayPage: log the double-day bonus workout (USER-REPORTED)**
+   `handleOutcomeConfirm` used to log just the primary
+   (`logAction(planId, today, ...)`) and call `actions.advance()` to
+   skip the rotation past the bonus. The bonus itself was never
+   persisted. Now, when `doubleDay` is on:
+   1. Primary is logged as before (HistoryEntry keyed by
+      `(planId, today)`).
+   2. Bonus is persisted as an `ExtraWorkoutEntry` on today — the
+      existing bucket for ad-hoc workouts — so both records coexist
+      without colliding on the primary key.
+   3. After the primary OutcomeModal confirms, a second OutcomeModal
+      opens for the bonus, pre-populated from the bonus plan day.
+      Closing without confirming keeps the extra entry (the workout
+      happened) but leaves the outcome blank, matching the ad-hoc
+      extras already created from History.
+   4. Rotation still advances an extra step so tomorrow projects past
+      the bonus.
+   - `src/pages/TodayPage.tsx`
+   - **Risk**: medium. Introduces a new persistence path from the
+     Today page. Contained to the double-day branch; single-workout
+     path is unchanged.
+   - **Rollback**: `git revert f2fe0af`. The HistoryPage / OutcomeModal
+     fixes are independently valuable and should remain.
+
+5. **`283ceb4` — Tests: extras coexist with primary entry/outcome on same date**
+   Locks down the invariants the double-day fix depends on:
+   - Primary HistoryEntry and ExtraWorkoutEntry survive together on
+     the same `(planId, calendarDate)`; multiple extras accumulate
+     with distinct ids.
+   - `removeEntry` doesn't touch extras.
+   - Primary and extra outcomes coexist under distinct keys;
+     `clearPlanOutcomes` wipes both.
+   - Also resets `extraEntries` in the history-store test
+     `beforeEach` — the bucket was added to the store after the reset
+     was written, so state was leaking across tests. My first run of
+     the new tests exposed the leak, which this commit fixes.
+   - `src/store/__tests__/historyStore.test.ts`,
+     `src/store/__tests__/outcomeStore.test.ts`
+   - **Risk**: none (tests only).
+   - **Rollback**: `git revert 283ceb4`.
+
+6. **`28f7905` — TodayPage: Undo also clears today's extras for this plan**
+   After the double-day fix, the existing Undo button on Today only
+   cleaned up the primary HistoryEntry and outcome, leaving the bonus
+   ExtraWorkoutEntry (and its outcome) stranded. Undo now also removes
+   all of today's extras (and their outcomes) for this plan. Extras
+   for other plans on today are left untouched.
+   - `src/pages/TodayPage.tsx`
+   - **Risk**: low. Extras for this plan on today could previously
+     only have been created by the double-day flow; the rare user who
+     manually added a today-extra from the History page and then hit
+     Undo on Today would now lose that manual extra too. Documented
+     in REVIEW_NOTES for your consideration.
+   - **Rollback**: `git revert 28f7905`.
+
+### Not done this run
+
+- The optional medium-complexity feature slot was intentionally skipped.
+  The user-reported correctness bug + its latent cousin took the
+  whole session; stabilization first is the right call.
+
+---
+
 ## 2026-04-18 run — branch `claude/system-improvements-m4b4f`
 
 Baseline: 169 passing, 1 failing (stale CSV test assertion).

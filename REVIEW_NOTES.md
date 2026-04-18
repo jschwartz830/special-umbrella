@@ -1,5 +1,108 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-18 (fifth pass) — branch `claude/add-bonus-workout-outcomes-c1H1R`
+
+### Summary
+
+1. **What changed**: Fixed a user-reported data-loss bug where using the
+   "double-day" toggle on Today logged only the primary workout and silently
+   dropped the bonus. Also fixed a latent History-page bug uncovered while
+   investigating (extra-entry outcomes were overwriting the primary entry's
+   outcome for the same date). Six small commits, one of which is
+   documentation; end state is 176 tests passing (up from 171).
+
+2. **Highest confidence**:
+   - `9b89b44` + `7969378` — OutcomeModal prop + HistoryPage wiring. Purely
+     additive on the modal side; fixes a silent data-correctness bug on the
+     History side that was writing extras to the wrong key.
+   - `283ceb4` — the store tests. No production code, locks invariants.
+
+3. **Risky / worth a close look**:
+   - `f2fe0af` — the double-day change introduces a new persistence path
+     (ExtraWorkoutEntry) from the Today page. It's contained to the
+     `doubleDay` branch, but it's user-visible: a second OutcomeModal pops
+     up after the primary is confirmed. UX decision encoded: closing the
+     second modal without confirming keeps the extra entry but leaves its
+     outcome blank. If you'd rather the bonus outcome modal be mandatory,
+     or you'd rather the bonus not persist until its outcome is saved,
+     this is the commit to revisit.
+   - `28f7905` — Undo on Today now also wipes all of today's extras for
+     this plan. If a user somehow has a manually-created extra on today
+     (from the History page's Add-workout-for-this-day affordance) and
+     hits Undo on Today, that manual extra is now gone too. Edge case;
+     documented here rather than conditionalised.
+
+4. **Review first**: `f2fe0af` — it's the user-reported fix and the one
+   with user-visible UX choices.
+
+### Definitely keep
+
+- `9b89b44` OutcomeModal prop (enabler + no-op for old callers).
+- `7969378` HistoryPage extra-outcome write path (silent data bug fix).
+- `283ceb4` store tests.
+
+### Probably keep but tweak
+
+- `f2fe0af` double-day bonus logging. The UX seam worth reconsidering:
+  when the user closes the bonus OutcomeModal with the X button rather
+  than confirming, the ExtraWorkoutEntry stays but its outcome is
+  blank. Alternatives to consider tomorrow:
+  - Require the bonus outcome to confirm before the extra is persisted
+    (symmetric with the primary flow).
+  - Prompt "Discard bonus workout?" on close.
+  - Leave as-is (current behaviour matches how ad-hoc extras behave from
+    History — blank outcome is allowed).
+- `28f7905` Undo-cleans-extras. Decide whether you want Undo to also
+  drop manual extras on today, or whether it should be scoped to extras
+  created via the double-day flow specifically. Scoping would require
+  a flag on `ExtraWorkoutEntry` (e.g. `source: 'history' | 'double_day'`)
+  which is a schema change — deliberately not done in this run.
+
+### Do not keep
+
+None flagged for rejection.
+
+### Recommendations only (not implemented)
+
+- Add a visual indicator on today's workout card when a double-day bonus
+  is also logged, so the user sees "2 workouts logged today" at a glance.
+- Consider a unified "Today's workouts" section on Today page when
+  multiple workouts are logged for today — currently only the primary
+  is visible after completion.
+- `swap_slot` override type still has no UI trigger (unchanged from
+  prior audits).
+- Plan-expiry banner still shows every day with no dismiss (unchanged).
+- The existing `completionStateToAction` comment still misdocuments
+  rotation-advance behaviour for `day_off` (noted in earlier audit,
+  not touched this run).
+
+### Open questions for you
+
+1. Should the bonus-workout modal be mandatory (block persistence until
+   confirmed) or optional (current: extra persists, outcome may be blank)?
+2. Should Undo on Today distinguish "double-day bonus" extras from
+   manually-logged extras? That's a schema change; I didn't take it.
+3. In the double-day case, the primary outcome modal and the bonus
+   outcome modal open sequentially. Do you want a single combined UI
+   later (two forms in one modal) or is the chained flow fine?
+
+### Known issues or incomplete work
+
+- No component-level test for TodayPage's double-day flow. The
+  store-level tests cover the persistence invariants (two workouts
+  coexist on one date), but the actual UI flow (click Complete →
+  confirm primary → second modal appears → confirm bonus) is not
+  automated. Acceptable given this codebase has no React test setup —
+  adding one was out of scope.
+- Tests were not added for `removeRetroJumpForDate` or other existing
+  gaps; this run was scoped to the reported bug + its adjacent issues.
+
+### Dependencies added
+
+None. No `package.json` changes.
+
+---
+
 ## 2026-04-18 run — branch `claude/system-improvements-m4b4f`
 
 ### Executive Summary

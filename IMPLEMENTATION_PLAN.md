@@ -1,5 +1,100 @@
 # Implementation Plan
 
+## 2026-04-18 — Overnight Audit (fifth pass)
+
+Branch: `claude/add-bonus-workout-outcomes-c1H1R`.
+Follow-up to the 2026-04-18 fourth-pass audit.
+Baseline on entry: **171 passing, 0 failing** (after `npm install`).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match the prior audits:
+- Zustand + localStorage stores: `planStore`, `historyStore`, `outcomeStore`
+- Pure `rotationEngine` + `calendarProjection`
+- Pure `run-adaptation/engine` for per-group run progression
+- React Router, Vite, Tailwind, PWA via `vite-plugin-pwa`
+- `historyStore.extraEntries` for ad-hoc workouts logged outside the rotation
+  (used by History page; outcomes keyed via `makeExtraWorkoutInstanceId`)
+
+### What appears strong and well-designed (unchanged)
+
+- 171-test suite covers engine/stores/adaptation/lib.
+- Stores are small, purely functional where possible, and each has its own
+  test file.
+- Outcome cleanup on plan delete + entry removal is wired through
+  `clearPlanOutcomes` / `removeOutcome`.
+
+### Key issues or risks this pass
+
+1. **Double-day bonus workout logs only one workout** (user-reported; also open
+   from prior audits). When double-day is toggled on and the user presses
+   Complete, `handleOutcomeConfirm` logs the primary workout as a HistoryEntry
+   at today, advances rotation past the bonus, and does NOT capture the
+   bonus workout at all. The user expects two workouts to be recorded on the
+   same date. `HistoryEntry` is keyed by `(planId, calendarDate)` so a
+   naive second `logAction` on the same date would replace the first. The
+   existing `ExtraWorkoutEntry` bucket (already used by History page for
+   ad-hoc logs) is the right mechanism for the bonus — multiple can exist
+   per date and each has its own outcome instance id via
+   `makeExtraWorkoutInstanceId`. **Priority: high — user requested this run.**
+
+2. **`OutcomeModal` ignores caller-supplied instance IDs** (latent bug).
+   The modal always rebuilds `workoutInstanceId` from `makeWorkoutInstanceId(planId, calendarDate)`
+   inside `handleConfirm`. `HistoryPage.openOutcomeForExtra` tracks the
+   correct extra-instance id in `outcomeTarget.instanceId`, but when the
+   user confirms, the outcome ends up saved under the primary key (plan+date),
+   not the extra's key. Today this means: editing an outcome on an extra
+   entry in History writes to the primary entry's outcome slot. This will
+   block the double-day fix if not addressed. Fix: add an optional
+   `workoutInstanceId` prop on OutcomeModal; callers who need a
+   non-default id pass it in.
+
+3. **Still open from prior audits** (recommendations only, unchanged):
+   - `swap_slot` override type still has no UI trigger.
+   - No progression-reset UI.
+   - Plan-expiry banner shows every day once expired (no dismiss).
+
+### Prioritized plan (this run)
+
+**Safe to implement:**
+
+1. **[SAFE]** Add optional `workoutInstanceId` prop to OutcomeModal
+   (backward-compatible — default falls through to existing behaviour).
+2. **[SAFE]** Fix the HistoryPage extra-outcome write path to use the extra's
+   instance id (now that OutcomeModal accepts it). Prevents cross-writing.
+3. **[USER PRIORITY]** Log the double-day bonus workout:
+   - Primary remains a HistoryEntry at today (unchanged).
+   - Bonus is persisted as an ExtraWorkoutEntry at today, with its outcome
+     keyed by `makeExtraWorkoutInstanceId`.
+   - Rotation still advances one extra step to skip past the bonus.
+   - UX: after the primary OutcomeModal confirms, a second OutcomeModal
+     opens for the bonus workout. The user can confirm or close; closing
+     keeps the ExtraWorkoutEntry but leaves the outcome blank (matches
+     how ad-hoc extras already work in History).
+4. **[SAFE]** Tests: store-level test proving that two workouts on the same
+   date land in separate buckets and survive reload.
+
+**Explicitly out of scope for this run:**
+
+- Rewriting the OutcomeModal to own its instance-id logic beyond the prop.
+- Adding a separate "bonus" visual treatment in History — existing
+  ExtraWorkoutEntry rendering already covers it.
+- Undo/redo for the bonus — out of scope; the existing extra-entry
+  History UI already supports edit/delete.
+- The medium-complexity feature slot — this run's scope is the user's
+  reported bug plus supporting fixes; stabilization first.
+
+### Rationale for sequencing
+
+The instance-id plumbing fix (item 1) unblocks both the History-extra
+latent bug (item 2) and the double-day fix (item 3). Doing them in that
+order makes each commit small and individually revertable: OutcomeModal
+change alone is a no-op with existing callers, the HistoryPage fix is
+a one-line instance-id wiring change, and the TodayPage change is
+self-contained to the double-day path.
+
+---
+
 ## 2026-04-18 — Overnight Audit (fourth pass)
 
 Branch: `claude/system-improvements-m4b4f`.
