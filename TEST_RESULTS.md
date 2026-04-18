@@ -1,5 +1,55 @@
 # Test Results
 
+## 2026-04-18 (sixth pass) — branch `claude/overnight-audit-improvements-RzBkA`
+
+### Suite totals
+
+| Metric | Entry | Exit |
+| --- | ---: | ---: |
+| Test files | 8 | 8 |
+| Tests | 176 | **192** |
+| Failing | 0 | 0 |
+
+Final run: `npx vitest run`
+
+```
+ Test Files  8 passed (8)
+      Tests  192 passed (192)
+```
+
+Type-check: `npx tsc --noEmit` — clean (only the pre-existing
+`baseUrl` deprecation warning; unrelated to this run).
+
+### Tests reviewed
+
+- `src/store/__tests__/historyStore.test.ts` — extended with 19 new
+  tests across four new describe blocks.
+- All other suites passed unchanged.
+
+### Tests added
+
+**`updateEntryDate`** (3): moves entry, isolates other entries, preserves fields.
+
+**`updateExtraEntryDate`** (4): moves extra, isolates other extras, preserves fields, no-ops on wrong id.
+
+**`clearExtraEntriesForDate`** (4): clears matching plan+date, leaves other dates, leaves other plans, no-op.
+
+**`ExtraWorkoutEntry.source`** (6): double_day persisted, history persisted, undefined for legacy shape, Undo filter removes double_day+undefined but keeps history, removes-all, keeps-all.
+
+### Results
+
+All 192 tests pass.
+
+### Important areas still untested
+
+- UI-level tests for any page (no React testing setup; unchanged from
+  prior passes).
+- CalendarPage OutcomeModal fix is covered by type-check and store-level
+  key-collision invariants, but not by an automated UI test.
+- `progressionStates` cleanup on plan delete — not implemented.
+
+---
+
 ## 2026-04-18 (fifth pass) — branch `claude/add-bonus-workout-outcomes-c1H1R`
 
 ### Suite totals

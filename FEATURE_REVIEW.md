@@ -1,3 +1,79 @@
+# Feature Review — ExtraWorkoutEntry.source Field
+
+Date: 2026-04-18
+Feature commit: `d865ff9`
+Classification: **Keep with one open tweak decision**
+
+## What was actually built
+
+An optional `source?: 'history' | 'double_day'` field on
+`ExtraWorkoutEntry`. Three call sites updated:
+- TodayPage double-day bonus → `'double_day'`
+- HistoryPage "Add workout for this day" → `'history'`
+- CalendarPage "Add workout for this day" → `'history'`
+
+Undo on TodayPage now filters: removes extras where
+`source !== 'history'` (i.e., double_day and old records without a
+source). Extras tagged `'history'` survive Undo.
+
+## What assumptions were encoded
+
+- Old `ExtraWorkoutEntry` records in localStorage have `source ===
+  undefined`. The filter `source !== 'history'` treats them as
+  double_day — they are removed on Undo.
+- If you want old records to survive Undo, change the filter to
+  `source === 'double_day'` in `TodayPage.tsx:~333`.
+
+## What worked well
+
+- The type change is genuinely backward-compatible — undefined is
+  handled explicitly, TypeScript is happy, no migration.
+- The three creation paths are all small and easy to verify.
+- The Undo filter is a single line and the intent is documented in
+  the code comment above it.
+- 6 store-level tests lock the invariant.
+
+## What feels risky or incomplete
+
+- **Old-record treatment**: Treating undefined as double_day is
+  conservative but could surprise a user who had manually-added extras
+  before upgrading. This is pre-existing behavior (prior to this commit,
+  Undo cleared ALL extras), so it is not a regression — but it's worth
+  a conscious product decision.
+- **No History badge**: The `source` field now exists but History still
+  shows the generic "Extra" pill for all extras. Double-day extras could
+  show "Via double-day" to help users understand their history. This
+  is intentionally out of scope for this commit; it's a one-line JSX
+  change when desired.
+
+## What I should evaluate
+
+1. Do you want old extras (source undefined) treated as double_day
+   (current: removed on Undo) or history (left alone on Undo)?
+2. Do you want a badge in History for `source === 'double_day'` extras?
+
+## Recommended next steps
+
+- Decide on the undefined treatment (see above) — if you want to
+  change it, the fix is one character: `!== 'history'` → `=== 'double_day'`.
+- Optionally add a "Via double-day" badge in HistoryPage's extra entry
+  render block (`kind === 'extra'` branch, around line 492).
+
+## Classification
+
+**Keep** — the schema change is minimal, additive, and backward-
+compatible. The Undo behavior is strictly better than before. The one
+open question (undefined treatment) is a product preference, not a
+correctness issue.
+
+## Rollback
+
+`git revert d865ff9`. Old records are unchanged; the only effect
+is that Undo on Today reverts to clearing all extras for the date
+(prior behavior).
+
+---
+
 # Feature Review — History Stats Summary
 
 Date: 2026-04-17
