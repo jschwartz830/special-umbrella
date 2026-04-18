@@ -321,6 +321,7 @@ export function CalendarPage() {
           calendarDate={outcomeTarget.calendarDate}
           planDay={outcomeTarget.planDay}
           existingOutcome={outcomes[outcomeTarget.instanceId] ?? null}
+          workoutInstanceId={outcomeTarget.instanceId}
           onConfirm={handleOutcomeConfirm}
           onClose={() => setOutcomeTarget(null)}
         />
