@@ -1,5 +1,74 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-18 run — branch `claude/system-improvements-m4b4f`
+
+### Executive Summary
+
+Fourth-pass audit, building on 2026-04-17. Intentionally narrow:
+**5 commits** (1 plan doc, 1 test-correction, 1 real-bug fix, 1 doc
+fix, 1 test addition). No engine changes, no new features, no schema
+changes.
+
+The baseline was 169 pass / 1 fail — a single stale test assertion.
+End state is 171 pass.
+
+### Review first — the real correctness fix
+
+**`90ef6b3` — extraEntries orphaned on plan delete**
+
+`clearPlanHistory(planId)` filtered `entries` and `overrides` but not
+`extraEntries`. Any ad-hoc workouts the user logged against a plan
+(yoga, swim, etc. logged outside the rotation) stayed in localStorage
+after the plan was deleted. They could never surface in the UI (their
+planId was gone) but they leaked storage and broke the "delete means
+delete" invariant that applies to every other scoped record.
+
+One-line addition to the existing filter call:
+
+```ts
+extraEntries: s.extraEntries.filter(e => e.planId !== planId),
+```
+
+No UI changes were needed — `PlansPage` already calls `clearPlanHistory`
+→ `clearPlanOutcomes` → `deletePlan`, and extra-outcome keys are
+prefixed `${planId}_` so `clearPlanOutcomes` already covers them.
+
+### Supporting changes
+
+- **`40edf34`** — stale CSV test assertion flipped. Commit `d16e8c2`
+  intentionally started preserving planId on CSV import so previously
+  exported history CSVs stay linkable. The test still expected a
+  regenerated id and had been failing since that change landed.
+- **`aa09ad7`** — JSDoc on `completionStateToAction` had claimed
+  `deferred → day_off (does NOT advance rotation)`. The rotation
+  engine advances the pointer for all three action types. Doc only.
+- **`59ec028`** — new integration test: delete plan A, verify plan A
+  extras + their outcomes are gone and plan B's are intact.
+
+### Nothing is risky or destructive
+
+No engine logic changed. No migration. No storage format changed.
+Extras filter mirrors the existing pattern for entries/overrides.
+
+### Not implemented (recommendations only)
+
+- `swap_slot` override UI — product decision still needed.
+- Double-day bonus outcome capture — needs UX path for second modal.
+- Progression-reset UI — scope decision (per-group vs global).
+- Plan-expiry banner dismiss — wants a persisted-dismissal design.
+- **Medium-complexity feature was intentionally declined**. Baseline
+  was already close to clean; the three fixes are pure correctness
+  and the audit surfaced no stability concerns. Keeping the scope
+  narrow means the review surface is 5 small commits, each
+  individually revertable.
+
+### Estimated review time
+
+~10 minutes. Two of the five commits are doc-only, one is a test
+correction, one is a 1-line fix, one is a new test.
+
+---
+
 ## 2026-04-17 run — branch `claude/funny-galileo-6zMOl`
 
 ### Executive Summary

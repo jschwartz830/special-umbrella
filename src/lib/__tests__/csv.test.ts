@@ -171,10 +171,14 @@ describe('plansToCsv + plansFromCsv', () => {
     expect(plans[0].status).toBe('inactive')
   })
 
-  it('generates fresh IDs on import', () => {
+  it('preserves planId but generates fresh day/slot IDs on import', () => {
+    // planId is preserved so that previously-exported history CSVs (which
+    // reference planId) stay linkable after a plan re-import. Day and slot
+    // IDs are regenerated since they're internal and not referenced by
+    // other exports.
     const csv = plansToCsv([makePlan()])
     const { plans } = plansFromCsv(csv)
-    expect(plans[0].id).not.toBe('plan-1')
+    expect(plans[0].id).toBe('plan-1')
     expect(plans[0].days[0].id).not.toBe('d1')
     expect(plans[0].days[0].slots[0].id).not.toBe('s1')
   })

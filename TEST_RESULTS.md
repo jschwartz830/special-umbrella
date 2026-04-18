@@ -1,5 +1,54 @@
 # Test Results
 
+## 2026-04-18 run — branch `claude/system-improvements-m4b4f`
+
+### Suite totals
+
+| Stage       | Files | Tests | Passing |
+|-------------|-------|-------|---------|
+| Baseline    | 8     | 170   | 169 (1 failing) |
+| After run   | 8     | 171   | **171** |
+| Delta       | 0     | +1    | +2 (1 fix + 1 add) |
+
+All green. Run with `npx vitest run` (or `npm test`).
+
+### Failing test that was fixed
+
+**`src/lib/__tests__/csv.test.ts`** — the `'generates fresh IDs on
+import'` test asserted `plans[0].id` was regenerated. Commit
+`d16e8c2` intentionally changed the import to preserve planId so
+previously-exported history CSVs stay linkable across re-imports.
+Renamed the test to `'preserves planId but generates fresh day/slot
+IDs on import'` and flipped the assertion to `toBe('plan-1')`. Day
+and slot IDs are still verified to regenerate.
+
+### New tests added
+
+**`src/store/__tests__/planDeleteCleanup.test.ts`** (+1 test, now 3 total)
+
+- `'removes ad-hoc extra workouts and their outcomes for the deleted
+  plan only'` — seeds plan A with 2 extras and plan B with 1 extra,
+  creates outcomes for each extra, simulates the PlansPage
+  delete-cascade (`clearPlanHistory` → `clearPlanOutcomes` →
+  `deletePlan`), asserts plan A extras + outcomes are gone and plan B
+  extras + outcome survive. The existing two tests (basic cascade,
+  active-plan reset) were untouched.
+
+### Behaviors now guaranteed by tests
+
+1. Deleting a plan removes all ad-hoc extra workouts logged against
+   it from `historyStore.extraEntries`, and their outcomes from
+   `outcomeStore.outcomes`. Sibling plans' extras survive.
+2. CSV plan import preserves planId (contract documented by test).
+   Day and slot IDs still regenerate.
+
+### Not regression-tested (acceptable)
+
+Doc-only changes (`aa09ad7` on `completionStateToAction`) don't need
+a test. No code path changed.
+
+---
+
 ## 2026-04-17 run — branch `claude/funny-galileo-6zMOl`
 
 ### Suite totals

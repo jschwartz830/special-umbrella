@@ -1,5 +1,93 @@
 # Overnight Changelog
 
+## 2026-04-18 run — branch `claude/system-improvements-m4b4f`
+
+Baseline: 169 passing, 1 failing (stale CSV test assertion).
+End state: **171 tests pass**.
+
+Scope-tight correctness run. Three targeted fixes + one new test. No
+engine changes, no schema changes, no new features.
+
+### Commits (oldest → newest)
+
+1. **`dbf4c51` — Add IMPLEMENTATION_PLAN.md section for 2026-04-18 audit**
+   Dated architecture re-summary + prioritized plan. No code changes.
+
+2. **`40edf34` — Update stale csv test: planId is preserved, day/slot IDs regenerate**
+   Commit `d16e8c2` intentionally started preserving planId on CSV
+   import (so previously-exported history CSVs stay cross-referenceable
+   across re-imports). The existing test still asserted that planId
+   was regenerated, so the suite had been failing since that change
+   landed. Flipped the assertion + renamed the test to state the
+   current contract; added inline comment explaining why.
+   - `src/lib/__tests__/csv.test.ts`
+   - **Risk**: none. Test-only change that documents existing behavior.
+   - **Rollback**: `git revert 40edf34`.
+
+3. **`90ef6b3` — Clear plan's extra workouts when clearing plan history**
+   `clearPlanHistory(planId)` filtered `entries` and `overrides` but
+   not `extraEntries`. Deleting a plan left any ad-hoc logged workouts
+   (yoga / swim / run / etc. logged outside the rotation) orphaned in
+   localStorage. PlansPage's delete flow already calls
+   `clearPlanHistory` → `clearPlanOutcomes` → `deletePlan`, so adding
+   the filter to `clearPlanHistory` is enough — outcome keys for extras
+   are prefixed by `${planId}_` and are already cleared by
+   `clearPlanOutcomes`.
+   - `src/store/historyStore.ts`
+   - **Risk**: low. One-line addition; mirrors the existing pattern
+     for `entries` and `overrides`.
+   - **Rollback**: `git revert 90ef6b3`.
+
+4. **`aa09ad7` — Correct misleading JSDoc on completionStateToAction**
+   The doc on `completionStateToAction` claimed `deferred → day_off
+   (does NOT advance rotation)`. `rotationEngine.computeCurrentDayIndex`
+   actually advances the pointer for all three action types
+   (`complete`, `skip`, `day_off`). Re-worded to state the truth and
+   point at the engine function for anyone debugging progression
+   semantics. Doc only.
+   - `src/modules/workout-outcomes/types.ts`
+   - **Risk**: none.
+   - **Rollback**: `git revert aa09ad7`.
+
+5. **`59ec028` — Add test for extraEntries cleanup in plan-delete cascade**
+   Extends `planDeleteCleanup.test.ts` with a third integration-style
+   test: seeds plan A with 2 extras and plan B with 1 extra, creates
+   outcomes for each extra via `makeExtraWorkoutInstanceId`, simulates
+   the PlansPage delete cascade for plan A, and asserts plan B's extra
+   + outcome survive while plan A's are gone. Also adds
+   `extraEntries: []` to the `beforeEach` store reset.
+   - `src/store/__tests__/planDeleteCleanup.test.ts`
+   - **Risk**: none. Test-only.
+   - **Rollback**: `git revert 59ec028`.
+
+### Tests
+
+- Before: 169 pass / 1 fail.
+- After: **171 pass** (+1 fix, +1 new test).
+
+### User-visible behavior changes
+
+1. Deleting a plan now also removes ad-hoc extra workouts (yoga / swim
+   / any off-rotation workout) logged against it. Previously those
+   stayed in localStorage forever.
+
+Nothing else affects UI, CSV export/import, rotation advancement, or
+the PWA manifest.
+
+### Not implemented (recommendations only)
+
+- `swap_slot` override UI — product decision still needed.
+- Double-day bonus outcome capture — needs UX path for a second modal.
+- Progression reset button — scope decision (single group vs all).
+- Plan-expiry banner dismiss — wants a persisted-dismissal design.
+
+Medium-complexity feature work was intentionally skipped this run to
+keep scope narrow around correctness. Baseline was close to clean
+(169/170); a pure-correctness run lands the suite green without
+layering in anything that needs separate review.
+
+---
+
 ## 2026-04-17 run — branch `claude/funny-galileo-6zMOl`
 
 Baseline: 156 tests pass (inherited from 2026-04-16 run).
