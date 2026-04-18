@@ -39,10 +39,14 @@ import type { ActionType } from '../../types'
 
 /**
  * Map a WorkoutCompletionState to the legacy ActionType used by historyStore.
- * - completed / partially_completed / swapped → 'complete' (advances rotation)
- * - skipped → 'skip' (advances rotation)
- * - deferred → 'day_off' (does NOT advance rotation)
+ * - completed / partially_completed / swapped → 'complete'
+ * - skipped → 'skip'
+ * - deferred → 'day_off'
  * - planned → should never be persisted; default to 'complete'
+ *
+ * Note on rotation advancement: all three action types (complete, skip,
+ * day_off) currently advance the rotation pointer by 1. See
+ * `computeCurrentDayIndex` in rotationEngine.ts.
  */
 export function completionStateToAction(state: WorkoutCompletionState): ActionType {
   switch (state) {
