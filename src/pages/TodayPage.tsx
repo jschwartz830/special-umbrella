@@ -54,6 +54,7 @@ export function TodayPage() {
   const [doubleDay, setDoubleDay] = useState(false)
   const [loggingUpcoming, setLoggingUpcoming] = useState<ResolvedDay | null>(null)
   const [showUpcomingOutcome, setShowUpcomingOutcome] = useState(false)
+  const [upcomingLogError, setUpcomingLogError] = useState<string | null>(null)
   // After the primary double-day workout is confirmed, we open a second
   // OutcomeModal for the bonus. State carries the bonus's ResolvedDay plus the
   // ExtraWorkoutEntry id assigned when it was persisted.
@@ -175,6 +176,16 @@ export function TodayPage() {
     // A 'complete' on a future-dated upcoming workout records the session on
     // today — the day it was actually performed — instead of the scheduled date.
     const logDate = action === 'complete' ? today : rd.calendarDate
+    // Guard: if today already has a rotation entry, routing another 'complete'
+    // to today would overwrite it via addEntry's (planId, date) dedupe.
+    // Surface an inline error instead of silently losing the prior log.
+    if (action === 'complete' && logDate === today && isResolved) {
+      setUpcomingLogError(
+        "Today is already logged. Undo it first, or toggle double-day on a pending day to record two workouts.",
+      )
+      return
+    }
+    setUpcomingLogError(null)
     logAction(plan!.id, logDate, rd.planDayIndex, action)
     if (action === 'complete') {
       setShowUpcomingOutcome(true)
@@ -422,7 +433,7 @@ export function TodayPage() {
       {loggingUpcoming && !showUpcomingOutcome && (
         <Modal
           title={new Date(loggingUpcoming.calendarDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          onClose={() => setLoggingUpcoming(null)}
+          onClose={() => { setLoggingUpcoming(null); setUpcomingLogError(null) }}
         >
           <div className="space-y-4">
             {/* Workout summary */}
@@ -472,6 +483,12 @@ export function TodayPage() {
             ) : (
               /* Not yet logged — show action buttons */
               <div className="space-y-2">
+                {upcomingLogError && (
+                  <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+                    <Info size={13} className="text-red-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-red-300">{upcomingLogError}</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => handleUpcomingLog(loggingUpcoming, 'complete')}
