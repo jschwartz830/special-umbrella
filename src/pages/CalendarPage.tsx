@@ -65,6 +65,7 @@ export function CalendarPage() {
   const overrides = useHistoryStore(s => s.overrides)
   const extraEntries = useHistoryStore(s => s.extraEntries)
   const addEntry = useHistoryStore(s => s.addEntry)
+  const updateEntryAction = useHistoryStore(s => s.updateEntryAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
   const addOverride = useHistoryStore(s => s.addOverride)
   const removeRetroJumpForDate = useHistoryStore(s => s.removeRetroJumpForDate)
@@ -166,9 +167,8 @@ export function CalendarPage() {
     )
     if (entry) {
       const action = completionStateToAction(outcome.completionState)
-      // Update in store only if action changed
       if (entry.action !== action) {
-        addEntry({ ...entry, action })
+        updateEntryAction(entry.planId, entry.calendarDate, action, entry.planDayIndex)
       }
     }
     setOutcomeTarget(null)
