@@ -304,7 +304,7 @@ export function CalendarPage() {
           onEditExtraOutcome={(extra) => openExtraOutcome(extra)}
           onAddExtra={(type, name) => {
             if (!plan) return
-            addExtraEntry({ planId: plan.id, calendarDate: selected.calendarDate, workoutType: type, workoutName: name })
+            addExtraEntry({ planId: plan.id, calendarDate: selected.calendarDate, workoutType: type, workoutName: name, source: 'history' })
           }}
           onDeleteExtra={(extra) => {
             removeExtraEntry(extra.id)
@@ -321,6 +321,7 @@ export function CalendarPage() {
           calendarDate={outcomeTarget.calendarDate}
           planDay={outcomeTarget.planDay}
           existingOutcome={outcomes[outcomeTarget.instanceId] ?? null}
+          workoutInstanceId={outcomeTarget.instanceId}
           onConfirm={handleOutcomeConfirm}
           onClose={() => setOutcomeTarget(null)}
         />

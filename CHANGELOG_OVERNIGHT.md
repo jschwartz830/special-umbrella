@@ -1,5 +1,87 @@
 # Overnight Changelog
 
+## 2026-04-18 (sixth pass) — branch `claude/overnight-audit-improvements-RzBkA`
+
+Baseline on entry: **176 passing, 0 failing**.
+End state: **192 tests pass**.
+
+Scope: one re-opened data-correctness bug (CalendarPage OutcomeModal
+writing extra-entry outcomes to the wrong key — the exact peer of the
+HistoryPage fix from the fifth pass that Calendar had missed); one
+consistency fix; 13 new tests for previously uncovered store actions;
+and a medium-complexity feature (ExtraWorkoutEntry.source) that resolves
+the open product question from the fifth-pass review.
+
+### Commits (oldest → newest)
+
+1. **`729879c` — Plan: 2026-04-18 sixth-pass audit**
+   IMPLEMENTATION_PLAN.md section. No code changes.
+   - `IMPLEMENTATION_PLAN.md`
+   - **Risk**: none (doc only).
+
+2. **`f681c9f` — CalendarPage: pass workoutInstanceId to OutcomeModal for extra entries**
+   When `openExtraOutcome` set `outcomeTarget.instanceId` to the extra's
+   key (`makeExtraWorkoutInstanceId(...)`), the OutcomeModal was rendered
+   without `workoutInstanceId={outcomeTarget.instanceId}`. The modal
+   therefore fell back to `makeWorkoutInstanceId(planId, calendarDate)`
+   and wrote the extra's outcome to the primary rotation slot's key —
+   silently overwriting it. One-line fix; exact mirror of commit
+   `7969378` (fifth pass, HistoryPage).
+   - `src/pages/CalendarPage.tsx`
+   - **Risk**: low. Purely additive prop; existing callers for the primary
+     rotation outcome pass the same value as before.
+   - **Rollback**: `git revert f681c9f`.
+
+3. **`ab8d7f0` — TodayPage: normalize date string to format(new Date(), 'yyyy-MM-dd')**
+   TodayPage was the only file using `new Intl.DateTimeFormat('en-CA').format()`
+   to produce a YYYY-MM-DD local date string. Every other file uses
+   date-fns `format()`. Both produce identical output, but the
+   inconsistency made the codebase harder to scan.
+   - `src/pages/TodayPage.tsx`
+   - **Risk**: none. No behavior change.
+   - **Rollback**: `git revert ab8d7f0`.
+
+4. **`762f9bc` — Tests: cover updateEntryDate, updateExtraEntryDate, clearExtraEntriesForDate**
+   Three store actions added during the fourth pass for calendar
+   date-editing had no test coverage. Added 13 tests: 3 for
+   `updateEntryDate`, 4 for `updateExtraEntryDate`, 4 for
+   `clearExtraEntriesForDate`.
+   - `src/store/__tests__/historyStore.test.ts`
+   - **Risk**: none (tests only).
+   - **Rollback**: `git revert 762f9bc`.
+
+5. **`4a16d9b` — Plan: ExtraWorkoutEntry.source field — feature proposal**
+   FEATURE_PROPOSAL.md. No code changes.
+   - `FEATURE_PROPOSAL.md`
+   - **Risk**: none (doc only).
+
+6. **`d865ff9` — Feature: ExtraWorkoutEntry.source field + scoped Undo on TodayPage**
+   Added optional `source?: 'history' | 'double_day'` to
+   `ExtraWorkoutEntry` (backward-compatible). Updated three creation
+   paths: TodayPage double-day passes `'double_day'`; HistoryPage and
+   CalendarPage "Add workout for this day" pass `'history'`. Undo on
+   TodayPage now removes only extras where `source !== 'history'`
+   (double_day + legacy undefined = removed; history = left alone).
+   - `src/types/index.ts`, `src/pages/TodayPage.tsx`,
+     `src/pages/HistoryPage.tsx`, `src/pages/CalendarPage.tsx`
+   - **Risk**: low. Schema change is additive. Old extras without `source`
+     are treated like double_day (conservative — prevents orphaned extras).
+     Manually-added extras on today's date now survive an Undo on Today.
+   - **Rollback**: `git revert d865ff9`. Old extras still have no source
+     field; the only side-effect is Undo reverts to clearing all extras
+     for the date.
+
+7. **`948cfaf` — Tests: ExtraWorkoutEntry.source field and Undo scoping invariants**
+   6 new tests: source field persisted correctly for both values and for
+   the legacy undefined case; Undo filter (source !== 'history') removes
+   only the right records in mixed, all-double_day, and all-history
+   scenarios.
+   - `src/store/__tests__/historyStore.test.ts`
+   - **Risk**: none (tests only).
+   - **Rollback**: `git revert 948cfaf`.
+
+---
+
 ## 2026-04-18 (fifth pass) — branch `claude/add-bonus-workout-outcomes-c1H1R`
 
 Baseline on entry: **171 passing, 0 failing** (after `npm install`).

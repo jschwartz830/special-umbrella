@@ -338,3 +338,193 @@ describe('addExtraEntry alongside a primary HistoryEntry', () => {
     expect(getState().extraEntries).toHaveLength(1)
   })
 })
+
+// ── updateEntryDate ───────────────────────────────────────────────────────────
+
+describe('updateEntryDate', () => {
+  it('moves a rotation entry to the new date by id', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))
+    const id = getState().entries[0].id
+    getState().updateEntryDate(id, '2026-01-05')
+    expect(getState().entries[0].calendarDate).toBe('2026-01-05')
+  })
+
+  it('does not affect other entries', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))
+    getState().addEntry(makeEntry('2026-01-02', 'skip'))
+    const firstId = getState().entries.find(e => e.calendarDate === '2026-01-01')!.id
+    getState().updateEntryDate(firstId, '2026-01-10')
+    expect(getState().entries.find(e => e.id === firstId)!.calendarDate).toBe('2026-01-10')
+    expect(getState().entries.find(e => e.calendarDate === '2026-01-02')).toBeTruthy()
+  })
+
+  it('preserves all other fields on the moved entry', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 3, notes: 'Good run' }))
+    const id = getState().entries[0].id
+    getState().updateEntryDate(id, '2026-01-07')
+    const moved = getState().entries[0]
+    expect(moved.action).toBe('complete')
+    expect(moved.planDayIndex).toBe(3)
+    expect(moved.notes).toBe('Good run')
+  })
+})
+
+// ── updateExtraEntryDate ──────────────────────────────────────────────────────
+
+describe('updateExtraEntryDate', () => {
+  it('moves an extra entry to the new date by id', () => {
+    const id = getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'yoga',
+      workoutName: 'Yoga',
+    })
+    getState().updateExtraEntryDate(id, '2026-01-08')
+    expect(getState().extraEntries[0].calendarDate).toBe('2026-01-08')
+  })
+
+  it('does not affect other extra entries', () => {
+    const idA = getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'yoga',
+      workoutName: 'Yoga',
+    })
+    getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-02',
+      workoutType: 'swim',
+      workoutName: 'Swim',
+    })
+    getState().updateExtraEntryDate(idA, '2026-01-10')
+    expect(getState().extraEntries.find(e => e.id === idA)!.calendarDate).toBe('2026-01-10')
+    expect(getState().extraEntries.find(e => e.workoutName === 'Swim')!.calendarDate).toBe('2026-01-02')
+  })
+
+  it('preserves all other fields on the moved extra entry', () => {
+    const id = getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'long_run',
+      workoutName: 'Morning Run',
+    })
+    getState().updateExtraEntryDate(id, '2026-01-09')
+    const moved = getState().extraEntries[0]
+    expect(moved.workoutType).toBe('long_run')
+    expect(moved.workoutName).toBe('Morning Run')
+  })
+})
+
+// ── clearExtraEntriesForDate ──────────────────────────────────────────────────
+
+describe('clearExtraEntriesForDate', () => {
+  it('removes all extras for the given (planId, calendarDate)', () => {
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'yoga', workoutName: 'A' })
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'swim', workoutName: 'B' })
+    getState().clearExtraEntriesForDate('plan-1', '2026-01-01')
+    expect(getState().extraEntries).toHaveLength(0)
+  })
+
+  it('leaves extras on other dates intact', () => {
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'yoga', workoutName: 'A' })
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-02', workoutType: 'swim', workoutName: 'B' })
+    getState().clearExtraEntriesForDate('plan-1', '2026-01-01')
+    expect(getState().extraEntries).toHaveLength(1)
+    expect(getState().extraEntries[0].calendarDate).toBe('2026-01-02')
+  })
+
+  it('leaves extras for other plans on the same date intact', () => {
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'yoga', workoutName: 'A' })
+    getState().addExtraEntry({ planId: 'plan-2', calendarDate: '2026-01-01', workoutType: 'swim', workoutName: 'B' })
+    getState().clearExtraEntriesForDate('plan-1', '2026-01-01')
+    expect(getState().extraEntries).toHaveLength(1)
+    expect(getState().extraEntries[0].planId).toBe('plan-2')
+  })
+
+  it('is a no-op when there are no extras for the date', () => {
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-02', workoutType: 'yoga', workoutName: 'A' })
+    getState().clearExtraEntriesForDate('plan-1', '2026-01-01')
+    expect(getState().extraEntries).toHaveLength(1)
+  })
+})
+
+// ── ExtraWorkoutEntry.source ──────────────────────────────────────────────────
+// The source field lets callers tag each extra as user-initiated ('history')
+// or part of the double-day flow ('double_day'). TodayPage Undo removes
+// only extras where source !== 'history'.
+
+describe('ExtraWorkoutEntry.source field', () => {
+  it('persists source: double_day when provided', () => {
+    getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'recovery_run',
+      workoutName: 'Bonus',
+      source: 'double_day',
+    })
+    expect(getState().extraEntries[0].source).toBe('double_day')
+  })
+
+  it('persists source: history when provided', () => {
+    getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'yoga',
+      workoutName: 'Manual',
+      source: 'history',
+    })
+    expect(getState().extraEntries[0].source).toBe('history')
+  })
+
+  it('source is undefined when not provided (old-record shape)', () => {
+    getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'yoga',
+      workoutName: 'Legacy',
+    })
+    expect(getState().extraEntries[0].source).toBeUndefined()
+  })
+
+  it('Undo logic: removes double_day and legacy (undefined) extras, keeps history extras', () => {
+    // Simulate mixed extras for the same plan+date
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'recovery_run', workoutName: 'BonusRun', source: 'double_day' })
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'yoga', workoutName: 'ManualYoga', source: 'history' })
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'swim', workoutName: 'LegacySwim' })
+
+    // Simulate what TodayPage Undo does: remove extras where source !== 'history'
+    const toRemove = getState().extraEntries.filter(
+      ex => ex.planId === 'plan-1' && ex.calendarDate === '2026-01-01' && ex.source !== 'history',
+    )
+    for (const ex of toRemove) {
+      getState().removeExtraEntry(ex.id)
+    }
+
+    expect(getState().extraEntries).toHaveLength(1)
+    expect(getState().extraEntries[0].workoutName).toBe('ManualYoga')
+    expect(getState().extraEntries[0].source).toBe('history')
+  })
+
+  it('Undo logic: removes all extras when all are double_day', () => {
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'recovery_run', workoutName: 'Bonus', source: 'double_day' })
+
+    const toRemove = getState().extraEntries.filter(
+      ex => ex.planId === 'plan-1' && ex.calendarDate === '2026-01-01' && ex.source !== 'history',
+    )
+    for (const ex of toRemove) getState().removeExtraEntry(ex.id)
+
+    expect(getState().extraEntries).toHaveLength(0)
+  })
+
+  it('Undo logic: leaves all extras when all are history', () => {
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'yoga', workoutName: 'ManualA', source: 'history' })
+    getState().addExtraEntry({ planId: 'plan-1', calendarDate: '2026-01-01', workoutType: 'swim', workoutName: 'ManualB', source: 'history' })
+
+    const toRemove = getState().extraEntries.filter(
+      ex => ex.planId === 'plan-1' && ex.calendarDate === '2026-01-01' && ex.source !== 'history',
+    )
+    for (const ex of toRemove) getState().removeExtraEntry(ex.id)
+
+    expect(getState().extraEntries).toHaveLength(2)
+  })
+})

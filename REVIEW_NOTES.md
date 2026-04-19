@@ -1,5 +1,104 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-18 (sixth pass) — branch `claude/overnight-audit-improvements-RzBkA`
+
+### Summary
+
+1. **What changed**: Fixed a data-correctness bug in CalendarPage where
+   extra-entry outcomes were being written to the primary rotation slot's
+   key (exact peer of the HistoryPage fix from the fifth pass — Calendar
+   was missed). Normalized the one inconsistent date-string in TodayPage.
+   Added 13 tests for three previously untested store actions. Implemented
+   `ExtraWorkoutEntry.source` as the medium-complexity feature, which lets
+   Undo on Today spare manually-added extras and only remove double-day
+   ones. End state: 192 tests passing (up from 176).
+
+2. **Highest confidence**:
+   - `f681c9f` CalendarPage OutcomeModal fix — one-line, identical pattern
+     to the fifth-pass HistoryPage fix, no design judgment involved.
+   - `762f9bc` store tests — purely additive, no production code changes.
+   - `948cfaf` source-field tests — lock the exact filter invariant.
+
+3. **Risky / worth a close look**:
+   - `d865ff9` — the source field feature. Conservative assumption: old
+     extras without `source` are treated as double_day (removed on Undo).
+     If you have manually-added extras from before this upgrade that were
+     logged on the same date as a primary workout, hitting Undo on Today
+     would still clear them. This is identical to prior behavior, so not
+     a regression — but worth knowing.
+
+4. **Review first**: `f681c9f` — the correctness bug. Then `d865ff9` to
+   validate the Undo scoping decision.
+
+---
+
+### Definitely keep
+
+- `f681c9f` CalendarPage OutcomeModal fix — correctness bug, no risk.
+- `ab8d7f0` TodayPage date normalization — zero behavior change.
+- `762f9bc` + `948cfaf` — tests only, no risk.
+
+### Probably keep but tweak
+
+- `d865ff9` ExtraWorkoutEntry.source + Undo scoping. The behavior is
+  correct and the schema change is backward-compatible, but you may want
+  to reconsider the treatment of old records without a source:
+  - **Current**: `source === undefined` → removed on Undo (treats as double_day).
+  - **Alternative**: `source === undefined` → kept (treats as history).
+    This would be safer for users with existing data but could leave
+    orphaned extras after an Undo on older sessions.
+  - Changing is one character in `TodayPage.tsx`:
+    `ex.source !== 'history'` → `ex.source === 'double_day'`.
+
+### Do not keep
+
+Nothing flagged for rejection.
+
+### Recommendations only (not implemented)
+
+- **progressionStates orphaning**: `clearPlanOutcomes` wipes outcomes
+  keyed by `${planId}_*` but `progressionStates` (keyed by free-text
+  `progressionGroupId`) are never cleared on plan delete. Fixing properly
+  requires either a plan→progressionGroup index or clearing all states
+  that haven't been touched in N days. Left as a known storage leak.
+- **Visual double-day badge in History**: now that extras carry
+  `source: 'double_day'`, History could show a "Via double-day" badge
+  instead of the generic "Extra" pill. Trivial to add.
+- `swap_slot` override type still has no UI trigger (unchanged from all
+  prior audits).
+- Plan-expiry banner still shows every day with no dismiss.
+- `OutcomeMetrics` render block is duplicated verbatim in CalendarPage
+  and HistoryPage — could be extracted to a shared component. Cosmetic
+  only; no behavior impact.
+
+### Open questions for you
+
+1. Should old extras (source === undefined) be treated as double_day
+   (current: removed on Undo) or history (kept on Undo)?
+2. Do you want a "Via double-day" badge in History for extras with
+   `source === 'double_day'`? It's a one-line JSX change now that the
+   field exists.
+3. Should `progressionStates` be cleared on plan delete? If so, we
+   need a way to know which progression group IDs belong to a plan
+   (e.g., denormalize them onto the Plan record, or store a
+   planId→groupId map separately).
+
+### Known issues or incomplete work
+
+- No React-level (component) tests for TodayPage, HistoryPage, or
+  CalendarPage. The store-level tests cover data invariants but not UI
+  flows. This is unchanged from prior passes.
+- The CalendarPage fix (`f681c9f`) is verified by the store-level
+  invariant tests (primary and extra outcomes coexist under distinct keys)
+  and type-check, but no automated UI test confirms the modal actually
+  uses the prop.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-04-18 (fifth pass) — branch `claude/add-bonus-workout-outcomes-c1H1R`
 
 ### Summary

@@ -103,6 +103,14 @@ export interface ExtraWorkoutEntry {
   workoutName: string
   notes?: string
   createdAt: string
+  /**
+   * Where this extra originated. Used by Undo on TodayPage to distinguish
+   * double-day bonus entries (which Undo should remove) from user-initiated
+   * extras added via History or Calendar (which Undo should leave alone).
+   * Undefined on pre-migration records — treated as 'double_day' for safety
+   * so no orphaned extras are ever left behind.
+   */
+  source?: 'history' | 'double_day'
 }
 
 // ── Overrides ────────────────────────────────────────────────────────────────
