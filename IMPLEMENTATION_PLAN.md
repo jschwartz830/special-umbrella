@@ -1,5 +1,112 @@
 # Implementation Plan
 
+## 2026-04-19 — Overnight Audit (seventh pass)
+
+Branch: `claude/gracious-heisenberg-2fsGC`.
+Follow-up to the 2026-04-18 sixth-pass audit.
+Baseline on entry: **192 passing, 0 failing** (after `npm install`).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the sixth pass.
+
+### What appears strong and well-designed (unchanged)
+
+- 192-test suite covers engine/stores/adaptation/lib.
+- Double-day bonus persistence is end-to-end and Undo is source-scoped.
+- OutcomeModal's `workoutInstanceId` prop is a safe caller contract, now
+  used consistently across TodayPage, CalendarPage, and HistoryPage.
+- `historyStore.clearPlanHistory` handles entries, overrides, and
+  extraEntries in a single sweep; `clearPlanOutcomes` covers both primary
+  and extra outcome keys via the `${planId}_` prefix.
+
+### Key issues or risks this pass
+
+1. **TodayPage `handleUpcomingLog` silently overwrites today's entry**
+   (real data-loss risk). When today is already resolved (primary entry
+   logged) and the user opens an upcoming-day modal and taps "Complete",
+   `handleUpcomingLog` builds `logDate = today` and calls
+   `logAction(plan.id, today, rd.planDayIndex, 'complete')`. Because
+   `historyStore.addEntry` dedupes by `(planId, calendarDate)` and
+   replaces, today's primary entry is silently overwritten with the
+   upcoming slot's `planDayIndex`. The original completion is lost — no
+   confirmation, no undo trail. The affordance exists so users can "log
+   the upcoming workout I actually did today", but it was never designed
+   for the case where today was already logged. **Priority: high.**
+   Safest fix is a guard that blocks the overwrite and surfaces an inline
+   message ("Today is already logged. Undo it first, or use double-day to
+   record both."). Routing the second completion through
+   `ExtraWorkoutEntry` (double-day semantics) would be more permissive but
+   is a bigger behavior change — defer.
+
+2. **CalendarPage `handleOutcomeConfirm` uses `addEntry` to update the
+   action field** on an existing history entry instead of
+   `updateEntryAction`. Functionally equivalent — `addEntry`'s
+   dedupe-by-date step means the existing id/createdAt are preserved
+   through the payload spread — but semantically wrong and fragile: any
+   future change to `addEntry`'s dedupe logic would silently break the
+   CalendarPage sync path. HistoryPage already uses `updateEntryAction`
+   for the same purpose. **Fix: switch CalendarPage to
+   `updateEntryAction`; zero behavior change.**
+
+3. **`OutcomeMetrics` render block is duplicated** between CalendarPage
+   (as a local helper component) and HistoryPage (inlined twice — once
+   for rotation entries and once for extras). Three copies of the same
+   effort-dots + run-actuals block drift independently every time we
+   touch the design. Pure refactor opportunity.
+
+4. **HistoryPage edit-modal `saveAndClose` can trap the user on a
+   date conflict.** The modal's `onClose={saveAndClose}` makes the X
+   button and backdrop both trigger save. If the user picked a date that
+   already has an entry, `saveAndClose` sets `dateConflict = true` and
+   early-returns without calling `setEditingEntry(null)`. The user now
+   can't close the modal without either fixing the date or deleting the
+   entry. Minor UX issue; deferred this pass — a proper fix wants a
+   dedicated Cancel button or an explicit "discard draft" path.
+
+5. **`progressionStates` orphaning on plan delete** — still deferred from
+   all prior passes. Needs a schema change or a reverse index; not
+   touching this pass.
+
+### Prioritized plan (this pass)
+
+**Safe to implement:**
+
+1. **[SAFE]** Guard `TodayPage.handleUpcomingLog` against overwriting
+   today's entry. Inline error message when action='complete' would
+   collide with an already-logged today.
+2. **[SAFE]** Switch CalendarPage's action-sync from `addEntry` to
+   `updateEntryAction`. Matches HistoryPage pattern.
+3. **[SAFE]** Extract `OutcomeMetrics` to
+   `src/components/workout/OutcomeMetrics.tsx`. Use from CalendarPage and
+   HistoryPage (two callsites there).
+4. **[SAFE]** Add an invariant-style store test documenting that the
+   guard is what prevents data loss — `addEntry` on an existing
+   (planId, calendarDate) replaces, and the TodayPage guard relies on
+   this. Lock the behavior.
+
+**Not implemented this pass (recommendations only):**
+
+- HistoryPage saveAndClose trap — wants a dedicated Cancel button.
+- `progressionStates` orphaning — needs schema change.
+- `swap_slot` override UI — unchanged from prior audits.
+- Plan-expiry banner dismiss — unchanged from prior audits.
+- Medium-complexity feature — **declined this pass**. The baseline is
+  stable and the surfaced issues are all correctness or DRY; no feature
+  work is needed to unblock or improve stability. Keeping the surface
+  area tight.
+
+### Rationale for sequencing
+
+The upcoming-log overwrite fix goes first because it's the only real
+data-loss path. CalendarPage's action-sync change is a pure refactor,
+zero behavior change. OutcomeMetrics extraction removes the duplication
+so future outcome-display changes don't have to be made in three places.
+Tests come last to lock the guard's invariant.
+
+---
+
 ## 2026-04-18 — Overnight Audit (sixth pass)
 
 Branch: `claude/overnight-audit-improvements-RzBkA`.
