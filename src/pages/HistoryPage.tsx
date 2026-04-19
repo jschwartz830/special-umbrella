@@ -7,9 +7,6 @@ import {
   Pencil,
   Trash2,
   X,
-  Ruler,
-  Zap,
-  Timer,
   ClipboardList,
   Plus,
 } from 'lucide-react'
@@ -20,6 +17,7 @@ import { Modal } from '../components/shared/Modal'
 import { DifficultyBadge } from '../components/workout/DifficultyBadge'
 import { WorkoutBadge } from '../components/workout/WorkoutBadge'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
+import { OutcomeMetrics } from '../components/workout/OutcomeMetrics'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
@@ -27,10 +25,7 @@ import { computeHistoryStats } from '../lib/historyStats'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { ActionType, HistoryEntry, ExtraWorkoutEntry, WorkoutType, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
-import {
-  COMPLETION_STATE_LABELS,
-  formatPace,
-} from '../modules/workout-outcomes/types'
+import { COMPLETION_STATE_LABELS } from '../modules/workout-outcomes/types'
 
 const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
   { type: 'weightlifting', label: 'Weightlifting' },
@@ -376,38 +371,8 @@ export function HistoryPage() {
 
                       {/* Outcome actuals */}
                       {outcome && (
-                        <div className="mt-2 space-y-1">
-                          {outcome.perceivedEffort != null && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-slate-500">Effort:</span>
-                              <div className="flex gap-0.5">
-                                {([1,2,3,4,5] as const).map(e => (
-                                  <span key={e} className={`w-3 h-3 rounded-full ${
-                                    e <= outcome.perceivedEffort!
-                                      ? e <= 2 ? 'bg-emerald-400' : e === 3 ? 'bg-yellow-400' : e === 4 ? 'bg-orange-400' : 'bg-red-400'
-                                      : 'bg-slate-600'
-                                  }`} />
-                                ))}
-                              </div>
-                              <span className="text-xs text-slate-500">{outcome.perceivedEffort}/5</span>
-                            </div>
-                          )}
-                          {outcome.runActual && (
-                            <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-                              {outcome.runActual.actualDistanceMiles != null && (
-                                <span className="flex items-center gap-0.5"><Ruler size={10} /> {outcome.runActual.actualDistanceMiles} mi</span>
-                              )}
-                              {outcome.runActual.actualDurationMin != null && (
-                                <span className="flex items-center gap-0.5"><Timer size={10} /> {outcome.runActual.actualDurationMin} min</span>
-                              )}
-                              {outcome.runActual.averagePaceSecondsPerMile != null && (
-                                <span className="flex items-center gap-0.5"><Zap size={10} /> {formatPace(outcome.runActual.averagePaceSecondsPerMile)}</span>
-                              )}
-                            </div>
-                          )}
-                          {!outcome.runActual && outcome.durationActualMin != null && (
-                            <p className="text-xs text-slate-500">{outcome.durationActualMin} min</p>
-                          )}
+                        <div className="mt-2">
+                          <OutcomeMetrics outcome={outcome} />
                         </div>
                       )}
 
@@ -493,38 +458,8 @@ export function HistoryPage() {
                     </div>
 
                     {extraOutcome && (
-                      <div className="mt-2 space-y-1">
-                        {extraOutcome.perceivedEffort != null && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-slate-500">Effort:</span>
-                            <div className="flex gap-0.5">
-                              {([1,2,3,4,5] as const).map(e => (
-                                <span key={e} className={`w-3 h-3 rounded-full ${
-                                  e <= extraOutcome.perceivedEffort!
-                                    ? e <= 2 ? 'bg-emerald-400' : e === 3 ? 'bg-yellow-400' : e === 4 ? 'bg-orange-400' : 'bg-red-400'
-                                    : 'bg-slate-600'
-                                }`} />
-                              ))}
-                            </div>
-                            <span className="text-xs text-slate-500">{extraOutcome.perceivedEffort}/5</span>
-                          </div>
-                        )}
-                        {extraOutcome.runActual && (
-                          <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-                            {extraOutcome.runActual.actualDistanceMiles != null && (
-                              <span className="flex items-center gap-0.5"><Ruler size={10} /> {extraOutcome.runActual.actualDistanceMiles} mi</span>
-                            )}
-                            {extraOutcome.runActual.actualDurationMin != null && (
-                              <span className="flex items-center gap-0.5"><Timer size={10} /> {extraOutcome.runActual.actualDurationMin} min</span>
-                            )}
-                            {extraOutcome.runActual.averagePaceSecondsPerMile != null && (
-                              <span className="flex items-center gap-0.5"><Zap size={10} /> {formatPace(extraOutcome.runActual.averagePaceSecondsPerMile)}</span>
-                            )}
-                          </div>
-                        )}
-                        {!extraOutcome.runActual && extraOutcome.durationActualMin != null && (
-                          <p className="text-xs text-slate-500">{extraOutcome.durationActualMin} min</p>
-                        )}
+                      <div className="mt-2">
+                        <OutcomeMetrics outcome={extraOutcome} />
                       </div>
                     )}
 
