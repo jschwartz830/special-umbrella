@@ -1,5 +1,69 @@
 # Test Results
 
+## 2026-04-19 (seventh pass) — branch `claude/gracious-heisenberg-2fsGC`
+
+### Suite totals
+
+| Metric | Entry | Exit |
+| --- | ---: | ---: |
+| Test files | 8 | 8 |
+| Tests | 192 | **194** |
+| Failing | 0 | 0 |
+
+Final run: `npx vitest run`
+
+```
+ Test Files  8 passed (8)
+      Tests  194 passed (194)
+```
+
+Type-check: `npx tsc --noEmit` — clean.
+
+### Tests reviewed
+
+- `src/store/__tests__/historyStore.test.ts` — extended with 2 new
+  tests under a new describe block.
+- All other suites passed unchanged.
+
+### Tests added
+
+**`logAction replace-on-collision (TodayPage guard invariant)`** (2):
+
+- `replaces today's primary entry when logAction is called again for
+  the same (planId, today) with a different planDayIndex` — documents
+  the data-loss path the TodayPage guard prevents. Verifies that a
+  second `logAction` on the same `(planId, calendarDate)` wipes out
+  the prior `planDayIndex` and `notes`.
+- `does NOT collide when today has no entry yet (the intended
+  "upcoming-as-today" path)` — confirms the feature's intended use
+  case still works when today is pending.
+
+### Results
+
+All 194 tests pass. No regressions in any of the 8 suites.
+
+Full manifest:
+
+- `src/engine/__tests__/rotationEngine.test.ts`
+- `src/engine/__tests__/calendarProjection.test.ts`
+- `src/store/__tests__/historyStore.test.ts` (+2)
+- `src/store/__tests__/outcomeStore.test.ts`
+- `src/store/__tests__/planDeleteCleanup.test.ts`
+- `src/lib/__tests__/csv.test.ts`
+- `src/lib/__tests__/historyStats.test.ts`
+- `src/modules/run-adaptation/__tests__/` (adaptation engine)
+
+### UI flows not covered by tests
+
+- The TodayPage inline error banner for the guard case renders only
+  when `upcomingLogError` is set. No component-level test confirms
+  the banner shows; verified by code review and type check only.
+- The `OutcomeMetrics` shared component is rendered by CalendarPage
+  and HistoryPage; no component-level test confirms the visual output.
+  Type check and manual review only.
+
+---
+
 ## 2026-04-18 (sixth pass) — branch `claude/overnight-audit-improvements-RzBkA`
 
 ### Suite totals

@@ -1,5 +1,92 @@
 # Overnight Changelog
 
+## 2026-04-19 (seventh pass) — branch `claude/gracious-heisenberg-2fsGC`
+
+Baseline on entry: **192 passing, 0 failing**.
+End state: **194 tests pass**.
+
+Scope: one real data-loss guard (TodayPage upcoming-log overwrite);
+one pure refactor (CalendarPage action-sync); one DRY refactor
+(OutcomeMetrics extraction); one invariant test. No new features, no
+schema changes, no new dependencies.
+
+### Commits (oldest → newest)
+
+1. **`638dfca` — Plan: 2026-04-19 seventh-pass audit**
+   IMPLEMENTATION_PLAN.md section. No code changes.
+   - `IMPLEMENTATION_PLAN.md`
+   - **Risk**: none (doc only).
+
+2. **`ab5fcd2` — Fix: guard TodayPage upcoming-log against overwriting today's entry**
+   When today is already logged (today_complete, today_skip, or
+   today_day_off) and the user opened an upcoming-day modal and picked
+   "Complete", `handleUpcomingLog` built `logDate = today` and called
+   `logAction(plan.id, today, rd.planDayIndex, 'complete')`. Because
+   `addEntry` dedupes on `(planId, calendarDate)` and replaces, the
+   primary entry was silently overwritten with the upcoming slot's
+   `planDayIndex`. Guarded the overwrite: surfaced an inline error
+   ("Today is already logged. Undo it first, or toggle double-day on a
+   pending day to record two workouts.") and refused the log. No
+   behaviour change for the intended path (upcoming-complete when
+   today is still pending).
+   - `src/pages/TodayPage.tsx`
+   - **Risk**: low. Additive guard; only changes behaviour in the
+     previously-broken path where data was being lost silently. The
+     text of the error is a UX choice — revisit if you'd rather
+     permit the action via ExtraWorkoutEntry.
+   - **Rollback**: `git revert ab5fcd2`.
+
+3. **`7a980ca` — Refactor: CalendarPage action-sync uses updateEntryAction**
+   `handleOutcomeConfirm` was calling `addEntry({ ...entry, action })`
+   to sync the history entry's action to the OutcomeModal's
+   completion state. This worked because `addEntry`'s payload spread
+   preserved id/createdAt, but it was semantically misleading and
+   fragile — any future change to `addEntry`'s dedupe would silently
+   break it. Switched to `updateEntryAction` (same helper HistoryPage
+   already uses for the same purpose).
+   - `src/pages/CalendarPage.tsx`
+   - **Risk**: none. Zero behaviour change.
+   - **Rollback**: `git revert 7a980ca`.
+
+4. **`ee75b11` — Refactor: extract OutcomeMetrics to a shared component**
+   The effort-dots + run-actuals + duration block was duplicated
+   three times — once as a local helper in CalendarPage, and twice
+   inlined in HistoryPage (rotation entries and extras). Extracted to
+   `src/components/workout/OutcomeMetrics.tsx`. Normalised one
+   stylistic drift (CalendarPage's "w-10" label column dropped in
+   favour of HistoryPage's inline "Effort:" form).
+   - `src/components/workout/OutcomeMetrics.tsx` (new)
+   - `src/pages/CalendarPage.tsx`
+   - `src/pages/HistoryPage.tsx`
+   - **Risk**: very low. Visual: Calendar day-detail modal's Effort
+     row is now slightly narrower (no dedicated label column). No
+     logic change.
+   - **Rollback**: `git revert ee75b11`.
+
+5. **`835a030` — Tests: lock invariant behind TodayPage upcoming-log guard**
+   Added two tests under a new "TodayPage upcoming-log guard
+   invariant" describe block, pinning down the replace-on-collision
+   behaviour of `logAction` → `addEntry` the guard exists to prevent.
+   A future refactor of `addEntry` can't silently re-introduce the
+   data-loss path without tripping these tests.
+   - `src/store/__tests__/historyStore.test.ts`
+   - **Risk**: none (tests only).
+   - **Rollback**: `git revert 835a030`.
+
+### Rollback of entire pass
+
+```sh
+git revert 835a030 ee75b11 7a980ca ab5fcd2 638dfca
+```
+
+Each commit is independently revertable and commutes with the others
+except that the test (commit 5) explicitly references the guard's
+invariant and would pass just as well after reverting the guard
+itself (the tests describe `addEntry`'s behaviour, not the guard
+logic).
+
+---
+
 ## 2026-04-18 (sixth pass) — branch `claude/overnight-audit-improvements-RzBkA`
 
 Baseline on entry: **176 passing, 0 failing**.
