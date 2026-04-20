@@ -186,6 +186,20 @@ describe('updateEntryAction', () => {
     getState().updateEntryAction('plan-1', '2026-01-01', 'skip')
     expect(getState().entries.find(e => e.planId === 'plan-2')!.action).toBe('complete')
   })
+
+  it('preserves id and createdAt across an action change', () => {
+    // CalendarPage and HistoryPage both rely on the entry identity
+    // surviving an outcome-driven action sync (e.g. complete → complete
+    // with different completionState). If a future rewrite were to
+    // delete-and-reinsert the entry here, any outcome or downstream
+    // reference keyed by the entry's id would break.
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 0 }))
+    const before = getState().entries[0]
+    getState().updateEntryAction('plan-1', '2026-01-01', 'skip')
+    const after = getState().entries[0]
+    expect(after.id).toBe(before.id)
+    expect(after.createdAt).toBe(before.createdAt)
+  })
 })
 
 // ── removeRetroJumpForDate ────────────────────────────────────────────────────
