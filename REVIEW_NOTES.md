@@ -1,5 +1,91 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-20 (seventh pass) — branch `claude/gracious-heisenberg-FEhzQ`
+
+### Summary
+
+1. **What changed**: Two small polish items, both previously flagged
+   in earlier "recommendations only" lists. HistoryPage now shows a
+   distinct "Double-day" pill (purple) for `source === 'double_day'`
+   extras and keeps the existing "Extra" pill (sky) for manually-added
+   ones. CalendarPage's outcome-driven action sync now calls
+   `updateEntryAction` instead of `addEntry({ ...entry, action })`,
+   matching the pattern already used in HistoryPage. One test was
+   added locking in the `updateEntryAction` identity invariant (id +
+   createdAt survive). End state: **193 tests passing** (up from 192).
+   No medium-complexity feature taken this run.
+
+2. **Highest confidence**:
+   - `b3bce33` HistoryPage badge — conditional render only, no data or
+     state flow change.
+   - `3bba01f` test — pure additive assertion on existing behavior.
+
+3. **Risky / worth a close look**: Nothing. Both code changes are
+   strict subsets of the prior behavior (badge is additive; action
+   sync now uses the canonical update path).
+
+4. **Review first**: `6fa66ef` (CalendarPage) — it's the only change
+   that alters which store action is called. The behavior is identical
+   because `addEntry`'s payload-override semantics already short-
+   circuit id/createdAt generation when the caller spreads an existing
+   entry, but `updateEntryAction` is the intended API.
+
+---
+
+### Definitely keep
+
+- `b3bce33` HistoryPage "Double-day" vs "Extra" badge — cosmetic,
+  zero risk, directly matches a prior review recommendation.
+- `6fa66ef` CalendarPage `updateEntryAction` — semantic equivalence
+  proven both by the 193-test suite and the new invariant test.
+- `3bba01f` updateEntryAction identity test — pure guard.
+- `fee6ddd` Plan doc for this pass.
+
+### Probably keep but tweak
+
+Nothing.
+
+### Do not keep
+
+Nothing.
+
+### Recommendations only (not implemented)
+
+Unchanged from prior passes:
+
+- **`progressionStates` orphaning** on plan delete — structural
+  change; still documented-only.
+- **Shared `OutcomeMetrics` component** — Calendar and History each
+  render nearly identical outcome metrics but with small markup
+  differences (label colon, width class, spacing). A shared component
+  needs a design decision on the unified look; not doing cosmetic
+  redesign without sign-off.
+- **`swap_slot` UI** — override type exists in the engine with no UI
+  trigger.
+- **Plan-expiry banner dismiss** — banner still shows every day once
+  a plan expires.
+
+### Open questions for you
+
+None this run. The candidate items I looked at have either been
+addressed in prior passes or are clearly design decisions rather than
+bugs. If you want me to bias toward implementing the shared
+`OutcomeMetrics` component next run, let me know which of the two
+current markup styles to adopt (the Calendar detail modal's spaced
+layout, or the History list's tighter inline layout).
+
+### Why no medium-complexity feature this pass
+
+Three consecutive passes shipped medium-scope feature work (double-day
+outcome, instance-id plumbing, source-field + scoped Undo). The
+codebase is stable and there are no user-reported bugs open. The
+remaining "medium" candidates (progression reset UI, swap_slot UI,
+plan-expiry dismiss) each need a small product decision on scope
+before they can be implemented safely. Documented rather than
+speculatively built.
+
+---
+
 ## 2026-04-18 (sixth pass) — branch `claude/overnight-audit-improvements-RzBkA`
 
 ### Summary

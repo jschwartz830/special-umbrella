@@ -1,5 +1,53 @@
 # Test Results
 
+## 2026-04-20 (seventh pass) — branch `claude/gracious-heisenberg-FEhzQ`
+
+### Suite totals
+
+| Metric | Entry | Exit |
+| --- | ---: | ---: |
+| Test files | 8 | 8 |
+| Tests | 192 | **193** |
+| Failing | 0 | 0 |
+
+Final run: `npm test -- --run`
+
+```
+ Test Files  8 passed (8)
+      Tests  193 passed (193)
+```
+
+Type-check: `npx tsc --noEmit` — clean.
+
+### Tests added
+
+- `src/store/__tests__/historyStore.test.ts` — one new test in the
+  existing `updateEntryAction` describe block, asserting that the
+  entry's `id` and `createdAt` survive an action change. This locks in
+  the invariant the CalendarPage `6fa66ef` change relies on: an
+  outcome-driven action sync must not destroy the entry's identity
+  (otherwise anything keyed to the id would break).
+
+### Tests reviewed but not modified
+
+- Engine tests (`rotationEngine`, `calendarProjection`,
+  `run-adaptation/engine`) — unchanged; they exercise pure code that
+  wasn't touched.
+- `outcomeStore.test.ts` — unchanged; the instance-id boundary between
+  primary and extra records was verified last pass.
+- CSV / history stats tests — unchanged.
+
+### Manual smoke checks (static)
+
+- TypeScript compile: `npx tsc --noEmit` — clean.
+- `grep` for regressions: no remaining `addEntry({ ...entry` patterns
+  in `src/pages/`; the CalendarPage site was the only caller.
+- HistoryPage badge site inspected: the new conditional renders
+  exactly one pill per extra, picked by `extra.source === 'double_day'`.
+  No other call site renders an "Extra" pill.
+
+---
+
 ## 2026-04-18 (sixth pass) — branch `claude/overnight-audit-improvements-RzBkA`
 
 ### Suite totals

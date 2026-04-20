@@ -1,5 +1,70 @@
 # Overnight Changelog
 
+## 2026-04-20 (seventh pass) — branch `claude/gracious-heisenberg-FEhzQ`
+
+Baseline on entry: **192 passing, 0 failing**.
+End state: **193 tests pass**.
+
+Scope: two small polish items left over from prior reviews'
+"recommendations only" lists, plus one additive test. No medium-
+complexity feature this run — documented rationale in REVIEW_NOTES.md.
+
+### Commits (oldest → newest)
+
+1. **`fee6ddd` — Plan: 2026-04-20 seventh-pass audit**
+   IMPLEMENTATION_PLAN.md section. No code changes.
+   - `IMPLEMENTATION_PLAN.md`
+   - **Risk**: none (doc only).
+
+2. **`b3bce33` — HistoryPage: distinct Double-day badge for double-day bonus extras**
+   Previously both manually-added extras and double-day bonuses rendered
+   an identical "Extra" pill, making it impossible to tell them apart on
+   the History screen. Now: extras with `source === 'double_day'` show a
+   purple "Double-day" pill; everything else keeps the existing sky
+   "Extra" pill. Behavior of edit/delete/outcome flows is unchanged.
+   - `src/pages/HistoryPage.tsx`
+   - **Risk**: cosmetic only; additive conditional on an existing field.
+
+3. **`6fa66ef` — CalendarPage: use updateEntryAction for outcome-driven action sync**
+   The outcome modal's confirm handler on CalendarPage was syncing the
+   history entry's action by calling `addEntry({ ...entry, action })`.
+   This worked — `addEntry`'s payload-override semantics preserve id and
+   createdAt when the caller spreads an existing entry — but HistoryPage
+   uses the canonical `updateEntryAction(...)` for the same sync. The
+   two pages should be consistent. Pure refactor; identical observable
+   behavior (covered by commit `3bba01f`).
+   - `src/pages/CalendarPage.tsx`
+   - **Risk**: low; matches HistoryPage's existing pattern and is
+     covered by existing updateEntryAction tests plus the new identity
+     test.
+
+4. **`3bba01f` — Tests: updateEntryAction preserves id and createdAt**
+   One new test asserting that a `updateEntryAction` call leaves the
+   entry's `id` and `createdAt` intact. This locks in the invariant
+   that the CalendarPage change in `6fa66ef` (and the existing
+   HistoryPage path) rely on.
+   - `src/store/__tests__/historyStore.test.ts`
+   - **Risk**: none; test-only.
+
+### Test summary
+
+- Entered at 192 passing / 0 failing across 8 test files.
+- Exited at **193 passing / 0 failing** across 8 test files.
+- No test was removed or loosened.
+- No new production dependencies were added.
+
+### Not shipped
+
+- Shared `OutcomeMetrics` component refactor — flagged (recommendations
+  only) in prior passes and still flagged here. The two call sites have
+  small but real markup differences; extracting would be cosmetic design
+  work, not a pure refactor.
+- `progressionStates` orphaning on plan delete — unchanged, structural.
+- `swap_slot` UI, progression reset, plan-expiry dismiss — unchanged,
+  need product scoping before implementation.
+
+---
+
 ## 2026-04-18 (sixth pass) — branch `claude/overnight-audit-improvements-RzBkA`
 
 Baseline on entry: **176 passing, 0 failing**.
