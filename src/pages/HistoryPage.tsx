@@ -489,7 +489,11 @@ export function HistoryPage() {
                     <div className="flex items-center gap-2">
                       <WorkoutBadge type={extra.workoutType} size="sm" />
                       <p className="text-sm font-semibold text-slate-200 truncate">{extra.workoutName}</p>
-                      <span className="text-[10px] text-sky-400 bg-sky-400/10 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Extra</span>
+                      {extra.source === 'double_day' ? (
+                        <span className="text-[10px] text-purple-300 bg-purple-400/10 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Double-day</span>
+                      ) : (
+                        <span className="text-[10px] text-sky-400 bg-sky-400/10 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Extra</span>
+                      )}
                     </div>
 
                     {extraOutcome && (
