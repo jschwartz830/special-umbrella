@@ -1,5 +1,96 @@
 # Implementation Plan
 
+## 2026-04-20 — Overnight Audit (seventh pass)
+
+Branch: `claude/gracious-heisenberg-FEhzQ`.
+Follow-up to the 2026-04-18 sixth-pass audit.
+Baseline on entry: **192 passing, 0 failing** (after `npm install`).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering are unchanged since the sixth pass.
+`ExtraWorkoutEntry.source` is now in place (shipped last pass) and is honored
+by TodayPage's Undo handler.
+
+### What appears strong and well-designed (unchanged)
+
+- 192-test suite covers engine/stores/adaptation/lib and the new source-field
+  invariants.
+- Double-day persistence and Undo scoping are correct end-to-end.
+- Outcome instance-id plumbing (primary vs. extra) is consistent across
+  TodayPage, HistoryPage, and CalendarPage.
+
+### Key issues or risks this pass
+
+No new correctness bugs found on a full re-read of the engine, stores, and
+pages. The codebase is in a stable state after the last three passes
+(fourth→sixth) collapsed the known correctness issues. What remains are
+two cosmetic/polish items flagged by prior reviews plus three documented-
+only known limitations.
+
+1. **HistoryPage shows a single "Extra" pill for all ad-hoc workouts —
+   double-day bonuses and manually-added extras look identical.** The
+   sixth-pass review explicitly recommended splitting these visually now
+   that `ExtraWorkoutEntry.source` exists. Trivial conditional.
+
+2. **CalendarPage's `handleOutcomeConfirm` syncs the entry action by
+   calling `addEntry({ ...entry, action })`.** It works because the
+   `addEntry` implementation lets payload override the freshly-generated
+   `id`/`createdAt`, but HistoryPage uses `updateEntryAction(...)` for
+   the same sync — the two pages should be consistent. Stylistic
+   cleanup, same observable behavior.
+
+3. **Still open from prior audits** (recommendations only, unchanged):
+   - `progressionStates` orphaning on plan delete (storage leak).
+   - `swap_slot` override type has no UI trigger.
+   - Plan-expiry banner has no dismiss.
+   - `OutcomeMetrics` is duplicated between CalendarPage and HistoryPage
+     but with small layout differences — extracting would need a design
+     decision on the unified markup; skipped again this pass to avoid a
+     cosmetic regression.
+
+### Prioritized plan (this pass)
+
+**Safe to implement:**
+
+1. **[SAFE]** HistoryPage — show a distinct "Double-day" badge when
+   `extra.source === 'double_day'`, keep "Extra" for manually-added
+   entries (source `'history'` or undefined).
+2. **[SAFE]** CalendarPage — replace `addEntry({ ...entry, action })`
+   with `updateEntryAction(entry.planId, entry.calendarDate, action)`.
+   Pure refactor; matches the HistoryPage pattern.
+3. **[SAFE]** Tests: lock in the badge-label decision plus an explicit
+   assertion that `updateEntryAction` leaves the entry's `id` and
+   `createdAt` intact (guards against a future well-intentioned rewrite
+   of either action).
+
+**Medium-complexity feature:**
+
+**Deferred this run.** After three consecutive passes shipping feature-
+scope work (double-day outcome, instance-id plumbing, source field),
+the codebase is in a stable state with no user-reported bugs open. The
+remaining "medium" candidates (progression reset UI, swap_slot UI,
+plan-expiry dismiss) each need a product decision on scope. Flagging
+them for review rather than pre-committing to a direction.
+
+**Recommendations only (not implemented):**
+
+- `progressionStates` orphaning — structural change required; documented.
+- Shared `OutcomeMetrics` component — visual differences between the two
+  call sites make this a design decision, not a pure refactor.
+- `swap_slot` UI, progression reset, expiry dismiss — unchanged from
+  prior audits.
+
+### Rationale for sequencing
+
+Both changes are one-file, one-concept, additively reviewable. The badge
+change is user-visible and improves information density; the CalendarPage
+cleanup removes a subtle inconsistency that was noticed only on a careful
+read-through. Tests last to lock in the behavior and catch regressions
+if either spot is rewritten later.
+
+---
+
 ## 2026-04-18 — Overnight Audit (sixth pass)
 
 Branch: `claude/overnight-audit-improvements-RzBkA`.
