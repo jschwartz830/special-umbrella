@@ -1,5 +1,81 @@
 # Test Results
 
+## 2026-04-21 (eighth pass) — branch `claude/epic-cannon-Ltjw1`
+
+### Suite totals
+
+| Metric | Entry | Exit |
+| --- | ---: | ---: |
+| Test files | 8 | 8 |
+| Tests | 194 | **206** |
+| Failing | 0 | 0 |
+
+Final run: `npm test`
+
+```
+ Test Files  8 passed (8)
+      Tests  206 passed (206)
+```
+
+Type-check: `npx tsc --noEmit` — clean.
+Production build: `npm run build` — clean.
+
+### Tests reviewed
+
+- `src/lib/__tests__/historyStats.test.ts` — extended (new signature
+  plus 4 new extras-aware tests).
+- `src/lib/__tests__/csv.test.ts` — extended with 4 new tests: extras
+  round-trip, fresh-id generation on import, invalid workoutType
+  rejection, and a legacy-CSV backward-compat check.
+- `src/store/__tests__/historyStore.test.ts` — extended with 3 new
+  tests covering `importExtraEntries`.
+- All other suites passed unchanged.
+
+### Tests added (12)
+
+**`computeHistoryStats` extras** (4):
+
+- `includes extras in totals and completed counts` — verifies every
+  extra counts as a completed workout.
+- `includes extras in the 7-day and 30-day windows` — extras are
+  windowed on their calendarDate the same way rotation completes are.
+- `counts an extras-only streak that ends today` — a user who logs
+  only ad-hoc yoga every day sees the correct streak.
+- `extras fill gaps in a mixed streak` — an extra on a day otherwise
+  logged as `skip` keeps the streak going.
+- `duplicate-date extras do not double-count within the streak` —
+  Set-based dedupe by date is the right semantics.
+
+**`historyToCsv` / `historyFromCsv` extras** (3 + 1 compat):
+
+- `round-trips extraEntries and their outcomes` — the full path:
+  export with extras, re-import, verify the new extras exist and
+  their outcomes are rekeyed to the freshly generated ids.
+- `generates fresh extra IDs on import` — originals do not leak
+  across the boundary (prevents id collisions with existing extras).
+- `rejects extra rows with invalid workoutType` — malformed extras
+  are warned about, not silently created.
+- `treats pre-2026-04-21 CSVs (no entryKind column) as all-rotation`
+  — legacy backups still import cleanly.
+
+**`historyStore.importExtraEntries`** (3):
+
+- `appends new extras without touching existing ones`
+- `skips incoming extras whose id collides with an existing one`
+- `is a no-op for an empty array`
+
+### Notable diffs touching existing tests
+
+- Existing `historyStats` tests were updated to pass `[]` as the new
+  `extras` argument — behaviour-preserving signature change.
+- Existing `csv.test.ts` `rejects invalid action` / `rejects
+  malformed dates` tests were updated to include the new `entryKind`
+  column on their inline CSV fixtures.
+- Existing `historyToCsv` callsites in tests and HistoryPage now pass
+  `extraEntries` as the new second argument.
+
+---
+
 ## 2026-04-19 (seventh pass) — branch `claude/gracious-heisenberg-2fsGC`
 
 ### Suite totals

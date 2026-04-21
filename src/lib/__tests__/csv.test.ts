@@ -11,7 +11,7 @@ import {
   historyToCsv,
   historyFromCsv,
 } from '../csv'
-import type { Plan, HistoryEntry, WorkoutOutcome } from '../../types'
+import type { Plan, HistoryEntry, ExtraWorkoutEntry, WorkoutOutcome } from '../../types'
 
 // ── Core parser ───────────────────────────────────────────────────────────────
 
@@ -248,7 +248,7 @@ describe('historyToCsv + historyFromCsv', () => {
   }
 
   it('round-trips entries and outcomes', () => {
-    const csv = historyToCsv(entries, plans, outcomes)
+    const csv = historyToCsv(entries, [], plans, outcomes)
     const { entries: parsed, outcomes: parsedOutcomes, warnings } = historyFromCsv(csv, planIds)
 
     expect(warnings).toEqual([])
@@ -274,7 +274,7 @@ describe('historyToCsv + historyFromCsv', () => {
   })
 
   it('skips rows referencing unknown plan ids', () => {
-    const csv = historyToCsv(entries, plans, outcomes)
+    const csv = historyToCsv(entries, [], plans, outcomes)
     const { entries: parsed, warnings } = historyFromCsv(csv, new Set(['nope']))
     expect(parsed).toEqual([])
     expect(warnings.some(w => w.includes('not found'))).toBe(true)
@@ -282,8 +282,8 @@ describe('historyToCsv + historyFromCsv', () => {
 
   it('rejects invalid action values', () => {
     const csv =
-      'planId,calendarDate,planDayIndex,action,createdAt\n' +
-      `${plan.id},2026-04-10,0,fly,2026-04-10T00:00:00Z`
+      'entryKind,planId,calendarDate,planDayIndex,action,createdAt\n' +
+      `rotation,${plan.id},2026-04-10,0,fly,2026-04-10T00:00:00Z`
     const { entries: parsed, warnings } = historyFromCsv(csv, planIds)
     expect(parsed).toEqual([])
     expect(warnings.some(w => w.includes('invalid action'))).toBe(true)
@@ -291,10 +291,116 @@ describe('historyToCsv + historyFromCsv', () => {
 
   it('rejects malformed dates', () => {
     const csv =
-      'planId,calendarDate,planDayIndex,action,createdAt\n' +
-      `${plan.id},notadate,0,complete,2026-04-10T00:00:00Z`
+      'entryKind,planId,calendarDate,planDayIndex,action,createdAt\n' +
+      `rotation,${plan.id},notadate,0,complete,2026-04-10T00:00:00Z`
     const { entries: parsed, warnings } = historyFromCsv(csv, planIds)
     expect(parsed).toEqual([])
     expect(warnings.some(w => w.includes('invalid calendarDate'))).toBe(true)
+  })
+
+  // ── Extras round-trip ──────────────────────────────────────────────────────
+
+  it('round-trips extraEntries and their outcomes', () => {
+    const extras: ExtraWorkoutEntry[] = [
+      {
+        id: 'x1',
+        planId: plan.id,
+        calendarDate: '2026-04-11',
+        workoutType: 'yoga',
+        workoutName: 'Morning Yoga',
+        notes: 'Hip mobility focus',
+        createdAt: '2026-04-11T08:00:00Z',
+        source: 'history',
+      },
+      {
+        id: 'x2',
+        planId: plan.id,
+        calendarDate: '2026-04-11',
+        workoutType: 'swim',
+        workoutName: 'Lunch Swim',
+        createdAt: '2026-04-11T12:30:00Z',
+        source: 'double_day',
+      },
+    ]
+    const extraOutcomes: Record<string, WorkoutOutcome> = {
+      [`${plan.id}_2026-04-11_extra_x1`]: {
+        workoutInstanceId: `${plan.id}_2026-04-11_extra_x1`,
+        completionState: 'completed',
+        perceivedEffort: 2,
+        durationActualMin: 30,
+      },
+    }
+
+    const csv = historyToCsv(entries, extras, plans, { ...outcomes, ...extraOutcomes })
+    const {
+      entries: parsedEntries,
+      extras: parsedExtras,
+      outcomes: parsedOutcomes,
+      warnings,
+    } = historyFromCsv(csv, planIds)
+
+    expect(warnings).toEqual([])
+    expect(parsedEntries).toHaveLength(2)
+    expect(parsedExtras).toHaveLength(2)
+
+    const yoga = parsedExtras.find(e => e.workoutType === 'yoga')!
+    expect(yoga.workoutName).toBe('Morning Yoga')
+    expect(yoga.notes).toBe('Hip mobility focus')
+    expect(yoga.calendarDate).toBe('2026-04-11')
+    expect(yoga.planId).toBe(plan.id)
+
+    const swim = parsedExtras.find(e => e.workoutType === 'swim')!
+    expect(swim.workoutName).toBe('Lunch Swim')
+
+    // Outcome for the yoga extra must be rekeyed to the new generated id.
+    const yogaOutcome = parsedOutcomes.find(
+      o => o.workoutInstanceId === `${plan.id}_2026-04-11_extra_${yoga.id}`,
+    )
+    expect(yogaOutcome).toBeDefined()
+    expect(yogaOutcome!.completionState).toBe('completed')
+    expect(yogaOutcome!.perceivedEffort).toBe(2)
+    expect(yogaOutcome!.durationActualMin).toBe(30)
+  })
+
+  it('generates fresh extra IDs on import (old and new IDs do not collide)', () => {
+    const extras: ExtraWorkoutEntry[] = [
+      {
+        id: 'original-id',
+        planId: plan.id,
+        calendarDate: '2026-04-11',
+        workoutType: 'yoga',
+        workoutName: 'Yoga',
+        createdAt: '2026-04-11T08:00:00Z',
+      },
+    ]
+    const csv = historyToCsv([], extras, plans, {})
+    const { extras: parsed } = historyFromCsv(csv, planIds)
+    expect(parsed).toHaveLength(1)
+    expect(parsed[0].id).not.toBe('original-id')
+  })
+
+  it('rejects extra rows with invalid workoutType', () => {
+    const csv =
+      'entryKind,planId,calendarDate,workoutType,workoutName,createdAt\n' +
+      `extra,${plan.id},2026-04-11,moonwalk,Weird,2026-04-11T08:00:00Z`
+    const { extras, warnings } = historyFromCsv(csv, planIds)
+    expect(extras).toEqual([])
+    expect(warnings.some(w => w.includes('invalid workoutType'))).toBe(true)
+  })
+
+  // ── Backward compatibility ─────────────────────────────────────────────────
+
+  it('treats pre-2026-04-21 CSVs (no entryKind column) as all-rotation', () => {
+    // Legacy header layout — no entryKind, workoutType, or workoutName columns.
+    const legacyCsv =
+      'planId,planName,calendarDate,planDayIndex,planDayLabel,action,slotNames,completionState,perceivedEffort,durationActualMin,actualDistanceMiles,actualDurationMin,averagePaceSecondsPerMile,averageHeartRate,completedAsPlanned,completedAt,notes,createdAt\n' +
+      `${plan.id},${plan.name},2026-04-10,0,Upper,complete,Push,completed,4,50,,,,,,,Felt great,2026-04-10T17:00:00Z\n` +
+      `${plan.id},${plan.name},2026-04-12,,,day_off,,,,,,,,,,,,2026-04-12T09:00:00Z`
+    const { entries: parsed, extras, warnings } = historyFromCsv(legacyCsv, planIds)
+    expect(warnings).toEqual([])
+    expect(parsed).toHaveLength(2)
+    expect(extras).toEqual([])
+    expect(parsed.find(e => e.calendarDate === '2026-04-10')!.action).toBe('complete')
+    expect(parsed.find(e => e.calendarDate === '2026-04-12')!.action).toBe('day_off')
   })
 })

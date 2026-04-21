@@ -57,6 +57,7 @@ export function HistoryPage() {
   const updateAction = useHistoryStore(s => s.updateEntryAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
   const importEntries = useHistoryStore(s => s.importEntries)
+  const importExtraEntries = useHistoryStore(s => s.importExtraEntries)
   const addExtraEntry = useHistoryStore(s => s.addExtraEntry)
   const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
   const outcomes = useOutcomeStore(s => s.outcomes)
@@ -130,7 +131,7 @@ export function HistoryPage() {
   })
 
   const todayKey = format(new Date(), 'yyyy-MM-dd')
-  const stats = computeHistoryStats(filteredEntries, todayKey)
+  const stats = computeHistoryStats(filteredEntries, filteredExtras, todayKey)
 
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')
@@ -243,7 +244,7 @@ export function HistoryPage() {
   }
 
   function handleExport() {
-    const csv = historyToCsv(entries, plans, outcomes)
+    const csv = historyToCsv(entries, extraEntries, plans, outcomes)
     const stamp = format(new Date(), 'yyyy-MM-dd')
     downloadCsv(`workout-history-${stamp}.csv`, csv)
   }
@@ -251,16 +252,32 @@ export function HistoryPage() {
   async function handleImport(file: File): Promise<ImportResult> {
     const text = await file.text()
     const existingPlanIds = new Set(Object.keys(plans))
-    const { entries: newEntries, outcomes: newOutcomes, warnings } = historyFromCsv(text, existingPlanIds)
-    importEntries(newEntries)
-    importOutcomes(newOutcomes)
-    return {
-      summary: `Imported ${newEntries.length} history ${newEntries.length === 1 ? 'entry' : 'entries'}${newOutcomes.length ? ` and ${newOutcomes.length} outcome record${newOutcomes.length === 1 ? '' : 's'}` : ''}.`,
+    const {
+      entries: newEntries,
+      extras: newExtras,
+      outcomes: newOutcomes,
       warnings,
+    } = historyFromCsv(text, existingPlanIds)
+    importEntries(newEntries)
+    importExtraEntries(newExtras)
+    importOutcomes(newOutcomes)
+    const parts: string[] = []
+    if (newEntries.length > 0) {
+      parts.push(`${newEntries.length} history ${newEntries.length === 1 ? 'entry' : 'entries'}`)
     }
+    if (newExtras.length > 0) {
+      parts.push(`${newExtras.length} extra workout${newExtras.length === 1 ? '' : 's'}`)
+    }
+    if (newOutcomes.length > 0) {
+      parts.push(`${newOutcomes.length} outcome record${newOutcomes.length === 1 ? '' : 's'}`)
+    }
+    const summary = parts.length === 0
+      ? 'No importable rows found.'
+      : `Imported ${parts.join(', ')}.`
+    return { summary, warnings }
   }
 
-  if (entries.length === 0) {
+  if (entries.length === 0 && extraEntries.length === 0) {
     return (
       <div className="px-4 pt-safe">
         <div className="pt-6 pb-4 flex items-start justify-between gap-2">
@@ -293,9 +310,9 @@ export function HistoryPage() {
             </select>
           )}
         </div>
-        <CsvToolbar canExport={entries.length > 0} onExport={handleExport} onImport={handleImport} />
+        <CsvToolbar canExport={entries.length > 0 || extraEntries.length > 0} onExport={handleExport} onImport={handleImport} />
 
-        {filteredEntries.length > 0 && (
+        {(filteredEntries.length > 0 || filteredExtras.length > 0) && (
           <div className="grid grid-cols-4 gap-2">
             <StatTile label="Streak" value={stats.currentStreak} suffix={stats.currentStreak === 1 ? 'day' : 'days'} />
             <StatTile label="7-day" value={stats.last7Completed} />

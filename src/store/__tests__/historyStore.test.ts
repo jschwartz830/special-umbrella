@@ -448,6 +448,71 @@ describe('clearExtraEntriesForDate', () => {
   })
 })
 
+// ── importExtraEntries ───────────────────────────────────────────────────────
+
+describe('importExtraEntries', () => {
+  it('appends new extras without touching existing ones', () => {
+    getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'yoga',
+      workoutName: 'Existing',
+    })
+    const existingId = getState().extraEntries[0].id
+
+    getState().importExtraEntries([
+      {
+        id: 'imp-1',
+        planId: 'plan-1',
+        calendarDate: '2026-01-02',
+        workoutType: 'swim',
+        workoutName: 'Imported',
+        createdAt: '2026-01-02T09:00:00Z',
+      },
+    ])
+
+    expect(getState().extraEntries).toHaveLength(2)
+    expect(getState().extraEntries.find(e => e.id === existingId)?.workoutName).toBe('Existing')
+    expect(getState().extraEntries.find(e => e.id === 'imp-1')?.workoutName).toBe('Imported')
+  })
+
+  it('skips incoming extras whose id collides with an existing one', () => {
+    getState().importExtraEntries([
+      {
+        id: 'shared',
+        planId: 'plan-1',
+        calendarDate: '2026-01-01',
+        workoutType: 'yoga',
+        workoutName: 'First',
+        createdAt: '2026-01-01T08:00:00Z',
+      },
+    ])
+    getState().importExtraEntries([
+      {
+        id: 'shared',
+        planId: 'plan-1',
+        calendarDate: '2026-01-02',
+        workoutType: 'swim',
+        workoutName: 'Second (should be ignored)',
+        createdAt: '2026-01-02T09:00:00Z',
+      },
+    ])
+    expect(getState().extraEntries).toHaveLength(1)
+    expect(getState().extraEntries[0].workoutName).toBe('First')
+  })
+
+  it('is a no-op for an empty array', () => {
+    getState().addExtraEntry({
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'yoga',
+      workoutName: 'Solo',
+    })
+    getState().importExtraEntries([])
+    expect(getState().extraEntries).toHaveLength(1)
+  })
+})
+
 // ── TodayPage upcoming-log guard invariant ───────────────────────────────────
 // The guard in TodayPage.handleUpcomingLog refuses to route a 'complete'
 // on an upcoming slot to today when today already has a rotation entry,

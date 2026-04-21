@@ -1,5 +1,89 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-21 (eighth pass) — branch `claude/epic-cannon-Ltjw1`
+
+### Executive summary
+
+Three commits (plan + two fixes). Both fixes are about ad-hoc
+`extraEntries` finally being treated as first-class citizens in the
+two places the rest of the codebase already knows about them:
+the History stats summary and the CSV round-trip.
+
+Baseline 194 → end state 206 passing tests. No new features, no new
+dependencies. One additive schema change to the history CSV header
+(backward compatible — legacy CSVs still parse).
+
+**Review first**: `87e78ec` — the CSV fix. It's the data-loss path.
+The previous version of `historyToCsv` silently dropped every
+ad-hoc workout and every double-day bonus, so a user exporting as
+a backup and re-importing after clearing storage would lose all
+extras. Verify the round-trip by exporting on a plan that has
+extras, clearing `wpt_history` localStorage, importing the CSV, and
+confirming the extras are back with their outcomes reattached.
+
+`3f78bae` is the visible UX fix: the stat tiles at the top of
+History now include extras in streak/counts. Previously you could
+log yoga every day for a week and the Streak tile would still say
+"0" while the list above showed seven green rows — now they agree.
+
+### Definitely keep
+
+- `87e78ec` — CSV extras round-trip. The data-loss path is the most
+  important finding this pass. Backward-compat with old exports is
+  tested.
+- `3f78bae` — Stats tiles include extras. Restores consistency with
+  the flat list already rendered in the page header.
+
+### Probably keep but worth a look
+
+Nothing this pass — the two behaviour changes are both "stats tiles
+should match the list" and "backups should be complete", which
+should be uncontroversial.
+
+### Do not keep
+
+Nothing flagged for rejection.
+
+### Recommendations only (not implemented)
+
+- **HistoryPage edit-modal trap on date conflict** — still open
+  from all prior passes. Fix wants a dedicated Cancel button or
+  "discard draft" affordance.
+- **`progressionStates` orphaning** on plan delete — still needs a
+  schema change (denormalize `groupId` onto Plan, or a
+  planId→groupId map).
+- **`swap_slot` override** still has no UI trigger.
+- **Plan-expiry banner dismiss** still not implemented.
+- **Route upcoming-complete-when-today-logged through ExtraWorkoutEntry**
+  — open product question from the seventh pass.
+
+### Open questions for you
+
+1. The history CSV header now includes `entryKind`, `workoutType`,
+   `workoutName` (as columns 1, 9, 10). Fine to break strict column
+   compatibility with older exports? The parser handles missing
+   columns gracefully on import, but any external tooling that was
+   parsing the export by column index (rather than by header) would
+   need to be updated.
+2. Should the import summary also mention extras that were rejected
+   for unknown workoutType? Right now they go into `warnings` but
+   the summary string only counts successfully imported rows.
+3. The stat tiles now render even when there are only extras and no
+   rotation entries. Any concern about this surfacing to users
+   before they've ever started a plan? (Shouldn't happen in practice
+   — you can't log an extra without an active plan — but worth
+   flagging.)
+
+### Sanity notes
+
+- `npm run build` is clean.
+- `npx tsc --noEmit` is clean.
+- `npm test` — 206 passing, 0 failing (194 baseline + 12 new).
+- No localStorage schema migration required: the only schema change
+  is to the CSV serialization, which is ephemeral.
+
+---
+
 ## 2026-04-19 (seventh pass) — branch `claude/gracious-heisenberg-2fsGC`
 
 ### Executive summary
