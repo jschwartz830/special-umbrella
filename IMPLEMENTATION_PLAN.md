@@ -1,5 +1,107 @@
 # Implementation Plan
 
+## 2026-04-21 — Overnight Audit (eighth pass)
+
+Branch: `claude/epic-cannon-Ltjw1`.
+Follow-up to the 2026-04-19 seventh-pass audit.
+Baseline on entry: **194 passing, 0 failing** (after `npm install`).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the seventh pass.
+
+### What appears strong and well-designed (unchanged)
+
+- 194-test suite covers engine/stores/adaptation/lib and now the
+  TodayPage upcoming-log guard invariant.
+- `OutcomeMetrics` is now a single shared component.
+- `historyStore.clearPlanHistory` + `clearPlanOutcomes` correctly
+  cascade across entries, overrides, extraEntries, and both primary
+  and extra outcome keys.
+
+### Key issues or risks this pass
+
+1. **CSV history export/import silently drops `extraEntries`** (real
+   data-loss path). `historyToCsv` only iterates rotation entries;
+   `historyFromCsv` only produces rotation entries. The History page's
+   "Export history CSV" button claims to export the user's history but
+   in fact omits every ad-hoc workout (yoga session, extra run, double-
+   day bonus) they've ever logged. A user who exports as a backup and
+   then re-imports after clearing storage will silently lose all
+   extras and their outcomes. This is especially bad because the
+   History page's flat list shows extras counted and rendered — so
+   users reasonably assume those rows are part of "history".
+   **Priority: high.** Fix: add an optional `entryKind` column
+   (`rotation` | `extra`) plus `workoutType` / `workoutName` columns.
+   Old CSVs without `entryKind` parse as all-rotation (backward
+   compatible). Add an `importExtraEntries` store action and wire it
+   into `HistoryPage.handleImport`.
+
+2. **`computeHistoryStats` ignores `extraEntries`** (correctness /
+   UX inconsistency). HistoryPage renders a flat list that includes
+   both rotation entries and extras (`${flatItems.length} workouts`
+   in the header), but the Streak / 7-day / 30-day / Total stat tiles
+   only count rotation entries. A user who has been logging only
+   ad-hoc yoga every day for a week will see "Streak: 0" despite
+   looking at seven green rows above. Fix: have
+   `computeHistoryStats` accept `extras` as a second argument and
+   treat them as completed workouts for counts and streak. Every
+   existing caller lives in HistoryPage, so the blast radius is one
+   file.
+
+3. **Still open from prior audits** (recommendations only):
+   - HistoryPage saveAndClose trap on date conflict.
+   - `progressionStates` orphaning on plan delete (needs schema
+     change).
+   - `swap_slot` override UI.
+   - Plan-expiry banner dismiss.
+   - Routing "upcoming-complete when today is already logged" through
+     ExtraWorkoutEntry instead of refusing (open question from 7th
+     pass).
+
+### Prioritized plan (this pass)
+
+**Safe to implement:**
+
+1. **[SAFE]** Extend `computeHistoryStats` to accept an optional
+   `extras` array and include them in the counts / streak. Update
+   the one HistoryPage callsite to pass `filteredExtras`. Add tests
+   covering extras-only streaks, mixed windows, and the empty-extras
+   case (default behavior).
+2. **[SAFE]** Add `entryKind` + `workoutType` + `workoutName` columns
+   to the history CSV. Export extras as rows and generate new IDs on
+   import. Surface extras through `historyFromCsv` as a separate
+   `extras` array in `HistoryImportResult`. Add `importExtraEntries`
+   to `historyStore`. Wire both through `HistoryPage`. Preserve
+   backward compatibility for pre-existing history CSVs.
+3. **[SAFE]** Tests for the CSV extras round-trip, including a
+   backward-compat test that an old header (no `entryKind`) still
+   parses all rows as rotation.
+
+**Not implemented this pass (recommendations only):**
+
+- HistoryPage saveAndClose trap — still wants a dedicated Cancel
+  button. Deferred (behavior change to an existing UI affordance).
+- `progressionStates` orphaning — still needs a schema change.
+- `swap_slot` UI / plan-expiry dismiss — still unchanged.
+- Upcoming-complete routing through ExtraWorkoutEntry — still an
+  open product question.
+- Medium-complexity feature — **declined this pass**. The two
+  findings here are both real correctness/data-loss issues; fixing
+  them tightens the surface without expanding it. Keeping scope
+  narrow.
+
+### Rationale for sequencing
+
+`computeHistoryStats` goes first because it's the smaller, pure-
+function change with no persistence implications. CSV extras support
+is larger (schema + store action + UI wiring + round-trip tests) and
+builds confidence from the simpler change. Tests are written
+alongside each commit rather than batched.
+
+---
+
 ## 2026-04-19 — Overnight Audit (seventh pass)
 
 Branch: `claude/gracious-heisenberg-2fsGC`.
