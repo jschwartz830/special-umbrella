@@ -8,6 +8,7 @@ import type {
   WorkoutSlot,
   WorkoutType,
   HistoryEntry,
+  ExtraWorkoutEntry,
   PlanStatus,
   ActionType,
   WorkoutTag,
@@ -19,7 +20,7 @@ import type {
   PerceivedEffort,
 } from '../types'
 import { nanoid } from '../engine/rotationEngine'
-import { makeWorkoutInstanceId } from '../store/outcomeStore'
+import { makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 
 // ── Core encode/decode ────────────────────────────────────────────────────────
 
@@ -433,6 +434,9 @@ function defaultNameForType(type: WorkoutType): string {
 // ── History CSV ───────────────────────────────────────────────────────────────
 
 const HISTORY_HEADERS = [
+  'entryKind',       // 'rotation' | 'extra' — new in 2026-04-21 schema. Older
+                     // exports predate this column; parseRecordsToHistory
+                     // defaults missing values to 'rotation'.
   'planId',
   'planName',
   'calendarDate',
@@ -440,6 +444,8 @@ const HISTORY_HEADERS = [
   'planDayLabel',
   'action',
   'slotNames',
+  'workoutType',     // extras only — otherwise blank
+  'workoutName',     // extras only — otherwise blank
   'completionState',
   'perceivedEffort',
   'durationActualMin',
@@ -455,46 +461,95 @@ const HISTORY_HEADERS = [
 
 export function historyToCsv(
   entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
   plans: Record<string, Plan>,
   outcomes: Record<string, WorkoutOutcome>,
 ): string {
   const rows: (string | number | boolean | null | undefined)[][] = [[...HISTORY_HEADERS]]
-  // Sort oldest first for stable output
-  const sorted = [...entries].sort((a, b) =>
-    a.calendarDate.localeCompare(b.calendarDate) || a.createdAt.localeCompare(b.createdAt),
-  )
-  for (const e of sorted) {
-    const plan = plans[e.planId]
-    const planDay =
-      e.planDayIndex !== undefined ? plan?.days[e.planDayIndex] : undefined
-    const outcome = outcomes[makeWorkoutInstanceId(e.planId, e.calendarDate)]
-    const runActual = outcome?.runActual ?? null
-    rows.push([
-      e.planId,
-      plan?.name ?? '',
-      e.calendarDate,
-      e.planDayIndex ?? '',
-      planDay?.label ?? '',
-      e.action,
-      planDay ? planDay.slots.map(s => s.name).join(' + ') : '',
-      outcome?.completionState ?? '',
-      outcome?.perceivedEffort ?? '',
-      outcome?.durationActualMin ?? '',
-      runActual?.actualDistanceMiles ?? '',
-      runActual?.actualDurationMin ?? '',
-      runActual?.averagePaceSecondsPerMile ?? '',
-      runActual?.averageHeartRate ?? '',
-      runActual?.completedAsPlanned ?? '',
-      outcome?.completedAt ?? '',
-      e.notes ?? outcome?.notes ?? '',
-      e.createdAt,
-    ])
+
+  type Row =
+    | { kind: 'rotation'; date: string; createdAt: string; entry: HistoryEntry }
+    | { kind: 'extra'; date: string; createdAt: string; extra: ExtraWorkoutEntry }
+
+  const unified: Row[] = [
+    ...entries.map<Row>(e => ({ kind: 'rotation', date: e.calendarDate, createdAt: e.createdAt, entry: e })),
+    ...extras.map<Row>(e => ({ kind: 'extra', date: e.calendarDate, createdAt: e.createdAt, extra: e })),
+  ]
+  // Sort oldest first for stable output; rotation before extras on the same date+time.
+  unified.sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date)
+    if (a.createdAt !== b.createdAt) return a.createdAt.localeCompare(b.createdAt)
+    if (a.kind !== b.kind) return a.kind === 'rotation' ? -1 : 1
+    return 0
+  })
+
+  for (const row of unified) {
+    if (row.kind === 'rotation') {
+      const e = row.entry
+      const plan = plans[e.planId]
+      const planDay =
+        e.planDayIndex !== undefined ? plan?.days[e.planDayIndex] : undefined
+      const outcome = outcomes[makeWorkoutInstanceId(e.planId, e.calendarDate)]
+      const runActual = outcome?.runActual ?? null
+      rows.push([
+        'rotation',
+        e.planId,
+        plan?.name ?? '',
+        e.calendarDate,
+        e.planDayIndex ?? '',
+        planDay?.label ?? '',
+        e.action,
+        planDay ? planDay.slots.map(s => s.name).join(' + ') : '',
+        '',  // workoutType — extras only
+        '',  // workoutName — extras only
+        outcome?.completionState ?? '',
+        outcome?.perceivedEffort ?? '',
+        outcome?.durationActualMin ?? '',
+        runActual?.actualDistanceMiles ?? '',
+        runActual?.actualDurationMin ?? '',
+        runActual?.averagePaceSecondsPerMile ?? '',
+        runActual?.averageHeartRate ?? '',
+        runActual?.completedAsPlanned ?? '',
+        outcome?.completedAt ?? '',
+        e.notes ?? outcome?.notes ?? '',
+        e.createdAt,
+      ])
+    } else {
+      const x = row.extra
+      const plan = plans[x.planId]
+      const outcome = outcomes[makeExtraWorkoutInstanceId(x.planId, x.calendarDate, x.id)]
+      const runActual = outcome?.runActual ?? null
+      rows.push([
+        'extra',
+        x.planId,
+        plan?.name ?? '',
+        x.calendarDate,
+        '',  // planDayIndex — n/a
+        '',  // planDayLabel — n/a
+        '',  // action — n/a
+        '',  // slotNames — n/a
+        x.workoutType,
+        x.workoutName,
+        outcome?.completionState ?? '',
+        outcome?.perceivedEffort ?? '',
+        outcome?.durationActualMin ?? '',
+        runActual?.actualDistanceMiles ?? '',
+        runActual?.actualDurationMin ?? '',
+        runActual?.averagePaceSecondsPerMile ?? '',
+        runActual?.averageHeartRate ?? '',
+        runActual?.completedAsPlanned ?? '',
+        outcome?.completedAt ?? '',
+        x.notes ?? outcome?.notes ?? '',
+        x.createdAt,
+      ])
+    }
   }
   return encodeCsv(rows)
 }
 
 export interface HistoryImportResult {
   entries: HistoryEntry[]
+  extras: ExtraWorkoutEntry[]
   outcomes: WorkoutOutcome[]
   warnings: string[]
 }
@@ -505,9 +560,15 @@ const VALID_COMPLETION_STATES: WorkoutCompletionState[] = [
 ]
 
 /**
- * Parse CSV text into HistoryEntry + optional WorkoutOutcome records.
- * Requires rows to reference an existing planId (passed in `existingPlanIds`).
- * Rows with unknown planIds are skipped with a warning.
+ * Parse CSV text into HistoryEntry + ExtraWorkoutEntry + optional
+ * WorkoutOutcome records. Requires rows to reference an existing planId
+ * (passed in `existingPlanIds`). Rows with unknown planIds are skipped with
+ * a warning.
+ *
+ * Rows with `entryKind = 'extra'` become `ExtraWorkoutEntry` records with
+ * freshly generated IDs; any associated outcome data on the same row is
+ * keyed via `makeExtraWorkoutInstanceId` with the new ID. Missing
+ * `entryKind` (pre-2026-04-21 exports) defaults to 'rotation'.
  */
 export function historyFromCsv(
   text: string,
@@ -516,6 +577,7 @@ export function historyFromCsv(
   const records = parseCsvToRecords(text)
   const warnings: string[] = []
   const entries: HistoryEntry[] = []
+  const extras: ExtraWorkoutEntry[] = []
   const outcomes: WorkoutOutcome[] = []
   const now = new Date().toISOString()
 
@@ -535,6 +597,39 @@ export function historyFromCsv(
       warnings.push(`Row ${lineNum}: invalid calendarDate "${row.calendarDate}" — skipped.`)
       return
     }
+
+    const kind = (row.entryKind?.trim() || 'rotation').toLowerCase()
+
+    if (kind === 'extra') {
+      const workoutType = row.workoutType?.trim() as WorkoutType
+      if (!VALID_WORKOUT_TYPES.includes(workoutType)) {
+        warnings.push(`Row ${lineNum}: invalid workoutType "${row.workoutType}" for extra — skipped.`)
+        return
+      }
+      const extraId = nanoid()
+      extras.push({
+        id: extraId,
+        planId,
+        calendarDate,
+        workoutType,
+        workoutName: row.workoutName?.trim() || defaultNameForType(workoutType),
+        notes: row.notes || undefined,
+        createdAt: row.createdAt || now,
+      })
+
+      const outcome = buildOutcomeFromRow(
+        row,
+        makeExtraWorkoutInstanceId(planId, calendarDate, extraId),
+      )
+      if (outcome) outcomes.push(outcome)
+      return
+    }
+
+    if (kind !== 'rotation') {
+      warnings.push(`Row ${lineNum}: unknown entryKind "${row.entryKind}" — skipped.`)
+      return
+    }
+
     const action = row.action?.trim() as ActionType
     if (!VALID_ACTIONS.includes(action)) {
       warnings.push(`Row ${lineNum}: invalid action "${row.action}" — skipped.`)
@@ -553,45 +648,53 @@ export function historyFromCsv(
       createdAt: row.createdAt || now,
     })
 
-    // Optional outcome
-    const completionState = row.completionState?.trim() as WorkoutCompletionState
-    if (completionState && VALID_COMPLETION_STATES.includes(completionState)) {
-      const outcome: WorkoutOutcome = {
-        workoutInstanceId: makeWorkoutInstanceId(planId, calendarDate),
-        completionState,
-      }
-      const effort = toNum(row.perceivedEffort)
-      if (effort !== undefined && effort >= 1 && effort <= 5) {
-        outcome.perceivedEffort = effort as PerceivedEffort
-      }
-      const dur = toNum(row.durationActualMin)
-      if (dur !== undefined) outcome.durationActualMin = dur
-      if (row.completedAt) outcome.completedAt = row.completedAt
-      if (row.notes) outcome.notes = row.notes
-
-      const actualDistance = toNum(row.actualDistanceMiles)
-      const actualDuration = toNum(row.actualDurationMin)
-      const avgPace = toNum(row.averagePaceSecondsPerMile)
-      const avgHr = toNum(row.averageHeartRate)
-      const completedAsPlanned = toBool(row.completedAsPlanned)
-      if (
-        actualDistance !== undefined ||
-        actualDuration !== undefined ||
-        avgPace !== undefined ||
-        avgHr !== undefined ||
-        completedAsPlanned !== undefined
-      ) {
-        outcome.runActual = {
-          actualDistanceMiles: actualDistance,
-          actualDurationMin: actualDuration,
-          averagePaceSecondsPerMile: avgPace,
-          averageHeartRate: avgHr,
-          completedAsPlanned,
-        }
-      }
-      outcomes.push(outcome)
-    }
+    const outcome = buildOutcomeFromRow(
+      row,
+      makeWorkoutInstanceId(planId, calendarDate),
+    )
+    if (outcome) outcomes.push(outcome)
   })
 
-  return { entries, outcomes, warnings }
+  return { entries, extras, outcomes, warnings }
+}
+
+function buildOutcomeFromRow(
+  row: Record<string, string>,
+  workoutInstanceId: string,
+): WorkoutOutcome | null {
+  const completionState = row.completionState?.trim() as WorkoutCompletionState
+  if (!completionState || !VALID_COMPLETION_STATES.includes(completionState)) return null
+
+  const outcome: WorkoutOutcome = { workoutInstanceId, completionState }
+
+  const effort = toNum(row.perceivedEffort)
+  if (effort !== undefined && effort >= 1 && effort <= 5) {
+    outcome.perceivedEffort = effort as PerceivedEffort
+  }
+  const dur = toNum(row.durationActualMin)
+  if (dur !== undefined) outcome.durationActualMin = dur
+  if (row.completedAt) outcome.completedAt = row.completedAt
+  if (row.notes) outcome.notes = row.notes
+
+  const actualDistance = toNum(row.actualDistanceMiles)
+  const actualDuration = toNum(row.actualDurationMin)
+  const avgPace = toNum(row.averagePaceSecondsPerMile)
+  const avgHr = toNum(row.averageHeartRate)
+  const completedAsPlanned = toBool(row.completedAsPlanned)
+  if (
+    actualDistance !== undefined ||
+    actualDuration !== undefined ||
+    avgPace !== undefined ||
+    avgHr !== undefined ||
+    completedAsPlanned !== undefined
+  ) {
+    outcome.runActual = {
+      actualDistanceMiles: actualDistance,
+      actualDurationMin: actualDuration,
+      averagePaceSecondsPerMile: avgPace,
+      averageHeartRate: avgHr,
+      completedAsPlanned,
+    }
+  }
+  return outcome
 }

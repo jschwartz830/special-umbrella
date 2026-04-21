@@ -52,6 +52,9 @@ interface HistoryState {
   /** Bulk import: replaces any existing entry for the same (planId, calendarDate). */
   importEntries: (entries: HistoryEntry[]) => void
 
+  /** Bulk import: appends extras, deduplicated by id so re-imports are safe. */
+  importExtraEntries: (extras: ExtraWorkoutEntry[]) => void
+
   addExtraEntry: (payload: Omit<ExtraWorkoutEntry, 'id' | 'createdAt'>) => string
   updateExtraEntry: (id: string, patch: Partial<Pick<ExtraWorkoutEntry, 'workoutType' | 'workoutName' | 'notes'>>) => void
   removeExtraEntry: (id: string) => void
@@ -165,6 +168,16 @@ export const useHistoryStore = create<HistoryState>()(
             e => !keys.has(`${e.planId}__${e.calendarDate}`),
           )
           return { entries: [...filtered, ...incoming] }
+        })
+      },
+
+      importExtraEntries(incoming) {
+        if (incoming.length === 0) return
+        set(s => {
+          const existingIds = new Set(s.extraEntries.map(e => e.id))
+          const fresh = incoming.filter(e => !existingIds.has(e.id))
+          if (fresh.length === 0) return s
+          return { extraEntries: [...s.extraEntries, ...fresh] }
         })
       },
 
