@@ -1,5 +1,86 @@
 # Overnight Changelog
 
+## 2026-04-21 (eighth pass) — branch `claude/epic-cannon-Ltjw1`
+
+Baseline on entry: **194 passing, 0 failing**.
+End state: **206 tests pass**.
+
+Scope: two correctness fixes around `extraEntries` visibility — one
+in the History stats summary (display inconsistency) and one in the
+CSV round-trip (silent data loss on backup/restore). No new features,
+no new dependencies. One schema addition to the history CSV
+(additive, backward-compatible).
+
+### Commits (oldest → newest)
+
+1. **`519dbb4` — Plan: 2026-04-21 eighth-pass audit**
+   IMPLEMENTATION_PLAN.md section. No code changes.
+   - `IMPLEMENTATION_PLAN.md`
+   - **Risk**: none (doc only).
+
+2. **`3f78bae` — Fix: include extraEntries in History stats tiles**
+   `computeHistoryStats(entries, today)` became
+   `computeHistoryStats(entries, extras, today)`. Extras count as
+   completed workouts for totals, 7/30-day windows, and the current
+   streak. Extras participate in the streakable-days set, so an
+   extras-only day extends the streak and an extra backfills a day
+   that's been logged as `skip`. HistoryPage's one callsite passes
+   `filteredExtras` through and the stat tiles now render when there
+   are extras even if no rotation entries exist.
+   - `src/lib/historyStats.ts`
+   - `src/lib/__tests__/historyStats.test.ts`
+   - `src/pages/HistoryPage.tsx`
+   - **Risk**: low. Behaviour change is intentional — aligns stat
+     tiles with the flat list already rendered in the page header.
+     Reviewers: expect "Streak" / "Total" numbers to be non-zero
+     for users who have extras. If you prefer the old semantics,
+     revert — every caller goes through HistoryPage.
+   - **Rollback**: `git revert 3f78bae`.
+
+3. **`87e78ec` — Fix: CSV history export/import now round-trips extraEntries**
+   The history CSV used to drop every `ExtraWorkoutEntry` silently —
+   exports omitted them, imports couldn't produce them. Added three
+   columns to the history CSV header: `entryKind` (`rotation`|`extra`),
+   `workoutType`, `workoutName`. Rotation rows leave workoutType/
+   workoutName blank; extra rows leave planDayIndex/action/slotNames
+   blank. Legacy CSVs without `entryKind` default to rotation, so
+   previously-exported files continue to import cleanly.
+   `historyFromCsv` now returns an `extras: ExtraWorkoutEntry[]` array
+   alongside `entries`; a new `historyStore.importExtraEntries` appends
+   them (deduplicated by id). Outcomes attached to extras are rekeyed
+   to the freshly generated extra id so they survive the round-trip
+   under the correct `makeExtraWorkoutInstanceId` key.
+   - `src/lib/csv.ts`
+   - `src/lib/__tests__/csv.test.ts`
+   - `src/store/historyStore.ts`
+   - `src/store/__tests__/historyStore.test.ts`
+   - `src/pages/HistoryPage.tsx`
+   - **Risk**: medium-low. The CSV header grew and column order
+     changed (entryKind is first). Old exports still parse correctly
+     (tested). New exports are not round-trip-compatible with an
+     older version of the app that expects the old header order —
+     but this app ships from a single branch, so that's only a
+     concern if someone installs an old PWA version and imports a
+     new export. The import summary string also changed format
+     slightly to include extras when present.
+   - **Rollback**: `git revert 87e78ec`. Reverts both the export and
+     import paths; old extras in storage stay put.
+
+### Dropped / not attempted
+
+- HistoryPage saveAndClose trap on date conflict — still open from
+  the seventh pass. Fix wants a dedicated Cancel button.
+- `progressionStates` orphaning on plan delete — still needs a
+  schema change.
+- `swap_slot` override UI, plan-expiry dismiss — unchanged.
+- Upcoming-complete-when-today-logged routed through
+  ExtraWorkoutEntry — still an open product question.
+- Medium-complexity feature — declined. The two findings here are
+  both real correctness/data-loss issues; fixing them is enough for
+  the night.
+
+---
+
 ## 2026-04-19 (seventh pass) — branch `claude/gracious-heisenberg-2fsGC`
 
 Baseline on entry: **192 passing, 0 failing**.
