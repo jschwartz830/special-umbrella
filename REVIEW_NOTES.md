@@ -1,5 +1,99 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-19 (seventh pass) — branch `claude/gracious-heisenberg-2fsGC`
+
+### Executive summary
+
+Five commits. One real data-loss guard, two refactors, one invariant
+test, one plan doc. Baseline 192 → end state 194 passing tests.
+No new features, no schema changes, no new dependencies. Every commit
+is independently revertable.
+
+**Review first**: `ab5fcd2` — the TodayPage guard. It's a correctness
+fix for a silent data-loss path (tap an already-logged-today primary
+and then tap any upcoming day → Complete → primary gets overwritten
+with no undo trail). Verify by completing today, then tapping an
+upcoming workout card and picking Complete — you should now see an
+inline error instead of the primary entry disappearing.
+
+The other four commits are low-risk: a pure refactor switching
+CalendarPage's action-sync to the same helper HistoryPage uses
+(`7a980ca`), extracting the triplicated `OutcomeMetrics` render
+block to a shared component (`ee75b11`), and tests that lock the
+addEntry replace-on-collision behaviour (`835a030`) so the guard
+can't be silently defeated by a future refactor.
+
+### Definitely keep
+
+- `ab5fcd2` — data-loss guard. No behaviour change on the intended
+  path; only blocks the broken overwrite.
+- `7a980ca` — CalendarPage → `updateEntryAction`. Zero behaviour
+  change; matches the existing HistoryPage pattern.
+- `835a030` — invariant tests. Tests only.
+
+### Probably keep but worth a look
+
+- `ee75b11` — `OutcomeMetrics` extraction. One stylistic drift
+  normalised: CalendarPage's Effort row previously had a narrow
+  left-aligned "Effort" label column (`w-10`); the shared component
+  uses HistoryPage's inline "Effort:" prefix instead. Visible only
+  on the Calendar day-detail modal. Revert or re-tune the component
+  layout if you prefer the column form.
+
+### Do not keep
+
+Nothing flagged for rejection.
+
+### Recommendations only (not implemented)
+
+- **HistoryPage edit-modal trap on date conflict**. The edit modal
+  uses `onClose={saveAndClose}`, and `saveAndClose` early-returns
+  without closing when a date conflict is detected. A user who
+  picks a conflicting date and then tries to close via X or backdrop
+  is stuck until they either fix the date or delete the entry. Minor
+  UX. Proper fix wants a separate Cancel button or a "discard draft"
+  affordance; didn't take it this pass because it's a behaviour
+  change to an existing implicit-save interaction.
+- **`progressionStates` orphaning** on plan delete — still open.
+  Needs a schema change (denormalize groupId onto Plan, or a
+  planId→groupId map) to clear correctly.
+- **`swap_slot` override type** still has no UI trigger.
+- **Plan-expiry banner dismiss** still not implemented.
+- **Route upcoming-complete-when-today-logged through ExtraWorkoutEntry**
+  instead of refusing. This would match the double-day semantics
+  (two workouts on one date) and let the user log without needing to
+  Undo first. Deferred because it's a bigger UX change: it needs a
+  second OutcomeModal path, a rotation-pointer advance decision, and
+  a product question about whether this affordance should now always
+  route to extras regardless of today's state. The guard is the
+  conservative stop-the-bleeding fix; the extras route is the richer
+  follow-up.
+
+### Open questions for you
+
+1. Should the "upcoming-as-today when today is logged" case route to
+   ExtraWorkoutEntry automatically (like double-day) instead of
+   refusing? The guard is explicit ("Undo first") today.
+2. Does the OutcomeMetrics layout on the Calendar day-detail modal
+   still look right after the extraction? Previously the label was
+   in a fixed-width column; now it's inline.
+3. HistoryPage edit-modal close-trap on date conflict — small fix,
+   but wants a UX call: split Save / Cancel, or allow close-without-save
+   by ignoring unsaved date changes?
+
+### Known issues or incomplete work
+
+- Still no React-level component tests. All coverage is store-level.
+- The TodayPage guard is verified by store-level tests (replace-on-
+  collision behaviour) and by type-check, but no automated UI test
+  confirms the inline error actually renders.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-04-18 (sixth pass) — branch `claude/overnight-audit-improvements-RzBkA`
 
 ### Summary

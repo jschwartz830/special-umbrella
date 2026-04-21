@@ -448,6 +448,42 @@ describe('clearExtraEntriesForDate', () => {
   })
 })
 
+// ── TodayPage upcoming-log guard invariant ───────────────────────────────────
+// The guard in TodayPage.handleUpcomingLog refuses to route a 'complete'
+// on an upcoming slot to today when today already has a rotation entry,
+// because logAction → addEntry dedupes by (planId, calendarDate) and
+// replaces. These tests pin down the replace-on-collision behaviour the
+// guard exists to prevent so refactors can't silently re-introduce the
+// data-loss path.
+
+describe('logAction replace-on-collision (TodayPage guard invariant)', () => {
+  it('replaces today\'s primary entry when logAction is called again for the same (planId, today) with a different planDayIndex', () => {
+    // Primary entry: today's scheduled workout, planDayIndex=0
+    getState().logAction('plan-1', '2026-01-01', 0, 'complete', 'Primary session')
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].planDayIndex).toBe(0)
+    expect(getState().entries[0].notes).toBe('Primary session')
+
+    // Upcoming slot's planDayIndex=3, logged "as today" without a guard.
+    // Without the UI guard, this would overwrite the primary — demonstrating
+    // why the TodayPage guard must refuse the log.
+    getState().logAction('plan-1', '2026-01-01', 3, 'complete')
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].planDayIndex).toBe(3)
+    expect(getState().entries[0].notes).toBeUndefined()
+  })
+
+  it('does NOT collide when today has no entry yet (the intended "upcoming-as-today" path)', () => {
+    // No primary entry yet — today is pending.
+    expect(getState().entries).toHaveLength(0)
+
+    // Logging an upcoming slot as today is safe in this case.
+    getState().logAction('plan-1', '2026-01-01', 3, 'complete')
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].planDayIndex).toBe(3)
+  })
+})
+
 // ── ExtraWorkoutEntry.source ──────────────────────────────────────────────────
 // The source field lets callers tag each extra as user-initiated ('history')
 // or part of the double-day flow ('double_day'). TodayPage Undo removes
