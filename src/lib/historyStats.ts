@@ -1,4 +1,4 @@
-import type { HistoryEntry } from '../types'
+import type { HistoryEntry, ExtraWorkoutEntry } from '../types'
 
 export interface HistoryStats {
   totalLogged: number
@@ -9,38 +9,48 @@ export interface HistoryStats {
 }
 
 /**
- * Compute read-only stats over a set of history entries.
+ * Compute read-only stats over a set of history entries and ad-hoc extras.
  *
- * - `totalLogged` counts entries of any action.
- * - `totalCompleted` counts `complete` entries only.
- * - `last7Completed` / `last30Completed` count `complete` entries within
- *   the N-day window ending on `today` (inclusive).
+ * - `totalLogged` counts rotation entries (any action) plus every extra.
+ * - `totalCompleted` counts `complete` rotation entries plus every extra
+ *   (extras represent workouts the user actually did).
+ * - `last7Completed` / `last30Completed` count `complete` rotation entries
+ *   and extras within the N-day window ending on `today` (inclusive).
  * - `currentStreak` counts consecutive calendar days ending at `today`
- *   (inclusive) that have a `complete` or `day_off` entry; `skip` or no
- *   entry breaks the streak. If `today` itself has no qualifying entry,
- *   the streak is 0.
+ *   (inclusive) that have a `complete` or `day_off` rotation entry, or
+ *   any extra. `skip` (without a qualifying counterpart on the same day)
+ *   or an empty day breaks the streak.
  *
  * All date math uses string comparison on YYYY-MM-DD inputs.
  */
-export function computeHistoryStats(entries: HistoryEntry[], today: string): HistoryStats {
-  const totalLogged = entries.length
-  const totalCompleted = entries.filter(e => e.action === 'complete').length
+export function computeHistoryStats(
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  today: string,
+): HistoryStats {
+  const totalLogged = entries.length + extras.length
+  const totalCompleted =
+    entries.filter(e => e.action === 'complete').length + extras.length
 
   const d7 = shiftDay(today, -6)   // window of 7 days inclusive of today
   const d30 = shiftDay(today, -29) // window of 30 days inclusive of today
 
-  const last7Completed = entries.filter(
-    e => e.action === 'complete' && e.calendarDate >= d7 && e.calendarDate <= today,
-  ).length
-  const last30Completed = entries.filter(
-    e => e.action === 'complete' && e.calendarDate >= d30 && e.calendarDate <= today,
-  ).length
+  const inWindow = (date: string, from: string) =>
+    date >= from && date <= today
 
-  const streakable = new Set(
-    entries
-      .filter(e => e.action === 'complete' || e.action === 'day_off')
-      .map(e => e.calendarDate),
-  )
+  const last7Completed =
+    entries.filter(e => e.action === 'complete' && inWindow(e.calendarDate, d7)).length +
+    extras.filter(e => inWindow(e.calendarDate, d7)).length
+  const last30Completed =
+    entries.filter(e => e.action === 'complete' && inWindow(e.calendarDate, d30)).length +
+    extras.filter(e => inWindow(e.calendarDate, d30)).length
+
+  const streakable = new Set<string>()
+  for (const e of entries) {
+    if (e.action === 'complete' || e.action === 'day_off') streakable.add(e.calendarDate)
+  }
+  for (const e of extras) streakable.add(e.calendarDate)
+
   let currentStreak = 0
   let cursor = today
   while (streakable.has(cursor)) {

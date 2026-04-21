@@ -130,7 +130,7 @@ export function HistoryPage() {
   })
 
   const todayKey = format(new Date(), 'yyyy-MM-dd')
-  const stats = computeHistoryStats(filteredEntries, todayKey)
+  const stats = computeHistoryStats(filteredEntries, filteredExtras, todayKey)
 
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')
@@ -295,7 +295,7 @@ export function HistoryPage() {
         </div>
         <CsvToolbar canExport={entries.length > 0} onExport={handleExport} onImport={handleImport} />
 
-        {filteredEntries.length > 0 && (
+        {(filteredEntries.length > 0 || filteredExtras.length > 0) && (
           <div className="grid grid-cols-4 gap-2">
             <StatTile label="Streak" value={stats.currentStreak} suffix={stats.currentStreak === 1 ? 'day' : 'days'} />
             <StatTile label="7-day" value={stats.last7Completed} />

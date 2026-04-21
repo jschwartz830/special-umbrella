@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeHistoryStats } from '../historyStats'
-import type { HistoryEntry } from '../../types'
+import type { HistoryEntry, ExtraWorkoutEntry } from '../../types'
 
 function entry(
   date: string,
@@ -17,9 +17,23 @@ function entry(
   }
 }
 
+function extra(
+  date: string,
+  planId = 'plan-1',
+): ExtraWorkoutEntry {
+  return {
+    id: `extra_${planId}_${date}`,
+    planId,
+    calendarDate: date,
+    workoutType: 'yoga',
+    workoutName: 'Yoga',
+    createdAt: `${date}T12:30:00Z`,
+  }
+}
+
 describe('computeHistoryStats', () => {
-  it('returns zeros for an empty entry list', () => {
-    const s = computeHistoryStats([], '2026-04-17')
+  it('returns zeros for empty inputs', () => {
+    const s = computeHistoryStats([], [], '2026-04-17')
     expect(s).toEqual({
       totalLogged: 0,
       totalCompleted: 0,
@@ -29,14 +43,14 @@ describe('computeHistoryStats', () => {
     })
   })
 
-  it('counts totals and completed separately', () => {
+  it('counts totals and completed separately (rotation only)', () => {
     const entries = [
       entry('2026-04-10', 'complete'),
       entry('2026-04-11', 'skip'),
       entry('2026-04-12', 'day_off'),
       entry('2026-04-13', 'complete'),
     ]
-    const s = computeHistoryStats(entries, '2026-04-17')
+    const s = computeHistoryStats(entries, [], '2026-04-17')
     expect(s.totalLogged).toBe(4)
     expect(s.totalCompleted).toBe(2)
   })
@@ -47,7 +61,7 @@ describe('computeHistoryStats', () => {
       entry('2026-04-10', 'complete'), // day -7 — outside 7-day window
       entry('2026-04-17', 'complete'), // today
     ]
-    const s = computeHistoryStats(entries, '2026-04-17')
+    const s = computeHistoryStats(entries, [], '2026-04-17')
     expect(s.last7Completed).toBe(2)
   })
 
@@ -57,7 +71,7 @@ describe('computeHistoryStats', () => {
       entry('2026-03-18', 'complete'), // day -30 — outside
       entry('2026-04-17', 'complete'),
     ]
-    const s = computeHistoryStats(entries, '2026-04-17')
+    const s = computeHistoryStats(entries, [], '2026-04-17')
     expect(s.last30Completed).toBe(2)
   })
 
@@ -67,7 +81,7 @@ describe('computeHistoryStats', () => {
       entry('2026-04-16', 'day_off'),
       entry('2026-04-17', 'complete'),
     ]
-    const s = computeHistoryStats(entries, '2026-04-17')
+    const s = computeHistoryStats(entries, [], '2026-04-17')
     expect(s.last7Completed).toBe(1)
   })
 
@@ -78,7 +92,7 @@ describe('computeHistoryStats', () => {
       entry('2026-04-16', 'complete'),
       entry('2026-04-17', 'complete'),
     ]
-    const s = computeHistoryStats(entries, '2026-04-17')
+    const s = computeHistoryStats(entries, [], '2026-04-17')
     expect(s.currentStreak).toBe(4)
   })
 
@@ -87,7 +101,7 @@ describe('computeHistoryStats', () => {
       entry('2026-04-15', 'complete'),
       entry('2026-04-16', 'complete'),
     ]
-    const s = computeHistoryStats(entries, '2026-04-17')
+    const s = computeHistoryStats(entries, [], '2026-04-17')
     expect(s.currentStreak).toBe(0)
   })
 
@@ -98,7 +112,7 @@ describe('computeHistoryStats', () => {
       entry('2026-04-16', 'complete'),
       entry('2026-04-17', 'complete'),
     ]
-    const s = computeHistoryStats(entries, '2026-04-17')
+    const s = computeHistoryStats(entries, [], '2026-04-17')
     expect(s.currentStreak).toBe(2)
   })
 
@@ -109,7 +123,67 @@ describe('computeHistoryStats', () => {
       entry('2026-04-16', 'complete'),
       entry('2026-04-17', 'complete'),
     ]
-    const s = computeHistoryStats(entries, '2026-04-17')
+    const s = computeHistoryStats(entries, [], '2026-04-17')
     expect(s.currentStreak).toBe(2)
+  })
+
+  // ── Extras ──────────────────────────────────────────────────────────────
+
+  it('includes extras in totals and completed counts', () => {
+    const entries = [entry('2026-04-17', 'complete')]
+    const extras = [
+      extra('2026-04-15'),
+      extra('2026-04-16'),
+    ]
+    const s = computeHistoryStats(entries, extras, '2026-04-17')
+    expect(s.totalLogged).toBe(3)
+    expect(s.totalCompleted).toBe(3)
+  })
+
+  it('includes extras in the 7-day and 30-day windows', () => {
+    const entries: HistoryEntry[] = []
+    const extras = [
+      extra('2026-04-10'), // day -7 — outside 7-day, inside 30-day
+      extra('2026-04-11'), // day -6 — inside 7-day
+      extra('2026-04-17'), // today
+    ]
+    const s = computeHistoryStats(entries, extras, '2026-04-17')
+    expect(s.last7Completed).toBe(2)
+    expect(s.last30Completed).toBe(3)
+  })
+
+  it('counts an extras-only streak that ends today', () => {
+    const extras = [
+      extra('2026-04-15'),
+      extra('2026-04-16'),
+      extra('2026-04-17'),
+    ]
+    const s = computeHistoryStats([], extras, '2026-04-17')
+    expect(s.currentStreak).toBe(3)
+  })
+
+  it('extras fill gaps in a mixed streak', () => {
+    // 4/15: skip (streak-breaker), 4/16: extra (streak-builder), 4/17: complete
+    const entries = [
+      entry('2026-04-14', 'complete'),
+      entry('2026-04-15', 'skip'),
+      entry('2026-04-17', 'complete'),
+    ]
+    const extras = [
+      extra('2026-04-15'), // an extra workout on the same day as the skip
+      extra('2026-04-16'),
+    ]
+    const s = computeHistoryStats(entries, extras, '2026-04-17')
+    // 4/17 complete → 4/16 extra → 4/15 extra (overrides skip) → 4/14 complete
+    expect(s.currentStreak).toBe(4)
+  })
+
+  it('duplicate-date extras do not double-count within the streak', () => {
+    const extras = [
+      extra('2026-04-17'),
+      { ...extra('2026-04-17'), id: 'second_same_day' },
+    ]
+    const s = computeHistoryStats([], extras, '2026-04-17')
+    expect(s.currentStreak).toBe(1)
   })
 })
