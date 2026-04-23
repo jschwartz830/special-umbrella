@@ -52,7 +52,7 @@ export function TodayPage() {
   const [showOverride, setShowOverride] = useState(false)
   const [showJump, setShowJump] = useState(false)
   const [doubleDay, setDoubleDay] = useState(false)
-  const [loggingUpcoming, setLoggingUpcoming] = useState<ResolvedDay | null>(null)
+  const [loggingUpcoming, setLoggingUpcoming] = useState<{ rd: ResolvedDay; extraId?: string } | null>(null)
   const [showUpcomingOutcome, setShowUpcomingOutcome] = useState(false)
   const [upcomingLogError, setUpcomingLogError] = useState<string | null>(null)
   // After the primary double-day workout is confirmed, we open a second
@@ -84,6 +84,9 @@ export function TodayPage() {
   const isPending = todayResolved.status === 'today_pending'
   const isResolved = !isPending
   const planExpired = isPlanExpired(plan, planEntries, today)
+  const todayExtras = extraEntries
+    .filter(e => e.planId === plan.id && e.calendarDate === today)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
   const instanceId = makeWorkoutInstanceId(plan.id, today)
   const existingOutcome = getOutcome(instanceId)
@@ -176,18 +179,27 @@ export function TodayPage() {
     // A 'complete' on a future-dated upcoming workout records the session on
     // today — the day it was actually performed — instead of the scheduled date.
     const logDate = action === 'complete' ? today : rd.calendarDate
-    // Guard: if today already has a rotation entry, routing another 'complete'
-    // to today would overwrite it via addEntry's (planId, date) dedupe.
-    // Surface an inline error instead of silently losing the prior log.
+    // If today's primary entry is already taken, treat this as an extra
+    // completion (double-day style) so the original primary log is preserved.
     if (action === 'complete' && logDate === today && isResolved) {
-      setUpcomingLogError(
-        "Today is already logged. Undo it first, or toggle double-day on a pending day to record two workouts.",
-      )
+      const bonusSlot = rd.planDay.slots[0]
+      const extraId = addExtraEntry({
+        planId: plan!.id,
+        calendarDate: today,
+        workoutType: bonusSlot?.type ?? 'rest',
+        workoutName: rd.planDay.label,
+        source: 'double_day',
+      })
+      actions.advance()
+      setUpcomingLogError(null)
+      setLoggingUpcoming({ rd, extraId })
+      setShowUpcomingOutcome(true)
       return
     }
     setUpcomingLogError(null)
     logAction(plan!.id, logDate, rd.planDayIndex, action)
     if (action === 'complete') {
+      setLoggingUpcoming({ rd })
       setShowUpcomingOutcome(true)
     } else {
       setLoggingUpcoming(null)
@@ -196,11 +208,14 @@ export function TodayPage() {
 
   function handleUpcomingOutcomeConfirm(outcome: WorkoutOutcome) {
     if (!loggingUpcoming) return
-    const runSlot = loggingUpcoming.planDay.slots.find(s => isRunType(s.type))
+    const runSlot = loggingUpcoming.rd.planDay.slots.find(s => isRunType(s.type))
+    const instanceId = loggingUpcoming.extraId
+      ? makeExtraWorkoutInstanceId(plan!.id, today, loggingUpcoming.extraId)
+      : undefined
     if (runSlot) {
       logOutcomeWithProgression(outcome, runSlot)
     } else {
-      useOutcomeStore.getState().setOutcome(outcome)
+      useOutcomeStore.getState().setOutcome(instanceId ? { ...outcome, workoutInstanceId: instanceId } : outcome)
     }
     setShowUpcomingOutcome(false)
     setLoggingUpcoming(null)
@@ -259,6 +274,25 @@ export function TodayPage() {
           <Info size={14} className="text-orange-400 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-orange-300">{spacingWarning}</p>
         </div>
+      )}
+
+      {/* Completed today summary */}
+      {(todayResolved.status === 'today_complete' || todayExtras.length > 0) && (
+        <section className="space-y-2">
+          <h2 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">Completed today</h2>
+          {todayResolved.status === 'today_complete' && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30">
+              <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-emerald-200 font-medium">{todayResolved.planDay.label}</p>
+            </div>
+          )}
+          {todayExtras.map(extra => (
+            <div key={extra.id} className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30">
+              <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-emerald-200 font-medium">{extra.workoutName}</p>
+            </div>
+          ))}
+        </section>
       )}
 
       {/* Today's workout — or rest card if day off */}
@@ -403,7 +437,7 @@ export function TodayPage() {
                     </p>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <WorkoutDayCard resolved={rd} onClick={() => setLoggingUpcoming(rd)} />
+                    <WorkoutDayCard resolved={rd} onClick={() => setLoggingUpcoming({ rd })} />
                     {upcomingNote && (
                       <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
                         <TrendingUp size={10} />{upcomingNote}
@@ -432,13 +466,13 @@ export function TodayPage() {
       {/* Log upcoming workout modal */}
       {loggingUpcoming && !showUpcomingOutcome && (
         <Modal
-          title={new Date(loggingUpcoming.calendarDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          title={new Date(loggingUpcoming.rd.calendarDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           onClose={() => { setLoggingUpcoming(null); setUpcomingLogError(null) }}
         >
           <div className="space-y-4">
             {/* Workout summary */}
             <div className="space-y-1.5">
-              {loggingUpcoming.planDay.slots.map(slot => (
+              {loggingUpcoming.rd.planDay.slots.map(slot => (
                 <div key={slot.id} className="flex items-center gap-2">
                   <span className="text-sm font-medium text-slate-200">{slot.name}</span>
                   {slot.targetDistance && <span className="text-xs text-slate-500 ml-auto">{slot.targetDistance} mi</span>}
@@ -447,25 +481,25 @@ export function TodayPage() {
               ))}
             </div>
 
-            {loggingUpcoming.historyEntry ? (
+            {loggingUpcoming.rd.historyEntry ? (
               /* Already logged — show status + edit/clear */
               <div className="space-y-3">
                 <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl ${
-                  loggingUpcoming.historyEntry.action === 'complete' ? 'bg-emerald-500/10 border border-emerald-500/20' :
-                  loggingUpcoming.historyEntry.action === 'skip' ? 'bg-slate-700 border border-slate-600' :
+                  loggingUpcoming.rd.historyEntry.action === 'complete' ? 'bg-emerald-500/10 border border-emerald-500/20' :
+                  loggingUpcoming.rd.historyEntry.action === 'skip' ? 'bg-slate-700 border border-slate-600' :
                   'bg-amber-500/10 border border-amber-500/20'
                 }`}>
-                  {loggingUpcoming.historyEntry.action === 'complete' && <CheckCircle2 size={16} className="text-emerald-400" />}
-                  {loggingUpcoming.historyEntry.action === 'skip' && <SkipForward size={16} className="text-slate-400" />}
-                  {loggingUpcoming.historyEntry.action === 'day_off' && <Coffee size={16} className="text-amber-400" />}
+                  {loggingUpcoming.rd.historyEntry.action === 'complete' && <CheckCircle2 size={16} className="text-emerald-400" />}
+                  {loggingUpcoming.rd.historyEntry.action === 'skip' && <SkipForward size={16} className="text-slate-400" />}
+                  {loggingUpcoming.rd.historyEntry.action === 'day_off' && <Coffee size={16} className="text-amber-400" />}
                   <span className={`text-sm font-medium capitalize ${
-                    loggingUpcoming.historyEntry.action === 'complete' ? 'text-emerald-400' :
-                    loggingUpcoming.historyEntry.action === 'skip' ? 'text-slate-300' : 'text-amber-400'
+                    loggingUpcoming.rd.historyEntry.action === 'complete' ? 'text-emerald-400' :
+                    loggingUpcoming.rd.historyEntry.action === 'skip' ? 'text-slate-300' : 'text-amber-400'
                   }`}>
-                    {loggingUpcoming.historyEntry.action.replace('_', ' ')}
+                    {loggingUpcoming.rd.historyEntry.action.replace('_', ' ')}
                   </span>
                 </div>
-                {loggingUpcoming.historyEntry.action === 'complete' && (
+                {loggingUpcoming.rd.historyEntry.action === 'complete' && (
                   <button
                     onClick={() => setShowUpcomingOutcome(true)}
                     className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 text-sm font-medium transition-colors"
@@ -474,7 +508,7 @@ export function TodayPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => handleUpcomingClear(loggingUpcoming)}
+                  onClick={() => handleUpcomingClear(loggingUpcoming.rd)}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm font-medium transition-colors"
                 >
                   <X size={14} /> Clear entry
@@ -491,20 +525,20 @@ export function TodayPage() {
                 )}
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => handleUpcomingLog(loggingUpcoming, 'complete')}
+                    onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'complete')}
                     className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors active:scale-95"
                   >
                     <CheckCircle2 size={16} /> Complete
                   </button>
                   <button
-                    onClick={() => handleUpcomingLog(loggingUpcoming, 'skip')}
+                    onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'skip')}
                     className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-sm font-medium transition-colors active:scale-95"
                   >
                     <SkipForward size={16} /> Skip
                   </button>
                 </div>
                 <button
-                  onClick={() => handleUpcomingLog(loggingUpcoming, 'day_off')}
+                  onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'day_off')}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium transition-colors active:scale-95"
                 >
                   <Coffee size={16} /> Day Off
@@ -518,13 +552,17 @@ export function TodayPage() {
       {/* Outcome modal for upcoming workout — new completes attach to today;
           edits of pre-existing entries stay on the entry's original date. */}
       {loggingUpcoming && showUpcomingOutcome && (() => {
-        const outcomeDate = loggingUpcoming.historyEntry ? loggingUpcoming.calendarDate : today
+        const outcomeDate = loggingUpcoming.rd.historyEntry ? loggingUpcoming.rd.calendarDate : today
+        const workoutInstanceId = loggingUpcoming.extraId
+          ? makeExtraWorkoutInstanceId(plan.id, today, loggingUpcoming.extraId)
+          : makeWorkoutInstanceId(plan.id, outcomeDate)
         return (
           <OutcomeModal
             planId={plan.id}
             calendarDate={outcomeDate}
-            planDay={loggingUpcoming.planDay}
-            existingOutcome={getOutcome(makeWorkoutInstanceId(plan.id, outcomeDate))}
+            planDay={loggingUpcoming.rd.planDay}
+            workoutInstanceId={workoutInstanceId}
+            existingOutcome={getOutcome(workoutInstanceId)}
             onConfirm={handleUpcomingOutcomeConfirm}
             onClose={() => { setShowUpcomingOutcome(false); setLoggingUpcoming(null) }}
           />
