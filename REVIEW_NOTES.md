@@ -1,5 +1,63 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-23 (ninth pass) — branch `work`
+
+### Executive summary
+
+1. **What changed**: fixed a History page filter bug where plans with only `extraEntries` could be treated as if they had no history; extracted and tested reusable history-scope helpers; refreshed overnight review docs.
+2. **What is highest confidence**: helper-level logic + focused tests (`historyScope.test.ts`) and a minimal HistoryPage wiring change.
+3. **What is risky**: very low risk; behavior intentionally broadens filter eligibility to include extras, which matches existing History list behavior.
+4. **What you should review first**: `src/pages/HistoryPage.tsx` + new `src/lib/historyScope.ts` to confirm the extras-only plan visibility behavior is desired.
+
+### Biggest issues found
+
+- History plan-filter/default logic depended only on rotation entries, excluding extras-only plans from plan-history detection.
+
+### Improvements completed
+
+- Added `getPlansWithHistory` and `hasPlanHistory` helpers for consistent history activity detection across entries and extras.
+- Updated HistoryPage to use helper-based detection and clearer naming (`activePlanHasHistory`).
+- Added tests covering entries-only, extras-only, null/unknown IDs.
+
+### Small features added
+
+- None.
+
+### Medium-complexity feature explored
+
+- None this pass (stability-focused run).
+
+### Definitely keep
+
+- History filter/default fix for extras-only plans.
+- New helper tests.
+
+### Probably keep but tweak
+
+- Consider whether to co-locate history-scope helpers in an existing util file if you prefer fewer small files.
+
+### Do not keep
+
+- None identified.
+
+### Recommendations only (not implemented)
+
+- History edit modal conflict close-trap UX adjustment.
+- Progression-state cleanup on plan delete (schema/index decision required).
+
+### Open questions for you
+
+1. Should extras-only activity also drive any other UI defaults (e.g., dashboard or plan list badges)?
+2. Do you want a component-level test harness for page-level filtering behavior, or continue with helper-level tests only?
+
+### Known issues or incomplete work
+
+- No UI/component tests for History page interactions (unchanged).
+
+### Any dependencies added
+
+- None.
+
 ## 2026-04-21 (eighth pass) — branch `claude/epic-cannon-Ltjw1`
 
 ### Executive summary
