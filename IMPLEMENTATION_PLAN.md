@@ -1,5 +1,47 @@
 # Implementation Plan
 
+## 2026-04-23 — Overnight Audit (ninth pass)
+
+Branch: `work`.
+Baseline on entry: **206 passing, 0 failing**.
+
+### Architecture summary
+
+- React + TypeScript + Vite frontend with Zustand stores and pure lib helpers.
+- History experience composes data from `historyStore` (`entries` + `extraEntries`) and `outcomeStore`.
+- `HistoryPage` owns filtering logic and summary tiles while pure stats live in `src/lib`.
+
+### What appears strong and well-designed
+
+- Mature tests around engine/store/lib paths (now 210 passing tests).
+- CSV and stats logic are isolated and regression-tested from recent passes.
+- Prior data-loss fixes for extras are now stable and still passing.
+
+### Key issues or risks this pass
+
+1. **Plan filter visibility bug on History page for extras-only plans.**
+   `plansWithHistory` and initial `filterPlanId` state were derived from rotation
+   `entries` only. If a plan had only `extraEntries` (common after manual logging),
+   it could be hidden from the plan filter and omitted from active-plan defaulting.
+
+### Prioritized plan
+
+**Safe to implement**
+1. **[SAFE]** Extract tiny history-scope helpers and include extras in plan-history detection.
+2. **[SAFE]** Wire HistoryPage to those helpers and clean naming (`activePlanHasHistory`).
+3. **[SAFE]** Add unit tests for extras-only detection paths.
+4. **[SAFE]** Update overnight docs and test results for reviewer handoff.
+
+**Recommendations only (not implemented)**
+- History edit modal close/save conflict UX remains open from prior passes.
+- Progression state cleanup on plan delete remains schema-bound.
+- No medium-complexity feature selected this pass (stability-first).
+
+### Rationale for sequencing
+
+This fix is small, low-risk, and directly user-visible in existing history flows.
+A pure helper + tests keeps behavior explicit and future refactors safer.
+
 ## 2026-04-21 — Overnight Audit (eighth pass)
 
 Branch: `claude/epic-cannon-Ltjw1`.

@@ -22,6 +22,7 @@ import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
 import { computeHistoryStats } from '../lib/historyStats'
+import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { ActionType, HistoryEntry, ExtraWorkoutEntry, WorkoutType, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
@@ -94,13 +95,11 @@ export function HistoryPage() {
   const [editingExtraType, setEditingExtraType] = useState<WorkoutType>('yoga')
   const [editingExtraName, setEditingExtraName] = useState('')
 
-  const plansWithHistory = Object.values(plans).filter(p =>
-    entries.some(e => e.planId === p.id),
-  )
+  const plansWithHistory = getPlansWithHistory(plans, entries, extraEntries)
   const showPlanFilter = plansWithHistory.length > 1
-  const activePlanHasEntries = !!activePlanId && plansWithHistory.some(p => p.id === activePlanId)
+  const activePlanHasHistory = hasPlanHistory(activePlanId, entries, extraEntries)
   const [filterPlanId, setFilterPlanId] = useState<string | 'all'>(
-    activePlanHasEntries ? activePlanId! : 'all',
+    activePlanHasHistory ? activePlanId! : 'all',
   )
 
   const filteredEntries = [...entries]

@@ -1,5 +1,29 @@
 # Test Results
 
+## 2026-04-23 (ninth pass) — branch `work`
+
+### Tests reviewed
+
+- `src/pages/HistoryPage.tsx` history filter/default selection logic.
+- Existing full suite to ensure no regressions.
+
+### Tests added/updated
+
+- **Added** `src/lib/__tests__/historyScope.test.ts` (4 tests):
+  - includes plans with rotation entries
+  - includes plans with extras-only entries
+  - `hasPlanHistory` true for extras-only plans
+  - `hasPlanHistory` false for null/unknown plan IDs
+
+### Results
+
+- `npm test` → **pass** (9 files, 210 tests).
+- `npm run build` → **pass** (TypeScript + production bundle).
+
+### Important areas still untested
+
+- HistoryPage component-level interaction tests (plan filter rendering and default selection) remain unimplemented; coverage is helper-level + integration via full suite.
+
 ## 2026-04-21 (eighth pass) — branch `claude/epic-cannon-Ltjw1`
 
 ### Suite totals

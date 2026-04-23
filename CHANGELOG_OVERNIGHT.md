@@ -1,5 +1,35 @@
 # Overnight Changelog
 
+## 2026-04-23 (ninth pass) — branch `work`
+
+Baseline on entry: **206 passing, 0 failing**.
+End state: **210 tests pass**.
+
+Scope: one low-risk correctness fix in History plan filtering (extras-only plans now counted as having history), plus additive test/documentation updates. No new dependencies.
+
+### Commits (oldest → newest)
+
+1. **Plan/docs update for ninth pass**
+   Added a dated audit section with findings, sequencing, and deferred items.
+   - `IMPLEMENTATION_PLAN.md`
+   - **Risk**: none (doc only).
+
+2. **Fix: include extras in plan-history detection for HistoryPage filter/default**
+   Introduced `getPlansWithHistory` + `hasPlanHistory` helpers so History page
+   treats either rotation entries or extra workouts as valid history activity.
+   This fixes the extras-only edge case where a plan could be hidden from the
+   filter options and skipped as the initial active-plan filter selection.
+   - `src/lib/historyScope.ts`
+   - `src/pages/HistoryPage.tsx`
+   - `src/lib/__tests__/historyScope.test.ts`
+   - **Risk**: low. Only broadens history detection criteria to match real logged data.
+   - **Rollback**: revert this commit to return to entries-only behavior.
+
+### Dropped / not attempted
+
+- Medium-complexity feature intentionally skipped; stabilization took precedence.
+- Prior open recommendations (edit modal close trap, progression-state cleanup) remain deferred.
+
 ## 2026-04-21 (eighth pass) — branch `claude/epic-cannon-Ltjw1`
 
 Baseline on entry: **194 passing, 0 failing**.
