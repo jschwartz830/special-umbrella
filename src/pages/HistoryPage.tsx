@@ -139,6 +139,11 @@ export function HistoryPage() {
     setEditingEntry(entry)
   }
 
+  function discardAndClose() {
+    setEditingEntry(null)
+    setDateConflict(false)
+  }
+
   function saveAndClose() {
     if (!editingEntry) return
     const oldDate = editingEntry.calendarDate
@@ -548,7 +553,7 @@ export function HistoryPage() {
       {editingEntry && (
         <Modal
           title={format(parseISO(editingEntry.calendarDate), 'EEE, MMM d, yyyy')}
-          onClose={saveAndClose}
+          onClose={discardAndClose}
           footer={
             <button onClick={saveAndClose} className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold transition-colors">
               Save
