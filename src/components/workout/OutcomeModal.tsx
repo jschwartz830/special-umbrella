@@ -124,11 +124,12 @@ export function OutcomeModal({
         }
       : null
 
+    const parsedDuration = parseFloat(durationMin)
     const outcome: WorkoutOutcome = {
       workoutInstanceId: workoutInstanceId ?? makeWorkoutInstanceId(planId, calendarDate),
       completionState,
       completedAt: new Date().toISOString(),
-      durationActualMin: parseFloat(durationMin) || null,
+      durationActualMin: isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : null,
       perceivedEffort: effort,
       notes: notes.trim() || null,
       runActual,

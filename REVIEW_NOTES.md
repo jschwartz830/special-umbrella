@@ -1,5 +1,109 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-24 (tenth pass) — branch `claude/great-mccarthy-hYhLK`
+
+### Executive summary
+
+1. **What changed**: Two correctness fixes (edit-modal close-trap in History,
+   negative duration guard in OutcomeModal), one additive visual improvement
+   ('Bonus' pill for double-day extras), one medium-complexity feature
+   (dismissible plan-expiry banner), and 12 new tests.
+2. **What is highest confidence**: The edit-modal trap fix and duration guard.
+   Both are pure correctness, zero behavior change on the happy path.
+3. **What is risky**: Nothing high-risk. The feature adds a localStorage key
+   that, if cleared, simply re-shows the banner — graceful degradation by design.
+4. **What you should review first**: `b079a9e` (edit-modal trap) — trigger it
+   by opening a History entry, changing the date to one that already has an entry,
+   then clicking X. Before this fix: modal stayed open. After: modal closes and
+   discards the draft.
+
+### Biggest issues found
+
+- **Edit-modal close-trap** (UX, high): History edit modal had no way to close
+  without a valid save when a date conflict occurred. Deferred since the fifth pass;
+  finally resolved.
+- **durationActualMin negative guard** (correctness, medium): OutcomeModal accepted
+  negative duration values silently and stored them. Adjacent fields already used
+  the `isFinite + > 0` pattern; this one was missed.
+
+### Improvements completed
+
+- Fixed HistoryPage edit-modal close-trap: separated `discardAndClose` (X / backdrop)
+  from `saveAndClose` (Save button) so the user can always exit the modal.
+- Fixed OutcomeModal `durationActualMin` to reject negative and zero values.
+- Added 'Bonus' pill in HistoryPage for extras with `source === 'double_day'`.
+- Added 12 tests for the new hook and the duration guard pattern.
+
+### Small features added
+
+- 'Bonus' badge for double-day extras in History (one-liner building on the sixth-pass
+  `source` field that was added specifically to enable this).
+
+### Medium-complexity feature explored
+
+**Dismissible plan expiry banner** — **Keep** (see FEATURE_REVIEW.md).
+
+Added `useExpiryDismiss` hook: per-plan localStorage key, isolated by planId,
+graceful fallback on localStorage failure. TodayPage hides the banner when
+dismissed and shows a × button to trigger it. No store coupling.
+
+### Definitely keep
+
+- `b079a9e` — Edit-modal close-trap fix. Five passes overdue; low risk.
+- `4994634` — Duration guard fix. One-line correctness improvement.
+- `76a9231` — 'Bonus' pill. Surfaces the source field that was always there.
+- `dfe3803` — Tests. Lock the storage contract and duration guard behavior.
+
+### Probably keep but tweak
+
+- `9c91919` — Dismissible expiry banner. Core implementation is solid. One
+  potential tweak: the × button is small (13px icon) and sits next to 'Plans →',
+  which could cause accidental taps on mobile. Consider a slightly larger hit
+  target if that's reported. See FEATURE_REVIEW.md for more.
+
+### Do not keep
+
+- Nothing flagged for rejection.
+
+### Recommendations only (not implemented)
+
+- **`progressionStates` orphaning on plan delete** — still needs a schema
+  change (denormalize progressionGroupId onto Plan, or a planId→groupId map).
+  Accumulates in localStorage indefinitely. Known storage leak.
+- **`swap_slot` override UI** — the override type exists in the engine but has
+  no UI trigger. Still needs a product decision on scope.
+- **Un-dismiss expiry banner from Plans page** — currently the only way to
+  un-dismiss is clearing localStorage. Low priority unless users report it.
+- **HistoryPage edit-modal: no Cancel button on the extra-edit flow** —
+  `editingExtra` modal uses `onClose={() => setEditingExtra(null)}` (correct,
+  no trap here), but the inline delete button in that modal doesn't ask for
+  confirmation. Minor UX inconsistency.
+
+### Open questions for you
+
+1. Is the 'Bonus' pill color (violet) the right visual distinction from 'Extra'
+   (sky blue)? Both are on a dark background; violet reads well but may clash
+   with the purple progression-state badge elsewhere.
+2. Should clicking × on the expiry banner also navigate to Plans? Or is silent
+   dismiss the right behavior?
+3. The edit-modal close now discards unsaved changes on X — is that the right
+   call, or would you prefer a "Discard changes?" confirm on close?
+
+### Known issues or incomplete work
+
+- No React-level component tests. All coverage is store/hook/lib-level.
+  The edit-modal fix is verified by inspection and type-check, not automation.
+- `useExpiryDismiss` initialState uses a lazy initializer that runs once at
+  mount time. If the same planId key is written before mount (e.g., by an
+  SSR-like setup), the hook correctly reads it. If the key is cleared after
+  mount but before dismiss, the banner re-shows on next mount (correct behavior).
+
+### Any dependencies added
+
+None.
+
+---
+
 ## 2026-04-23 (ninth pass) — branch `work`
 
 ### Executive summary

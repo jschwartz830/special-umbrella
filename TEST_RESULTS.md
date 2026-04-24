@@ -1,5 +1,66 @@
 # Test Results
 
+## 2026-04-24 (tenth pass) — branch `claude/great-mccarthy-hYhLK`
+
+### Tests reviewed
+
+- Run-adaptation engine test suite (`engine.test.ts`) — confirmed the
+  audit finding that effort=5 on a skipped/deferred workout is already
+  caught by the early skip guard before reaching the effort check.
+  No bug exists; the behavior is correct.
+- Full existing suite (210 tests) — all passing on entry, no regressions.
+
+### Tests added / updated
+
+- **Added** `src/hooks/__tests__/useExpiryDismiss.test.ts` (12 tests):
+  - 6 for the `useExpiryDismiss` localStorage storage contract:
+    - key is absent before any dismiss call
+    - key is set to `'1'` on dismiss
+    - isolated by planId (plan-a dismiss does not affect plan-b)
+    - `getItem === '1'` is true when key equals `'1'`
+    - `getItem === '1'` is false when key is absent
+    - `getItem === '1'` is false when key is any other value
+  - 6 for the `durationActualMin` input guard (`isFinite + > 0` pattern):
+    - passes through positive integer
+    - passes through positive decimal
+    - returns null for zero
+    - returns null for negative value
+    - returns null for empty string
+    - returns null for non-numeric input
+
+### Results
+
+| Suite | Before | After |
+|---|---|---|
+| All test files | 9 files, 210 tests | 10 files, 222 tests |
+| Pass | 210 | 222 |
+| Fail | 0 | 0 |
+
+`npx vitest run` output: **10 passed (10), 222 passed (222)**
+
+### Type checking
+
+`npx tsc --noEmit` — clean after all changes.
+
+### Build
+
+Not run this pass (prior passes confirmed the build is clean; no
+structural changes were made that could break bundling).
+
+### Important areas still untested
+
+- React component rendering (TodayPage, HistoryPage, CalendarPage) —
+  no jsdom setup; all component tests are store/hook/lib-level.
+- The edit-modal close-trap fix is verified by inspection: `discardAndClose`
+  calls `setEditingEntry(null)` unconditionally and is passed to `onClose`,
+  ensuring the modal always closes on X press.
+- The 'Bonus' pill is a pure JSX conditional — verified by type-check and
+  reading the JSX, not by render test.
+- `useExpiryDismiss` hook is tested via its storage contract only; the hook's
+  React state (`useState`, `useCallback`) is not render-tested.
+
+---
+
 ## 2026-04-23 (ninth pass) — branch `work`
 
 ### Tests reviewed

@@ -1,5 +1,83 @@
 # Implementation Plan
 
+## 2026-04-24 — Overnight Audit (tenth pass)
+
+Branch: `claude/great-mccarthy-hYhLK`.
+Baseline on entry: **210 passing, 0 failing**.
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the ninth pass.
+
+### What appears strong and well-designed (unchanged)
+
+- 210-test suite covering engine/stores/adaptation/lib.
+- `extraEntries` are now first-class in CSV round-trip, stats, and
+  plan-history detection (eighth and ninth passes).
+- `ExtraWorkoutEntry.source` field enables scoped Undo without touching
+  manually-logged extras.
+
+### Key issues or risks this pass
+
+1. **HistoryPage edit-modal close-trap** (UX bug, HIGH priority, deferred
+   since fifth pass). The edit modal's `onClose={saveAndClose}` makes the
+   X button trigger `saveAndClose`. When a date conflict is detected,
+   `saveAndClose` sets `dateConflict = true` and early-returns WITHOUT
+   closing the modal. The user is stuck and cannot close without either
+   fixing the date or using the save button. Fix: pass a dedicated
+   `discardAndClose` function to `onClose` that always closes without
+   saving, leaving `saveAndClose` only on the explicit Save button.
+
+2. **OutcomeModal `durationActualMin` accepts negative values** (MEDIUM).
+   `handleConfirm` builds `durationActualMin: parseFloat(durationMin) || null`.
+   A negative entry like `-30` passes through as `-30` because `|| null`
+   only catches `NaN` and `0`. All other numeric fields (`actualDistanceMiles`,
+   `actualDurationMin`) already guard with an explicit `> 0` check.
+   Fix: mirror the same `isFinite(n) && n > 0` pattern.
+
+3. **"Extra" badge in History doesn't distinguish double-day extras**
+   (LOW, visual clarity). The `source` field was added in the sixth pass
+   precisely so Undo could distinguish double-day from manually-logged
+   extras. History still shows a generic "Extra" pill for both. A "Bonus"
+   label for `source === 'double_day'` extras is a one-line change and
+   makes the source visible to the user.
+
+4. **Plan-expiry banner shows every day with no dismiss** (UX friction,
+   LOW, deferred since first pass). Once a plan expires, TodayPage shows
+   the purple "Plan complete!" banner on every visit forever. The banner
+   is useful once but becomes noise. Selected as medium-complexity feature
+   this pass: add a per-plan dismiss persisted to localStorage via a tiny
+   helper, with auto-clear when the plan changes.
+
+### Prioritized plan
+
+**Safe to implement:**
+1. **[SAFE]** Fix HistoryPage edit-modal close-trap. Pass `discardAndClose`
+   to `onClose`; keep `saveAndClose` on the Save button only. Zero behavior
+   change on the happy path.
+2. **[SAFE]** Fix OutcomeModal `durationActualMin` negative guard. Mirror
+   `> 0` pattern from adjacent fields.
+3. **[SAFE]** Show "Bonus" pill instead of "Extra" for `source === 'double_day'`
+   extras in HistoryPage. Additive, no data changes.
+
+**Medium-complexity feature (selected):**
+4. **[FEATURE]** Dismissible plan expiry banner. See FEATURE_PROPOSAL.md.
+
+**Recommendations only (not implemented):**
+- `progressionStates` orphaning on plan delete — still needs schema change.
+- `swap_slot` override UI — still needs product decision.
+
+### Rationale for sequencing
+
+The edit-modal trap has been deferred for five consecutive passes; it is now
+the highest-priority remaining UX correctness issue and is a low-risk change.
+The duration guard is a one-line fix. The double-day badge leverages the
+`source` field that was added specifically to enable it. The banner dismiss
+goes last because it is the only item with any persistence complexity.
+
+---
+
 ## 2026-04-23 — Overnight Audit (ninth pass)
 
 Branch: `work`.

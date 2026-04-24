@@ -1,3 +1,108 @@
+# Feature Proposal — Dismissible Plan Expiry Banner
+
+Date: 2026-04-24
+Branch: `claude/great-mccarthy-hYhLK`
+Status: **Proposed — implementing this run**
+
+---
+
+## Feature selected
+
+Add a per-plan dismiss button to the "Plan complete!" expiry banner on
+TodayPage, with dismissal state persisted to localStorage so it survives
+page reloads and is isolated by plan.
+
+---
+
+## Why it was selected
+
+The plan-expiry banner has been listed as an open recommendation in every
+overnight audit pass from the first through the ninth. The banner is useful
+exactly once — the first time the user sees it — but continues showing on
+every visit with no way to dismiss it. This is a genuine friction point:
+
+- Zero architectural changes required (no store, no engine).
+- Isolated localStorage key per planId — no migration, no schema impact.
+- Easy to review (one new hook + one TodayPage change).
+- Trivially revertable (revert two files; no data loss).
+
+---
+
+## Expected user value
+
+Users who have finished a plan no longer see the "Plan complete!" banner
+on every subsequent visit. The informational notification becomes one-time,
+which matches the user's expectation after they've acknowledged it.
+
+---
+
+## Implementation scope for this run
+
+1. Add `src/hooks/useExpiryDismiss.ts` — a thin hook that reads/writes a
+   per-plan localStorage key (`wpt_expiry_dismissed_v1_${planId}`).
+   Exports `{ isDismissed, dismiss }`.
+2. TodayPage calls the hook and conditionally renders the banner.
+3. The banner gets a small `×` dismiss button.
+4. No store changes. No migration.
+
+---
+
+## Assumptions being made
+
+- Per-plan persistence is the right granularity (not per-session, not global).
+- After dismiss, the banner never needs to re-appear for the same plan.
+- localStorage is available (assumed throughout the app already).
+- A simple key-presence check is sufficient (no TTL, no "show N times" logic).
+
+---
+
+## Open product / UX decisions
+
+1. Should dismissal reset if the user creates a new plan? No (new plan =
+   new planId = new key = fresh state automatically).
+2. Should there be a way to un-dismiss (e.g., from Plans page)? Not
+   implemented; clearing localStorage is the escape hatch.
+3. Should the banner re-appear after some time? Not implemented; dismissed
+   means dismissed until the key is cleared.
+
+---
+
+## Architecture / schema impact
+
+- No Zustand store changes.
+- One new file: `src/hooks/useExpiryDismiss.ts` (~15 lines).
+- One changed file: `src/pages/TodayPage.tsx` (~5 lines).
+- New localStorage key `wpt_expiry_dismissed_v1_${planId}` is namespaced and
+  isolated from all existing store keys (`wpt_plans`, `wpt_history`, etc.).
+
+---
+
+## Risks
+
+- Very low. If localStorage is unavailable (sandboxed environments, private
+  browsing quota reached), the hook catches the exception and the banner
+  remains visible — correct fail-safe.
+- Changing the key prefix (e.g., if naming conventions change) would silently
+  un-dismiss all existing dismissals. Low risk, easily documented.
+
+---
+
+## Rollback strategy
+
+`git revert <feature-commit>` removes the hook and the TodayPage wiring.
+The banner reverts to always-visible behavior. No stored user data is affected.
+
+---
+
+## What is intentionally not being built yet
+
+- "Remind me in 7 days" / dismiss with TTL.
+- "Mark as started" vs "mark as complete" distinction for the banner.
+- Un-dismiss affordance from Settings or Plans page.
+- Any animation/fade-out on dismiss.
+
+---
+
 # Feature Proposal — ExtraWorkoutEntry.source Field
 
 Date: 2026-04-18

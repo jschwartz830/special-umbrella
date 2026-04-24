@@ -1,5 +1,76 @@
 # Overnight Changelog
 
+## 2026-04-24 (tenth pass) — branch `claude/great-mccarthy-hYhLK`
+
+Baseline on entry: **210 passing, 0 failing**.
+End state: **222 tests pass**.
+
+Scope: two correctness fixes, one visual improvement, one medium-complexity
+feature, and 12 new tests. No new dependencies.
+
+### Commits (oldest → newest)
+
+1. **Plan/docs update for tenth pass** (`8b9030b`)
+   IMPLEMENTATION_PLAN.md: documents findings, fix plan, rationale.
+   - `IMPLEMENTATION_PLAN.md`
+   - **Risk**: none (doc only).
+
+2. **Fix: HistoryPage edit-modal close-trap on date conflict** (`b079a9e`)
+   `saveAndClose` was passed to both `onClose` (X button / backdrop) and the
+   explicit Save button. On a date conflict, `saveAndClose` early-returned
+   without closing, trapping the user. Split into `discardAndClose` (always
+   closes, passed to `onClose`) and `saveAndClose` (validates + commits,
+   stays on the Save button). No behavior change on the save-succeeds path.
+   Deferred since the fifth pass; implemented this pass.
+   - `src/pages/HistoryPage.tsx`
+   - **Risk**: very low. The save path is unchanged; only the X / backdrop
+     path changes (now discards rather than attempting to save).
+   - **Rollback**: revert this commit to restore original behavior (both
+     paths call `saveAndClose`).
+
+3. **Fix: guard durationActualMin against negative values in OutcomeModal** (`4994634`)
+   `handleConfirm` used `parseFloat(durationMin) || null`, which passed through
+   negative inputs. All adjacent numeric fields already guard with
+   `isFinite(n) && n > 0`. This commit mirrors that pattern.
+   - `src/components/workout/OutcomeModal.tsx`
+   - **Risk**: none. Negative durations are nonsensical; previously they
+     corrupted stored outcomes silently.
+   - **Rollback**: revert this commit to restore the original guard.
+
+4. **UX: show 'Bonus' pill for double-day extras in History** (`76a9231`)
+   The `ExtraWorkoutEntry.source` field was added in the sixth pass to enable
+   this distinction. History was still showing a generic 'Extra' pill for both
+   manually-added extras and double-day bonus workouts. Extras with
+   `source === 'double_day'` now display a violet 'Bonus' pill.
+   - `src/pages/HistoryPage.tsx`
+   - **Risk**: none (purely additive visual change, no data impact).
+   - **Rollback**: revert this commit.
+
+5. **Feature: dismissible plan expiry banner** (`9c91919`)
+   The 'Plan complete!' banner showed on every TodayPage visit once a plan
+   expired, with no way to dismiss it. Added `useExpiryDismiss` hook (per-plan
+   localStorage key, `wpt_expiry_dismissed_v1_<planId>`). TodayPage hides the
+   banner when dismissed and shows a small × button to trigger dismiss.
+   See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md for full design rationale.
+   - `src/hooks/useExpiryDismiss.ts` (new file)
+   - `src/pages/TodayPage.tsx`
+   - `FEATURE_PROPOSAL.md`
+   - **Risk**: very low. No store changes. localStorage exception is caught
+     gracefully. Rollback: revert this commit; no data loss.
+
+6. **Tests: useExpiryDismiss storage contract + durationActualMin guard** (`dfe3803`)
+   12 new tests in `src/hooks/__tests__/useExpiryDismiss.test.ts`:
+   - 6 tests for the localStorage key contract (isolation by planId, absence
+     = false, '1' = true, other values = false). Uses `vi.stubGlobal` to
+     provide an in-memory mock for the node test environment.
+   - 6 tests for the `durationActualMin` guard logic (positive int/decimal,
+     zero, negative, empty string, non-numeric).
+   - 210 → 222 tests passing.
+   - `src/hooks/__tests__/useExpiryDismiss.test.ts` (new file)
+   - **Risk**: none (tests only).
+
+---
+
 ## 2026-04-23 (ninth pass) — branch `work`
 
 Baseline on entry: **206 passing, 0 failing**.

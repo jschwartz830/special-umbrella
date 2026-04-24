@@ -139,6 +139,11 @@ export function HistoryPage() {
     setEditingEntry(entry)
   }
 
+  function discardAndClose() {
+    setEditingEntry(null)
+    setDateConflict(false)
+  }
+
   function saveAndClose() {
     if (!editingEntry) return
     const oldDate = editingEntry.calendarDate
@@ -470,7 +475,10 @@ export function HistoryPage() {
                     <div className="flex items-center gap-2">
                       <WorkoutBadge type={extra.workoutType} size="sm" />
                       <p className="text-sm font-semibold text-slate-200 truncate">{extra.workoutName}</p>
-                      <span className="text-[10px] text-sky-400 bg-sky-400/10 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Extra</span>
+                      {extra.source === 'double_day'
+                        ? <span className="text-[10px] text-violet-400 bg-violet-400/10 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Bonus</span>
+                        : <span className="text-[10px] text-sky-400 bg-sky-400/10 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Extra</span>
+                      }
                     </div>
 
                     {extraOutcome && (
@@ -548,7 +556,7 @@ export function HistoryPage() {
       {editingEntry && (
         <Modal
           title={format(parseISO(editingEntry.calendarDate), 'EEE, MMM d, yyyy')}
-          onClose={saveAndClose}
+          onClose={discardAndClose}
           footer={
             <button onClick={saveAndClose} className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold transition-colors">
               Save

@@ -1,3 +1,71 @@
+# Feature Review — Dismissible Plan Expiry Banner
+
+Date: 2026-04-24
+Branch: `claude/great-mccarthy-hYhLK`
+Classification: **Keep**
+
+## What was actually built
+
+- `src/hooks/useExpiryDismiss.ts` — a 35-line hook that reads/writes a
+  per-plan localStorage key (`wpt_expiry_dismissed_v1_<planId>`). Exports
+  `{ isDismissed, dismiss }`. Catches localStorage exceptions so missing
+  or blocked storage degrades gracefully (banner stays visible).
+- TodayPage updated: reads `{ isDismissed: expiryBannerDismissed, dismiss:
+  dismissExpiryBanner }` from the hook. The banner is hidden when
+  `isDismissed` is true. A small `×` button (aria-labeled "Dismiss")
+  triggers `dismissExpiryBanner`. No store changes.
+- 6 storage-contract tests in `src/hooks/__tests__/useExpiryDismiss.test.ts`.
+
+## Assumptions Encoded
+
+1. Per-plan dismissal is the right granularity — new plans start fresh
+   automatically because they have a different planId.
+2. Dismissed once means dismissed permanently (no TTL, no re-surface).
+3. localStorage failure → banner remains visible (fail-open, not fail-closed).
+
+## What Worked Well
+
+- Extremely narrow scope: one new file, five changed lines in TodayPage.
+- Zero coupling to any store or engine logic.
+- Per-plan isolation falls out naturally from the key design — no explicit
+  "reset on plan change" logic needed.
+
+## What Feels Risky or Incomplete
+
+- No way to un-dismiss from the UI. The only escape hatch is clearing
+  localStorage (`wpt_expiry_dismissed_v1_<planId>`). This is acceptable
+  for now but might frustrate a power user who accidentally dismisses.
+- The banner disappears immediately on click with no animation or
+  confirmation. Fine given the stakes (can always see via Plans page), but
+  the snap-to-hidden may feel abrupt on slow devices.
+
+## What I Should Evaluate Tomorrow
+
+1. Does the dismiss feel intentional, or does the × feel too easy to
+   accidentally tap on mobile?
+2. Should the Plans page show a "Completed" badge for expired plans
+   (already done) AND note when the expiry banner was dismissed?
+3. Is there a future need to re-surface the banner after a plan is
+   re-activated or cycled? If so, the current hook would need a `reset()`
+   path (one extra localStorage.removeItem call).
+
+## Recommended Next Steps
+
+- Ship as-is; the friction reduction is real and the implementation is
+  minimal.
+- If users report accidental dismissal, add a "Show again" option to the
+  Plans page or a brief undo toast.
+- Consider the `dismiss()` + optional TTL variant only if the "permanent
+  dismiss" assumption proves wrong.
+
+## Classification
+
+**Keep.** The narrowest viable slice works — one hook, one banner change,
+six tests. No architectural decisions encoded. Fully reversible with one
+commit revert.
+
+---
+
 # Feature Review — ExtraWorkoutEntry.source Field
 
 Date: 2026-04-18

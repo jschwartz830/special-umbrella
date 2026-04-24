@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
+import { useExpiryDismiss } from '../hooks/useExpiryDismiss'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { WorkoutDayCard } from '../components/workout/WorkoutDayCard'
@@ -47,6 +48,7 @@ export function TodayPage() {
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const today = format(new Date(), 'yyyy-MM-dd')
+  const { isDismissed: expiryBannerDismissed, dismiss: dismissExpiryBanner } = useExpiryDismiss(plan?.id ?? null)
 
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
@@ -241,7 +243,7 @@ export function TodayPage() {
       </div>
 
       {/* Plan completion / expiry banner */}
-      {planExpired && (
+      {planExpired && !expiryBannerDismissed && (
         <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
           <PartyPopper size={14} className="text-purple-400 mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
@@ -256,6 +258,13 @@ export function TodayPage() {
             className="text-xs text-purple-400 hover:text-purple-200 font-medium flex-shrink-0 ml-1"
           >
             Plans →
+          </button>
+          <button
+            onClick={dismissExpiryBanner}
+            className="text-purple-400/60 hover:text-purple-200 flex-shrink-0 transition-colors"
+            aria-label="Dismiss"
+          >
+            <X size={13} />
           </button>
         </div>
       )}
