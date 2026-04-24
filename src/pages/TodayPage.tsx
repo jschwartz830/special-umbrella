@@ -31,8 +31,16 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import type { ResolvedDay } from '../types'
+import type { ResolvedDay, ExtraWorkoutEntry, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+
+function extraToPlanDay(extra: ExtraWorkoutEntry): PlanDay {
+  return {
+    id: extra.id,
+    label: extra.workoutName,
+    slots: [{ id: extra.id, type: extra.workoutType, name: extra.workoutName }],
+  }
+}
 
 export function TodayPage() {
   const navigate = useNavigate()
@@ -61,6 +69,7 @@ export function TodayPage() {
   // OutcomeModal for the bonus. State carries the bonus's ResolvedDay plus the
   // ExtraWorkoutEntry id assigned when it was persisted.
   const [bonusOutcome, setBonusOutcome] = useState<{ rd: ResolvedDay; extraId: string } | null>(null)
+  const [editingExtra, setEditingExtra] = useState<ExtraWorkoutEntry | null>(null)
 
   if (!plan || !todayResolved) {
     return (
@@ -93,6 +102,13 @@ export function TodayPage() {
   const instanceId = makeWorkoutInstanceId(plan.id, today)
   const existingOutcome = getOutcome(instanceId)
 
+  // The workout actually logged for today may differ from `todayResolved.planDay`
+  // after a double-day advance — the rotation pointer has moved on, but the
+  // primary entry still refers to the original day. Prefer the history entry's
+  // planDayIndex so the displayed/edited workout matches what was logged.
+  const primaryPlanDayIndex = todayResolved.historyEntry?.planDayIndex ?? todayResolved.planDayIndex
+  const primaryPlanDay = plan.days[primaryPlanDayIndex] ?? todayResolved.planDay
+
   // Resolve run adaptation note for today's workout
   const todayRunSlot = todayResolved.planDay.slots.find(s => isRunType(s.type))
   const todayProgressionState = todayRunSlot?.runConfig?.progressionGroupId
@@ -116,10 +132,11 @@ export function TodayPage() {
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
     const action = completionStateToAction(outcome.completionState)
-    logAction(plan!.id, today, todayResolved!.planDayIndex, action, outcome.notes ?? undefined)
+    logAction(plan!.id, today, primaryPlanDayIndex, action, outcome.notes ?? undefined)
 
-    if (todayRunSlot) {
-      logOutcomeWithProgression(outcome, todayRunSlot)
+    const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
+    if (runSlot) {
+      logOutcomeWithProgression(outcome, runSlot)
     } else {
       useOutcomeStore.getState().setOutcome(outcome)
     }
@@ -290,16 +307,37 @@ export function TodayPage() {
         <section className="space-y-2">
           <h2 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">Completed today</h2>
           {todayResolved.status === 'today_complete' && (
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30">
+            <button
+              onClick={handleEditOutcome}
+              className="w-full text-left flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors active:scale-[0.99]"
+            >
               <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-emerald-200 font-medium">{todayResolved.planDay.label}</p>
-            </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-emerald-200 font-medium truncate">{primaryPlanDay.label}</p>
+                {primaryPlanDay.slots.length > 0 && (
+                  <p className="text-xs text-emerald-300/70 mt-0.5 truncate">
+                    {primaryPlanDay.slots.map(s => s.name).join(' + ')}
+                  </p>
+                )}
+              </div>
+              <ChevronRight size={14} className="text-emerald-400/60 flex-shrink-0 mt-1" />
+            </button>
           )}
           {todayExtras.map(extra => (
-            <div key={extra.id} className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30">
+            <button
+              key={extra.id}
+              onClick={() => setEditingExtra(extra)}
+              className="w-full text-left flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors active:scale-[0.99]"
+            >
               <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-emerald-200 font-medium">{extra.workoutName}</p>
-            </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-emerald-200 font-medium truncate">{extra.workoutName}</p>
+                <p className="text-xs text-emerald-300/70 mt-0.5 truncate capitalize">
+                  {extra.workoutType.replace('_', ' ')}
+                </p>
+              </div>
+              <ChevronRight size={14} className="text-emerald-400/60 flex-shrink-0 mt-1" />
+            </button>
           ))}
         </section>
       )}
@@ -465,12 +503,31 @@ export function TodayPage() {
         <OutcomeModal
           planId={plan.id}
           calendarDate={today}
-          planDay={todayResolved.planDay}
+          planDay={primaryPlanDay}
           existingOutcome={existingOutcome}
           onConfirm={handleOutcomeConfirm}
           onClose={() => setShowOutcomeModal(false)}
         />
       )}
+
+      {/* Edit outcome for a completed extra workout (double-day bonus or ad-hoc) */}
+      {editingExtra && (() => {
+        const extraInstanceId = makeExtraWorkoutInstanceId(plan.id, today, editingExtra.id)
+        return (
+          <OutcomeModal
+            planId={plan.id}
+            calendarDate={today}
+            planDay={extraToPlanDay(editingExtra)}
+            workoutInstanceId={extraInstanceId}
+            existingOutcome={getOutcome(extraInstanceId)}
+            onConfirm={(outcome) => {
+              useOutcomeStore.getState().setOutcome({ ...outcome, workoutInstanceId: extraInstanceId })
+              setEditingExtra(null)
+            }}
+            onClose={() => setEditingExtra(null)}
+          />
+        )
+      })()}
 
       {/* Log upcoming workout modal */}
       {loggingUpcoming && !showUpcomingOutcome && (
