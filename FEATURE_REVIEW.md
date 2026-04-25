@@ -1,3 +1,69 @@
+# Feature Review — Plan Progress Computation
+
+Date: 2026-04-25
+Branch: `claude/great-mccarthy-0XEfh`
+Classification: **Keep**
+
+## What was actually built
+
+- `computePlanProgress(plan, entries, today)` added to `src/lib/historyStats.ts`.
+  Returns `{ completed, total, percentComplete }` for both `rotations` and `weeks`
+  duration types.
+- `PlanProgress` interface exported from the same file.
+- 15 new tests added to `src/lib/__tests__/historyStats.test.ts`.
+
+## What assumptions were encoded
+
+- **Weeks-type**: progress is purely calendar-based (floor of elapsed days / 7),
+  capped at `total`. History entries are ignored — consistent with how
+  `isPlanExpired` works for `weeks` plans.
+- **Rotations-type**: only `complete` and `skip` entries count (mirrors
+  `isPlanExpired`). `day_off` entries are excluded. Cross-plan entries are
+  filtered by `plan.id`.
+- **Rounding**: percentComplete is `Math.round`, capped at 100. This means
+  1 of 8 weeks = 13% (not 12.5%).
+- **Pre-startDate**: returns 0 completed (no negative progress).
+
+## What worked well
+
+- The formula for both duration types is simple, consistent with existing
+  `isPlanExpired` logic, and fully tested.
+- Pure function — zero side effects, no store coupling, easy to test.
+- The `dateDiffDays` helper avoids `date-fns` dependency for a simple
+  subtraction, consistent with the pattern used in `historyStats.shiftDay`.
+
+## What feels risky or incomplete
+
+- **No UI yet**: the function is useful but invisible to the user without
+  a PlansPage or TodayPage change. Intentional for this run.
+- **Partial-week feedback**: a user on day 6 of week 1 sees 0 completed weeks.
+  This might feel misleading. A `daysFraction` or `inProgress` field could
+  supplement without changing the core semantics.
+
+## What you should evaluate tomorrow
+
+1. Does PlansPage want to show progress inline on each plan card?
+2. Should `percentComplete` be displayed as a progress bar or just text?
+3. Is the weeks formula (purely calendar-based, ignoring entries) intuitive?
+   A case can be made that if you logged 20 workouts in 3 weeks, you should
+   see "3 weeks" not "0 weeks," but the current approach is simpler and matches
+   `isPlanExpired`.
+
+## Recommended next steps
+
+- Wire `computePlanProgress` into PlansPage to show "2 / 4 rotations" or
+  "Week 5 of 8" on each plan card. This is a read-only display change.
+- Consider a lightweight progress bar component (Tailwind `w-full bg-gray-200`
+  with an inner `bg-blue-500` div) for PlansPage.
+
+## Keep / revise / prototype only / reject
+
+**Keep** — the function is correct, fully tested, and creates no coupling.
+It is a prerequisite for any progress display. The only follow-up needed is
+UI wiring, which should be a separate commit.
+
+---
+
 # Feature Review — Dismissible Plan Expiry Banner
 
 Date: 2026-04-24

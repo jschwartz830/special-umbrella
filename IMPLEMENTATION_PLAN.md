@@ -1,5 +1,68 @@
 # Implementation Plan
 
+## 2026-04-25 — Overnight Audit (eleventh pass)
+
+Branch: `claude/great-mccarthy-0XEfh`.
+Baseline on entry: **222 passing, 0 failing**.
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the tenth pass.
+
+### What appears strong and well-designed (unchanged)
+
+- 222-test suite covering all major paths.
+- Rotation engine, run adaptation, CSV, and store invariants remain stable.
+- `ExtraWorkoutEntry.source` field enables scoped Undo.
+- Dismissible plan expiry banner from the tenth pass.
+
+### Key issues or risks this pass
+
+1. **`historyStore.importEntries` intra-batch deduplication bug** (MEDIUM).
+   If two rows in an import CSV shared the same `(planId, calendarDate)`, both
+   were appended to the store, breaking the one-entry-per-(plan,date) invariant
+   that `computeCurrentDayIndex` and the UI rely on. The existing store entries
+   for those keys were correctly removed, but the incoming batch was not itself
+   deduplicated before being appended.
+   **Fixed**: `deduplicateByDate()` helper reduces the batch to last-wins per key
+   before any store mutation. **Implemented.**
+
+2. **`recommendation/explanation.ts` had zero test coverage** (LOW).
+   Three exported functions — `generateRunAdaptationNote`, `generateDifficultySpacingWarning`,
+   `summariseRunOutcome` — had no tests despite `summariseRunOutcome` containing
+   non-trivial formatting logic (pace string, dot-separator, null omission).
+   **Fixed**: 22 new tests added in a new test file. **Implemented.**
+
+3. **`evaluateRunProgression` missing edge-case tests** (LOW).
+   Three specific branches were not exercised: effort=5 + partially_completed,
+   completed but between 80–95% of target, and completedAsPlanned=false with
+   no distance. The engine code was correct but untested.
+   **Fixed**: 4 new tests added to the existing engine test file. **Implemented.**
+
+4. **Still open (recommendations only):**
+   - `progressionStates` orphaning on plan delete (needs reverse index / schema change).
+   - TodayPage at 1,700+ lines (high maintenance risk; needs daytime review to split).
+   - `logAction` accepts planDayIndex as required even for day_off (minor type issue).
+
+### Prioritized plan
+
+| # | Item | Action |
+|---|------|--------|
+| 1 | `importEntries` intra-batch dedup | **Implemented** |
+| 2 | `recommendation/explanation.ts` tests | **Implemented** |
+| 3 | `evaluateRunProgression` edge cases | **Implemented** |
+| 4 | `computePlanProgress` helper (medium feature) | **Implemented** |
+| 5 | TodayPage extraction | Recommend only |
+| 6 | `progressionStates` orphaning | Recommend only |
+
+### Rationale for sequencing
+
+Bug fix first (highest correctness impact). Tests second (no risk, pure value).
+Feature last after all correctness work is done and green.
+
+---
+
 ## 2026-04-24 — Overnight Audit (tenth pass)
 
 Branch: `claude/great-mccarthy-hYhLK`.

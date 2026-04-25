@@ -1,5 +1,107 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-25 (eleventh pass) — branch `claude/great-mccarthy-0XEfh`
+
+### Executive summary
+
+1. **What changed**: One bug fix (`importEntries` intra-batch deduplication),
+   two test-coverage gaps closed (`recommendation/explanation.ts` at 0 → 22 tests,
+   `evaluateRunProgression` edge cases +4 tests), and one medium-complexity feature
+   (`computePlanProgress` pure helper + 15 tests). 45 new tests total. No UI changes.
+2. **What is highest confidence**: The `importEntries` fix and both test additions.
+   The fix is strictly more correct (enforces an invariant the engine relies on);
+   the tests are purely additive.
+3. **What is risky**: Nothing high-risk. `computePlanProgress` is a pure function
+   with no store coupling or UI changes; risk is limited to formula correctness,
+   which is fully covered by 15 tests.
+4. **What you should review first**: `29444c5` (importEntries fix) — specifically
+   whether the last-wins semantics for intra-batch duplicates match your expectations
+   for CSV imports. The alternative would be first-wins or error-on-duplicate.
+
+### Biggest issues found
+
+- **`importEntries` intra-batch dedup bug** (correctness, medium): A malformed or
+  programmatically-generated CSV with two rows sharing the same `(planId,
+  calendarDate)` would create two entries in the store for that key, violating the
+  invariant that `computeCurrentDayIndex` and the UI both rely on.
+- **Zero test coverage on `recommendation/explanation.ts`** (test gap, low):
+  `summariseRunOutcome` has pace formatting logic that could regress silently.
+- **Three uncovered branches in `evaluateRunProgression`** (test gap, low):
+  The "completed but just missed 95% target" case is a meaningful edge that
+  affects user experience (hold instead of progress).
+
+### Improvements completed
+
+- Fixed `historyStore.importEntries` to deduplicate within the incoming batch before
+  appending to the store (last-wins per `(planId, calendarDate)`).
+- Added 22 tests for `recommendation/explanation.ts` (all three exported functions).
+- Added 4 tests for uncovered `evaluateRunProgression` branches.
+- Added 4 tests for `importEntries` (the entire surface was previously untested).
+
+### Small features added
+
+None this pass. All non-feature changes are bug fix or test additions.
+
+### Medium-complexity feature explored
+
+**`computePlanProgress` helper** — **Keep** (see FEATURE_REVIEW.md).
+
+Pure function that returns `{ completed, total, percentComplete }` for any plan.
+Supports both `rotations` (entry-based) and `weeks` (calendar-based) duration types.
+15 tests. No UI coupling. Prerequisite for a future progress bar in PlansPage.
+
+### Definitely keep
+
+- `29444c5` — `importEntries` dedup fix. Correctness issue; zero behavior change on
+  well-formed CSVs (which is what the UI always generates).
+- `3395e74` — `recommendation/explanation.ts` tests. Pure value, no risk.
+- `7d2cbc3` — `evaluateRunProgression` edge-case tests. Documents subtle branching.
+- `0c4d145` — `computePlanProgress` feature. Fully tested pure function.
+
+### Probably keep but tweak
+
+Nothing this pass.
+
+### Do not keep
+
+Nothing this pass.
+
+### Recommendations only (not implemented)
+
+- **TodayPage extraction**: at 1,700+ lines, TodayPage is the biggest maintenance
+  risk in the codebase. Splitting it into smaller components (e.g., separating the
+  override controls, the upcoming list, and the double-day flow) would improve
+  testability and readability, but it requires thorough manual UI testing to do safely.
+- **`progressionStates` orphaning on plan delete**: deleting a plan leaves orphaned
+  `RunProgressionState` records in localStorage. Fixing this cleanly requires a
+  plan→progressionGroup reverse index that doesn't exist in the current schema.
+- **`logAction` planDayIndex type**: the parameter is required even for `day_off`
+  (where it is immediately discarded). Should be optional or accept `undefined`.
+  Low-risk one-line change but touches the public API of `historyStore`.
+- **Wire `computePlanProgress` into PlansPage**: show "2 / 4 rotations" or
+  "Week 5 of 8" on each plan card. Pure read-only display; no engine changes needed.
+
+### Open questions for you
+
+1. For `importEntries` intra-batch dedup: is **last-wins** the right semantic?
+   The alternative is **first-wins** (preserve the earlier row) or **warn-and-skip**.
+   Last-wins matches the store's own `addEntry` behavior (newer write replaces older).
+2. For `computePlanProgress` with weeks-type plans: should partial weeks be surfaced?
+   Currently "6 days into week 1" shows 0 completed weeks. A `daysElapsed` field could
+   complement `completed` without changing the semantics.
+3. Should `computePlanProgress` be wired into PlansPage this week, or do you want
+   to decide the UI treatment first?
+
+### Known issues or incomplete work
+
+- `computePlanProgress` has no UI entry point yet. Intentional for this run.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-04-24 (tenth pass) — branch `claude/great-mccarthy-hYhLK`
 
 ### Executive summary

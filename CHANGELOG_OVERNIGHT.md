@@ -1,5 +1,62 @@
 # Overnight Changelog
 
+## 2026-04-25 (eleventh pass) — branch `claude/great-mccarthy-0XEfh`
+
+Baseline on entry: **222 passing, 0 failing**.
+End state: **267 tests pass**.
+
+Scope: one bug fix, two test-coverage gaps closed, and one medium-complexity
+feature (pure function + tests). No new dependencies. No UI changes.
+
+### Commits (oldest → newest)
+
+1. **Docs: IMPLEMENTATION_PLAN.md and FEATURE_PROPOSAL.md** (part of final doc commit)
+   Audit findings, fix rationale, feature proposal for `computePlanProgress`.
+   - `IMPLEMENTATION_PLAN.md`, `FEATURE_PROPOSAL.md`
+   - **Risk**: none (doc only).
+
+2. **Fix: `importEntries` deduplicates within the incoming batch** (`29444c5`)
+   `importEntries` removed existing store entries for colliding keys but did not
+   deduplicate the incoming batch itself. Two rows with the same `(planId,
+   calendarDate)` both survived, breaking the one-entry-per-(plan,date) invariant.
+   Added `deduplicateByDate()` helper (last-wins per key) applied to the batch
+   before any store mutation. Four new tests added (happy path, replace-existing,
+   intra-batch dedup, no-op on empty) — the entire `importEntries` surface was
+   previously untested.
+   - `src/store/historyStore.ts`, `src/store/__tests__/historyStore.test.ts`
+   - **Risk**: very low. The fix is strictly more correct; existing tests unchanged.
+   - **Rollback**: revert this commit. The only behavior change is that a malformed
+     CSV with duplicate dates no longer creates duplicate store entries.
+
+3. **Tests: `recommendation/explanation.ts` coverage (0 → 22 tests)** (`3395e74`)
+   All three exported functions were previously untested. `summariseRunOutcome` has
+   non-trivial formatting logic (pace string as "M:SS /mi", dot-separator joining,
+   null-field omission) that could silently regress on a refactor. New test file
+   covers all meaningful paths for all three functions.
+   - `src/modules/recommendation/__tests__/explanation.test.ts` (new file)
+   - **Risk**: none (additive tests only).
+
+4. **Tests: `evaluateRunProgression` edge-case coverage** (`7d2cbc3`)
+   Three previously uncovered branches: (1) effort=5 + partially_completed confirms
+   the high-effort regress fires before the partial check; (2) completed + 80–95% of
+   target → default_hold (the "almost-but-not-quite" case); (3) completedAsPlanned=false
+   + no distance → hold. Appended to the existing engine test describe block.
+   - `src/modules/run-adaptation/__tests__/engine.test.ts`
+   - **Risk**: none (additive tests only).
+
+5. **Feature: `computePlanProgress` helper** (`0c4d145`)
+   Pure function in `src/lib/historyStats.ts` that returns `{ completed, total,
+   percentComplete }` for any plan. Supports both duration types:
+   - `rotations`: counts complete/skip entries, floors to full rotations.
+   - `weeks`: counts calendar weeks elapsed since startDate, floor division.
+   Both cap at the plan's total and return 0 for edge cases (empty plan,
+   pre-start date). 15 tests cover all paths. No UI changes this run.
+   - `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts`
+   - **Risk**: very low. Additive pure function; no store or UI coupling.
+   - **Rollback**: revert this commit. No data is written.
+
+---
+
 ## 2026-04-24 (tenth pass) — branch `claude/great-mccarthy-hYhLK`
 
 Baseline on entry: **210 passing, 0 failing**.
