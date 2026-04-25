@@ -1,3 +1,103 @@
+# Feature Proposal — Plan Progress Computation
+
+Date: 2026-04-25
+Branch: `claude/great-mccarthy-0XEfh`
+Status: **Proposed — implementing this run**
+
+---
+
+## Feature selected
+
+Add a `computePlanProgress` pure function to `src/lib/historyStats.ts` that
+returns how far through a plan's defined duration a user has progressed —
+as a percentage, a completion count, and a total count — for both
+`rotations`-type and `weeks`-type plans.
+
+---
+
+## Why it was selected
+
+The app knows when a plan expires (`isPlanExpired`) but has no concept of
+*how close* a user is to completion. Users have no signal that they are,
+say, 70% through a 12-week plan or 3 of 4 rotations done. This gap makes
+it hard to feel momentum or plan transitions.
+
+Selection criteria met:
+- Adjacent to `historyStats.ts` and `rotationEngine.isPlanExpired` (same domain).
+- Pure function — no store, no UI, no side effects.
+- Easy to unit-test fully with the existing test fixture style.
+- Narrowest viable slice: just the calculation, not the display.
+  PlansPage can render it independently in a future commit.
+- No new dependencies.
+
+---
+
+## Expected user value
+
+PlansPage and TodayPage can show "3 of 4 rotations done" or "Week 5 of 8"
+without any additional data. This is a prerequisite for a future progress
+bar or completion countdown. Even without UI, the function is useful as an
+auditable pure helper.
+
+---
+
+## Implementation scope for this run
+
+1. Add `computePlanProgress(plan, entries, today)` to `src/lib/historyStats.ts`.
+   Returns `{ completed: number; total: number; percentComplete: number }`.
+2. Add a full test suite in `src/lib/__tests__/historyStats.test.ts`.
+3. **Not** wiring up any UI — keeps the PR reviewable without browser testing.
+
+---
+
+## Assumptions
+
+- Weeks-based: `completed` = calendar weeks elapsed since startDate (capped at total).
+  A "week" is 7 calendar days. Partial weeks count as `floor(days / 7)`.
+- Rotations-based: `completed` = `floor(completeSkipCount / plan.days.length)`.
+  `day_off` entries do not count (mirrors `isPlanExpired` semantics).
+- `percentComplete` is 0–100, capped at 100.
+
+---
+
+## Open product / UX decisions
+
+- Should partial-week progress be reflected (e.g., 6.5 weeks done)?
+  *Decision: no — floor for simplicity, matches how weeks-expiry works.*
+- Should the percentage be shown in PlansPage or TodayPage?
+  *Decision: not decided this run; leaving for daytime review.*
+
+---
+
+## Architecture / schema impact
+
+None. Pure function added to an existing lib file. No store changes.
+
+---
+
+## Risks
+
+Very low. Additive pure function, fully tested. The only risk is a wrong
+formula that could mislead users — mitigated by tests covering all edge cases.
+
+---
+
+## Rollback strategy
+
+Delete or revert the function and its tests. No data is written, no store
+is modified.
+
+---
+
+## What is intentionally not built yet
+
+- UI rendering in PlansPage or TodayPage.
+- "Days until completion" countdown.
+- Progress bar component.
+- Notification or banner when > 90% complete.
+
+---
+
 # Feature Proposal — Dismissible Plan Expiry Banner
 
 Date: 2026-04-24

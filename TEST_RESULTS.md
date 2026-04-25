@@ -1,5 +1,47 @@
 # Test Results
 
+## 2026-04-25 (eleventh pass) — branch `claude/great-mccarthy-0XEfh`
+
+Baseline: **222 passing** (10 test files).
+End state: **267 passing** (11 test files).
+New tests: **45**.
+
+### Tests reviewed
+
+- `historyStore` — audited `importEntries`; found it had zero tests and a dedup bug.
+- `evaluateRunProgression` — traced three uncovered branches in the progression logic.
+- `recommendation/explanation.ts` — confirmed module had zero test coverage despite
+  containing non-trivial formatting and conditional logic.
+- Full baseline suite — all 222 tests passing on entry, no regressions.
+
+### Tests added
+
+| File | Tests | Coverage added |
+|------|-------|---------------|
+| `src/store/__tests__/historyStore.test.ts` | +4 | `importEntries` happy path, replace-existing, intra-batch dedup, no-op |
+| `src/modules/recommendation/__tests__/explanation.test.ts` | +22 | All three exported functions: `generateRunAdaptationNote`, `generateDifficultySpacingWarning`, `summariseRunOutcome` |
+| `src/modules/run-adaptation/__tests__/engine.test.ts` | +4 | effort=5+partial_completed, completed+80–95% target, completed+missed+effort=4, completedAsPlanned=false |
+| `src/lib/__tests__/historyStats.test.ts` | +15 | `computePlanProgress` — rotations (baseline, partial, full, skip counting, day_off exclusion, cross-plan, cap, empty-days) + weeks (day 0, day 7, day 28, overflow, pre-startDate, ignores entries) |
+
+### Results
+
+All 267 tests pass. No failures, no skipped tests.
+
+### Important areas still untested
+
+- **TodayPage / CalendarPage / HistoryPage / PlansPage / PlanBuilderPage** —
+  these are React components that would require a browser-like test environment
+  (jsdom or Playwright). The current test config uses `environment: node`.
+  Page-level tests remain the biggest coverage gap.
+- **`useActivePlan` hook** — not tested; covered indirectly by the engine tests it delegates to.
+- **`usePlanActions` hook** — not tested; delegates to store actions which are tested.
+- **`computeCurrentDayIndex` with very long histories** — correctness at scale not
+  exercised; not a practical concern given localStorage size limits.
+- **`progressionStates` after plan delete** — orphaning behavior is not tested because
+  there is no cleanup logic to test yet.
+
+---
+
 ## 2026-04-24 (tenth pass) — branch `claude/great-mccarthy-hYhLK`
 
 ### Tests reviewed

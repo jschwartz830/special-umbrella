@@ -1,4 +1,4 @@
-import type { HistoryEntry, ExtraWorkoutEntry } from '../types'
+import type { HistoryEntry, ExtraWorkoutEntry, Plan } from '../types'
 
 export interface HistoryStats {
   totalLogged: number
@@ -59,6 +59,66 @@ export function computeHistoryStats(
   }
 
   return { totalLogged, totalCompleted, last7Completed, last30Completed, currentStreak }
+}
+
+// ── Plan progress ─────────────────────────────────────────────────────────────
+
+export interface PlanProgress {
+  /** Number of completed units (rotations or full weeks elapsed). */
+  completed: number
+  /** Total units defined by the plan's duration. */
+  total: number
+  /** 0–100, capped at 100. */
+  percentComplete: number
+}
+
+/**
+ * Compute how far through its defined duration a plan has progressed.
+ *
+ * - `weeks` plans: completed = full 7-day weeks elapsed since startDate
+ *   (floor), capped at the plan's week count.
+ * - `rotations` plans: completed = full rotations finished, where one
+ *   rotation = plan.days.length complete/skip entries. `day_off` entries
+ *   do not count toward rotation completion (mirrors `isPlanExpired`).
+ *
+ * Returns zeros for an empty-day plan or a plan that hasn't started yet.
+ */
+export function computePlanProgress(
+  plan: Plan,
+  entries: HistoryEntry[],
+  today: string,
+): PlanProgress {
+  const total = plan.duration.value
+
+  if (plan.days.length === 0 || total <= 0) {
+    return { completed: 0, total, percentComplete: 0 }
+  }
+
+  let completed: number
+
+  if (plan.duration.type === 'weeks') {
+    const daysElapsed = dateDiffDays(plan.startDate, today)
+    const weeksElapsed = Math.max(0, Math.floor(daysElapsed / 7))
+    completed = Math.min(weeksElapsed, total)
+  } else {
+    const planEntries = entries.filter(
+      e => e.planId === plan.id && (e.action === 'complete' || e.action === 'skip'),
+    )
+    const rotationsFinished = Math.floor(planEntries.length / plan.days.length)
+    completed = Math.min(rotationsFinished, total)
+  }
+
+  const percentComplete = Math.min(Math.round((completed / total) * 100), 100)
+  return { completed, total, percentComplete }
+}
+
+/** Difference in calendar days between two YYYY-MM-DD strings (b − a). */
+function dateDiffDays(a: string, b: string): number {
+  const [ay, am, ad] = a.split('-').map(Number)
+  const [by, bm, bd] = b.split('-').map(Number)
+  const dtA = Date.UTC(ay, am - 1, ad)
+  const dtB = Date.UTC(by, bm - 1, bd)
+  return Math.floor((dtB - dtA) / 86_400_000)
 }
 
 /** Shift a YYYY-MM-DD string by `delta` days (positive or negative). */

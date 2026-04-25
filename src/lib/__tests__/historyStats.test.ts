@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats } from '../historyStats'
-import type { HistoryEntry, ExtraWorkoutEntry } from '../../types'
+import { computeHistoryStats, computePlanProgress } from '../historyStats'
+import type { HistoryEntry, ExtraWorkoutEntry, Plan } from '../../types'
 
 function entry(
   date: string,
@@ -185,5 +185,180 @@ describe('computeHistoryStats', () => {
     ]
     const s = computeHistoryStats([], extras, '2026-04-17')
     expect(s.currentStreak).toBe(1)
+  })
+})
+
+// ── computePlanProgress ───────────────────────────────────────────────────────
+
+function makePlan(overrides: Partial<Plan> = {}): Plan {
+  return {
+    id: 'plan-1',
+    name: 'Test Plan',
+    status: 'active',
+    days: [
+      { id: 'd0', label: 'Day 1', slots: [{ id: 's0', type: 'weightlifting', name: 'Lift' }] },
+      { id: 'd1', label: 'Day 2', slots: [{ id: 's1', type: 'yoga', name: 'Yoga' }] },
+      { id: 'd2', label: 'Day 3', slots: [{ id: 's2', type: 'rest', name: 'Rest' }] },
+    ],
+    duration: { type: 'rotations', value: 4 },
+    startDate: '2026-01-01',
+    startDayIndex: 0,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
+
+function completeEntry(date: string, planId = 'plan-1'): HistoryEntry {
+  return {
+    id: `e-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    planDayIndex: 0,
+    action: 'complete',
+    createdAt: `${date}T12:00:00Z`,
+  }
+}
+
+describe('computePlanProgress', () => {
+  describe('rotations-based plans', () => {
+    it('returns 0 completed when no entries', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 4 } })
+      const result = computePlanProgress(plan, [], '2026-01-10')
+      expect(result).toEqual({ completed: 0, total: 4, percentComplete: 0 })
+    })
+
+    it('returns 1 rotation completed after 3 complete entries (3-day plan)', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 4 } })
+      const entries = [
+        completeEntry('2026-01-01'),
+        completeEntry('2026-01-02'),
+        completeEntry('2026-01-03'),
+      ]
+      const result = computePlanProgress(plan, entries, '2026-01-05')
+      expect(result.completed).toBe(1)
+      expect(result.total).toBe(4)
+      expect(result.percentComplete).toBe(25)
+    })
+
+    it('counts 2 rotations after 6 entries', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 4 } })
+      const entries = Array.from({ length: 6 }, (_, i) =>
+        completeEntry(`2026-01-0${i + 1}`),
+      )
+      const result = computePlanProgress(plan, entries, '2026-01-10')
+      expect(result.completed).toBe(2)
+      expect(result.percentComplete).toBe(50)
+    })
+
+    it('counts 4 rotations (100%) after 12 complete entries', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 4 } })
+      const entries = Array.from({ length: 12 }, (_, i) =>
+        completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
+      )
+      const result = computePlanProgress(plan, entries, '2026-01-20')
+      expect(result.completed).toBe(4)
+      expect(result.percentComplete).toBe(100)
+    })
+
+    it('counts skip entries toward rotation completion', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 2 } })
+      const entries: HistoryEntry[] = [
+        { ...completeEntry('2026-01-01'), action: 'skip' },
+        completeEntry('2026-01-02'),
+        completeEntry('2026-01-03'),
+      ]
+      const result = computePlanProgress(plan, entries, '2026-01-05')
+      expect(result.completed).toBe(1)
+    })
+
+    it('does NOT count day_off entries toward rotation completion', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 2 } })
+      const entries: HistoryEntry[] = [
+        { id: 'e-d', planId: 'plan-1', calendarDate: '2026-01-01', action: 'day_off', createdAt: '2026-01-01T12:00:00Z' },
+        completeEntry('2026-01-02'),
+        completeEntry('2026-01-03'),
+      ]
+      // 2 complete/skip out of 3 needed → 0 full rotations
+      const result = computePlanProgress(plan, entries, '2026-01-05')
+      expect(result.completed).toBe(0)
+    })
+
+    it('caps completed at total when more entries exist than plan requires', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 2 } })
+      const entries = Array.from({ length: 12 }, (_, i) =>
+        completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
+      )
+      const result = computePlanProgress(plan, entries, '2026-01-20')
+      expect(result.completed).toBe(2) // capped at total
+      expect(result.percentComplete).toBe(100)
+    })
+
+    it('only counts entries for this plan (ignores other plans)', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 4 } })
+      const entries = [
+        completeEntry('2026-01-01', 'plan-1'),
+        completeEntry('2026-01-02', 'plan-1'),
+        completeEntry('2026-01-03', 'plan-1'),
+        completeEntry('2026-01-01', 'plan-2'), // different plan — should not count
+      ]
+      const result = computePlanProgress(plan, entries, '2026-01-10')
+      expect(result.completed).toBe(1)
+    })
+
+    it('returns zeros for a plan with 0 days', () => {
+      const plan = makePlan({ days: [], duration: { type: 'rotations', value: 4 } })
+      const result = computePlanProgress(plan, [], '2026-01-10')
+      expect(result).toEqual({ completed: 0, total: 4, percentComplete: 0 })
+    })
+  })
+
+  describe('weeks-based plans', () => {
+    it('returns 0 completed on the start date (0 weeks elapsed)', () => {
+      const plan = makePlan({ duration: { type: 'weeks', value: 8 }, startDate: '2026-01-01' })
+      const result = computePlanProgress(plan, [], '2026-01-01')
+      expect(result.completed).toBe(0)
+      expect(result.total).toBe(8)
+      expect(result.percentComplete).toBe(0)
+    })
+
+    it('returns 1 week completed after 7 days', () => {
+      const plan = makePlan({ duration: { type: 'weeks', value: 8 }, startDate: '2026-01-01' })
+      const result = computePlanProgress(plan, [], '2026-01-08')
+      expect(result.completed).toBe(1)
+      expect(result.percentComplete).toBe(13) // round(1/8*100) = 13
+    })
+
+    it('returns 4 weeks completed after 28 days (exactly half of 8-week plan)', () => {
+      const plan = makePlan({ duration: { type: 'weeks', value: 8 }, startDate: '2026-01-01' })
+      const result = computePlanProgress(plan, [], '2026-01-29')
+      expect(result.completed).toBe(4)
+      expect(result.percentComplete).toBe(50)
+    })
+
+    it('caps at 100% after plan duration is exceeded', () => {
+      const plan = makePlan({ duration: { type: 'weeks', value: 4 }, startDate: '2026-01-01' })
+      // 40 days past start >> 4 weeks
+      const result = computePlanProgress(plan, [], '2026-02-10')
+      expect(result.completed).toBe(4)
+      expect(result.percentComplete).toBe(100)
+    })
+
+    it('ignores history entries (weeks progress is calendar-only)', () => {
+      const plan = makePlan({ duration: { type: 'weeks', value: 8 }, startDate: '2026-01-01' })
+      // Entries should not affect weeks-based progress
+      const entries = Array.from({ length: 20 }, (_, i) =>
+        completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
+      )
+      const result = computePlanProgress(plan, entries, '2026-01-08')
+      expect(result.completed).toBe(1) // only 1 week has elapsed
+    })
+
+    it('handles a date before startDate gracefully (returns 0)', () => {
+      const plan = makePlan({ duration: { type: 'weeks', value: 8 }, startDate: '2026-06-01' })
+      const result = computePlanProgress(plan, [], '2026-01-01')
+      expect(result.completed).toBe(0)
+      expect(result.percentComplete).toBe(0)
+    })
   })
 })

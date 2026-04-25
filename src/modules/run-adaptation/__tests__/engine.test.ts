@@ -203,6 +203,72 @@ describe('evaluateRunProgression', () => {
       expect(result.action).toBe('regress')
       expect(result.nextTargetDistanceMiles).toBe(5)
     })
+
+    it('effort=5 regresses even when completionState is partially_completed', () => {
+      // effort=5 check fires before the partial-completion check; ensure both paths
+      // land on regress (not accidentally on the partial-hold branch).
+      const result = evaluateRunProgression(
+        makeSlot(),
+        makeOutcome({
+          completionState: 'partially_completed',
+          perceivedEffort: 5,
+          runActual: { actualDistanceMiles: 4.2 },
+        }),
+        makeState({ currentTargetDistanceMiles: 5 }),
+      )
+      expect(result.action).toBe('regress')
+      expect(result.reason).toBe('high_effort')
+    })
+  })
+
+  describe('default hold path', () => {
+    it('holds when completed but distance is between 80–95% of target (missed 95% threshold)', () => {
+      // actualDistance = 4.6 mi is 92% of 5 mi → not hitTarget (< 95%), not partial
+      // → not progress, not effort-regress, not partial-regress → default hold
+      const result = evaluateRunProgression(
+        makeSlot(),
+        makeOutcome({
+          completionState: 'completed',
+          perceivedEffort: 3,
+          runActual: { actualDistanceMiles: 4.6 },
+        }),
+        makeState(),
+      )
+      expect(result.action).toBe('hold')
+      expect(result.reason).toBe('default_hold')
+      expect(result.nextTargetDistanceMiles).toBe(5)
+    })
+
+    it('holds when completed + missed target + effort=4 (hold check requires hitTarget)', () => {
+      // hitTarget = false (4.7 < 4.75), effort = 4
+      // The explicit hold check: (completed && hitTarget && effort===4) = false
+      // Falls to default hold.
+      const result = evaluateRunProgression(
+        makeSlot(),
+        makeOutcome({
+          completionState: 'completed',
+          perceivedEffort: 4,
+          runActual: { actualDistanceMiles: 4.7 }, // 94% of 5 — just below 95%
+        }),
+        makeState(),
+      )
+      expect(result.action).toBe('hold')
+      expect(result.reason).toBe('default_hold')
+    })
+
+    it('holds when completedAsPlanned=false and no actual distance (cannot evaluate hitTarget)', () => {
+      // No distance logged + completedAsPlanned=false → hitTarget=false → default hold
+      const result = evaluateRunProgression(
+        makeSlot(),
+        makeOutcome({
+          completionState: 'completed',
+          perceivedEffort: 2,
+          runActual: { actualDistanceMiles: null, completedAsPlanned: false },
+        }),
+        makeState(),
+      )
+      expect(result.action).toBe('hold')
+    })
   })
 })
 

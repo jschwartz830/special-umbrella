@@ -448,6 +448,82 @@ describe('clearExtraEntriesForDate', () => {
   })
 })
 
+// ── importEntries ─────────────────────────────────────────────────────────────
+
+describe('importEntries', () => {
+  it('appends new entries without touching existing ones', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))
+    const existingId = getState().entries[0].id
+
+    getState().importEntries([
+      {
+        id: 'imp-1',
+        planId: 'plan-1',
+        calendarDate: '2026-01-02',
+        planDayIndex: 1,
+        action: 'skip',
+        createdAt: '2026-01-02T09:00:00Z',
+      },
+    ])
+
+    expect(getState().entries).toHaveLength(2)
+    expect(getState().entries.find(e => e.id === existingId)?.action).toBe('complete')
+    expect(getState().entries.find(e => e.id === 'imp-1')?.action).toBe('skip')
+  })
+
+  it('replaces an existing entry when incoming has the same (planId, calendarDate)', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete', { planDayIndex: 0 }))
+    expect(getState().entries[0].action).toBe('complete')
+
+    getState().importEntries([
+      {
+        id: 'imp-new',
+        planId: 'plan-1',
+        calendarDate: '2026-01-01',
+        planDayIndex: 0,
+        action: 'skip',
+        createdAt: '2026-01-01T12:00:00Z',
+      },
+    ])
+
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].action).toBe('skip')
+    expect(getState().entries[0].id).toBe('imp-new')
+  })
+
+  it('deduplicates within the incoming batch — last entry wins per (planId, calendarDate)', () => {
+    // Two incoming rows for the same date: the second should win.
+    getState().importEntries([
+      {
+        id: 'imp-a',
+        planId: 'plan-1',
+        calendarDate: '2026-01-05',
+        planDayIndex: 0,
+        action: 'complete',
+        createdAt: '2026-01-05T08:00:00Z',
+      },
+      {
+        id: 'imp-b',
+        planId: 'plan-1',
+        calendarDate: '2026-01-05',
+        planDayIndex: 0,
+        action: 'skip',
+        createdAt: '2026-01-05T20:00:00Z',
+      },
+    ])
+    // Only one entry should be stored (not two)
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].id).toBe('imp-b')
+    expect(getState().entries[0].action).toBe('skip')
+  })
+
+  it('is a no-op for an empty array', () => {
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))
+    getState().importEntries([])
+    expect(getState().entries).toHaveLength(1)
+  })
+})
+
 // ── importExtraEntries ───────────────────────────────────────────────────────
 
 describe('importExtraEntries', () => {
