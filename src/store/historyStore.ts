@@ -66,6 +66,15 @@ interface HistoryState {
   updateExtraEntryDate: (id: string, newDate: string) => void
 }
 
+/** Keep the last entry for each (planId, calendarDate) pair in an array. */
+function deduplicateByDate(entries: HistoryEntry[]): HistoryEntry[] {
+  const map = new Map<string, HistoryEntry>()
+  for (const e of entries) {
+    map.set(`${e.planId}__${e.calendarDate}`, e)
+  }
+  return Array.from(map.values())
+}
+
 export const useHistoryStore = create<HistoryState>()(
   persist(
     (set, get) => ({
@@ -163,11 +172,14 @@ export const useHistoryStore = create<HistoryState>()(
       importEntries(incoming) {
         if (incoming.length === 0) return
         set(s => {
-          const keys = new Set(incoming.map(e => `${e.planId}__${e.calendarDate}`))
+          // Deduplicate within the batch (last-wins per planId+calendarDate),
+          // then remove existing store entries that collide with the batch.
+          const deduped = deduplicateByDate(incoming)
+          const keys = new Set(deduped.map(e => `${e.planId}__${e.calendarDate}`))
           const filtered = s.entries.filter(
             e => !keys.has(`${e.planId}__${e.calendarDate}`),
           )
-          return { entries: [...filtered, ...incoming] }
+          return { entries: [...filtered, ...deduped] }
         })
       },
 
