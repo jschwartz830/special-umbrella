@@ -1,4 +1,4 @@
-import type { HistoryEntry, ExtraWorkoutEntry, Plan } from '../types'
+import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutType, WorkoutOutcome } from '../types'
 
 export interface HistoryStats {
   totalLogged: number
@@ -130,4 +130,103 @@ function shiftDay(date: string, delta: number): string {
   const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
   const dd = String(dt.getUTCDate()).padStart(2, '0')
   return `${yy}-${mm}-${dd}`
+}
+
+// ── Workout type breakdown ────────────────────────────────────────────────────
+
+export interface WorkoutTypeStat {
+  /** Number of completed rotation entries + all extras for this type. */
+  completed: number
+  /** Number of skipped rotation entries for this type. */
+  skipped: number
+  /**
+   * Average perceived effort (1–5) across completed workouts that have an
+   * outcome with perceivedEffort set. null when no effort data is available.
+   */
+  avgEffort: number | null
+}
+
+export type WorkoutTypeBreakdown = Partial<Record<WorkoutType, WorkoutTypeStat>>
+
+/**
+ * Aggregate per-workout-type completion stats from rotation history entries,
+ * ad-hoc extras, and outcomes.
+ *
+ * - Rotation entry type comes from the plan day's first slot via `planDaysById`
+ *   (a Map from planDayIndex → { slots: [{ type }] }). Entries whose index is
+ *   not found in the map are skipped for type attribution. Pass `null` to skip
+ *   all rotation entries (e.g., if plan data is unavailable).
+ * - Extra entries use their `workoutType` field directly.
+ * - `day_off` entries have no specific workout type and are excluded.
+ * - Optional `dateRange` restricts to a `{ from, to }` window (inclusive,
+ *   YYYY-MM-DD strings). Omit for all-time results.
+ *
+ * Only types that appear in the data are present in the returned object.
+ */
+export function computeWorkoutTypeBreakdown(
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  outcomes: Record<string, WorkoutOutcome>,
+  planDaysById: Map<number, { slots: Array<{ type: WorkoutType }> }> | null,
+  dateRange?: { from: string; to: string },
+): WorkoutTypeBreakdown {
+  const counts = new Map<WorkoutType, { completed: number; skipped: number }>()
+  const effortSums = new Map<WorkoutType, { sum: number; count: number }>()
+
+  const inRange = (date: string) =>
+    !dateRange || (date >= dateRange.from && date <= dateRange.to)
+
+  function ensureType(type: WorkoutType) {
+    if (!counts.has(type)) counts.set(type, { completed: 0, skipped: 0 })
+  }
+
+  function addEffort(type: WorkoutType, effort: number | null | undefined) {
+    if (effort == null) return
+    const cur = effortSums.get(type) ?? { sum: 0, count: 0 }
+    cur.sum += effort
+    cur.count += 1
+    effortSums.set(type, cur)
+  }
+
+  // ── Rotation entries ──────────────────────────────────────────────────────
+  for (const e of entries) {
+    if (!inRange(e.calendarDate)) continue
+    if (e.action === 'day_off') continue
+    if (e.planDayIndex === undefined || !planDaysById) continue
+
+    const type = planDaysById.get(e.planDayIndex)?.slots[0]?.type ?? null
+    if (!type) continue
+
+    ensureType(type)
+    if (e.action === 'complete') {
+      counts.get(type)!.completed++
+      const outcome = outcomes[`${e.planId}_${e.calendarDate}`]
+      addEffort(type, outcome?.perceivedEffort)
+    } else if (e.action === 'skip') {
+      counts.get(type)!.skipped++
+    }
+  }
+
+  // ── Extra entries (all treated as completed) ──────────────────────────────
+  for (const x of extras) {
+    if (!inRange(x.calendarDate)) continue
+    ensureType(x.workoutType)
+    counts.get(x.workoutType)!.completed++
+    const extraKey = `${x.planId}_${x.calendarDate}_extra_${x.id}`
+    addEffort(x.workoutType, outcomes[extraKey]?.perceivedEffort)
+  }
+
+  // ── Assemble result ───────────────────────────────────────────────────────
+  const result: WorkoutTypeBreakdown = {}
+  for (const [type, { completed, skipped }] of counts) {
+    const effort = effortSums.get(type)
+    result[type] = {
+      completed,
+      skipped,
+      avgEffort: effort && effort.count > 0
+        ? Math.round((effort.sum / effort.count) * 10) / 10
+        : null,
+    }
+  }
+  return result
 }

@@ -1,3 +1,109 @@
+# Feature Proposal — Workout Type Breakdown Utility
+
+Date: 2026-04-26
+Branch: `claude/great-mccarthy-bM0YZ`
+Status: **Proposed — implementing this run**
+
+---
+
+## Feature selected
+
+**`computeWorkoutTypeBreakdown`** — a new pure function in `src/lib/historyStats.ts`
+that computes per-workout-type completion stats from the history + outcomes.
+
+---
+
+## Why it was selected
+
+The HistoryPage shows aggregate stats (streak, 7/30-day counts, total) but no
+per-type breakdown. A user training across multiple workout types (lifting +
+running + yoga) has no view of which types they actually logged most, or how their
+average effort varies by type. All the data already exists in entries, extras, and
+outcomes — it just isn't aggregated.
+
+Selection criteria met:
+- **Adjacent to existing**: follows the exact same pattern as `computeHistoryStats`.
+- **No architectural changes**: pure function, no stores, no persistence.
+- **Fully testable**: runs in Vitest without a browser.
+- **Easy to revert**: one file addition + test deletion.
+- **Leaves UI to the developer**: no page changes in this pass.
+
+---
+
+## Expected user value
+
+When wired into the HistoryPage or a future analytics view, users see:
+
+- Weightlifting: 12 completed, avg effort 3.2
+- Long Run: 8 completed, avg effort 2.8
+- Recovery Run: 5 completed, avg effort 1.4
+- Yoga: 3 completed (extras)
+
+This makes imbalances in training visible without any new input from the user.
+
+---
+
+## Implementation scope for this run
+
+1. Add `WorkoutTypeStat` and `WorkoutTypeBreakdown` interfaces.
+2. Implement `computeWorkoutTypeBreakdown(entries, extras, outcomes, planDays?, dateRange?)`.
+3. Full unit tests in `historyStats.test.ts`.
+4. Export from the stats module.
+
+**No UI changes in this pass.**
+
+---
+
+## Assumptions
+
+1. Effort averages use `perceivedEffort` from `WorkoutOutcome`. Entries without an
+   outcome are counted in completions but excluded from the effort average.
+2. `ExtraWorkoutEntry` uses `workoutType` directly. All extras count as "completed".
+3. For rotation entries, the workout type comes from the plan day's first slot.
+   Multi-slot days are attributed to the first slot type.
+4. `day_off` entries have no specific workout type and are not counted toward any type.
+5. `skip` entries are counted separately (not "completed").
+
+---
+
+## Open product / UX decisions
+
+1. **Multi-slot days**: Count toward one type (first slot) or both? This
+   implementation chooses first slot for simplicity.
+2. **date range**: Optional `{ from, to }` — caller decides window.
+3. **Sorting**: Results returned as an object; UI sorts as needed.
+
+---
+
+## Architecture / schema impact
+
+None. Pure function addition. No store changes, no localStorage changes.
+
+---
+
+## Risks
+
+- Very low. Additive pure function, fully tested.
+- A multi-slot day being attributed only to the first slot type could slightly
+  misrepresent workouts. Documented in assumptions.
+
+---
+
+## Rollback strategy
+
+Delete the function and its types from `historyStats.ts`. Remove tests. Done.
+
+---
+
+## What is intentionally NOT built yet
+
+- UI integration (HistoryPage analytics section).
+- Per-plan breakdown (caller pre-filters entries by planId).
+- Chart/visualization.
+- CSV export of the breakdown.
+
+---
+
 # Feature Proposal — Plan Progress Computation
 
 Date: 2026-04-25
