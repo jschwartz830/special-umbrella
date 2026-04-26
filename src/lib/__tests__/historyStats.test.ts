@@ -311,6 +311,12 @@ describe('computePlanProgress', () => {
       const result = computePlanProgress(plan, [], '2026-01-10')
       expect(result).toEqual({ completed: 0, total: 4, percentComplete: 0 })
     })
+
+    it('returns zeros when duration.value is 0 (guard: total <= 0)', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 0 } })
+      const result = computePlanProgress(plan, [], '2026-01-10')
+      expect(result).toEqual({ completed: 0, total: 0, percentComplete: 0 })
+    })
   })
 
   describe('weeks-based plans', () => {
