@@ -362,7 +362,7 @@ describe('historyToCsv + historyFromCsv', () => {
     expect(yogaOutcome!.durationActualMin).toBe(30)
   })
 
-  it('generates fresh extra IDs on import (old and new IDs do not collide)', () => {
+  it('preserves extraId on import so re-importing the same CSV is idempotent', () => {
     const extras: ExtraWorkoutEntry[] = [
       {
         id: 'original-id',
@@ -376,7 +376,20 @@ describe('historyToCsv + historyFromCsv', () => {
     const csv = historyToCsv([], extras, plans, {})
     const { extras: parsed } = historyFromCsv(csv, planIds)
     expect(parsed).toHaveLength(1)
-    expect(parsed[0].id).not.toBe('original-id')
+    // ID is preserved from the extraId column — same on every re-import.
+    expect(parsed[0].id).toBe('original-id')
+  })
+
+  it('generates a fresh ID for extras when the extraId column is absent (pre-2026-04-26 exports)', () => {
+    // Simulate an older CSV export that has entryKind but no extraId column.
+    const legacyExtraCsv =
+      `entryKind,planId,calendarDate,planDayIndex,planDayLabel,action,slotNames,workoutType,workoutName,completionState,perceivedEffort,durationActualMin,actualDistanceMiles,actualDurationMin,averagePaceSecondsPerMile,averageHeartRate,completedAsPlanned,completedAt,notes,createdAt\n` +
+      `extra,${plan.id},2026-04-11,,,,, yoga,Morning Yoga,,,,,,,,,,,2026-04-11T08:00:00Z`
+    const { extras: parsed } = historyFromCsv(legacyExtraCsv, planIds)
+    expect(parsed).toHaveLength(1)
+    // No extraId column → fresh ID generated; just verify it's a non-empty string.
+    expect(typeof parsed[0].id).toBe('string')
+    expect(parsed[0].id.length).toBeGreaterThan(0)
   })
 
   it('rejects extra rows with invalid workoutType', () => {

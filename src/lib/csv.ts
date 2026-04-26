@@ -437,6 +437,9 @@ const HISTORY_HEADERS = [
   'entryKind',       // 'rotation' | 'extra' — new in 2026-04-21 schema. Older
                      // exports predate this column; parseRecordsToHistory
                      // defaults missing values to 'rotation'.
+  'extraId',         // extras only — stable ID for re-import deduplication.
+                     // Absent in pre-2026-04-26 exports; missing value treated
+                     // as blank (new ID generated on import, same as before).
   'planId',
   'planName',
   'calendarDate',
@@ -493,6 +496,7 @@ export function historyToCsv(
       const runActual = outcome?.runActual ?? null
       rows.push([
         'rotation',
+        '',  // extraId — rotation rows don't have one
         e.planId,
         plan?.name ?? '',
         e.calendarDate,
@@ -521,6 +525,7 @@ export function historyToCsv(
       const runActual = outcome?.runActual ?? null
       rows.push([
         'extra',
+        x.id,  // extraId — used for idempotent re-import
         x.planId,
         plan?.name ?? '',
         x.calendarDate,
@@ -565,10 +570,12 @@ const VALID_COMPLETION_STATES: WorkoutCompletionState[] = [
  * (passed in `existingPlanIds`). Rows with unknown planIds are skipped with
  * a warning.
  *
- * Rows with `entryKind = 'extra'` become `ExtraWorkoutEntry` records with
- * freshly generated IDs; any associated outcome data on the same row is
- * keyed via `makeExtraWorkoutInstanceId` with the new ID. Missing
- * `entryKind` (pre-2026-04-21 exports) defaults to 'rotation'.
+ * Rows with `entryKind = 'extra'` become `ExtraWorkoutEntry` records. When
+ * an `extraId` column is present (exports from 2026-04-26 onward) its value
+ * is reused as the entry ID so that re-importing the same CSV is idempotent.
+ * Older exports without `extraId` fall back to generating a fresh ID (matching
+ * previous behavior). Missing `entryKind` (pre-2026-04-21 exports) defaults
+ * to 'rotation'.
  */
 export function historyFromCsv(
   text: string,
@@ -606,7 +613,10 @@ export function historyFromCsv(
         warnings.push(`Row ${lineNum}: invalid workoutType "${row.workoutType}" for extra — skipped.`)
         return
       }
-      const extraId = nanoid()
+      // Prefer the stable extraId from the CSV when present (2026-04-26+ exports)
+      // so that re-importing the same file is idempotent. Fall back to a fresh
+      // nanoid() for older exports that don't include this column.
+      const extraId = row.extraId?.trim() || nanoid()
       extras.push({
         id: extraId,
         planId,
