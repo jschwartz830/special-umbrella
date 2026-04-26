@@ -1,3 +1,69 @@
+# Feature Review — Workout Type Breakdown Utility
+
+Date: 2026-04-26
+Branch: `claude/great-mccarthy-bM0YZ`
+Classification: **Keep**
+
+---
+
+## What was actually built
+
+`computeWorkoutTypeBreakdown(entries, extras, outcomes, planDaysById, dateRange?)` in
+`src/lib/historyStats.ts` plus 14 unit tests. Returns a `WorkoutTypeBreakdown`
+(a `Partial<Record<WorkoutType, WorkoutTypeStat>>`) with completed/skipped counts
+and average effort per type.
+
+## What assumptions were encoded
+
+1. Rotation entry type comes from the plan day's first slot. Multi-slot days
+   (lifting + run) are attributed to the first slot only.
+2. All extras count as "completed" (matching `computeHistoryStats` semantics).
+3. Average effort is rounded to 1 decimal place.
+4. `day_off` entries are excluded — they have no specific workout type.
+
+## What worked well
+
+- Clean accumulator pattern with two separate maps (counts + effort sums) avoids
+  mutable running-average complexity.
+- `planDaysById = null` gracefully skips all rotation entries, making the function
+  usable for extras-only queries.
+- The dateRange filter is composable — callers can pre-filter or pass a window.
+- 14 tests cover all branches and edge cases cleanly.
+
+## What feels risky or incomplete
+
+- **No UI integration**: The function exists but nothing renders it. A developer
+  must wire it into HistoryPage to get user-visible value.
+- **Multi-slot attribution**: First-slot-only attribution is a documented assumption
+  but may surprise users on days with a lift + run pair.
+- **planDaysById construction**: The caller must build the Map from the active plan's
+  `days` array. This is simple but not obvious. A convenience wrapper that accepts
+  a `Plan` directly would improve DX.
+
+## What I should evaluate tomorrow
+
+1. Is the first-slot attribution for multi-slot days acceptable, or should we count
+   both slot types?
+2. Does the HistoryPage stats section feel like the right place to expose per-type
+   breakdown, or is this better as a standalone analytics screen?
+3. Should the function also accept a full `Plan` type (instead of the `planDaysById`
+   Map) for simpler callsites?
+
+## Recommended next steps
+
+- Wire into HistoryPage stats section as a collapsible "by type" table below the
+  existing 4-tile summary.
+- Consider adding a `computeWorkoutTypeBreakdownForPlan(plan, entries, extras, outcomes)`
+  convenience wrapper.
+
+## Classification: **Keep**
+
+The function is pure, tested, and ready to use. It fills a real gap in the stats
+module. No UI integration needed before merging — the developer can choose if/how
+to surface it.
+
+---
+
 # Feature Review — Plan Progress Computation
 
 Date: 2026-04-25

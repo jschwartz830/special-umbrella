@@ -1,5 +1,53 @@
 # Test Results
 
+## 2026-04-26 (twelfth pass) — branch `claude/great-mccarthy-bM0YZ`
+
+**Result: 286 passing, 0 failing** (11 test files, +19 tests this pass)
+
+### Tests added this pass (+19)
+
+**`src/lib/__tests__/csv.test.ts` (+2)**
+
+| Test | Purpose |
+|------|---------|
+| `preserves extraId on import so re-importing the same CSV is idempotent` | Regression lock for the CSV re-import bug fix — stable extraId column survives round-trip |
+| `generates a fresh ID for extras when the extraId column is absent (pre-2026-04-26 exports)` | Backward-compat: legacy CSVs without extraId column still import cleanly |
+
+**`src/engine/__tests__/rotationEngine.test.ts` (+3)**
+
+| Test | Purpose |
+|------|---------|
+| `computeCurrentDayIndex: returns startDayIndex when targetDate is before plan.startDate` | Pre-startDate queries return startDayIndex, not a negative value |
+| `getUpcomingDays: single-day plan always projects the same day (mod 1 = 0)` | Modulo with one plan day always yields index 0 |
+| `isPlanExpired: is never expired for a 0-day plan (division by zero guard)` | `Math.floor(0/0) = NaN`, `NaN >= 1` is `false` → 0-day plan is never expired |
+
+**`src/lib/__tests__/historyStats.test.ts` (+14)**
+
+`computePlanProgress` (+1): `returns zeros when duration.value is 0 (guard: total <= 0)`
+
+`computeWorkoutTypeBreakdown` (+13): empty inputs; completed/skipped rotation counts; day_off exclusion; null planDaysById; missing index in map; extras by workoutType; combined rotation+extras; avgEffort computation; null effort when no data; rounding to 1 decimal; dateRange filter for rotation entries; dateRange filter for extras.
+
+### Test file summary
+
+| File | Tests |
+|------|-------|
+| `src/engine/__tests__/calendarProjection.test.ts` | 31 |
+| `src/engine/__tests__/rotationEngine.test.ts` | 50 |
+| `src/lib/__tests__/csv.test.ts` | 25 |
+| `src/lib/__tests__/historyScope.test.ts` | 4 |
+| `src/lib/__tests__/historyStats.test.ts` | 54 |
+| `src/lib/__tests__/runProgression.test.ts` | 46 |
+| `src/modules/recommendation/__tests__/explanation.test.ts` | 23 |
+| `src/hooks/__tests__/useExpiryDismiss.test.ts` | 12 |
+| `src/store/__tests__/historyStore.test.ts` | 24 |
+| `src/store/__tests__/outcomeStore.test.ts` | 6 |
+| `src/store/__tests__/planDeleteCleanup.test.ts` | 3 |
+| **Total** | **286** |
+
+No existing tests were deleted or disabled. One csv.test.ts test was renamed and its expectation inverted to match the now-correct (fixed) behavior.
+
+---
+
 ## 2026-04-25 (eleventh pass) — branch `claude/great-mccarthy-0XEfh`
 
 Baseline: **222 passing** (10 test files).

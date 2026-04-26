@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress } from '../historyStats'
-import type { HistoryEntry, ExtraWorkoutEntry, Plan } from '../../types'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown } from '../historyStats'
+import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 
 function entry(
   date: string,
@@ -311,6 +311,12 @@ describe('computePlanProgress', () => {
       const result = computePlanProgress(plan, [], '2026-01-10')
       expect(result).toEqual({ completed: 0, total: 4, percentComplete: 0 })
     })
+
+    it('returns zeros when duration.value is 0 (guard: total <= 0)', () => {
+      const plan = makePlan({ duration: { type: 'rotations', value: 0 } })
+      const result = computePlanProgress(plan, [], '2026-01-10')
+      expect(result).toEqual({ completed: 0, total: 0, percentComplete: 0 })
+    })
   })
 
   describe('weeks-based plans', () => {
@@ -360,5 +366,199 @@ describe('computePlanProgress', () => {
       expect(result.completed).toBe(0)
       expect(result.percentComplete).toBe(0)
     })
+  })
+})
+
+// ── computeWorkoutTypeBreakdown ───────────────────────────────────────────────
+
+function makeEntry(
+  date: string,
+  action: HistoryEntry['action'],
+  planDayIndex: number | undefined = 0,
+  planId = 'plan-1',
+): HistoryEntry {
+  return {
+    id: `${planId}_${date}`,
+    planId,
+    calendarDate: date,
+    planDayIndex: action === 'day_off' ? undefined : planDayIndex,
+    action,
+    createdAt: `${date}T12:00:00Z`,
+  }
+}
+
+function makeExtra(
+  date: string,
+  type: 'yoga' | 'swim' | 'recovery_run' = 'yoga',
+  id = `extra_${date}`,
+  planId = 'plan-1',
+): ExtraWorkoutEntry {
+  return {
+    id,
+    planId,
+    calendarDate: date,
+    workoutType: type,
+    workoutName: type,
+    createdAt: `${date}T12:30:00Z`,
+  }
+}
+
+function makeOutcome(
+  instanceId: string,
+  effort: number | null = null,
+): WorkoutOutcome {
+  return {
+    workoutInstanceId: instanceId,
+    completionState: 'completed',
+    perceivedEffort: effort as WorkoutOutcome['perceivedEffort'],
+  }
+}
+
+// planDaysById maps planDayIndex → { slots: [{ type }] }
+function daysMap(
+  entries: Array<{ index: number; type: 'weightlifting' | 'long_run' | 'yoga' | 'rest' }>,
+): Map<number, { slots: Array<{ type: 'weightlifting' | 'long_run' | 'yoga' | 'rest' }> }> {
+  const m = new Map<number, { slots: Array<{ type: 'weightlifting' | 'long_run' | 'yoga' | 'rest' }> }>()
+  for (const { index, type } of entries) {
+    m.set(index, { slots: [{ type }] })
+  }
+  return m
+}
+
+describe('computeWorkoutTypeBreakdown', () => {
+  it('returns empty object for empty inputs', () => {
+    const result = computeWorkoutTypeBreakdown([], [], {}, null)
+    expect(Object.keys(result)).toHaveLength(0)
+  })
+
+  it('counts completed rotation entries by type', () => {
+    const entries = [
+      makeEntry('2026-04-01', 'complete', 0),
+      makeEntry('2026-04-02', 'complete', 0),
+      makeEntry('2026-04-03', 'complete', 1),
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }, { index: 1, type: 'yoga' }])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.weightlifting?.completed).toBe(2)
+    expect(result.yoga?.completed).toBe(1)
+  })
+
+  it('counts skipped rotation entries separately from completed', () => {
+    const entries = [
+      makeEntry('2026-04-01', 'complete', 0),
+      makeEntry('2026-04-02', 'skip', 0),
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.weightlifting?.completed).toBe(1)
+    expect(result.weightlifting?.skipped).toBe(1)
+  })
+
+  it('excludes day_off entries (no specific workout type)', () => {
+    const entries = [makeEntry('2026-04-01', 'day_off', undefined)]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(Object.keys(result)).toHaveLength(0)
+  })
+
+  it('skips rotation entries when planDaysById is null', () => {
+    const entries = [makeEntry('2026-04-01', 'complete', 0)]
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, null)
+    expect(Object.keys(result)).toHaveLength(0)
+  })
+
+  it('skips rotation entries whose planDayIndex is not in the map', () => {
+    const entries = [makeEntry('2026-04-01', 'complete', 5)]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }]) // index 5 not present
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(Object.keys(result)).toHaveLength(0)
+  })
+
+  it('counts all extras as completed using their workoutType', () => {
+    const extras = [makeExtra('2026-04-01', 'yoga'), makeExtra('2026-04-02', 'swim')]
+    const result = computeWorkoutTypeBreakdown([], extras, {}, null)
+    expect(result.yoga?.completed).toBe(1)
+    expect(result.swim?.completed).toBe(1)
+  })
+
+  it('accumulates extras and rotation entries for the same type', () => {
+    const entries = [makeEntry('2026-04-01', 'complete', 0)]
+    const extras = [makeExtra('2026-04-02', 'yoga')]
+    const days = daysMap([{ index: 0, type: 'yoga' }])
+    const result = computeWorkoutTypeBreakdown(entries, extras, {}, days)
+    expect(result.yoga?.completed).toBe(2)
+  })
+
+  it('computes avgEffort from outcomes (rotation entries)', () => {
+    const entries = [
+      makeEntry('2026-04-01', 'complete', 0),
+      makeEntry('2026-04-02', 'complete', 0),
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-04-01': makeOutcome('plan-1_2026-04-01', 3),
+      'plan-1_2026-04-02': makeOutcome('plan-1_2026-04-02', 5),
+    }
+    const result = computeWorkoutTypeBreakdown(entries, [], outcomes, days)
+    // avgEffort = (3 + 5) / 2 = 4
+    expect(result.weightlifting?.avgEffort).toBe(4)
+  })
+
+  it('computes avgEffort from outcomes (extras)', () => {
+    const extras = [makeExtra('2026-04-01', 'yoga', 'x1')]
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-04-01_extra_x1': makeOutcome('plan-1_2026-04-01_extra_x1', 2),
+    }
+    const result = computeWorkoutTypeBreakdown([], extras, outcomes, null)
+    expect(result.yoga?.avgEffort).toBe(2)
+  })
+
+  it('returns avgEffort=null when no outcomes have effort data', () => {
+    const entries = [makeEntry('2026-04-01', 'complete', 0)]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.weightlifting?.avgEffort).toBeNull()
+  })
+
+  it('rounds avgEffort to 1 decimal place', () => {
+    const entries = [
+      makeEntry('2026-04-01', 'complete', 0),
+      makeEntry('2026-04-02', 'complete', 0),
+      makeEntry('2026-04-03', 'complete', 0),
+    ]
+    const days = daysMap([{ index: 0, type: 'long_run' }])
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-04-01': makeOutcome('plan-1_2026-04-01', 2),
+      'plan-1_2026-04-02': makeOutcome('plan-1_2026-04-02', 3),
+      'plan-1_2026-04-03': makeOutcome('plan-1_2026-04-03', 4),
+    }
+    const result = computeWorkoutTypeBreakdown(entries, [], outcomes, days)
+    // (2 + 3 + 4) / 3 = 3.0
+    expect(result.long_run?.avgEffort).toBe(3)
+  })
+
+  it('filters by dateRange (inclusive)', () => {
+    const entries = [
+      makeEntry('2026-04-01', 'complete', 0), // outside
+      makeEntry('2026-04-05', 'complete', 0), // inside
+      makeEntry('2026-04-10', 'complete', 0), // inside
+      makeEntry('2026-04-15', 'complete', 0), // outside
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(
+      entries, [], {}, days, { from: '2026-04-05', to: '2026-04-10' },
+    )
+    expect(result.weightlifting?.completed).toBe(2)
+  })
+
+  it('filters extras by dateRange', () => {
+    const extras = [
+      makeExtra('2026-04-01', 'yoga', 'x1'),
+      makeExtra('2026-04-06', 'yoga', 'x2'),
+    ]
+    const result = computeWorkoutTypeBreakdown(
+      [], extras, {}, null, { from: '2026-04-05', to: '2026-04-10' },
+    )
+    expect(result.yoga?.completed).toBe(1)
   })
 })

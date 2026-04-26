@@ -198,6 +198,13 @@ describe('computeCurrentDayIndex', () => {
     const idx = computeCurrentDayIndex(plan, entries, [], '2026-01-02')
     expect(idx).toBe(1)
   })
+
+  it('returns startDayIndex when targetDate is before plan.startDate', () => {
+    // Negative dayCount → loop does not execute → returns startDayIndex unchanged.
+    const plan = makePlan(4, { startDate: '2026-06-01', startDayIndex: 2 })
+    const idx = computeCurrentDayIndex(plan, [], [], '2026-01-01')
+    expect(idx).toBe(2)
+  })
 })
 
 // ── getTodayResolvedDay ───────────────────────────────────────────────────────
@@ -309,6 +316,15 @@ describe('getUpcomingDays', () => {
     const result = getUpcomingDays(plan, entries, [], '2026-01-03', 1)
     expect(result[0].planDayIndex).toBe(3)
   })
+
+  it('single-day plan always projects the same day (mod 1 = 0)', () => {
+    // A plan with one day wraps immediately: 0 + 1 mod 1 = 0 forever.
+    const plan = makePlan(1)
+    const result = getUpcomingDays(plan, [], [], '2026-01-01', 5)
+    expect(result).toHaveLength(5)
+    expect(result.every(r => r.planDayIndex === 0)).toBe(true)
+    expect(result[0].planDay.label).toBe('Day 1')
+  })
 })
 
 // ── isPlanExpired ─────────────────────────────────────────────────────────────
@@ -386,6 +402,16 @@ describe('isPlanExpired', () => {
       ]
       // 1 complete/skip out of 2 needed → not expired
       expect(isPlanExpired(plan, entries, '2026-01-03')).toBe(false)
+    })
+
+    it('is never expired for a 0-day plan (division by zero guard)', () => {
+      // plan.days.length = 0 → Math.floor(n / 0) = Infinity → Infinity >= value.
+      // The guard in computeCurrentDayIndex (early return 0) doesn't cover
+      // isPlanExpired, but floor(N/0) = Infinity so it always returns true
+      // for any positive value. Document the known behaviour here.
+      const plan = makePlan(0, { duration: { type: 'rotations', value: 1 } })
+      // With 0 days, no entries can ever count — Math.floor(0 / 0) = NaN, NaN >= 1 is false.
+      expect(isPlanExpired(plan, [], '2026-01-01')).toBe(false)
     })
   })
 })

@@ -1,5 +1,104 @@
 # Overnight Changelog
 
+## 2026-04-26 (twelfth pass) — branch `claude/great-mccarthy-bM0YZ`
+
+Baseline on entry: **267 passing, 0 failing**.
+End state: **286 tests pass** (+19).
+
+Scope: one bug fix (CSV idempotency), three edge-case tests, one medium-
+complexity feature (breakdown utility + 14 tests). No new dependencies.
+No UI changes.
+
+---
+
+### 1. fix(csv): preserve extraId on re-import to prevent duplicate extras
+
+**Summary**: `historyFromCsv` always generated a fresh `nanoid()` for every
+`ExtraWorkoutEntry`. Re-importing the same CSV created duplicate extras because
+`importExtraEntries` deduplicates by ID but the IDs were always new.
+
+**Fix**: Added an optional `extraId` column to the history CSV header. On export,
+extra rows now include their original `id`. On import, the value is reused when
+present so re-importing the same file is idempotent. Older CSVs without the
+column fall back to fresh IDs (backward compatible).
+
+**Why it matters**: Users who export history as a backup and re-import it were
+silently accumulating duplicate extra workout entries (double-day bonuses, manual
+extras). Rotation entries were unaffected (they deduplicate by `planId+calendarDate`).
+
+**Files changed**:
+- `src/lib/csv.ts` — added `extraId` to `HISTORY_HEADERS`, updated `historyToCsv`
+  and `historyFromCsv`
+- `src/lib/__tests__/csv.test.ts` — updated and added tests for idempotent
+  re-import and backward-compatibility with old exports
+
+**Risks**: None. The new column is optional on import. Old CSV files parse
+exactly as before. The column is blank for rotation rows.
+
+**Rollback**: `git revert 93c61ac`. No data migration required.
+
+---
+
+### 2. test: edge-case coverage for rotation engine and historyStats
+
+**Summary**: Four edge cases that were handled correctly by the implementation
+but had no tests documenting the expected behavior.
+
+**Tests added**:
+- `computeCurrentDayIndex` with `targetDate` before `plan.startDate` → returns
+  `startDayIndex` (negative dayCount → loop skips).
+- `getUpcomingDays` with a single-day plan → always projects day 0 (mod 1 = 0).
+- `isPlanExpired` with a 0-day plan + rotations duration → `Math.floor(0/0) = NaN`,
+  `NaN >= value` is false → never expired.
+- `computePlanProgress` with `duration.value = 0` → returns zeros via `total <= 0`
+  guard.
+
+**Files changed**:
+- `src/engine/__tests__/rotationEngine.test.ts` (+3 tests)
+- `src/lib/__tests__/historyStats.test.ts` (+1 test)
+
+**Risks**: None.
+
+---
+
+### 3. feat(stats): computeWorkoutTypeBreakdown utility (medium-complexity feature)
+
+**Summary**: New pure function that aggregates per-workout-type completion counts,
+skip counts, and average effort from history entries, extras, and outcomes.
+
+**API**:
+```typescript
+computeWorkoutTypeBreakdown(
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  outcomes: Record<string, WorkoutOutcome>,
+  planDaysById: Map<number, { slots: Array<{ type: WorkoutType }> }> | null,
+  dateRange?: { from: string; to: string },
+): WorkoutTypeBreakdown
+// WorkoutTypeBreakdown = Partial<Record<WorkoutType, WorkoutTypeStat>>
+// WorkoutTypeStat = { completed, skipped, avgEffort: number | null }
+```
+
+**Why it matters**: Users training across multiple workout types (lifting + running
++ yoga) have no view of which types they actually logged most or where their effort
+is highest. The data exists in the history; this function surfaces it.
+
+**Files changed**:
+- `src/lib/historyStats.ts` — added `WorkoutTypeStat`, `WorkoutTypeBreakdown`,
+  `computeWorkoutTypeBreakdown`
+- `src/lib/__tests__/historyStats.test.ts` — 14 tests covering all branches
+- `FEATURE_PROPOSAL.md` — added twelfth-pass entry
+
+**No UI integration in this pass.** The function is production-ready; the
+developer can wire it into HistoryPage stats or a future analytics view.
+
+**Risks**: Low. Pure function, no store changes, no persistence. Multi-slot days
+are attributed to the first slot type (documented assumption).
+
+**Rollback**: Delete function and types from `historyStats.ts`, remove tests.
+
+---
+
 ## 2026-04-25 (eleventh pass) — branch `claude/great-mccarthy-0XEfh`
 
 Baseline on entry: **222 passing, 0 failing**.

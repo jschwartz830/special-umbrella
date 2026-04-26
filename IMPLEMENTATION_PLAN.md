@@ -1,5 +1,84 @@
 # Implementation Plan
 
+## 2026-04-26 — Overnight Audit (twelfth pass)
+
+Branch: `claude/great-mccarthy-bM0YZ`.
+Baseline on entry: **267 passing, 0 failing**.
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the eleventh pass.
+
+### What appears strong and well-designed (unchanged)
+
+- 267-test suite covering engine, stores, adaptation, lib, CSV, and
+  recommendation modules. All major pure-logic paths are exercised.
+- Rotation engine, run adaptation, CSV, store invariants, and stats
+  remain stable and well-tested from prior passes.
+- `ExtraWorkoutEntry.source` field (sixth pass) enables scoped Undo.
+- Dismissible plan expiry banner (tenth pass) reduces banner fatigue.
+- `computePlanProgress` (eleventh pass) enables plan progress display.
+- Double-day bonus persistence (fifth pass) is end-to-end correct.
+
+### Key issues or risks this pass
+
+1. **CSV extras re-import is not idempotent** (MEDIUM, new finding).
+   `historyFromCsv` always generates new IDs (`nanoid()`) for every
+   `ExtraWorkoutEntry` it parses. `importExtraEntries` deduplicates by
+   ID — but since IDs are fresh each time, re-importing the same CSV
+   creates duplicate extra workout entries in the store. Rotation entries
+   are safe (they deduplicate by `planId + calendarDate`). This means a
+   user who exports history as a backup and re-imports it accumulates
+   phantom duplicates for every extra workout (double-day bonuses, manual
+   ad-hoc entries). **Fix: add an optional `extraId` column to the CSV
+   export and use it on import when present. Backward-compatible —
+   columns absent in old exports are silently ignored.**
+
+2. **Edge cases in `computeCurrentDayIndex` are untested** (LOW).
+   When `targetDate` is before `plan.startDate`, `differenceInCalendarDays`
+   returns a negative number and the loop doesn't execute, returning
+   `startDayIndex`. This is correct behavior but is not covered by any test.
+
+3. **`getUpcomingDays` with a single-day plan is untested** (LOW).
+   A plan with `days.length === 1` should wrap the upcoming list entirely to
+   that same day index. The function handles it correctly (mod 1 = 0 always)
+   but there is no test asserting this.
+
+4. **`computePlanProgress` with `duration.value = 0` is untested** (LOW).
+   The guard `total <= 0` handles this and returns zeros, but is uncovered.
+
+5. **`logAction` type mismatch on `planDayIndex` for `day_off`** (LOW,
+   noted in eleventh pass, recommendation only). `logAction` accepts
+   `planDayIndex: number` as required but internally ignores it for
+   `day_off`. The implementation is correct but the type signature misleads
+   callers. Remains a recommendation (fixing the type is a refactor that
+   touches all callsites).
+
+6. **Still open from prior audits (recommendations only):**
+   - `progressionStates` orphaning on plan delete.
+   - TodayPage size (~1700 lines) — needs daytime review to split.
+
+### Prioritized plan
+
+| # | Item | Action |
+|---|---|---|
+| 1 | Fix CSV extras re-import idempotency | **Implemented** |
+| 2 | Add edge-case tests for rotationEngine | **Implemented** |
+| 3 | Add edge-case tests for historyStats | **Implemented** |
+| 4 | Run type breakdown utility (medium feature) | **Implemented** |
+| 5 | `logAction` planDayIndex type fix | Recommend only |
+| 6 | `progressionStates` orphaning | Recommend only |
+| 7 | TodayPage extraction | Recommend only |
+
+### Rationale for sequencing
+
+Bug fix (CSV idempotency) first — it's the only correctness risk. Edge-case
+tests second — no risk, pure value, locks in expected behavior. Feature last
+after all correctness work is green.
+
+---
+
 ## 2026-04-25 — Overnight Audit (eleventh pass)
 
 Branch: `claude/great-mccarthy-0XEfh`.
