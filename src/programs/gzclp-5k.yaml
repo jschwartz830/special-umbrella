@@ -1,0 +1,273 @@
+name: "GZCLP + 5K Build"
+description: >
+  GZCLP linear strength progression (Squat/Bench/Deadlift/OHP/Row)
+  combined with a 5K base-building run plan.
+  6-day rotation: Lift A / Easy Run / Lift B / Tempo+Drills / Lift C / Intervals.
+  Weights add 5 lb each session (10 lb for deadlift); reset to 85 % on failure.
+  Run distances and interval reps increase when effort stays easy.
+
+duration:
+  type: weeks
+  value: 12
+
+# ── Starting weights (lb) and run targets ────────────────────────────────────
+vars:
+  squat:          135
+  bench:           95
+  ohp:             65
+  deadlift:       155
+  row:             95
+  easy_miles:       3.0
+  tempo_miles:      2.0
+  interval_reps:    4
+
+# ── 6-day rotation ────────────────────────────────────────────────────────────
+days:
+
+  # ── Day 1: Squat + OHP ──────────────────────────────────────────────────────
+  - label: "Lift A — Squat + OHP"
+    slots:
+      - type: weights
+        name: "T1 Squat / T2 OHP"
+        focus: legs
+        intent: strength
+        durationMin: 55
+
+        warmup:
+          - exercise: Squat
+            sets:
+              - { reps: 5,  load: "45lb",          isWarmup: true }
+              - { reps: 5,  load: "0.5 * squat",   isWarmup: true }
+              - { reps: 3,  load: "0.7 * squat",   isWarmup: true }
+              - { reps: 1,  load: "0.85 * squat",  isWarmup: true }
+
+        exercises:
+          - exercise: Squat
+            sets: 5
+            reps: 3
+            load: squat
+            rest: 3m
+            tempo: "3-0-1-0"   # 3s down, 0 pause, 1s up, 0 top
+            progress:
+              if: all_reps
+              then: "squat += 5"
+              else: "squat = round5(squat * 0.85)"
+
+          - exercise: OHP
+            sets: 3
+            reps: 10
+            load: ohp
+            rest: 90s
+            progress:
+              if: all_reps
+              then: "ohp += 5"
+              else: "ohp = round5(ohp * 0.9)"
+
+  # ── Day 2: Easy Run ──────────────────────────────────────────────────────────
+  - label: "Easy Run"
+    slots:
+      - type: run
+        name: "Easy Run"
+        subtype: easy
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: easy
+            notes: Walk/very easy jog
+          - type: easy
+            distance: "easy_miles mi"
+            pace: easy
+          - type: cooldown
+            duration: 5m
+            pace: easy
+        progress:
+          if: "effort <= 3"
+          then: "easy_miles = min(easy_miles + 0.5, 8)"
+
+  # ── Day 3: Bench + Row ───────────────────────────────────────────────────────
+  - label: "Lift B — Bench + Row"
+    slots:
+      - type: weights
+        name: "T1 Bench / T2 Row"
+        focus: upper
+        intent: strength
+        durationMin: 55
+
+        warmup:
+          - exercise: "Bench Press"
+            sets:
+              - { reps: 10, load: "45lb",         isWarmup: true }
+              - { reps: 5,  load: "0.5 * bench",  isWarmup: true }
+              - { reps: 3,  load: "0.7 * bench",  isWarmup: true }
+              - { reps: 1,  load: "0.85 * bench", isWarmup: true }
+
+        exercises:
+          - exercise: "Bench Press"
+            sets: 5
+            reps: 3
+            load: bench
+            rest: 3m
+            tempo: "2-1-1-0"
+            progress:
+              if: all_reps
+              then: "bench += 5"
+              else: "bench = round5(bench * 0.85)"
+
+          - exercise: "Barbell Row"
+            sets: 3
+            reps: 10
+            load: row
+            rest: 90s
+            progress:
+              if: all_reps
+              then: "row += 5"
+              else: "row = round5(row * 0.9)"
+
+  # ── Day 4: Tempo + Drills ────────────────────────────────────────────────────
+  - label: "Tempo Run + Drills"
+    slots:
+      - type: run
+        name: "Tempo with Drills"
+        subtype: tempo
+        durationMin: 40
+        difficulty: moderate
+        segments:
+          - type: warmup
+            duration: 10m
+            pace: easy
+
+          - type: drills
+            name: "Running Drills"
+            drills:
+              - name: "High Knees"
+                sets: 2
+                duration: 20s
+                rest: 30s
+              - name: "Butt Kicks"
+                sets: 2
+                duration: 20s
+                rest: 30s
+              - name: "A-Skips"
+                sets: 2
+                reps: 20
+                perSide: true
+                rest: 30s
+              - name: "B-Skips"
+                sets: 2
+                reps: 20
+                perSide: true
+                rest: 30s
+              - name: "Leg Swings (lateral)"
+                sets: 1
+                reps: 10
+                perSide: true
+              - name: "Leg Swings (fore-aft)"
+                sets: 1
+                reps: 10
+                perSide: true
+              - name: "Strides"
+                sets: 4
+                distance: 100m
+                pace: "mile"
+                rest: 60s
+
+          - type: tempo
+            distance: "tempo_miles mi"
+            pace: tempo
+            notes: Comfortably hard; able to speak in short sentences
+
+          - type: cooldown
+            duration: 5m
+            pace: easy
+
+        progress:
+          if: "effort <= 3"
+          then: "tempo_miles = min(tempo_miles + 0.25, 5)"
+
+  # ── Day 5: Deadlift + Core ───────────────────────────────────────────────────
+  - label: "Lift C — Deadlift + Core"
+    slots:
+      - type: weights
+        name: "T1 Deadlift / Core"
+        focus: full_body
+        intent: strength
+        durationMin: 50
+
+        warmup:
+          - exercise: Deadlift
+            sets:
+              - { reps: 5, load: "135lb",            isWarmup: true }
+              - { reps: 3, load: "0.6 * deadlift",   isWarmup: true }
+              - { reps: 2, load: "0.75 * deadlift",  isWarmup: true }
+              - { reps: 1, load: "0.875 * deadlift", isWarmup: true }
+
+        exercises:
+          - exercise: Deadlift
+            sets: 1
+            reps: 5
+            load: deadlift
+            rest: 5m
+            notes: Reset and brace between each rep (dead stop)
+            progress:
+              if: all_reps
+              then: "deadlift += 10"
+              else: "deadlift = round5(deadlift * 0.9)"
+
+          - exercise: "Romanian Deadlift"
+            sets: 3
+            reps: 8
+            load: "0.5 * deadlift"
+            rest: 90s
+            notes: Hinge to mid-shin, slight knee bend
+
+          - exercise: Plank
+            sets: 3
+            duration: 45s
+            rest: 60s
+
+          - exercise: "Dead Bug"
+            sets: 3
+            reps: 10
+            rest: 45s
+            notes: Extend opposite arm/leg, keep lower back flush
+
+          - exercise: "Pallof Press"
+            sets: 3
+            reps: 12
+            rest: 45s
+            notes: Anti-rotation; use cable or band
+
+  # ── Day 6: Interval Track ────────────────────────────────────────────────────
+  - label: "Track Intervals"
+    slots:
+      - type: run
+        name: "800 m Repeats"
+        subtype: intervals
+        difficulty: hard
+        segments:
+          - type: warmup
+            distance: 1mi
+            pace: easy
+
+          - type: drills
+            name: "Pre-workout activation"
+            drills:
+              - { name: "High Knees",  sets: 1, duration: 20s }
+              - { name: "A-Skips",     sets: 1, reps: 20, perSide: true }
+              - { name: "Strides",     sets: 2, distance: 100m, pace: "mile", rest: 60s }
+
+          - type: interval
+            name: "800 m Repeats"
+            distance: 800m
+            pace: "5K"
+            reps: interval_reps
+            rest: 2m
+            notes: Full recovery jog between reps
+
+          - type: cooldown
+            distance: 1mi
+            pace: easy
+
+        progress:
+          if: "effort <= 3"
+          then: "interval_reps = min(interval_reps + 1, 8)"
