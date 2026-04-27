@@ -331,6 +331,19 @@ describe('formatPace', () => {
   it('formats 543 sec/mi as 9:03 /mi', () => {
     expect(formatPace(543)).toBe('9:03 /mi')
   })
+
+  it('does not produce ":60" when fractional seconds round up to 60', () => {
+    // 599.5 rounds to 600 total seconds → 10:00, not 9:60
+    expect(formatPace(599.5)).toBe('10:00 /mi')
+  })
+
+  it('does not produce ":60" for 539.5 sec/mi (8:60 → 9:00)', () => {
+    expect(formatPace(539.5)).toBe('9:00 /mi')
+  })
+
+  it('rounds fractional seconds correctly (599.4 → 9:59)', () => {
+    expect(formatPace(599.4)).toBe('9:59 /mi')
+  })
 })
 
 // ── resolveWorkoutDisplayTarget ───────────────────────────────────────────────

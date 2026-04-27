@@ -83,7 +83,9 @@ export function derivePaceSecondsPerMile(
 
 /** Format pace (seconds/mile) as "M:SS /mi" */
 export function formatPace(secondsPerMile: number): string {
-  const mins = Math.floor(secondsPerMile / 60)
-  const secs = Math.round(secondsPerMile % 60)
+  // Round total seconds first to avoid a secs=60 display (e.g. "9:60 /mi")
+  const totalSecs = Math.round(secondsPerMile)
+  const mins = Math.floor(totalSecs / 60)
+  const secs = totalSecs % 60
   return `${mins}:${secs.toString().padStart(2, '0')} /mi`
 }

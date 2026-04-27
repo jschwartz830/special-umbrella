@@ -1,3 +1,31 @@
+# Feature Review — Compact Stats Bar (TodayPage)
+
+Date: 2026-04-27
+Branch: `claude/great-mccarthy-PqhIm`
+Classification: **Keep**
+
+## Assessment
+
+The stats bar is purely additive with no state mutations, no new stores, and
+no new edge cases. It reuses `computeHistoryStats` which is well-tested.
+
+### Strengths
+- Zero new logic — all metrics come from an existing, tested function.
+- Scoped correctly (active plan only), consistent with the rest of the page.
+- Visually matches the existing dark-slate design language.
+- Gracefully handles 0 entries (all tiles show 0).
+
+### Concerns
+- None identified. The tile row is narrow enough to fit on small screens
+  (three equal-width flex items with minimal padding).
+
+### Verdict
+
+Keep. The feature adds genuine value (ambient streak awareness reduces the need
+to navigate to History) with negligible risk.
+
+---
+
 # Feature Review — Workout Type Breakdown Utility
 
 Date: 2026-04-26

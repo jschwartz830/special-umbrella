@@ -440,6 +440,9 @@ const HISTORY_HEADERS = [
   'extraId',         // extras only — stable ID for re-import deduplication.
                      // Absent in pre-2026-04-26 exports; missing value treated
                      // as blank (new ID generated on import, same as before).
+  'extraSource',     // extras only — 'history' | 'double_day' | ''. Absent in
+                     // pre-2026-04-27 exports; missing/empty treated as
+                     // undefined (matches old-record shape, Undo removes them).
   'planId',
   'planName',
   'calendarDate',
@@ -497,6 +500,7 @@ export function historyToCsv(
       rows.push([
         'rotation',
         '',  // extraId — rotation rows don't have one
+        '',  // extraSource — rotation rows don't have one
         e.planId,
         plan?.name ?? '',
         e.calendarDate,
@@ -525,7 +529,8 @@ export function historyToCsv(
       const runActual = outcome?.runActual ?? null
       rows.push([
         'extra',
-        x.id,  // extraId — used for idempotent re-import
+        x.id,           // extraId — used for idempotent re-import
+        x.source ?? '', // extraSource — preserve Undo classification across re-import
         x.planId,
         plan?.name ?? '',
         x.calendarDate,
@@ -617,6 +622,13 @@ export function historyFromCsv(
       // so that re-importing the same file is idempotent. Fall back to a fresh
       // nanoid() for older exports that don't include this column.
       const extraId = row.extraId?.trim() || nanoid()
+      // Restore source field so Undo on TodayPage keeps the correct
+      // 'history' vs 'double_day' classification after a re-import.
+      // Absent in pre-2026-04-27 exports — undefined matches old record shape.
+      const rawSource = row.extraSource?.trim()
+      const source = rawSource === 'history' || rawSource === 'double_day'
+        ? rawSource
+        : undefined
       extras.push({
         id: extraId,
         planId,
@@ -624,6 +636,7 @@ export function historyFromCsv(
         workoutType,
         workoutName: row.workoutName?.trim() || defaultNameForType(workoutType),
         notes: row.notes || undefined,
+        source,
         createdAt: row.createdAt || now,
       })
 

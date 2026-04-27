@@ -392,6 +392,54 @@ describe('historyToCsv + historyFromCsv', () => {
     expect(parsed[0].id.length).toBeGreaterThan(0)
   })
 
+  it('preserves source field through export/import round-trip', () => {
+    const extras: ExtraWorkoutEntry[] = [
+      {
+        id: 'ex-h',
+        planId: plan.id,
+        calendarDate: '2026-04-15',
+        workoutType: 'yoga',
+        workoutName: 'Yoga',
+        source: 'history',
+        createdAt: '2026-04-15T08:00:00Z',
+      },
+      {
+        id: 'ex-d',
+        planId: plan.id,
+        calendarDate: '2026-04-15',
+        workoutType: 'recovery_run',
+        workoutName: 'Easy Run',
+        source: 'double_day',
+        createdAt: '2026-04-15T18:00:00Z',
+      },
+      {
+        id: 'ex-u',
+        planId: plan.id,
+        calendarDate: '2026-04-15',
+        workoutType: 'swim',
+        workoutName: 'Swim',
+        // source intentionally absent — old-record shape
+        createdAt: '2026-04-15T20:00:00Z',
+      },
+    ]
+
+    const csv = historyToCsv([], extras, plans, {})
+    const { extras: parsed, warnings } = historyFromCsv(csv, planIds)
+
+    expect(warnings).toEqual([])
+    expect(parsed).toHaveLength(3)
+
+    const h = parsed.find(e => e.id === 'ex-h')!
+    expect(h.source).toBe('history')
+
+    const d = parsed.find(e => e.id === 'ex-d')!
+    expect(d.source).toBe('double_day')
+
+    const u = parsed.find(e => e.id === 'ex-u')!
+    // Empty extraSource column → restored as undefined (matches old-record shape)
+    expect(u.source).toBeUndefined()
+  })
+
   it('rejects extra rows with invalid workoutType', () => {
     const csv =
       'entryKind,planId,calendarDate,workoutType,workoutName,createdAt\n' +

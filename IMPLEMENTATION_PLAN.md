@@ -1,5 +1,81 @@
 # Implementation Plan
 
+## 2026-04-27 — Overnight Audit (thirteenth pass)
+
+Branch: `claude/great-mccarthy-PqhIm`.
+Baseline on entry: **286 passing, 0 failing**.
+Exit state: **291 passing, 0 failing** (+5 tests).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the twelfth pass.
+
+### What appears strong and well-designed (unchanged)
+
+- 291-test suite covering engine, stores, adaptation, lib, CSV, and
+  recommendation modules. All major pure-logic paths are exercised.
+- CSV round-trip is now fully idempotent (twelfth pass fixed extras IDs;
+  thirteenth pass adds `source` field preservation).
+- Rotation engine, run adaptation, store invariants, and stats remain
+  stable and well-tested from prior passes.
+
+### Key issues found this pass
+
+1. **`formatPace` second-overflow bug** (BUG — reproducible).
+   `Math.round(secondsPerMile % 60)` can produce `60` when the fractional
+   part of the remainder rounds up (e.g., 599.5 % 60 = 59.5 → 60), yielding
+   output like "9:60 /mi". Fix: round total seconds first, then split into
+   minutes and seconds using integer arithmetic, which can never produce secs=60.
+
+2. **`isPlanExpired` unsafe on 0-day plans** (BUG — latent).
+   A plan with `days.length === 0` caused division-by-zero when computing the
+   rotation count (`entries.length / 0`), resulting in `NaN`. NaN comparisons
+   return `false`, so `NaN >= value` was accidentally safe — but this relied
+   on implicit NaN semantics. Fix: add an explicit early-return guard before
+   the filter step.
+
+3. **`replace('_', ' ')` only replaces first underscore** (BUG).
+   In TodayPage's completed extras section, workout type strings containing
+   multiple underscores (e.g., `long_run`) were displayed as `long run` while
+   hypothetical multi-underscore types would only have the first replaced.
+   Fix: `replaceAll('_', ' ')`.
+
+4. **CSV export drops `ExtraWorkoutEntry.source`** (BUG — data loss).
+   The `source` field (`'history' | 'double_day' | undefined`) controls Undo
+   scoping for extra entries. It was not included in the CSV export, meaning
+   a round-trip export/import lost this field and all re-imported extras
+   defaulted to `source: undefined`, incorrectly widening Undo scope.
+   Fix: add `extraSource` column (backward-compatible — empty/absent in old
+   exports is parsed as `undefined`, matching the old-record shape).
+
+### Feature implemented
+
+**Compact stats bar on TodayPage** (streak, this-week, total).
+Three-tile row rendered below the plan header, above the expiry banner.
+Uses the existing `computeHistoryStats` function — no new logic, only wiring.
+Scoped to plan entries (same-plan only), consistent with all other plan stats.
+
+### Prioritized plan
+
+| # | Item | Action |
+|---|---|---|
+| 1 | Fix `formatPace` second-overflow | **Implemented** |
+| 2 | Fix `isPlanExpired` zero-day guard | **Implemented** |
+| 3 | Fix `replaceAll` in TodayPage display | **Implemented** |
+| 4 | Fix CSV `source` field preservation | **Implemented** |
+| 5 | Stats bar feature (streak/week/total) | **Implemented** |
+| 6 | `logAction` planDayIndex type fix | Recommend only |
+| 7 | `progressionStates` orphaning | Recommend only |
+| 8 | TodayPage extraction | Recommend only |
+
+### Rationale for sequencing
+
+Bugs first (correctness), feature last (new surface). All four bugs were
+isolated, low-risk fixes with clear test coverage added for each.
+
+---
+
 ## 2026-04-26 — Overnight Audit (twelfth pass)
 
 Branch: `claude/great-mccarthy-bM0YZ`.

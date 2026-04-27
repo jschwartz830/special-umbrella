@@ -404,14 +404,15 @@ describe('isPlanExpired', () => {
       expect(isPlanExpired(plan, entries, '2026-01-03')).toBe(false)
     })
 
-    it('is never expired for a 0-day plan (division by zero guard)', () => {
-      // plan.days.length = 0 → Math.floor(n / 0) = Infinity → Infinity >= value.
-      // The guard in computeCurrentDayIndex (early return 0) doesn't cover
-      // isPlanExpired, but floor(N/0) = Infinity so it always returns true
-      // for any positive value. Document the known behaviour here.
+    it('is never expired for a 0-day plan (explicit guard)', () => {
+      // An explicit early return guards against division-by-zero (days.length=0).
       const plan = makePlan(0, { duration: { type: 'rotations', value: 1 } })
-      // With 0 days, no entries can ever count — Math.floor(0 / 0) = NaN, NaN >= 1 is false.
       expect(isPlanExpired(plan, [], '2026-01-01')).toBe(false)
+    })
+
+    it('is never expired for a 0-day plan regardless of value', () => {
+      const plan = makePlan(0, { duration: { type: 'rotations', value: 999 } })
+      expect(isPlanExpired(plan, [], '2099-12-31')).toBe(false)
     })
   })
 })

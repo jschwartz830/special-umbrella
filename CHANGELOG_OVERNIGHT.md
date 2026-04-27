@@ -1,5 +1,51 @@
 # Overnight Changelog
 
+## 2026-04-27 (thirteenth pass) — branch `claude/great-mccarthy-PqhIm`
+
+Baseline on entry: **286 passing, 0 failing**.
+Exit state: **291 passing, 0 failing** (+5 tests).
+
+### Commits
+
+| SHA | Commit message |
+|-----|---------------|
+| 292125c | fix(formatPace): prevent seconds overflow producing "9:60 /mi" |
+| 3658166 | fix(isPlanExpired): add explicit zero-day guard |
+| 1e1a509 | fix(TodayPage): use replaceAll for workout type display |
+| 98e186a | fix(csv): preserve ExtraWorkoutEntry.source across export/import |
+| 48d8819 | feat(TodayPage): add compact stats bar (streak, this-week, total) |
+
+### Bug fixes
+
+**1. `formatPace` — second-overflow (9:60 /mi)**
+`Math.round(secondsPerMile % 60)` produces 60 when the fractional remainder
+rounds up. Fixed: round total seconds first, then integer-divide for mins/secs.
+File: `src/modules/workout-outcomes/types.ts`. Tests: +3.
+
+**2. `isPlanExpired` — zero-day plan guard**
+0-day plan caused implicit NaN/Infinity arithmetic. Added explicit
+`if (plan.days.length === 0) return false` guard.
+File: `src/engine/rotationEngine.ts`. Tests: +1.
+
+**3. TodayPage — `replace` → `replaceAll` for type display**
+`String.replace(string, string)` only replaces the first occurrence.
+Used `replaceAll` for consistent multi-underscore type formatting.
+File: `src/pages/TodayPage.tsx`. Tests: none (UI-only).
+
+**4. CSV — `ExtraWorkoutEntry.source` preservation**
+`source` field was silently dropped on export. Added `extraSource` column,
+backward-compatible with old exports (empty/absent → `undefined`).
+File: `src/lib/csv.ts`. Tests: +1 round-trip test.
+
+### Feature
+
+**5. Compact stats bar on TodayPage**
+Three-tile row (streak / this-week / total) wired to `computeHistoryStats`.
+Scoped to active plan. No new logic — purely wiring + UI.
+File: `src/pages/TodayPage.tsx`.
+
+---
+
 ## 2026-04-26 (twelfth pass) — branch `claude/great-mccarthy-bM0YZ`
 
 Baseline on entry: **267 passing, 0 failing**.
