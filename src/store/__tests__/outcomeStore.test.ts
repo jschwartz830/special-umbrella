@@ -87,7 +87,7 @@ describe('setOutcome / getOutcome', () => {
   it('stores and retrieves an outcome by workoutInstanceId', () => {
     const outcome = makeOutcome('plan-1', '2026-01-01')
     getState().setOutcome(outcome)
-    expect(getState().getOutcome(outcome.workoutInstanceId)).toEqual(outcome)
+    expect(getState().getOutcome(outcome.workoutInstanceId)).toMatchObject(outcome)
   })
 
   it('returns null for an unknown instanceId', () => {
@@ -150,7 +150,7 @@ describe('logOutcomeWithProgression', () => {
   it('stores the outcome regardless of slot type', () => {
     const outcome = makeOutcome('plan-1', '2026-01-01')
     getState().logOutcomeWithProgression(outcome, makeNonRunSlot())
-    expect(getState().getOutcome(outcome.workoutInstanceId)).toEqual(outcome)
+    expect(getState().getOutcome(outcome.workoutInstanceId)).toMatchObject(outcome)
   })
 
   it('does not create a progression state for a non-run slot', () => {

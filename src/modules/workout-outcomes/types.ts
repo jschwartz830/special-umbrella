@@ -20,6 +20,40 @@ export interface RunWorkoutActual {
   completedAsPlanned?: boolean | null
 }
 
+export interface LoggedSetActual {
+  targetReps?: number | string | null
+  targetLoad?: string | null
+  actualReps?: number | null
+  actualLoad?: number | null
+  completed?: boolean
+  restSeconds?: number | null
+  notes?: string | null
+}
+
+export interface LoggedExerciseActual {
+  exercise: string
+  progressionMode?: 'single' | 'double' | 'volume' | 'maintenance'
+  sets: LoggedSetActual[]
+}
+
+export interface WeightsWorkoutActual {
+  exercises: LoggedExerciseActual[]
+}
+
+export interface SwimWorkoutActual {
+  actualDistanceMeters?: number | null
+  actualDurationMin?: number | null
+  averagePaceSecondsPer100m?: number | null
+  completedAsPlanned?: boolean | null
+}
+
+export interface ProgressionRecommendation {
+  discipline: 'weights' | 'run' | 'swim'
+  mode: 'single' | 'double' | 'volume' | 'endurance' | 'speed' | 'maintenance'
+  action: 'progress' | 'hold' | 'regress'
+  note: string
+}
+
 export interface WorkoutOutcome {
   /** `${planId}_${calendarDate}` */
   workoutInstanceId: string
@@ -31,6 +65,11 @@ export interface WorkoutOutcome {
   swapTargetWorkoutTemplateId?: string | null
   /** Only present for run slots */
   runActual?: RunWorkoutActual | null
+  /** Only present for weights slots */
+  weightsActual?: WeightsWorkoutActual | null
+  /** Only present for swim slots */
+  swimActual?: SwimWorkoutActual | null
+  progressionRecommendation?: ProgressionRecommendation | null
 }
 
 // ── Mapping helpers ───────────────────────────────────────────────────────────
@@ -81,6 +120,14 @@ export function derivePaceSecondsPerMile(
   return (durationMin * 60) / distanceMiles
 }
 
+/** Derive swim pace (seconds / 100m) from distance (meters) and duration (minutes). */
+export function deriveSwimPaceSecondsPer100m(
+  distanceMeters: number,
+  durationMin: number,
+): number {
+  return (durationMin * 60) / (distanceMeters / 100)
+}
+
 /** Format pace (seconds/mile) as "M:SS /mi" */
 export function formatPace(secondsPerMile: number): string {
   // Round total seconds first to avoid a secs=60 display (e.g. "9:60 /mi")
@@ -88,4 +135,12 @@ export function formatPace(secondsPerMile: number): string {
   const mins = Math.floor(totalSecs / 60)
   const secs = totalSecs % 60
   return `${mins}:${secs.toString().padStart(2, '0')} /mi`
+}
+
+/** Format swim pace as "M:SS /100m" */
+export function formatSwimPace(secondsPer100m: number): string {
+  const totalSecs = Math.round(secondsPer100m)
+  const mins = Math.floor(totalSecs / 60)
+  const secs = totalSecs % 60
+  return `${mins}:${secs.toString().padStart(2, '0')} /100m`
 }

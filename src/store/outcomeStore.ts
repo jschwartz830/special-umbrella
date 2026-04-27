@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+import { buildProgressionRecommendation } from '../modules/workout-outcomes/progression'
 import type { RunProgressionState } from '../modules/run-adaptation/types'
 import {
   evaluateRunProgression,
@@ -77,8 +78,12 @@ export const useOutcomeStore = create<OutcomeState>()(
       },
 
       logOutcomeWithProgression(outcome, slot) {
-        // 1. Persist the outcome
-        get().setOutcome(outcome)
+        // 1. Attach an outcome-level progression recommendation and persist
+        const recommendation = buildProgressionRecommendation(slot, outcome)
+        get().setOutcome({
+          ...outcome,
+          progressionRecommendation: recommendation,
+        })
 
         // 2. Evaluate legacy run progression (runConfig-based)
         const groupId = slot.runConfig?.progressionGroupId

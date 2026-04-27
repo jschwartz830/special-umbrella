@@ -1,8 +1,12 @@
-import { Ruler, Timer, Zap } from 'lucide-react'
-import { formatPace } from '../../modules/workout-outcomes/types'
+import { Ruler, Timer, Zap, Dumbbell, Waves } from 'lucide-react'
+import { formatPace, formatSwimPace } from '../../modules/workout-outcomes/types'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 
 export function OutcomeMetrics({ outcome }: { outcome: WorkoutOutcome }) {
+  const weightSetCount = outcome.weightsActual?.exercises
+    ?.flatMap(ex => ex.sets)
+    .filter(s => s.completed).length ?? 0
+
   return (
     <div className="space-y-1.5 py-1">
       {outcome.perceivedEffort != null && (
@@ -20,6 +24,13 @@ export function OutcomeMetrics({ outcome }: { outcome: WorkoutOutcome }) {
           <span className="text-xs text-slate-500">{outcome.perceivedEffort}/5</span>
         </div>
       )}
+
+      {outcome.weightsActual && (
+        <p className="text-xs text-slate-400 flex items-center gap-1">
+          <Dumbbell size={10} /> {weightSetCount} completed set{weightSetCount === 1 ? '' : 's'}
+        </p>
+      )}
+
       {outcome.runActual && (
         <div className="flex flex-wrap gap-3 text-xs text-slate-400">
           {outcome.runActual.actualDistanceMiles != null && (
@@ -33,7 +44,26 @@ export function OutcomeMetrics({ outcome }: { outcome: WorkoutOutcome }) {
           )}
         </div>
       )}
-      {!outcome.runActual && outcome.durationActualMin != null && (
+
+      {outcome.swimActual && (
+        <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+          {outcome.swimActual.actualDistanceMeters != null && (
+            <span className="flex items-center gap-0.5"><Waves size={10} /> {outcome.swimActual.actualDistanceMeters} m</span>
+          )}
+          {outcome.swimActual.actualDurationMin != null && (
+            <span className="flex items-center gap-0.5"><Timer size={10} /> {outcome.swimActual.actualDurationMin} min</span>
+          )}
+          {outcome.swimActual.averagePaceSecondsPer100m != null && (
+            <span className="flex items-center gap-0.5"><Zap size={10} /> {formatSwimPace(outcome.swimActual.averagePaceSecondsPer100m)}</span>
+          )}
+        </div>
+      )}
+
+      {outcome.progressionRecommendation && (
+        <p className="text-xs text-sky-300">↗ {outcome.progressionRecommendation.note}</p>
+      )}
+
+      {!outcome.runActual && !outcome.swimActual && outcome.durationActualMin != null && (
         <p className="text-xs text-slate-500">{outcome.durationActualMin} min</p>
       )}
     </div>
