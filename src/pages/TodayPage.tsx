@@ -139,9 +139,9 @@ export function TodayPage() {
     const action = completionStateToAction(outcome.completionState)
     logAction(plan!.id, today, primaryPlanDayIndex, action, outcome.notes ?? undefined)
 
-    const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
-    if (runSlot) {
-      logOutcomeWithProgression(outcome, runSlot)
+    const primarySlot = primaryPlanDay.slots[0]
+    if (primarySlot) {
+      logOutcomeWithProgression(outcome, primarySlot)
     } else {
       useOutcomeStore.getState().setOutcome(outcome)
     }
@@ -170,9 +170,9 @@ export function TodayPage() {
 
   function handleBonusOutcomeConfirm(outcome: WorkoutOutcome) {
     if (!bonusOutcome) return
-    const runSlot = bonusOutcome.rd.planDay.slots.find(s => isRunType(s.type))
-    if (runSlot) {
-      logOutcomeWithProgression(outcome, runSlot)
+    const slot = bonusOutcome.rd.planDay.slots[0]
+    if (slot) {
+      logOutcomeWithProgression(outcome, slot)
     } else {
       useOutcomeStore.getState().setOutcome(outcome)
     }
@@ -232,14 +232,15 @@ export function TodayPage() {
 
   function handleUpcomingOutcomeConfirm(outcome: WorkoutOutcome) {
     if (!loggingUpcoming) return
-    const runSlot = loggingUpcoming.rd.planDay.slots.find(s => isRunType(s.type))
+    const slot = loggingUpcoming.rd.planDay.slots[0]
     const instanceId = loggingUpcoming.extraId
       ? makeExtraWorkoutInstanceId(plan!.id, today, loggingUpcoming.extraId)
       : undefined
-    if (runSlot) {
-      logOutcomeWithProgression(outcome, runSlot)
+    const outcomeWithId = instanceId ? { ...outcome, workoutInstanceId: instanceId } : outcome
+    if (slot) {
+      logOutcomeWithProgression(outcomeWithId, slot)
     } else {
-      useOutcomeStore.getState().setOutcome(instanceId ? { ...outcome, workoutInstanceId: instanceId } : outcome)
+      useOutcomeStore.getState().setOutcome(outcomeWithId)
     }
     setShowUpcomingOutcome(false)
     setLoggingUpcoming(null)
@@ -560,7 +561,13 @@ export function TodayPage() {
             workoutInstanceId={extraInstanceId}
             existingOutcome={getOutcome(extraInstanceId)}
             onConfirm={(outcome) => {
-              useOutcomeStore.getState().setOutcome({ ...outcome, workoutInstanceId: extraInstanceId })
+              const slot = extraToPlanDay(editingExtra).slots[0]
+              const extraOutcome = { ...outcome, workoutInstanceId: extraInstanceId }
+              if (slot) {
+                logOutcomeWithProgression(extraOutcome, slot)
+              } else {
+                useOutcomeStore.getState().setOutcome(extraOutcome)
+              }
               setEditingExtra(null)
             }}
             onClose={() => setEditingExtra(null)}
