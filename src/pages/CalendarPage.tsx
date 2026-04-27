@@ -87,12 +87,28 @@ export function CalendarPage() {
     else setMonth(m => m + 1)
   }
 
+  function goToToday() {
+    setYear(now.getFullYear())
+    setMonth(now.getMonth())
+  }
+
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
+
   function logForDate(rd: ResolvedDay, action: ActionType, selectedPlanDayIdx: number) {
     if (!plan) return
 
+    // Check for an existing jump *before* removing it. rd.planDayIndex was
+    // computed WITH that jump applied, so if we remove it and the user
+    // confirmed the same index, the condition below would incorrectly skip
+    // re-anchoring — shifting the rotation for all subsequent dates.
+    const hadJump = overrides.some(o => {
+      if (o.planId !== plan.id || o.type !== 'jump') return false
+      return format(new Date(o.appliedAt), 'yyyy-MM-dd') === rd.calendarDate
+    })
+
     removeRetroJumpForDate(plan.id, rd.calendarDate)
 
-    if (action !== 'day_off' && selectedPlanDayIdx !== rd.planDayIndex) {
+    if (action !== 'day_off' && (hadJump || selectedPlanDayIdx !== rd.planDayIndex)) {
       addOverride({
         planId: plan.id,
         type: 'jump',
@@ -202,9 +218,19 @@ export function CalendarPage() {
             <button onClick={prevMonth} className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
               <ChevronLeft size={18} />
             </button>
-            <h2 className="text-base font-semibold text-white">
-              {new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-white">
+                {new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </h2>
+              {!isCurrentMonth && (
+                <button
+                  onClick={goToToday}
+                  className="text-xs text-sky-400 hover:text-sky-200 font-medium px-2 py-0.5 rounded-md bg-sky-500/10 hover:bg-sky-500/20 transition-colors"
+                >
+                  Today
+                </button>
+              )}
+            </div>
             <button onClick={nextMonth} className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
               <ChevronRight size={18} />
             </button>

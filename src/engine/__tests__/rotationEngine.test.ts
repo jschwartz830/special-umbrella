@@ -205,6 +205,41 @@ describe('computeCurrentDayIndex', () => {
     const idx = computeCurrentDayIndex(plan, [], [], '2026-01-01')
     expect(idx).toBe(2)
   })
+
+  it('removing a retroactive jump override without re-adding one shifts the rotation for subsequent dates', () => {
+    // Regression anchor: CalendarPage.logForDate must re-add a jump when
+    // removing an existing one, even if the user confirms the same planDayIndex.
+    //
+    // 4-day plan, startDayIndex=0, no prior entries/overrides.
+    //
+    // Natural pointer at Jan3 (start of day) = 0 (Days 1+2 are unlogged):
+    //   Jan1 unlogged → pointer stays 0; Jan2 unlogged → pointer stays 0.
+    //
+    // With a jump to Day1 (index 1) on Jan3:
+    //   Jan3 pointer = jump(1); entry complete → pointer advances to 2.
+    //   Jan4 pointer = 2.
+    //
+    // Without the jump:
+    //   Jan3 pointer = 0 (natural); entry complete → pointer advances to 1.
+    //   Jan4 pointer = 1.
+    //
+    // The two differ — removing the jump without replacement silently shifts
+    // the rotation. CalendarPage.logForDate guards against this by always
+    // re-anchoring with a new jump when an existing one is removed.
+    const plan = makePlan(4)
+    const entry = makeEntry('2026-01-03', 'complete', 1) // logged Day1 (index 1) on Jan3
+
+    const jumpOverride = makeOverride('2026-01-03T12:00:00.000', 'jump', { targetDayIndex: 1 })
+
+    const idxWithJump = computeCurrentDayIndex(plan, [entry], [jumpOverride], '2026-01-04')
+    expect(idxWithJump).toBe(2) // jump to Day1(1) + complete → pointer 2
+
+    const idxWithoutJump = computeCurrentDayIndex(plan, [entry], [], '2026-01-04')
+    expect(idxWithoutJump).toBe(1) // natural Day0(0) + complete → pointer 1
+
+    // The two results differ — this is the rotation shift the fix prevents.
+    expect(idxWithJump).not.toBe(idxWithoutJump)
+  })
 })
 
 // ── getTodayResolvedDay ───────────────────────────────────────────────────────
