@@ -31,6 +31,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
+import { computeHistoryStats } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 
@@ -95,8 +96,9 @@ export function TodayPage() {
   const isPending = todayResolved.status === 'today_pending'
   const isResolved = !isPending
   const planExpired = isPlanExpired(plan, planEntries, today)
-  const todayExtras = extraEntries
-    .filter(e => e.planId === plan.id && e.calendarDate === today)
+  const planExtras = extraEntries.filter(e => e.planId === plan.id)
+  const todayExtras = planExtras
+    .filter(e => e.calendarDate === today)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
   const instanceId = makeWorkoutInstanceId(plan.id, today)
@@ -125,6 +127,9 @@ export function TodayPage() {
     todayResolved.planDay.slots[0]?.difficulty,
     tomorrowSlot?.difficulty,
   )
+
+  // Stats for the compact stats bar (scoped to the active plan's history)
+  const stats = computeHistoryStats(planEntries, planExtras, today)
 
   function handleCompleteClick() {
     setShowOutcomeModal(true)
@@ -257,6 +262,40 @@ export function TodayPage() {
         <p className="text-xs text-slate-500 mt-0.5">
           Day {todayResolved.planDayIndex + 1} of {plan.days.length} in rotation
         </p>
+      </div>
+
+      {/* Stats bar — streak + this-week count */}
+      <div className="flex gap-3">
+        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/60">
+          <span className="text-base leading-none">🔥</span>
+          <div>
+            <p className="text-xs text-slate-500 leading-none mb-0.5">Streak</p>
+            <p className="text-sm font-bold text-white leading-none">
+              {stats.currentStreak}
+              <span className="text-xs font-normal text-slate-400 ml-1">day{stats.currentStreak !== 1 ? 's' : ''}</span>
+            </p>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/60">
+          <span className="text-base leading-none">📅</span>
+          <div>
+            <p className="text-xs text-slate-500 leading-none mb-0.5">This week</p>
+            <p className="text-sm font-bold text-white leading-none">
+              {stats.last7Completed}
+              <span className="text-xs font-normal text-slate-400 ml-1">done</span>
+            </p>
+          </div>
+        </div>
+        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/60">
+          <span className="text-base leading-none">✅</span>
+          <div>
+            <p className="text-xs text-slate-500 leading-none mb-0.5">Total</p>
+            <p className="text-sm font-bold text-white leading-none">
+              {stats.totalCompleted}
+              <span className="text-xs font-normal text-slate-400 ml-1">done</span>
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Plan completion / expiry banner */}
