@@ -235,8 +235,8 @@ function planHeaderCells(
     empty ? '' : slot.targetPace ?? '',
     empty ? '' : slot.targetDuration ?? '',
     empty ? '' : slot.difficulty ?? '',
-    empty ? '' : (slot.tags ?? []).join('|'),
-    empty ? '' : run?.subtype ?? '',
+    '',
+    empty ? '' : slot.subtype ?? run?.subtype ?? '',
     empty ? '' : run?.targetDistanceMiles ?? '',
     empty ? '' : run?.targetDurationMin ?? '',
     empty ? '' : run?.targetPaceRange?.minSecondsPerMile ?? '',
@@ -251,13 +251,14 @@ function planHeaderCells(
 }
 
 const VALID_WORKOUT_TYPES: WorkoutType[] = [
-  'weightlifting', 'long_run', 'recovery_run', 'swim', 'yoga', 'rest',
+  'weights', 'run', 'swim', 'yoga', 'other',
+  'weightlifting', 'long_run', 'recovery_run', 'rest',
 ]
 const VALID_STATUSES: PlanStatus[] = ['active', 'inactive', 'archived']
 const VALID_DIFFICULTIES: WorkoutDifficulty[] = ['easy', 'moderate', 'hard']
 const VALID_RUN_SUBTYPES: RunWorkoutSubtype[] = [
-  'easy_run', 'recovery_run', 'long_run', 'tempo', 'intervals',
-  'race_pace', 'walk_run', 'other',
+  'easy', 'recovery', 'long', 'tempo', 'intervals', 'custom',
+  'easy_run', 'recovery_run', 'long_run', 'race_pace', 'walk_run', 'other',
 ]
 
 export interface PlansImportResult {
@@ -383,14 +384,20 @@ function rowToSlot(row: Record<string, string>, type: WorkoutType): WorkoutSlot 
   }
   if (row.tags) {
     const tags = row.tags.split('|').map(t => t.trim()).filter(Boolean) as WorkoutTag[]
-    if (tags.length > 0) slot.tags = tags
+    if (tags.includes('home')) slot.location = 'home'
+    if (tags.includes('gym')) slot.location = 'gym'
+    if (tags.includes('indoor')) slot.location = 'indoor'
+    if (tags.includes('outdoor')) slot.location = 'outdoor'
+    if (tags.includes('upper')) slot.weightsFocusArea = 'upper'
+    if (tags.includes('lower')) slot.weightsFocusArea = 'lower'
+    if (tags.includes('full_body')) slot.weightsFocusArea = 'full_body'
   }
 
   // Run config
   if (row.runSubtype) {
     const subtype: RunWorkoutSubtype = VALID_RUN_SUBTYPES.includes(row.runSubtype as RunWorkoutSubtype)
       ? (row.runSubtype as RunWorkoutSubtype)
-      : 'other'
+      : 'custom'
     const runTargetDistance = toNum(row.runTargetDistance)
     const runTargetDuration = toNum(row.runTargetDuration)
     const paceMin = toNum(row.runTargetPaceMin)
@@ -415,6 +422,7 @@ function rowToSlot(row: Record<string, string>, type: WorkoutType): WorkoutSlot 
     const maxStep = toNum(row.runMaxStepMiles)
     if (maxStep !== undefined) config.maxStepMiles = maxStep
     slot.runConfig = config
+    slot.subtype = subtype
   }
 
   return slot
@@ -422,6 +430,9 @@ function rowToSlot(row: Record<string, string>, type: WorkoutType): WorkoutSlot 
 
 function defaultNameForType(type: WorkoutType): string {
   switch (type) {
+    case 'weights': return 'Weights'
+    case 'run': return 'Run'
+    case 'other': return 'Other'
     case 'weightlifting': return 'Weightlifting'
     case 'long_run': return 'Long Run'
     case 'recovery_run': return 'Recovery Run'

@@ -1,6 +1,9 @@
 // ── Workout Types ────────────────────────────────────────────────────────────
 
 export type WorkoutType =
+  | 'weights'
+  | 'run'
+  | 'other'
   | 'weightlifting'
   | 'long_run'
   | 'recovery_run'
@@ -55,6 +58,19 @@ export interface WorkoutSlot {
   difficulty?: import('../modules/workout-metadata/types').WorkoutDifficulty
   /** Rich run configuration; only meaningful when type = long_run | recovery_run */
   runConfig?: import('../modules/workout-metadata/types').RunWorkoutConfig | null
+  /** Unified subtype field for type-specific programming (run/yoga/swim/other). */
+  subtype?: string
+  /** Shared environment field; options vary by workout type in UI. */
+  location?: string
+  /** Weights-specific programming fields. */
+  weightsFocusArea?: import('../modules/workout-metadata/types').WeightsFocusArea
+  weightsIntent?: import('../modules/workout-metadata/types').WeightsTrainingIntent
+  /** Canonical numeric duration target in minutes. */
+  durationMin?: number
+  /** Canonical run fields (keep legacy fields for compatibility/read paths). */
+  timeMin?: number
+  structureDescription?: string
+  adaptiveProgressionEnabled?: boolean
 }
 
 /** One entry in the repeating day sequence */

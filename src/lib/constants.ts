@@ -1,10 +1,10 @@
 import {
   Dumbbell,
   Footprints,
-  Wind,
   Waves,
   Flower2,
   Moon,
+  Circle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { WorkoutType } from '../types'
@@ -20,6 +20,22 @@ export interface WorkoutMeta {
 }
 
 export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
+  weights: {
+    label: 'Weights',
+    bgColor: 'bg-orange-500',
+    borderColor: 'border-orange-500',
+    textColor: 'text-orange-600',
+    ringColor: 'ring-orange-400',
+    icon: Dumbbell,
+  },
+  run: {
+    label: 'Run',
+    bgColor: 'bg-emerald-500',
+    borderColor: 'border-emerald-500',
+    textColor: 'text-emerald-600',
+    ringColor: 'ring-emerald-400',
+    icon: Footprints,
+  },
   weightlifting: {
     label: 'Weights',
     bgColor: 'bg-orange-500',
@@ -29,7 +45,7 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
     icon: Dumbbell,
   },
   long_run: {
-    label: 'Long Run',
+    label: 'Run',
     bgColor: 'bg-emerald-500',
     borderColor: 'border-emerald-500',
     textColor: 'text-emerald-600',
@@ -37,12 +53,12 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
     icon: Footprints,
   },
   recovery_run: {
-    label: 'Recovery Run',
-    bgColor: 'bg-teal-500',
-    borderColor: 'border-teal-500',
-    textColor: 'text-teal-600',
-    ringColor: 'ring-teal-400',
-    icon: Wind,
+    label: 'Run',
+    bgColor: 'bg-emerald-500',
+    borderColor: 'border-emerald-500',
+    textColor: 'text-emerald-600',
+    ringColor: 'ring-emerald-400',
+    icon: Footprints,
   },
   swim: {
     label: 'Swim',
@@ -60,8 +76,16 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
     ringColor: 'ring-purple-400',
     icon: Flower2,
   },
+  other: {
+    label: 'Other',
+    bgColor: 'bg-slate-500',
+    borderColor: 'border-slate-500',
+    textColor: 'text-slate-400',
+    ringColor: 'ring-slate-300',
+    icon: Circle,
+  },
   rest: {
-    label: 'Rest',
+    label: 'Other',
     bgColor: 'bg-slate-400',
     borderColor: 'border-slate-400',
     textColor: 'text-slate-500',
@@ -71,12 +95,11 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
 }
 
 export const WORKOUT_TYPES: WorkoutType[] = [
-  'weightlifting',
-  'long_run',
-  'recovery_run',
+  'weights',
+  'run',
   'swim',
   'yoga',
-  'rest',
+  'other',
 ]
 
 // ── Difficulty display metadata ───────────────────────────────────────────────

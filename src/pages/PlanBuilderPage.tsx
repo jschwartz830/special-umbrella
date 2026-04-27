@@ -15,10 +15,17 @@ import { WORKOUT_META, WORKOUT_TYPES } from '../lib/constants'
 import { Modal } from '../components/shared/Modal'
 import { nanoid } from '../engine/rotationEngine'
 import type { Plan, PlanDay, WorkoutSlot } from '../types'
-import type { WorkoutTag, WorkoutDifficulty, RunWorkoutSubtype, RunWorkoutConfig } from '../modules/workout-metadata/types'
+import type {
+  WorkoutDifficulty,
+  RunWorkoutSubtype,
+  RunWorkoutConfig,
+  WeightsFocusArea,
+  WeightsTrainingIntent,
+  SwimWorkoutSubtype,
+  YogaWorkoutSubtype,
+  OtherWorkoutSubtype,
+} from '../modules/workout-metadata/types'
 import {
-  ALL_WORKOUT_TAGS,
-  TAG_LABELS,
   RUN_SUBTYPE_LABELS,
   isRunType,
   defaultRunSubtype,
@@ -42,6 +49,8 @@ function SlotEditor({
   const [expanded, setExpanded] = useState(false)
   const meta = WORKOUT_META[slot.type]
   const isRun = isRunType(slot.type)
+  const isWeights = slot.type === 'weights' || slot.type === 'weightlifting'
+  const isOther = slot.type === 'other' || slot.type === 'rest'
 
   function set<K extends keyof WorkoutSlot>(key: K, val: WorkoutSlot[K]) {
     onChange({ ...slot, [key]: val })
@@ -54,18 +63,15 @@ function SlotEditor({
     onChange({ ...slot, runConfig: { ...existing, ...patch } })
   }
 
-  function toggleTag(tag: WorkoutTag) {
-    const current = slot.tags ?? []
-    const next = current.includes(tag)
-      ? current.filter(t => t !== tag)
-      : [...current, tag]
-    set('tags', next)
-  }
-
   const DIFFICULTIES: WorkoutDifficulty[] = ['easy', 'moderate', 'hard']
   const SUBTYPES: RunWorkoutSubtype[] = [
-    'easy_run', 'recovery_run', 'long_run', 'tempo', 'intervals', 'race_pace', 'walk_run', 'other',
+    'easy', 'long', 'tempo', 'intervals', 'recovery', 'custom',
   ]
+  const WEIGHTS_FOCUS_AREAS: WeightsFocusArea[] = ['upper', 'lower', 'full_body', 'push', 'pull', 'legs', 'core']
+  const WEIGHTS_INTENTS: WeightsTrainingIntent[] = ['strength', 'hypertrophy', 'power', 'conditioning', 'technique', 'deload', 'recovery_mobility']
+  const SWIM_SUBTYPES: SwimWorkoutSubtype[] = ['easy', 'endurance', 'intervals', 'technique', 'recovery']
+  const YOGA_SUBTYPES: YogaWorkoutSubtype[] = ['mobility', 'flow', 'recovery', 'strength', 'stretch']
+  const OTHER_SUBTYPES: OtherWorkoutSubtype[] = ['rest', 'walk', 'sport', 'pt_rehab', 'mobility', 'custom']
 
   return (
     <div className="bg-slate-700/50 rounded-xl p-3 space-y-2">
@@ -149,7 +155,7 @@ function SlotEditor({
             </div>
           )}
 
-          {slot.type === 'weightlifting' && (
+          {isWeights && (
             <div className="grid grid-cols-2 gap-2">
               <label className="space-y-1">
                 <span className="text-xs text-slate-400">Target time (min)</span>
@@ -160,6 +166,42 @@ function SlotEditor({
                   onChange={e => set('targetTime', parseInt(e.target.value) || undefined)}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-slate-400">Location</span>
+                <select
+                  value={slot.location ?? ''}
+                  onChange={e => set('location', e.target.value || undefined)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="">Select</option>
+                  <option value="home">Home</option>
+                  <option value="gym">Gym</option>
+                  <option value="indoor">Indoor</option>
+                  <option value="outdoor">Outdoor</option>
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-slate-400">Weights Focus Area</span>
+                <select
+                  value={slot.weightsFocusArea ?? ''}
+                  onChange={e => set('weightsFocusArea', (e.target.value || undefined) as WeightsFocusArea | undefined)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="">Select</option>
+                  {WEIGHTS_FOCUS_AREAS.map(v => <option key={v} value={v}>{v.replace(/_/g, ' ')}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs text-slate-400">Weights Training Intent</span>
+                <select
+                  value={slot.weightsIntent ?? ''}
+                  onChange={e => set('weightsIntent', (e.target.value || undefined) as WeightsTrainingIntent | undefined)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="">Select</option>
+                  {WEIGHTS_INTENTS.map(v => <option key={v} value={v}>{v.replace(/_/g, ' / ')}</option>)}
+                </select>
               </label>
               <label className="flex items-center gap-2 mt-5">
                 <input
@@ -173,7 +215,7 @@ function SlotEditor({
             </div>
           )}
 
-          {(slot.type === 'swim' || slot.type === 'yoga') && (
+          {(slot.type === 'swim' || slot.type === 'yoga' || isOther) && (
             <div className="grid grid-cols-2 gap-2">
               <label className="space-y-1">
                 <span className="text-xs text-slate-400">Duration (min)</span>
@@ -198,6 +240,75 @@ function SlotEditor({
                   />
                 </label>
               )}
+              {slot.type === 'swim' && (
+                <label className="space-y-1">
+                  <span className="text-xs text-slate-400">Swim Subtype</span>
+                  <select
+                    value={slot.subtype ?? ''}
+                    onChange={e => set('subtype', e.target.value || undefined)}
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  >
+                    <option value="">Select</option>
+                    {SWIM_SUBTYPES.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </label>
+              )}
+              {slot.type === 'yoga' && (
+                <>
+                  <label className="space-y-1">
+                    <span className="text-xs text-slate-400">Yoga Subtype</span>
+                    <select
+                      value={slot.subtype ?? ''}
+                      onChange={e => set('subtype', e.target.value || undefined)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    >
+                      <option value="">Select</option>
+                      {YOGA_SUBTYPES.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-xs text-slate-400">Location</span>
+                    <select
+                      value={slot.location ?? ''}
+                      onChange={e => set('location', e.target.value || undefined)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    >
+                      <option value="">Select</option>
+                      <option value="self_directed">Self Directed</option>
+                      <option value="class">Class</option>
+                    </select>
+                  </label>
+                </>
+              )}
+              {isOther && (
+                <>
+                  <label className="space-y-1">
+                    <span className="text-xs text-slate-400">Other Subtype</span>
+                    <select
+                      value={slot.subtype ?? ''}
+                      onChange={e => set('subtype', e.target.value || undefined)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    >
+                      <option value="">Select</option>
+                      {OTHER_SUBTYPES.map(v => <option key={v} value={v}>{v.replace('_', ' / ')}</option>)}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-xs text-slate-400">Location</span>
+                    <select
+                      value={slot.location ?? ''}
+                      onChange={e => set('location', e.target.value || undefined)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                    >
+                      <option value="">Select</option>
+                      <option value="home">Home</option>
+                      <option value="gym">Gym</option>
+                      <option value="indoor">Indoor</option>
+                      <option value="outdoor">Outdoor</option>
+                    </select>
+                  </label>
+                </>
+              )}
             </div>
           )}
 
@@ -210,8 +321,8 @@ function SlotEditor({
               <label className="space-y-1 block">
                 <span className="text-xs text-slate-400">Subtype</span>
                 <select
-                  value={slot.runConfig?.subtype ?? defaultRunSubtype(slot.type)}
-                  onChange={e => setRunConfig({ subtype: e.target.value as RunWorkoutSubtype })}
+                  value={(slot.subtype as RunWorkoutSubtype | undefined) ?? slot.runConfig?.subtype ?? defaultRunSubtype(slot.type)}
+                  onChange={e => { set('subtype', e.target.value); setRunConfig({ subtype: e.target.value as RunWorkoutSubtype }) }}
                   className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
                 >
                   {SUBTYPES.map(st => (
@@ -236,11 +347,24 @@ function SlotEditor({
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={slot.runConfig?.progressionEligible ?? false}
-                  onChange={e => setRunConfig({ progressionEligible: e.target.checked })}
+                  checked={slot.adaptiveProgressionEnabled ?? slot.runConfig?.progressionEligible ?? false}
+                  onChange={e => { set('adaptiveProgressionEnabled', e.target.checked); setRunConfig({ progressionEligible: e.target.checked }) }}
                   className="w-4 h-4 rounded accent-sky-500"
                 />
                 <span className="text-sm text-slate-300">Enable adaptive progression</span>
+              </label>
+
+              <label className="space-y-1 block">
+                <span className="text-xs text-slate-400">Location</span>
+                <select
+                  value={slot.location ?? ''}
+                  onChange={e => set('location', e.target.value || undefined)}
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="">Select</option>
+                  <option value="indoor">Indoor</option>
+                  <option value="outdoor">Outdoor</option>
+                </select>
               </label>
 
               {slot.runConfig?.progressionEligible && (
@@ -293,32 +417,6 @@ function SlotEditor({
                       }`}
                     >
                       {d}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ── Tags ────────────────────────────────────────────────────── */}
-          {slot.type !== 'rest' && (
-            <div>
-              <p className="text-xs text-slate-400 mb-1.5">Tags</p>
-              <div className="flex flex-wrap gap-1.5">
-                {ALL_WORKOUT_TAGS.map(tag => {
-                  const active = (slot.tags ?? []).includes(tag)
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => toggleTag(tag)}
-                      className={`px-2 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${
-                        active
-                          ? 'bg-sky-500/20 border-sky-500/50 text-sky-400'
-                          : 'bg-slate-700 border-slate-600 text-slate-500 hover:text-slate-300'
-                      }`}
-                    >
-                      {TAG_LABELS[tag]}
                     </button>
                   )
                 })}
