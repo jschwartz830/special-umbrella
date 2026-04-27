@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
@@ -16,14 +16,18 @@ import {
   X,
   PartyPopper,
   CheckCircle2,
+  Play,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
 import { useExpiryDismiss } from '../hooks/useExpiryDismiss'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
+import { useProgramStore } from '../store/programStore'
 import { WorkoutDayCard } from '../components/workout/WorkoutDayCard'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
+import { ActiveWorkoutTracker } from '../components/workout/ActiveWorkoutTracker'
+import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
@@ -33,7 +37,25 @@ import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, PlanDay } from '../types'
-import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
+
+/** Find the most recent outcome with weights data for this plan (excluding today). */
+function findPreviousWeightsOutcome(
+  planId: string,
+  currentDate: string,
+  outcomes: Record<string, WorkoutOutcome>,
+): WorkoutOutcome | null {
+  const prefix = planId + '_'
+  let best: WorkoutOutcome | null = null
+  for (const outcome of Object.values(outcomes)) {
+    if (!outcome.workoutInstanceId.startsWith(prefix)) continue
+    const rest = outcome.workoutInstanceId.slice(prefix.length)
+    if (rest.startsWith(currentDate)) continue
+    if (!outcome.weightsActual?.exercises?.length) continue
+    if (!best || (outcome.completedAt ?? '') > (best.completedAt ?? '')) best = outcome
+  }
+  return best
+}
 
 function extraToPlanDay(extra: ExtraWorkoutEntry): PlanDay {
   return {
@@ -59,6 +81,17 @@ export function TodayPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const { isDismissed: expiryBannerDismissed, dismiss: dismissExpiryBanner } = useExpiryDismiss(plan?.id ?? null)
 
+  const allOutcomes = useOutcomeStore(s => s.outcomes)
+  const programVarsMap = useProgramStore(s => s.vars)
+  const planProgramVars = useMemo(
+    () => (plan ? (programVarsMap[plan.id] ?? {}) : {}),
+    [plan, programVarsMap],
+  )
+  const previousWeightsOutcome = useMemo(
+    () => (plan ? findPreviousWeightsOutcome(plan.id, today, allOutcomes) : null),
+    [plan, today, allOutcomes],
+  )
+
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
   const [showJump, setShowJump] = useState(false)
@@ -71,6 +104,12 @@ export function TodayPage() {
   // ExtraWorkoutEntry id assigned when it was persisted.
   const [bonusOutcome, setBonusOutcome] = useState<{ rd: ResolvedDay; extraId: string } | null>(null)
   const [editingExtra, setEditingExtra] = useState<ExtraWorkoutEntry | null>(null)
+
+  // Active workout tracker state
+  const [showActiveWorkout, setShowActiveWorkout] = useState(false)
+  // Exercises tracked during active session — used to pre-fill OutcomeModal
+  const [activeTrackedExercises, setActiveTrackedExercises] = useState<LoggedExerciseActual[] | null>(null)
+  const [activeTrackedDurationMin, setActiveTrackedDurationMin] = useState<number | null>(null)
 
   if (!plan || !todayResolved) {
     return (
@@ -131,11 +170,20 @@ export function TodayPage() {
   // Stats for the compact stats bar (scoped to the active plan's history)
   const stats = computeHistoryStats(planEntries, planExtras, today)
 
+  function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
+    setActiveTrackedExercises(exercises)
+    setActiveTrackedDurationMin(Math.round(meta.totalElapsedSeconds / 60) || null)
+    setShowActiveWorkout(false)
+    setShowOutcomeModal(true)
+  }
+
   function handleCompleteClick() {
     setShowOutcomeModal(true)
   }
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
+    setActiveTrackedExercises(null)
+    setActiveTrackedDurationMin(null)
     const action = completionStateToAction(outcome.completionState)
     logAction(plan!.id, today, primaryPlanDayIndex, action, outcome.notes ?? undefined)
 
@@ -405,6 +453,17 @@ export function TodayPage() {
         </div>
       )}
 
+      {/* Start Workout button — only when pending */}
+      {isPending && (
+        <button
+          onClick={() => setShowActiveWorkout(true)}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors active:scale-[0.98]"
+        >
+          <Play size={18} />
+          Start Workout
+        </button>
+      )}
+
       {/* Action buttons — only show if pending */}
       {isPending && (
         <div className="grid grid-cols-3 gap-2">
@@ -544,11 +603,46 @@ export function TodayPage() {
           planId={plan.id}
           calendarDate={today}
           planDay={primaryPlanDay}
-          existingOutcome={existingOutcome}
+          existingOutcome={
+            activeTrackedExercises
+              ? {
+                  workoutInstanceId: makeWorkoutInstanceId(plan.id, today),
+                  completionState: 'completed',
+                  completedAt: new Date().toISOString(),
+                  durationActualMin: activeTrackedDurationMin,
+                  perceivedEffort: null,
+                  notes: null,
+                  runActual: null,
+                  swimActual: null,
+                  weightsActual: { exercises: activeTrackedExercises },
+                }
+              : existingOutcome
+          }
           onConfirm={handleOutcomeConfirm}
-          onClose={() => setShowOutcomeModal(false)}
+          onClose={() => {
+            setShowOutcomeModal(false)
+            setActiveTrackedExercises(null)
+            setActiveTrackedDurationMin(null)
+          }}
         />
       )}
+
+      {/* Active workout tracker */}
+      {showActiveWorkout && plan && todayResolved && (() => {
+        const slot = primaryPlanDay.slots[0]
+        if (!slot) return null
+        return (
+          <ActiveWorkoutTracker
+            planId={plan.id}
+            planDay={primaryPlanDay}
+            slot={slot}
+            programVars={planProgramVars}
+            previousOutcome={previousWeightsOutcome}
+            onClose={() => setShowActiveWorkout(false)}
+            onComplete={handleActiveWorkoutComplete}
+          />
+        )
+      })()}
 
       {/* Edit outcome for a completed extra workout (double-day bonus or ad-hoc) */}
       {editingExtra && (() => {
