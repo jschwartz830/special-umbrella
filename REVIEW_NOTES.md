@@ -1,5 +1,102 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-27 (fourteenth pass) — branch `claude/great-mccarthy-GNrKl`
+
+### Executive summary
+
+1. **What changed**: Two bug fixes (`logAction` type + CalendarPage jump
+   re-anchor), two features (plan progress on PlansPage cards, Today button
+   on CalendarPage), and 2 new tests. All 293 tests pass.
+2. **What is highest confidence**: The `logAction` type fix — zero behavior
+   change, pure type cleanup. The plan progress display — pure read-only
+   wiring of an already-tested function.
+3. **What is risky**: The CalendarPage jump re-anchor fix changes a subtle
+   override-management decision. It is provably more correct, but since
+   there are no CalendarPage component tests, the fix can only be verified
+   manually.
+4. **What to review first**: `e72e96a` (CalendarPage fix). Trigger the
+   scenario: log a past date via CalendarPage, let it create a jump override,
+   then open that same date again and re-confirm the same workout without
+   changing the day index. Verify the rotation for subsequent dates is
+   unchanged before and after.
+
+---
+
+### Bug severity assessment
+
+| Bug | Severity | Was it user-visible? |
+|-----|----------|---------------------|
+| `logAction` planDayIndex type | Low | No — `-1` was silently discarded anyway |
+| CalendarPage jump re-anchor | Medium | Yes — re-confirming a retroactively-logged day could silently shift the rotation |
+
+---
+
+### Improvements completed
+
+| # | Change | Confidence |
+|---|---|---|
+| 1 | `logAction` type: `number` → `number | undefined` | High |
+| 2 | CalendarPage `logForDate`: re-anchor jump on removal | High |
+| 3 | PlansPage: show `computePlanProgress` on plan cards | High |
+| 4 | CalendarPage: "Today" button to jump back to current month | High |
+
+---
+
+### Definitely keep
+
+- `fd0debc` — type cleanup, zero risk.
+- `f48a501` — surfaces a production-ready utility. Pure display. Zero risk.
+- Today button (in `e72e96a`) — additive, zero risk.
+
+### Probably keep but verify manually
+
+- `e72e96a` (jump re-anchor fix) — correct by reasoning and test, but no
+  component tests exist. Manually verify the scenario before shipping.
+
+### Do not keep
+
+- Nothing from this pass warrants removal.
+
+### Recommendations only (not implemented)
+
+- **TodayPage extraction**: still ~1700 lines; still the biggest maintenance
+  risk. No overnight fix — requires daytime UI testing.
+- **`progressionStates` orphaning on plan delete**: wasted storage only;
+  no correctness risk. Needs a plan→progressionGroup index to fix cleanly.
+- **Wire `computeWorkoutTypeBreakdown` to History or Today page**: pure
+  function added in twelfth pass, still no UI entry point.
+- **Add `computePlanProgress` to the active-plan header on TodayPage**:
+  now showing on PlansPage; could also show on TodayPage to reinforce
+  plan progress while working out.
+
+---
+
+### Open questions for the developer
+
+1. For the CalendarPage jump re-anchor: should `day_off` also re-anchor?
+   Currently it does not — a `day_off` on a day that had a jump removes the
+   jump and does not re-add it. The rotation advances from the natural pointer
+   position. Is this the intended behavior, or should `day_off` also preserve
+   the rotation anchor?
+2. For plan progress on PlansPage: is the "X/Y done (Z%)" text the right
+   format? An alternative is a thin progress bar. Easy to change.
+3. Any plans for TodayPage extraction? It's now past 1700 lines and growing.
+
+---
+
+### Known issues / incomplete work
+
+- CalendarPage has no component tests. The jump re-anchor fix is correct
+  by reasoning and the engine regression test, but manual verification is
+  recommended.
+- `computeWorkoutTypeBreakdown` remains wired to no UI entry point.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-04-27 (thirteenth pass) — branch `claude/great-mccarthy-PqhIm`
 
 ### Executive summary

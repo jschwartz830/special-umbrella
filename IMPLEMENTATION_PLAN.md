@@ -1,5 +1,69 @@
 # Implementation Plan
 
+## 2026-04-27 — Overnight Audit (fourteenth pass)
+
+Branch: `claude/great-mccarthy-GNrKl`.
+Baseline on entry: **291 passing, 0 failing**.
+Exit state: **293 passing, 0 failing** (+2 tests).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the thirteenth pass.
+
+### What appears strong and well-designed (unchanged)
+
+- 291-test suite (now 293) covering engine, stores, adaptation, lib, CSV,
+  and recommendation modules.
+- All prior bug fixes from passes 1–13 remain stable; no regressions.
+- `computePlanProgress` (eleventh pass) and `computeHistoryStats` (earlier
+  passes) are both now surfaced in the UI (PlansPage and TodayPage).
+
+### Key issues found this pass
+
+1. **`logAction` planDayIndex type mismatch** (TYPE, low severity).
+   `logAction` required `planDayIndex: number` even for `day_off`, where it
+   is immediately discarded. `usePlanActions.dayOff()` passed `-1` as a dummy.
+   Changed to `number | undefined`; updated callers.
+
+2. **CalendarPage `logForDate` retroactive jump re-anchor bug** (BUG, medium severity).
+   When `logForDate` removed a retroactive jump override, it only added a
+   replacement if `selectedPlanDayIdx !== rd.planDayIndex`. But `rd.planDayIndex`
+   was computed WITH the jump applied, so when a user confirmed the same index
+   the condition was `false` — no replacement was added, the jump was gone, and
+   the rotation silently shifted for all subsequent dates. Fix: check for an
+   existing jump before removal; if one existed, always re-anchor with a new
+   jump after removal.
+
+### Features implemented
+
+3. **`computePlanProgress` wired into PlansPage** (FEATURE).
+   Each plan card now shows completed/total progress when any has been made
+   (e.g. "2/4 rotations · 2/4 done (50%)"). Uses the existing pure function
+   from the eleventh pass.
+
+4. **"Today" button on CalendarPage** (FEATURE).
+   When the user navigates away from the current month, a small "Today" badge
+   appears next to the month title. Hidden when already on the current month.
+
+### Prioritized plan
+
+| # | Item | Action |
+|---|---|---|
+| 1 | Fix `logAction` type | **Implemented** |
+| 2 | Fix `logForDate` retroactive jump re-anchor | **Implemented** |
+| 3 | Wire `computePlanProgress` into PlansPage | **Implemented** |
+| 4 | "Today" button on CalendarPage | **Implemented** |
+| 5 | `progressionStates` orphaning on plan delete | Recommend only |
+| 6 | TodayPage extraction (~1700 lines) | Recommend only |
+
+### Rationale for sequencing
+
+Type fix first (smallest change, zero behavior impact). Bug fix second
+(correctness, CalendarPage only). Features last (additive, zero store changes).
+
+---
+
 ## 2026-04-27 — Overnight Audit (thirteenth pass)
 
 Branch: `claude/great-mccarthy-PqhIm`.
