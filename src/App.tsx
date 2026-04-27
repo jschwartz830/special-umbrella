@@ -5,6 +5,7 @@ import { CalendarPage } from './pages/CalendarPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { PlansPage } from './pages/PlansPage'
 import { PlanBuilderPage } from './pages/PlanBuilderPage'
+import { ProgramImportPage } from './pages/ProgramImportPage'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="plans" element={<PlansPage />} />
         <Route path="plans/new" element={<PlanBuilderPage />} />
         <Route path="plans/:id/edit" element={<PlanBuilderPage />} />
+        <Route path="plans/import" element={<ProgramImportPage />} />
       </Route>
     </Routes>
   )

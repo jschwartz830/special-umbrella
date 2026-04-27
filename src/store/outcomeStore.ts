@@ -7,6 +7,7 @@ import {
   applyRunProgressionDecision,
 } from '../modules/run-adaptation/engine'
 import type { WorkoutSlot } from '../types'
+import { useProgramStore } from './programStore'
 
 interface OutcomeState {
   /** Keyed by workoutInstanceId = `${planId}_${calendarDate}` */
@@ -79,21 +80,50 @@ export const useOutcomeStore = create<OutcomeState>()(
         // 1. Persist the outcome
         get().setOutcome(outcome)
 
-        // 2. Evaluate run progression if applicable
+        // 2. Evaluate legacy run progression (runConfig-based)
         const groupId = slot.runConfig?.progressionGroupId
-        if (!slot.runConfig?.progressionEligible || !groupId) return
+        if (slot.runConfig?.progressionEligible && groupId) {
+          const prevState = get().progressionStates[groupId] ?? null
+          const decision = evaluateRunProgression(slot, outcome, prevState)
+          if (decision.action !== 'none') {
+            const nextState = applyRunProgressionDecision(
+              outcome.workoutInstanceId,
+              groupId,
+              decision,
+              prevState,
+            )
+            get().setProgressionState(nextState)
+          }
+        }
 
-        const prevState = get().progressionStates[groupId] ?? null
-        const decision = evaluateRunProgression(slot, outcome, prevState)
-        if (decision.action === 'none') return
+        // 3. Evaluate program-level progression rules (YAML-imported plans)
+        const planId = outcome.workoutInstanceId.split('_')[0]
+        if (!planId) return
 
-        const nextState = applyRunProgressionDecision(
-          outcome.workoutInstanceId,
-          groupId,
-          decision,
-          prevState,
-        )
-        get().setProgressionState(nextState)
+        const programStore = useProgramStore.getState()
+        const currentVars = programStore.getVars(planId)
+        if (Object.keys(currentVars).length === 0) return // not a program plan
+
+        const ctxBase = {
+          effort: outcome.perceivedEffort ?? null,
+          all_reps: outcome.completionState === 'completed',
+          session_complete:
+            outcome.completionState !== 'skipped' && outcome.completionState !== 'planned',
+        }
+
+        // 3a. Slot-level progression (run slots)
+        if (slot.slotProgress) {
+          programStore.applyProgressionRule(planId, slot.slotProgress, ctxBase)
+        }
+
+        // 3b. Per-exercise progression (weights slots)
+        if (slot.exercises) {
+          for (const ex of slot.exercises) {
+            if (ex.progress) {
+              programStore.applyProgressionRule(planId, ex.progress, ctxBase)
+            }
+          }
+        }
       },
 
       updateOutcomeNotes(workoutInstanceId, notes) {

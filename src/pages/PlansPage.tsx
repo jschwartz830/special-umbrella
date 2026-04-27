@@ -9,6 +9,7 @@ import {
   Trash2,
   ChevronRight,
   Dumbbell,
+  FileCode,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { usePlanStore } from '../store/planStore'
@@ -180,12 +181,22 @@ export function PlansPage() {
       <div className="pt-6 pb-4 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-white">Plans</h1>
-          <button
-            onClick={() => navigate('/plans/new')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-semibold transition-colors active:scale-95"
-          >
-            <Plus size={16} /> New Plan
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/plans/import')}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-semibold transition-colors active:scale-95"
+              title="Import program from YAML"
+            >
+              <FileCode size={16} />
+              <span className="hidden sm:inline">Import YAML</span>
+            </button>
+            <button
+              onClick={() => navigate('/plans/new')}
+              className="flex items-center gap-1.5 px-3 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-semibold transition-colors active:scale-95"
+            >
+              <Plus size={16} /> New Plan
+            </button>
+          </div>
         </div>
         <CsvToolbar
           canExport={allPlans.length > 0}

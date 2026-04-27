@@ -17,6 +17,7 @@ export type ActionType = 'complete' | 'skip' | 'day_off'
 export type { WorkoutTag, WorkoutDifficulty, RunWorkoutConfig, RunWorkoutSubtype, PaceRange } from '../modules/workout-metadata/types'
 export type { WorkoutCompletionState, PerceivedEffort, WorkoutOutcome, RunWorkoutActual } from '../modules/workout-outcomes/types'
 export type { RunProgressionState, RunProgressionDecision, ResolvedWorkoutTarget } from '../modules/run-adaptation/types'
+export type { ExerciseSpec, SetSpec, RunSegment, DrillSpec, ProgressionRule, ProgramMeta, ProgramVarDefs } from './program'
 
 export type PlanStatus = 'active' | 'inactive' | 'archived'
 
@@ -71,6 +72,16 @@ export interface WorkoutSlot {
   timeMin?: number
   structureDescription?: string
   adaptiveProgressionEnabled?: boolean
+
+  // ── Program / DSL fields (populated when slot comes from a YAML import) ──
+  /** Structured weightlifting warmup sets */
+  warmup?: import('./program').ExerciseSpec[]
+  /** Structured weightlifting exercises with sets/reps/load/progression */
+  exercises?: import('./program').ExerciseSpec[]
+  /** Structured run segments (warmup, intervals, drills, cooldown, etc.) */
+  segments?: import('./program').RunSegment[]
+  /** Slot-level progression rule (typically used on run slots) */
+  slotProgress?: import('./program').ProgressionRule
 }
 
 /** One entry in the repeating day sequence */
@@ -96,6 +107,8 @@ export interface Plan {
   startDayIndex: number  // rotation index when activated (0 for new plans)
   createdAt: string
   updatedAt: string
+  /** Present when the plan was imported from a YAML program definition */
+  programMeta?: import('./program').ProgramMeta
 }
 
 // ── History ──────────────────────────────────────────────────────────────────
