@@ -22,7 +22,7 @@ interface HistoryState {
   logAction: (
     planId: string,
     calendarDate: string,
-    planDayIndex: number,
+    planDayIndex: number | undefined,
     action: ActionType,
     notes?: string,
   ) => void

@@ -15,6 +15,7 @@ import { usePlanStore } from '../store/planStore'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore } from '../store/outcomeStore'
 import { isPlanExpired } from '../engine/rotationEngine'
+import { computePlanProgress } from '../lib/historyStats'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
@@ -78,6 +79,7 @@ export function PlansPage() {
     const isArchived = plan.status === 'archived'
     const planEntries = entries.filter(e => e.planId === plan.id)
     const expired = isActive && isPlanExpired(plan, planEntries, today)
+    const progress = computePlanProgress(plan, planEntries, today)
 
     return (
       <div
@@ -109,6 +111,11 @@ export function PlansPage() {
               )}
               <p className="text-xs text-slate-500 mt-1">
                 {plan.days.length} days · {plan.duration.value} {plan.duration.type}
+                {progress.total > 0 && progress.completed > 0 && (
+                  <span className="ml-1.5 text-slate-400">
+                    · {progress.completed}/{progress.total} done ({progress.percentComplete}%)
+                  </span>
+                )}
               </p>
             </div>
             <ChevronRight size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />

@@ -1,5 +1,126 @@
 # Overnight Changelog
 
+## 2026-04-27 (fourteenth pass) — branch `claude/great-mccarthy-GNrKl`
+
+Baseline on entry: **291 passing, 0 failing**.
+Exit state: **293 passing, 0 failing** (+2 tests).
+
+### Commits
+
+| SHA | Commit message |
+|-----|---------------|
+| fd0debc | fix(historyStore): accept undefined planDayIndex in logAction for day_off |
+| e72e96a | fix(CalendarPage): re-anchor rotation after retroactive jump removal |
+| f48a501 | feat(PlansPage): show plan progress on each plan card |
+
+> Note: the "Today" CalendarPage button was committed together with the
+> bug fix in e72e96a (both changes touch CalendarPage.tsx). The commit
+> message emphasises the bug fix; the button is a small additive change.
+
+---
+
+### 1. fix(historyStore): logAction planDayIndex type
+
+**Summary**: `logAction` required `planDayIndex: number` even for `day_off`
+actions, where the value is immediately discarded (set to `undefined` in
+`addEntry`). `usePlanActions.dayOff()` passed `-1` as a dummy value.
+Changed type to `number | undefined`; updated `dayOff()` to pass
+`undefined` directly.
+
+**Why it matters**: Eliminates a misleading type that could confuse future
+readers and tools. No behavior change on the happy path; `day_off` entries
+already stored `planDayIndex: undefined` regardless of what was passed.
+
+**Files changed**:
+- `src/store/historyStore.ts` — interface: `number` → `number | undefined`
+- `src/hooks/usePlanActions.ts` — `dayOff()`: `-1` → `undefined`
+- `src/store/__tests__/historyStore.test.ts` — +1 test for new calling convention
+
+**Risk**: None. `logAction` implementation ignores the value for `day_off`
+regardless. Existing tests continue to pass since the old numeric API is
+still accepted by the `number | undefined` type.
+
+**Rollback**: `git revert fd0debc`
+
+---
+
+### 2. fix(CalendarPage): retroactive jump re-anchor
+
+**Summary**: `logForDate` in CalendarPage called `removeRetroJumpForDate`
+then only added a replacement jump if `selectedPlanDayIdx !== rd.planDayIndex`.
+The bug: `rd.planDayIndex` was computed WITH the jump applied. When the user
+confirmed the same planDayIndex that was already showing (via the old jump),
+the condition was `false` — no replacement was added. The jump was gone and
+the rotation silently shifted for all subsequent dates.
+
+**Example**: Day 5 shows Day 2 (via jump). User logs Day 2 again (confirms
+same day). Old jump removed, no new jump added. Now Day 5 naturally shows
+a different rotation position. Day 6 onward is off by N positions.
+
+**Fix**: Before calling `removeRetroJumpForDate`, check whether a jump
+override exists for that date (`hadJump`). If it did, always add a new
+jump to `selectedPlanDayIdx` (for non-`day_off` actions) so the rotation
+stays anchored regardless of whether the user changed the index or not.
+
+**Why it matters**: Without the fix, a user who opens a retroactively-logged
+calendar day and saves it without changes can corrupt their rotation for
+all future dates — with no visible feedback.
+
+**Files changed**:
+- `src/pages/CalendarPage.tsx` — `logForDate`: added `hadJump` check + new condition
+- `src/engine/__tests__/rotationEngine.test.ts` — +1 regression test documenting
+  the "removing jump without re-anchor shifts subsequent rotation" invariant
+
+**Risk**: Minimal. The new code path only adds an override when one is being
+replaced. If `hadJump` is `false` and `selectedPlanDayIdx === rd.planDayIndex`,
+no override is added (same as before). The only new override is a jump to the
+user-selected day when an old jump existed — which is strictly more correct.
+
+**Rollback**: `git revert e72e96a` (also reverts Today button)
+
+---
+
+### 3. feat(CalendarPage): Today button in month nav
+
+**Summary**: A "Today" badge appears next to the month title when the user
+has navigated away from the current month. Clicking it resets to the current
+year/month. Hidden when already on the current month.
+
+**Why it matters**: Reduces friction when reviewing past months — one tap
+back to the current date instead of repeatedly clicking the forward arrow.
+
+**Files changed**: `src/pages/CalendarPage.tsx` (same commit as bug fix)
+
+**Risk**: Zero. Purely additive; `goToToday` sets two existing state vars.
+
+**Rollback**: Reverts with bug fix commit e72e96a.
+
+---
+
+### 4. feat(PlansPage): plan progress on plan cards
+
+**Summary**: Wires `computePlanProgress` (added in eleventh pass, never
+surfaced in the UI) into `PlanCard`. Each card now shows completed/total
+units and a percentage when any progress has been logged. Display is
+suppressed for plans with no progress to keep cards clean.
+
+**Example display**: "4 days · 4 rotations · 2/4 done (50%)"
+
+**Why it matters**: Users could not see how far through a plan they were
+without navigating away. The helper was production-ready (15 tests) and
+was explicitly recommended for UI wiring in the eleventh pass.
+
+**Files changed**:
+- `src/pages/PlansPage.tsx` — imports `computePlanProgress`, adds display to `PlanCard`
+
+**Risk**: Zero. `computePlanProgress` is a pure function, fully tested. No
+store changes. Display only appears when `progress.completed > 0` so it
+does not affect the look of plans with no history.
+
+**Rollback**: `git revert f48a501`
+
+---
+
 ## 2026-04-27 (thirteenth pass) — branch `claude/great-mccarthy-PqhIm`
 
 Baseline on entry: **286 passing, 0 failing**.

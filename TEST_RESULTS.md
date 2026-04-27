@@ -1,5 +1,49 @@
 # Test Results
 
+## 2026-04-27 (fourteenth pass) — branch `claude/great-mccarthy-GNrKl`
+
+**Result: 293 passing, 0 failing** (+2 tests this pass)
+
+### New tests added
+
+| File | Test | Covers |
+|------|------|--------|
+| `historyStore.test.ts` | `logAction: accepts undefined planDayIndex directly for day_off` | New `number \| undefined` type for day_off callers |
+| `rotationEngine.test.ts` | `removing a retroactive jump override without re-adding one shifts the rotation` | Engine invariant that CalendarPage fix relies on |
+
+### Full suite summary
+
+```
+Test Files: 11 passed (11)
+Tests:      293 passed (293)
+Duration:   ~1.3s
+```
+
+### Test file breakdown (post-fourteenth-pass)
+
+| File | Tests |
+|------|-------|
+| `src/engine/__tests__/calendarProjection.test.ts` | 31 |
+| `src/engine/__tests__/rotationEngine.test.ts` | 51 (+1) |
+| `src/lib/__tests__/csv.test.ts` | 25 |
+| `src/lib/__tests__/historyScope.test.ts` | 4 |
+| `src/lib/__tests__/historyStats.test.ts` | 54 |
+| `src/lib/__tests__/runProgression.test.ts` | 46 |
+| `src/modules/recommendation/__tests__/explanation.test.ts` | 23 |
+| `src/hooks/__tests__/useExpiryDismiss.test.ts` | 12 |
+| `src/store/__tests__/historyStore.test.ts` | 25 (+1) |
+| `src/store/__tests__/outcomeStore.test.ts` | 6 |
+| `src/store/__tests__/planDeleteCleanup.test.ts` | 3 |
+| **Total** | **293** |
+
+### Areas still without direct test coverage
+
+- CalendarPage component (no component tests exist anywhere)
+- TodayPage component
+- PlansPage component (plan progress wiring is read-only display; tested indirectly via `computePlanProgress` unit tests)
+
+---
+
 ## 2026-04-27 (thirteenth pass) — branch `claude/great-mccarthy-PqhIm`
 
 **Result: 291 passing, 0 failing** (+5 tests this pass)
