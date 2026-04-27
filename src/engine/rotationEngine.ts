@@ -240,6 +240,7 @@ export function isPlanExpired(
     const endDate = format(addDays(parseISO(plan.startDate), value * 7), 'yyyy-MM-dd')
     return today >= endDate
   }
+  if (plan.days.length === 0) return false
   const completeSkip = entries.filter(
     e => e.planId === plan.id && (e.action === 'complete' || e.action === 'skip'),
   )
