@@ -246,7 +246,8 @@ export function ActiveWorkoutTracker({
       setRunRef.current = false; setSetRunning(false)
       restRunRef.current = false; setRestRunning(false)
     } else {
-      const last = pausePeriodsRef.current.at(-1)
+      const periods = pausePeriodsRef.current
+      const last = periods[periods.length - 1]
       if (last && !last.end) last.end = new Date().toISOString()
       workoutRunRef.current = true; setWorkoutRunning(true)
       if (restRemRef.current != null) {
@@ -350,7 +351,8 @@ export function ActiveWorkoutTracker({
 
   function handleDone() {
     const endTime = new Date().toISOString()
-    const last = pausePeriodsRef.current.at(-1)
+    const periods = pausePeriodsRef.current
+    const last = periods[periods.length - 1]
     if (last && !last.end) last.end = endTime
 
     const result: LoggedExerciseActual[] = exercises.map(ex => ({
