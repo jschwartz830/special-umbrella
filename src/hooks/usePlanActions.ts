@@ -19,7 +19,7 @@ export function usePlanActions(planId: string | null) {
 
   function dayOff() {
     if (!planId) return
-    logAction(planId, today, -1, 'day_off')
+    logAction(planId, today, undefined, 'day_off')
   }
 
   function advance() {

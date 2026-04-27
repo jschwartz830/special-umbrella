@@ -109,9 +109,15 @@ describe('logAction', () => {
     expect(getState().entries[0].planDayIndex).toBe(3)
   })
 
-  it('stores undefined planDayIndex for day_off entries', () => {
+  it('stores undefined planDayIndex for day_off entries (numeric dummy)', () => {
     getState().logAction('plan-1', '2026-01-01', 5, 'day_off')
     expect(getState().entries[0].planDayIndex).toBeUndefined()
+  })
+
+  it('accepts undefined planDayIndex directly for day_off (new calling convention)', () => {
+    getState().logAction('plan-1', '2026-01-01', undefined, 'day_off')
+    expect(getState().entries[0].planDayIndex).toBeUndefined()
+    expect(getState().entries[0].action).toBe('day_off')
   })
 
   it('stores notes when provided', () => {
