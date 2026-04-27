@@ -4,17 +4,15 @@ import type { WorkoutSlot, PlanDay } from '../../types'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import { resolveLoad, type EvalContext } from '../../lib/expressionEval'
 
-// ── Internal state types ──────────────────────────────────────────────────────
-
 interface SetTrackState {
-  setTimerSnapshot: number | null  // global set-timer value when this set was completed
+  setElapsedSeconds: number
   completed: boolean
   actualReps: number | null
   actualLoad: number | null
   targetReps: number | string | null
   targetLoad: string | null
   restSeconds: number | null
-  resolvedLoadLbs: number | null   // pre-resolved from program vars (for placeholder)
+  resolvedLoadLbs: number | null
 }
 
 interface ExerciseTrackState {
@@ -23,8 +21,6 @@ interface ExerciseTrackState {
   sets: SetTrackState[]
   previousSets?: LoggedSetActual[]
 }
-
-// ── Public types ──────────────────────────────────────────────────────────────
 
 export interface WorkoutSessionMeta {
   startTime: string
@@ -39,11 +35,10 @@ interface Props {
   slot: WorkoutSlot
   programVars: Record<string, number>
   previousOutcome: WorkoutOutcome | null
+  previousSetsByExercise?: Record<string, LoggedSetActual[]>
   onClose: () => void
   onComplete: (exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) => void
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(s: number): string {
   const m = Math.floor(s / 60)
@@ -64,8 +59,6 @@ function parseNumericLoad(load?: string | null): number | null {
   const m = load.match(/(\d+(\.\d+)?)/)
   return m ? Number(m[1]) : null
 }
-
-// ── Timer column sub-component ────────────────────────────────────────────────
 
 interface TimerColProps {
   label: string
@@ -122,31 +115,28 @@ function TimerCol({
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 export function ActiveWorkoutTracker({
   planId: _planId,
   planDay,
   slot,
   programVars,
   previousOutcome,
+  previousSetsByExercise,
   onClose,
   onComplete,
 }: Props) {
   const workoutStartRef = useRef(new Date().toISOString())
   const pausePeriodsRef = useRef<{ start: string; end?: string }[]>([])
+  const pausedSetRef = useRef<{ exIdx: number; setIdx: number } | null>(null)
 
-  // Refs (read by interval, must stay in sync with state)
   const workoutRunRef = useRef(true)
-  const setRunRef = useRef(true)
+  const activeSetRef = useRef<{ exIdx: number; setIdx: number } | null>(null)
   const restRunRef = useRef(false)
   const restRemRef = useRef<number | null>(null)
 
-  // Display state
   const [workoutElapsed, setWorkoutElapsed] = useState(0)
   const [workoutRunning, setWorkoutRunning] = useState(true)
-  const [setElapsed, setSetElapsed] = useState(0)
-  const [setRunning, setSetRunning] = useState(true)
+  const [activeSetTimer, setActiveSetTimer] = useState<{ exIdx: number; setIdx: number } | null>(null)
   const [restRemaining, setRestRemaining] = useState<number | null>(null)
   const [restRunning, setRestRunning] = useState(false)
   const [timersExpanded, setTimersExpanded] = useState(false)
@@ -154,7 +144,6 @@ export function ActiveWorkoutTracker({
   const hasVars = Object.keys(programVars).length > 0
   const evalCtx: EvalContext = { vars: programVars }
 
-  // Build initial exercise list (runs once on mount)
   const [exercises, setExercises] = useState<ExerciseTrackState[]>(() => {
     const allExercises = [
       ...(slot.warmup ?? []),
@@ -163,9 +152,8 @@ export function ActiveWorkoutTracker({
     if (!allExercises.length) return []
 
     return allExercises.map(ex => {
-      const prevEx = previousOutcome?.weightsActual?.exercises?.find(
-        e => e.exercise === ex.exercise,
-      )
+      const prevEx = previousSetsByExercise?.[ex.exercise]
+        ?? previousOutcome?.weightsActual?.exercises?.find(e => e.exercise === ex.exercise)?.sets
 
       function buildSet(load?: string | null, reps?: number | string | null, rest?: string | null): SetTrackState {
         const resolvedLoadLbs = hasVars
@@ -173,7 +161,7 @@ export function ActiveWorkoutTracker({
           : parseNumericLoad(load)
         const validLoad = resolvedLoadLbs != null && resolvedLoadLbs > 0 ? resolvedLoadLbs : null
         return {
-          setTimerSnapshot: null,
+          setElapsedSeconds: 0,
           completed: false,
           actualReps: typeof reps === 'number' ? reps : null,
           actualLoad: validLoad,
@@ -196,16 +184,27 @@ export function ActiveWorkoutTracker({
         exercise: ex.exercise,
         progressionMode: 'single' as const,
         sets,
-        previousSets: prevEx?.sets,
+        previousSets: prevEx,
       }
     })
   })
 
-  // Master 1-second interval
   useEffect(() => {
     const id = setInterval(() => {
       if (workoutRunRef.current) setWorkoutElapsed(s => s + 1)
-      if (setRunRef.current) setSetElapsed(s => s + 1)
+
+      const activeSet = activeSetRef.current
+      if (workoutRunRef.current && !restRunRef.current && activeSet) {
+        setExercises(prev => prev.map((ex, ei) => (
+          ei !== activeSet.exIdx ? ex : {
+            ...ex,
+            sets: ex.sets.map((set, si) => (
+              si !== activeSet.setIdx ? set : { ...set, setElapsedSeconds: set.setElapsedSeconds + 1 }
+            )),
+          }
+        )))
+      }
+
       if (restRunRef.current) {
         const cur = restRemRef.current
         if (cur == null || cur <= 1) {
@@ -213,10 +212,6 @@ export function ActiveWorkoutTracker({
           restRemRef.current = null
           setRestRemaining(null)
           setRestRunning(false)
-          // Resume set timer
-          setRunRef.current = true
-          setSetRunning(true)
-          setSetElapsed(0)
         } else {
           restRemRef.current = cur - 1
           setRestRemaining(cur - 1)
@@ -226,120 +221,143 @@ export function ActiveWorkoutTracker({
     return () => clearInterval(id)
   }, [])
 
-  // ── Timer control helpers ───────────────────────────────────────────────────
-
   function startRest(seconds: number) {
     restRemRef.current = seconds
     setRestRemaining(seconds)
     restRunRef.current = true
     setRestRunning(true)
-    setRunRef.current = false
-    setSetRunning(false)
-    setSetElapsed(0)
+    activeSetRef.current = null
+    setActiveSetTimer(null)
   }
 
   function toggleWorkout(e?: React.MouseEvent) {
     e?.stopPropagation()
     if (workoutRunning) {
       pausePeriodsRef.current.push({ start: new Date().toISOString() })
-      workoutRunRef.current = false; setWorkoutRunning(false)
-      setRunRef.current = false; setSetRunning(false)
-      restRunRef.current = false; setRestRunning(false)
-    } else {
-      const periods = pausePeriodsRef.current
-      const last = periods[periods.length - 1]
-      if (last && !last.end) last.end = new Date().toISOString()
-      workoutRunRef.current = true; setWorkoutRunning(true)
-      if (restRemRef.current != null) {
-        restRunRef.current = true; setRestRunning(true)
-      } else {
-        setRunRef.current = true; setSetRunning(true)
-      }
+      workoutRunRef.current = false
+      setWorkoutRunning(false)
+      pausedSetRef.current = activeSetRef.current
+      activeSetRef.current = null
+      setActiveSetTimer(null)
+      restRunRef.current = false
+      setRestRunning(false)
+      return
     }
-  }
 
-  function toggleSet(e: React.MouseEvent) {
-    e.stopPropagation()
-    if (setRunning) { setRunRef.current = false; setSetRunning(false) }
-    else { setRunRef.current = true; setSetRunning(true) }
+    const periods = pausePeriodsRef.current
+    const last = periods[periods.length - 1]
+    if (last && !last.end) last.end = new Date().toISOString()
+    workoutRunRef.current = true
+    setWorkoutRunning(true)
+
+    if (restRemRef.current != null) {
+      restRunRef.current = true
+      setRestRunning(true)
+      return
+    }
+
+    if (pausedSetRef.current) {
+      activeSetRef.current = pausedSetRef.current
+      setActiveSetTimer(pausedSetRef.current)
+      pausedSetRef.current = null
+    }
   }
 
   function toggleRest(e: React.MouseEvent) {
     e.stopPropagation()
     if (restRemRef.current == null) return
-    if (restRunning) { restRunRef.current = false; setRestRunning(false) }
-    else { restRunRef.current = true; setRestRunning(true) }
-  }
-
-  function resetSet(e: React.MouseEvent) {
-    e.stopPropagation()
-    setSetElapsed(0)
+    if (restRunning) {
+      restRunRef.current = false
+      setRestRunning(false)
+      return
+    }
+    restRunRef.current = true
+    setRestRunning(true)
   }
 
   function resetRest(e: React.MouseEvent) {
     e.stopPropagation()
     restRemRef.current = null
     setRestRemaining(null)
-    restRunRef.current = false; setRestRunning(false)
-    setRunRef.current = true; setSetRunning(true)
+    restRunRef.current = false
+    setRestRunning(false)
   }
 
-  function adjust(timer: 'workout' | 'set' | 'rest', delta: number, e: React.MouseEvent) {
+  function adjust(timer: 'workout' | 'rest', delta: number, e: React.MouseEvent) {
     e.stopPropagation()
     if (timer === 'workout') {
       setWorkoutElapsed(s => Math.max(0, s + delta))
-    } else if (timer === 'set') {
-      setSetElapsed(s => Math.max(0, s + delta))
-    } else {
-      const cur = restRemRef.current ?? 0
-      const next = Math.max(0, cur + delta)
-      restRemRef.current = next
-      setRestRemaining(next || null)
-      if (next > 0 && !restRunning && workoutRunning) {
-        restRunRef.current = true; setRestRunning(true)
-        setRunRef.current = false; setSetRunning(false)
-      }
+      return
+    }
+
+    const cur = restRemRef.current ?? 0
+    const next = Math.max(0, cur + delta)
+    restRemRef.current = next
+    setRestRemaining(next || null)
+    if (next > 0 && !restRunning && workoutRunning) {
+      restRunRef.current = true
+      setRestRunning(true)
+      pausedSetRef.current = activeSetRef.current
+      activeSetRef.current = null
+      setActiveSetTimer(null)
     }
   }
 
-  // ── Exercise / set handlers ─────────────────────────────────────────────────
+  function handleSetTimerToggle(exIdx: number, setIdx: number) {
+    if (!workoutRunning || restRunning || !isActiveSet(exIdx, setIdx)) return
+    const set = exercises[exIdx]?.sets[setIdx]
+    if (!set || set.completed) return
+
+    const current = activeSetRef.current
+    if (current && current.exIdx === exIdx && current.setIdx === setIdx) {
+      activeSetRef.current = null
+      setActiveSetTimer(null)
+      return
+    }
+
+    activeSetRef.current = { exIdx, setIdx }
+    setActiveSetTimer({ exIdx, setIdx })
+  }
 
   function handleSetComplete(exIdx: number, setIdx: number) {
-    const completing = !exercises[exIdx].sets[setIdx].completed
-    const snapshot = setElapsed
+    const setToToggle = exercises[exIdx].sets[setIdx]
+    const completing = !setToToggle.completed
 
-    setExercises(prev => prev.map((ex, ei) =>
+    setExercises(prev => prev.map((ex, ei) => (
       ei !== exIdx ? ex : {
         ...ex,
-        sets: ex.sets.map((s, si) =>
+        sets: ex.sets.map((s, si) => (
           si !== setIdx ? s : {
             ...s,
             completed: completing,
-            setTimerSnapshot: completing ? snapshot : null,
+            setElapsedSeconds: completing ? s.setElapsedSeconds : 0,
           }
-        ),
+        )),
       }
-    ))
+    )))
+
+    if (activeSetRef.current?.exIdx === exIdx && activeSetRef.current?.setIdx === setIdx) {
+      activeSetRef.current = null
+      setActiveSetTimer(null)
+    }
 
     if (completing) {
-      startRest(exercises[exIdx].sets[setIdx].restSeconds ?? 90)
+      startRest(setToToggle.restSeconds ?? 90)
     }
   }
 
   function updateSet(exIdx: number, setIdx: number, patch: Partial<SetTrackState>) {
-    setExercises(prev => prev.map((ex, ei) =>
+    setExercises(prev => prev.map((ex, ei) => (
       ei !== exIdx ? ex : {
         ...ex,
         sets: ex.sets.map((s, si) => si !== setIdx ? s : { ...s, ...patch }),
       }
-    ))
+    )))
   }
 
   function setTimerDisplay(exIdx: number, setIdx: number): string {
     const s = exercises[exIdx].sets[setIdx]
-    if (s.completed && s.setTimerSnapshot != null) return fmt(s.setTimerSnapshot)
-    const isActive = exercises[exIdx].sets.slice(0, setIdx).every(p => p.completed) && !s.completed
-    return isActive ? fmt(setElapsed) : '—'
+    return fmt(s.setElapsedSeconds)
   }
 
   function isActiveSet(exIdx: number, setIdx: number): boolean {
@@ -347,7 +365,11 @@ export function ActiveWorkoutTracker({
       && !exercises[exIdx].sets[setIdx].completed
   }
 
-  // ── Done handler ────────────────────────────────────────────────────────────
+  function previousSetDisplay(ex: ExerciseTrackState, setIdx: number): string {
+    const previous = ex.previousSets?.[setIdx]
+    if (!previous || previous.actualReps == null || previous.actualLoad == null) return '-'
+    return `${previous.actualReps} x ${previous.actualLoad}lb`
+  }
 
   function handleDone() {
     const endTime = new Date().toISOString()
@@ -376,12 +398,8 @@ export function ActiveWorkoutTracker({
     })
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
-
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-slate-800">
         <button
           onClick={onClose}
@@ -406,12 +424,11 @@ export function ActiveWorkoutTracker({
         </button>
       </div>
 
-      {/* ── Timers box (collapsible) ────────────────────────────────────────── */}
       <div
         className="flex-shrink-0 mx-4 mt-3 border border-slate-700 rounded-xl bg-slate-800/60 cursor-pointer select-none"
         onClick={() => setTimersExpanded(v => !v)}
       >
-        <div className="grid grid-cols-3 divide-x divide-slate-700/60 py-2.5">
+        <div className="grid grid-cols-2 divide-x divide-slate-700/60 py-2.5">
           <TimerCol
             label="Workout"
             value={fmt(workoutElapsed)}
@@ -421,16 +438,6 @@ export function ActiveWorkoutTracker({
             onToggle={e => { e.stopPropagation(); toggleWorkout(e) }}
             onReset={e => { e.stopPropagation(); setWorkoutElapsed(0) }}
             onAdjust={(d, e) => adjust('workout', d, e)}
-          />
-          <TimerCol
-            label="Set"
-            value={fmt(setElapsed)}
-            running={setRunning}
-            colorClass="text-amber-300"
-            expanded={timersExpanded}
-            onToggle={toggleSet}
-            onReset={resetSet}
-            onAdjust={(d, e) => adjust('set', d, e)}
           />
           <TimerCol
             label="Rest"
@@ -449,7 +456,6 @@ export function ActiveWorkoutTracker({
         </div>
       </div>
 
-      {/* ── Exercise list ───────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 pt-3 pb-28 space-y-3">
         {exercises.length === 0 ? (
           <div className="text-center py-10 space-y-1">
@@ -460,35 +466,18 @@ export function ActiveWorkoutTracker({
         ) : (
           exercises.map((ex, exIdx) => (
             <div key={ex.exercise + exIdx} className="bg-slate-800/60 rounded-xl p-3 space-y-2">
-
-              {/* Exercise header */}
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-white leading-tight">{ex.exercise}</p>
-                  {ex.previousSets && ex.previousSets.length > 0 && (
-                    <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-                      Last:{' '}
-                      {ex.previousSets
-                        .map(s => {
-                          const parts = [
-                            s.actualLoad != null ? `${s.actualLoad}lb` : null,
-                            s.actualReps != null ? `×${s.actualReps}` : null,
-                          ].filter(Boolean)
-                          return parts.length ? parts.join('') : null
-                        })
-                        .filter(Boolean)
-                        .join(', ')}
-                    </p>
-                  )}
                 </div>
                 <select
                   value={ex.progressionMode}
-                  onChange={e => setExercises(prev => prev.map((it, i) =>
+                  onChange={e => setExercises(prev => prev.map((it, i) => (
                     i !== exIdx ? it : {
                       ...it,
                       progressionMode: e.target.value as ExerciseTrackState['progressionMode'],
                     }
-                  ))}
+                  )))}
                   className="flex-shrink-0 bg-slate-700 border border-slate-600 rounded px-1.5 py-0.5 text-[10px] text-slate-300"
                 >
                   <option value="single">Single</option>
@@ -498,18 +487,18 @@ export function ActiveWorkoutTracker({
                 </select>
               </div>
 
-              {/* Column headers */}
               <div className="grid grid-cols-12 gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
                 <span className="col-span-1 text-center">#</span>
-                <span className="col-span-4 text-center">Reps</span>
-                <span className="col-span-4 text-center">Lbs</span>
+                <span className="col-span-3 text-center">Prev</span>
+                <span className="col-span-3 text-center">Reps</span>
+                <span className="col-span-3 text-center">Lbs</span>
                 <span className="col-span-2 text-center">Time</span>
                 <span className="col-span-1 text-center">✓</span>
               </div>
 
-              {/* Set rows */}
               {ex.sets.map((s, setIdx) => {
                 const active = isActiveSet(exIdx, setIdx)
+                const timerRunning = activeSetTimer?.exIdx === exIdx && activeSetTimer?.setIdx === setIdx
                 return (
                   <div
                     key={setIdx}
@@ -517,6 +506,9 @@ export function ActiveWorkoutTracker({
                   >
                     <span className="col-span-1 text-center text-slate-400 text-xs font-medium">
                       {setIdx + 1}
+                    </span>
+                    <span className="col-span-3 text-center text-slate-500 text-[10px]">
+                      {previousSetDisplay(ex, setIdx)}
                     </span>
                     <input
                       type="number"
@@ -526,7 +518,7 @@ export function ActiveWorkoutTracker({
                         actualReps: e.target.value ? Number(e.target.value) : null,
                       })}
                       placeholder={String(s.targetReps ?? 'reps')}
-                      className="col-span-4 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
+                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
                     />
                     <input
                       type="number"
@@ -541,15 +533,20 @@ export function ActiveWorkoutTracker({
                           ? String(s.resolvedLoadLbs)
                           : (s.targetLoad ?? 'lbs')
                       }
-                      className="col-span-4 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
+                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
                     />
-                    {/* Timer (where ✓ was) */}
-                    <span className={`col-span-2 text-center font-mono text-[10px] leading-none ${
-                      s.completed ? 'text-emerald-400' : active ? 'text-amber-300' : 'text-slate-600'
-                    }`}>
-                      {setTimerDisplay(exIdx, setIdx)}
-                    </span>
-                    {/* ✓ (where Rest was) */}
+                    <button
+                      onClick={() => handleSetTimerToggle(exIdx, setIdx)}
+                      disabled={!active || s.completed || !workoutRunning || restRunning}
+                      className={`col-span-2 h-7 flex items-center justify-center gap-1 rounded border font-mono text-[10px] transition-colors ${
+                        timerRunning
+                          ? 'bg-amber-500/20 border-amber-500/50 text-amber-200'
+                          : 'bg-slate-700 border-slate-600 text-slate-300'
+                      } disabled:opacity-40 disabled:cursor-not-allowed`}
+                    >
+                      {timerRunning ? <Pause size={10} /> : <Play size={10} />}
+                      <span>{setTimerDisplay(exIdx, setIdx)}</span>
+                    </button>
                     <button
                       onClick={() => handleSetComplete(exIdx, setIdx)}
                       className={`col-span-1 h-7 flex items-center justify-center rounded border transition-colors ${
@@ -568,7 +565,6 @@ export function ActiveWorkoutTracker({
         )}
       </div>
 
-      {/* ── Done bar ────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-4 pt-3 pb-6 border-t border-slate-800 bg-slate-900">
         <button
           onClick={handleDone}
