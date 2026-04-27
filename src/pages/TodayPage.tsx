@@ -333,7 +333,7 @@ export function TodayPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-emerald-200 font-medium truncate">{extra.workoutName}</p>
                 <p className="text-xs text-emerald-300/70 mt-0.5 truncate capitalize">
-                  {extra.workoutType.replace('_', ' ')}
+                  {extra.workoutType.replaceAll('_', ' ')}
                 </p>
               </div>
               <ChevronRight size={14} className="text-emerald-400/60 flex-shrink-0 mt-1" />
