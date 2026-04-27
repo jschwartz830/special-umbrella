@@ -1,5 +1,46 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-27 (thirteenth pass) — branch `claude/great-mccarthy-PqhIm`
+
+### Executive summary
+
+Four bugs fixed, one medium feature added, five new tests. All 291 tests pass.
+No regressions. The fixes are all isolated, targeted, and low-risk.
+
+### Bug severity assessment
+
+| Bug | Severity | Was it user-visible? |
+|-----|----------|---------------------|
+| `formatPace` second-overflow | Medium | Yes — "9:60 /mi" in pace display |
+| `isPlanExpired` 0-day guard | Low | No — implicit NaN was accidentally correct |
+| `replaceAll` in TodayPage | Low | Yes — but only affects hypothetical multi-underscore types |
+| CSV `source` field lost | Medium | Yes — affects Undo behavior after CSV re-import |
+
+### Feature assessment
+
+The stats bar is a read-only, purely additive UI element using existing logic.
+It introduces no new state, no new stores, and no new edge cases. Risk is low.
+The implementation correctly scopes stats to the active plan (not all plans).
+
+### Remaining recommendations
+
+1. **`logAction` planDayIndex type** — misleading but not dangerous. Track for
+   next large refactor session.
+2. **`progressionStates` orphaning** — wasted storage only; no correctness risk.
+3. **TodayPage size (~1700 lines)** — needs daytime extraction session with
+   careful UI review and component testing.
+
+### What to verify during review
+
+- [ ] `formatPace(599.5)` renders as "10:00 /mi" in the app (pace display).
+- [ ] Stats bar renders correctly with a plan that has 0 completed entries
+      (all three tiles should show 0).
+- [ ] CSV re-import of an exported file preserves source on extra entries
+      (check Undo behavior still works after round-trip).
+- [ ] 0-day plan does not show as expired (edge case; defensive).
+
+---
+
 ## 2026-04-26 (twelfth pass) — branch `claude/great-mccarthy-bM0YZ`
 
 ### Executive summary

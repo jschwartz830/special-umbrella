@@ -1,5 +1,29 @@
 # Test Results
 
+## 2026-04-27 (thirteenth pass) — branch `claude/great-mccarthy-PqhIm`
+
+**Result: 291 passing, 0 failing** (+5 tests this pass)
+
+### New tests added
+
+| File | Test | Covers |
+|------|------|--------|
+| `engine.test.ts` | `formatPace` does not produce ":60" (599.5) | formatPace overflow fix |
+| `engine.test.ts` | `formatPace` does not produce ":60" (539.5) | formatPace overflow fix |
+| `engine.test.ts` | `formatPace` rounds correctly (599.4 → 9:59) | formatPace rounding |
+| `rotationEngine.test.ts` | 0-day plan is never expired (explicit guard) | isPlanExpired guard |
+| `csv.test.ts` | preserves source field through export/import round-trip | CSV source field |
+
+### Full suite summary
+
+```
+Test Files: 11 passed (11)
+Tests:      291 passed (291)
+Duration:   ~4s
+```
+
+---
+
 ## 2026-04-26 (twelfth pass) — branch `claude/great-mccarthy-bM0YZ`
 
 **Result: 286 passing, 0 failing** (11 test files, +19 tests this pass)

@@ -1,3 +1,39 @@
+# Feature Proposal — Compact Stats Bar (TodayPage)
+
+Date: 2026-04-27
+Branch: `claude/great-mccarthy-PqhIm`
+Status: **Implemented this run**
+
+## Problem
+
+TodayPage shows the current workout but gives no ambient context about recent
+performance. A user starting their workout has no quick way to see how many
+days they've kept their streak alive, how many workouts they've done this week,
+or their total for the plan — without navigating to the History page.
+
+## Proposal
+
+Add a compact three-tile horizontal stats bar below the plan header. Each tile
+shows one metric with an icon, a label, and a value:
+
+- **Streak** — current consecutive day streak (days)
+- **This week** — workouts completed in the last 7 days
+- **Total** — all-time completed workouts for this plan
+
+## Implementation
+
+Reuse `computeHistoryStats` which already computes all three metrics. Scope to
+the active plan's entries and extras. No new logic, no new stores, no new API.
+Render as a `flex gap-3` row of `rounded-xl bg-slate-800/60` tiles.
+
+## Risk
+
+Low. Read-only UI. No state changes. Existing function is well-tested. The only
+risk is a visual regression on small screens, which can be verified by viewing
+the app.
+
+---
+
 # Feature Proposal — Workout Type Breakdown Utility
 
 Date: 2026-04-26
