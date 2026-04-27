@@ -87,18 +87,8 @@ function SlotDetails({ slot }: { slot: ResolvedDay['planDay']['slots'][number] }
         <p className="text-xs text-slate-500 mt-1 italic">{resolved.structureText}</p>
       )}
 
-      {/* Tags */}
-      {slot.tags && slot.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1.5">
-          {slot.tags.slice(0, 3).map(tag => (
-            <span
-              key={tag}
-              className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-500 border border-slate-600 capitalize"
-            >
-              {tag.replace(/_/g, ' ')}
-            </span>
-          ))}
-        </div>
+      {slot.subtype && (
+        <p className="text-[10px] text-slate-500 capitalize mt-1">{slot.subtype.replace(/_/g, ' ')}</p>
       )}
 
       {slot.notes && (

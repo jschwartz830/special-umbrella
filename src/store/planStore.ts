@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { Plan, PlanDay, WorkoutSlot, WorkoutType } from '../types'
 import { nanoid } from '../engine/rotationEngine'
 import { format } from 'date-fns'
+import type { WorkoutTag } from '../modules/workout-metadata/types'
 
 interface PlanState {
   plans: Record<string, Plan>
@@ -163,20 +164,24 @@ export const usePlanStore = create<PlanState>()(
         })
       },
     }),
-    { name: 'wpt_plans' },
+    {
+      name: 'wpt_plans',
+      version: 2,
+      migrate: (persisted: unknown) => migratePlanState(persisted),
+    },
   ),
 )
 
 // ── Slot/Day helpers used by PlanBuilder ─────────────────────────────────────
 
-export function makeSlot(type: WorkoutType = 'weightlifting'): WorkoutSlot {
+export function makeSlot(type: WorkoutType = 'weights'): WorkoutSlot {
   const defaults: Partial<WorkoutSlot> = {}
-  if (type === 'weightlifting') defaults.name = 'Weightlifting'
-  else if (type === 'long_run') { defaults.name = 'Long Run'; defaults.targetDistance = 8 }
-  else if (type === 'recovery_run') { defaults.name = 'Recovery Run'; defaults.targetDistance = 3 }
+  if (type === 'weights' || type === 'weightlifting') defaults.name = 'Weights'
+  else if (type === 'run' || type === 'long_run') { defaults.name = 'Run'; defaults.targetDistance = 8; defaults.subtype = 'long' }
+  else if (type === 'recovery_run') { defaults.name = 'Run'; defaults.targetDistance = 3; defaults.subtype = 'recovery' }
   else if (type === 'swim') { defaults.name = 'Swim'; defaults.targetDuration = 45 }
   else if (type === 'yoga') { defaults.name = 'Yoga'; defaults.targetDuration = 30 }
-  else defaults.name = 'Rest'
+  else { defaults.name = 'Other'; defaults.subtype = 'rest' }
   return { id: nanoid(), type, ...defaults } as WorkoutSlot
 }
 
@@ -184,6 +189,64 @@ export function makeDay(label?: string): PlanDay {
   return {
     id: nanoid(),
     label: label ?? 'Workout Day',
-    slots: [makeSlot('weightlifting')],
+    slots: [makeSlot('weights')],
   }
+}
+
+function migratePlanState(persisted: unknown): PlanState {
+  const state = persisted as PlanState
+  if (!state || !state.plans) return { plans: {}, activePlanId: null } as PlanState
+  const plans = Object.fromEntries(
+    Object.entries(state.plans).map(([id, plan]) => [
+      id,
+      {
+        ...plan,
+        days: plan.days.map(day => ({
+          ...day,
+          slots: day.slots.map(slot => migrateSlot(slot)),
+        })),
+      },
+    ]),
+  )
+  return { ...state, plans }
+}
+
+function migrateSlot(slot: WorkoutSlot): WorkoutSlot {
+  const tags = slot.tags ?? []
+  const location = deriveLocation(tags) ?? slot.location
+  if (slot.type === 'weightlifting') {
+    return {
+      ...slot,
+      type: 'weights',
+      name: slot.name === 'Weightlifting' ? 'Weights' : slot.name,
+      weightsFocusArea: slot.weightsFocusArea ?? deriveFocus(tags),
+      location,
+      tags: undefined,
+    }
+  }
+  if (slot.type === 'long_run') {
+    return { ...slot, type: 'run', subtype: 'long', name: 'Run', location, tags: undefined }
+  }
+  if (slot.type === 'recovery_run') {
+    return { ...slot, type: 'run', subtype: 'recovery', name: 'Run', location, tags: undefined }
+  }
+  if (slot.type === 'rest') {
+    return { ...slot, type: 'other', subtype: 'rest', name: 'Other', tags: undefined }
+  }
+  return { ...slot, location, tags: undefined }
+}
+
+function deriveLocation(tags: WorkoutTag[]): string | undefined {
+  if (tags.includes('home')) return 'home'
+  if (tags.includes('gym')) return 'gym'
+  if (tags.includes('indoor')) return 'indoor'
+  if (tags.includes('outdoor')) return 'outdoor'
+  return undefined
+}
+
+function deriveFocus(tags: WorkoutTag[]): WorkoutSlot['weightsFocusArea'] {
+  if (tags.includes('upper')) return 'upper'
+  if (tags.includes('lower')) return 'lower'
+  if (tags.includes('full_body')) return 'full_body'
+  return undefined
 }

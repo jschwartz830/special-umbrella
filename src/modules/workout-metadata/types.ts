@@ -22,15 +22,62 @@ export type WorkoutTag =
 
 export type WorkoutDifficulty = 'easy' | 'moderate' | 'hard'
 
+export type WorkoutLocation = 'home' | 'gym' | 'indoor' | 'outdoor' | 'self_directed' | 'class'
+
+export type WeightsFocusArea =
+  | 'upper'
+  | 'lower'
+  | 'full_body'
+  | 'push'
+  | 'pull'
+  | 'legs'
+  | 'core'
+
+export type WeightsTrainingIntent =
+  | 'strength'
+  | 'hypertrophy'
+  | 'power'
+  | 'conditioning'
+  | 'technique'
+  | 'deload'
+  | 'recovery_mobility'
+
 export type RunWorkoutSubtype =
+  | 'easy'
+  | 'recovery'
+  | 'long'
+  | 'tempo'
+  | 'intervals'
+  | 'custom'
+  // legacy
   | 'easy_run'
   | 'recovery_run'
   | 'long_run'
-  | 'tempo'
-  | 'intervals'
   | 'race_pace'
   | 'walk_run'
   | 'other'
+
+export type SwimWorkoutSubtype =
+  | 'easy'
+  | 'endurance'
+  | 'intervals'
+  | 'technique'
+  | 'recovery'
+
+export type YogaWorkoutSubtype =
+  | 'mobility'
+  | 'flow'
+  | 'recovery'
+  | 'strength'
+  | 'stretch'
+
+export type OtherWorkoutSubtype =
+  | 'rest'
+  | 'walk'
+  | 'sport'
+  | 'pt_rehab'
+  | 'mobility'
+  | 'custom'
 
 export interface PaceRange {
   minSecondsPerMile?: number | null
@@ -81,24 +128,28 @@ export const ALL_WORKOUT_TAGS: WorkoutTag[] = [
 ]
 
 export const RUN_SUBTYPE_LABELS: Record<RunWorkoutSubtype, string> = {
-  easy_run: 'Easy Run',
-  recovery_run: 'Recovery Run',
-  long_run: 'Long Run',
+  easy: 'Easy',
+  recovery: 'Recovery',
+  long: 'Long',
   tempo: 'Tempo',
   intervals: 'Intervals',
+  custom: 'Custom',
+  easy_run: 'Easy',
+  recovery_run: 'Recovery',
+  long_run: 'Long',
   race_pace: 'Race Pace',
   walk_run: 'Walk/Run',
-  other: 'Other',
+  other: 'Custom',
 }
 
 /** Derive a default subtype from the slot's WorkoutType string */
 export function defaultRunSubtype(workoutType: string): RunWorkoutSubtype {
-  if (workoutType === 'long_run') return 'long_run'
-  if (workoutType === 'recovery_run') return 'recovery_run'
-  return 'easy_run'
+  if (workoutType === 'long_run') return 'long'
+  if (workoutType === 'recovery_run') return 'recovery'
+  return 'easy'
 }
 
 /** Returns true if a slot's WorkoutType is a run variant */
 export function isRunType(workoutType: string): boolean {
-  return workoutType === 'long_run' || workoutType === 'recovery_run'
+  return workoutType === 'run' || workoutType === 'long_run' || workoutType === 'recovery_run'
 }

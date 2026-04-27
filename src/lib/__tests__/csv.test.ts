@@ -149,7 +149,7 @@ describe('plansToCsv + plansFromCsv', () => {
     expect(push.isDeload).toBe(false)
     expect(push.notes).toBe('Keep RPE moderate')
     expect(push.difficulty).toBe('moderate')
-    expect(push.tags).toEqual(['upper', 'lift'])
+    expect(push.tags).toBeUndefined()
 
     const run = p.days[0].slots[1]
     expect(run.type).toBe('long_run')

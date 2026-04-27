@@ -29,12 +29,11 @@ import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import { COMPLETION_STATE_LABELS } from '../modules/workout-outcomes/types'
 
 const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
-  { type: 'weightlifting', label: 'Weightlifting' },
-  { type: 'long_run', label: 'Long Run' },
-  { type: 'recovery_run', label: 'Recovery Run' },
+  { type: 'weights', label: 'Weights' },
+  { type: 'run', label: 'Run' },
   { type: 'swim', label: 'Swim' },
   { type: 'yoga', label: 'Yoga' },
-  { type: 'rest', label: 'Rest' },
+  { type: 'other', label: 'Other' },
 ]
 
 function extraToPlanDay(extra: ExtraWorkoutEntry): PlanDay {

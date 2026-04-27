@@ -27,12 +27,11 @@ import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
-  { type: 'weightlifting', label: 'Weightlifting' },
-  { type: 'long_run', label: 'Long Run' },
-  { type: 'recovery_run', label: 'Recovery Run' },
+  { type: 'weights', label: 'Weights' },
+  { type: 'run', label: 'Run' },
   { type: 'swim', label: 'Swim' },
   { type: 'yoga', label: 'Yoga' },
-  { type: 'rest', label: 'Rest' },
+  { type: 'other', label: 'Other' },
 ]
 
 /** Build a synthetic PlanDay from an ExtraWorkoutEntry so OutcomeModal can render it */
