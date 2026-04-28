@@ -99,13 +99,16 @@ export function TodayPage() {
   const actions = usePlanActions(plan?.id ?? null)
   const logAction = useHistoryStore(s => s.logAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
+  const updateEntryDate = useHistoryStore(s => s.updateEntryDate)
   const addExtraEntry = useHistoryStore(s => s.addExtraEntry)
+  const updateExtraEntryDate = useHistoryStore(s => s.updateExtraEntryDate)
   const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
   const extraEntries = useHistoryStore(s => s.extraEntries)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const getOutcome = useOutcomeStore(s => s.getOutcome)
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
+  const moveOutcome = useOutcomeStore(s => s.moveOutcome)
   const today = format(new Date(), 'yyyy-MM-dd')
   const { isDismissed: expiryBannerDismissed, dismiss: dismissExpiryBanner } = useExpiryDismiss(plan?.id ?? null)
 
@@ -219,8 +222,26 @@ export function TodayPage() {
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
     setActiveTrackedExercises(null)
     setActiveTrackedDurationMin(null)
+    const completedDate = outcome.completedAt
+      ? format(new Date(outcome.completedAt), 'yyyy-MM-dd')
+      : today
     const action = completionStateToAction(outcome.completionState)
     logAction(plan!.id, today, primaryPlanDayIndex, action, outcome.notes ?? undefined)
+
+    if (completedDate !== today) {
+      const todayEntry = useHistoryStore.getState().entries.find(
+        e => e.planId === plan!.id && e.calendarDate === today,
+      )
+      if (todayEntry) {
+        removeEntry(plan!.id, completedDate)
+        updateEntryDate(todayEntry.id, completedDate)
+      }
+      moveOutcome(
+        makeWorkoutInstanceId(plan!.id, today),
+        makeWorkoutInstanceId(plan!.id, completedDate),
+      )
+      outcome = { ...outcome, workoutInstanceId: makeWorkoutInstanceId(plan!.id, completedDate) }
+    }
 
     const primarySlot = primaryPlanDay.slots[0]
     if (primarySlot) {
@@ -253,6 +274,16 @@ export function TodayPage() {
 
   function handleBonusOutcomeConfirm(outcome: WorkoutOutcome) {
     if (!bonusOutcome) return
+    const completedDate = outcome.completedAt
+      ? format(new Date(outcome.completedAt), 'yyyy-MM-dd')
+      : today
+    if (completedDate !== today) {
+      updateExtraEntryDate(bonusOutcome.extraId, completedDate)
+      const oldId = makeExtraWorkoutInstanceId(plan!.id, today, bonusOutcome.extraId)
+      const nextId = makeExtraWorkoutInstanceId(plan!.id, completedDate, bonusOutcome.extraId)
+      moveOutcome(oldId, nextId)
+      outcome = { ...outcome, workoutInstanceId: nextId }
+    }
     const slot = bonusOutcome.rd.planDay.slots[0]
     if (slot) {
       logOutcomeWithProgression(outcome, slot)
@@ -320,10 +351,20 @@ export function TodayPage() {
       ? makeExtraWorkoutInstanceId(plan!.id, today, loggingUpcoming.extraId)
       : undefined
     const outcomeWithId = instanceId ? { ...outcome, workoutInstanceId: instanceId } : outcome
+    const completedDate = outcomeWithId.completedAt
+      ? format(new Date(outcomeWithId.completedAt), 'yyyy-MM-dd')
+      : today
+    const finalOutcome = { ...outcomeWithId }
+    if (instanceId && loggingUpcoming.extraId && completedDate !== today) {
+      updateExtraEntryDate(loggingUpcoming.extraId, completedDate)
+      const nextId = makeExtraWorkoutInstanceId(plan!.id, completedDate, loggingUpcoming.extraId)
+      moveOutcome(instanceId, nextId)
+      finalOutcome.workoutInstanceId = nextId
+    }
     if (slot) {
-      logOutcomeWithProgression(outcomeWithId, slot)
+      logOutcomeWithProgression(finalOutcome, slot)
     } else {
-      useOutcomeStore.getState().setOutcome(outcomeWithId)
+      useOutcomeStore.getState().setOutcome(finalOutcome)
     }
     setShowUpcomingOutcome(false)
     setLoggingUpcoming(null)
@@ -652,6 +693,7 @@ export function TodayPage() {
           planId={plan.id}
           calendarDate={today}
           planDay={primaryPlanDay}
+          previousSetsByExercise={previousSetsByExercise}
           existingOutcome={
             activeTrackedExercises
               ? {
@@ -683,10 +725,12 @@ export function TodayPage() {
         return (
           <ActiveWorkoutTracker
             planId={plan.id}
+            workoutInstanceId={makeWorkoutInstanceId(plan.id, today)}
             planDay={primaryPlanDay}
             slot={slot}
             programVars={planProgramVars}
             previousOutcome={previousWeightsOutcome}
+            resumeOutcome={existingOutcome}
             previousSetsByExercise={previousSetsByExercise}
             minimized={activeWorkoutState === 'minimized'}
             onMinimize={() => setActiveWorkoutState('minimized')}
@@ -709,7 +753,16 @@ export function TodayPage() {
             existingOutcome={getOutcome(extraInstanceId)}
             onConfirm={(outcome) => {
               const slot = extraToPlanDay(editingExtra).slots[0]
-              const extraOutcome = { ...outcome, workoutInstanceId: extraInstanceId }
+              const completedDate = outcome.completedAt
+                ? format(new Date(outcome.completedAt), 'yyyy-MM-dd')
+                : today
+              let extraOutcome = { ...outcome, workoutInstanceId: extraInstanceId }
+              if (completedDate !== today) {
+                updateExtraEntryDate(editingExtra.id, completedDate)
+                const nextId = makeExtraWorkoutInstanceId(plan.id, completedDate, editingExtra.id)
+                moveOutcome(extraInstanceId, nextId)
+                extraOutcome = { ...extraOutcome, workoutInstanceId: nextId }
+              }
               if (slot) {
                 logOutcomeWithProgression(extraOutcome, slot)
               } else {
@@ -755,7 +808,7 @@ export function TodayPage() {
                     loggingUpcoming.rd.historyEntry.action === 'complete' ? 'text-emerald-400' :
                     loggingUpcoming.rd.historyEntry.action === 'skip' ? 'text-slate-300' : 'text-amber-400'
                   }`}>
-                    {loggingUpcoming.rd.historyEntry.action.replaceAll('_', ' ')}
+                    {loggingUpcoming.rd.historyEntry.action.replace(/_/g, ' ')}
                   </span>
                 </div>
                 {loggingUpcoming.rd.historyEntry.action === 'complete' && (

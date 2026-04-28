@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   CheckCircle2,
   MinusCircle,
@@ -8,8 +8,6 @@ import {
   Zap,
   Dumbbell,
   Waves,
-  Play,
-  Pause,
   AlertTriangle,
 } from 'lucide-react'
 import { Modal } from '../shared/Modal'
@@ -38,6 +36,7 @@ interface Props {
   planDay: PlanDay
   existingOutcome?: WorkoutOutcome | null
   workoutInstanceId?: string
+  previousSetsByExercise?: Record<string, LoggedSetActual[]>
   onConfirm: (outcome: WorkoutOutcome) => void
   onClose: () => void
 }
@@ -132,10 +131,18 @@ function buildInitialWeightActuals(planDay: PlanDay, existing?: WorkoutOutcome |
   })
 }
 
-function formatClock(totalSeconds: number): string {
-  const mins = Math.floor(totalSeconds / 60)
-  const secs = totalSeconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+function toDateTimeLocalValue(isoString?: string | null): string {
+  if (!isoString) return ''
+  const d = new Date(isoString)
+  if (Number.isNaN(d.getTime())) return ''
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
+function fromDateTimeLocalValue(localValue: string): string | null {
+  if (!localValue) return null
+  const d = new Date(localValue)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
 export function OutcomeModal({
@@ -144,6 +151,7 @@ export function OutcomeModal({
   planDay,
   existingOutcome,
   workoutInstanceId,
+  previousSetsByExercise,
   onConfirm,
   onClose,
 }: Props) {
@@ -182,10 +190,9 @@ export function OutcomeModal({
   const [swimCompletedAsPlanned, setSwimCompletedAsPlanned] = useState<boolean | null>(
     existingOutcome?.swimActual?.completedAsPlanned ?? null,
   )
-
-  const [restTimerSeconds, setRestTimerSeconds] = useState<number | null>(null)
-  const [exerciseTimerSeconds, setExerciseTimerSeconds] = useState<number>(0)
-  const [exerciseTimerRunning, setExerciseTimerRunning] = useState(false)
+  const [completedAtLocal, setCompletedAtLocal] = useState<string>(
+    toDateTimeLocalValue(existingOutcome?.completedAt ?? new Date().toISOString()),
+  )
 
   const isDirtyRef = useRef(false)
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
@@ -199,24 +206,6 @@ export function OutcomeModal({
       onClose()
     }
   }
-
-  useEffect(() => {
-    if (restTimerSeconds == null || restTimerSeconds <= 0) return
-    const id = window.setInterval(() => {
-      setRestTimerSeconds(prev => {
-        if (prev == null) return null
-        if (prev <= 1) return null
-        return prev - 1
-      })
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [restTimerSeconds])
-
-  useEffect(() => {
-    if (!exerciseTimerRunning) return
-    const id = window.setInterval(() => setExerciseTimerSeconds(s => s + 1), 1000)
-    return () => window.clearInterval(id)
-  }, [exerciseTimerRunning])
 
   const dist = parseFloat(distanceMiles)
   const dur = parseFloat(runDurationMin)
@@ -266,10 +255,11 @@ export function OutcomeModal({
       : null
 
     const parsedDuration = parseFloat(durationMin)
+    const parsedCompletedAt = fromDateTimeLocalValue(completedAtLocal)
     const outcome: WorkoutOutcome = {
       workoutInstanceId: workoutInstanceId ?? makeWorkoutInstanceId(planId, calendarDate),
       completionState,
-      completedAt: new Date().toISOString(),
+      completedAt: parsedCompletedAt ?? new Date().toISOString(),
       durationActualMin: isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : null,
       perceivedEffort: effort,
       notes: notes.trim() || null,
@@ -318,26 +308,16 @@ export function OutcomeModal({
           </div>
         </div>
 
-        <div className="border border-slate-700 rounded-xl p-3 space-y-2">
-          <p className="text-xs text-slate-500 uppercase tracking-wide font-medium">Timers</p>
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <button
-              onClick={() => setExerciseTimerRunning(v => !v)}
-              className="px-2 py-1 rounded-md border border-slate-600 bg-slate-700/80 flex items-center gap-1"
-            >
-              {exerciseTimerRunning ? <Pause size={12} /> : <Play size={12} />} Exercise timer
-            </button>
-            <button
-              onClick={() => { setExerciseTimerSeconds(0); setExerciseTimerRunning(false) }}
-              className="px-2 py-1 rounded-md border border-slate-600 bg-slate-700/80"
-            >
-              Reset
-            </button>
-            <span className="ml-auto font-semibold text-sky-300">{formatClock(exerciseTimerSeconds)}</span>
-          </div>
-          {restTimerSeconds != null && (
-            <p className="text-xs text-emerald-300">Rest timer: {formatClock(restTimerSeconds)}</p>
-          )}
+        <div>
+          <label className="text-xs text-slate-500 uppercase tracking-wide font-medium block mb-2">
+            Workout Date/Time
+          </label>
+          <input
+            type="datetime-local"
+            value={completedAtLocal}
+            onChange={e => { markDirty(); setCompletedAtLocal(e.target.value) }}
+            className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+          />
         </div>
 
         {hasWeights && (
@@ -351,24 +331,25 @@ export function OutcomeModal({
               <div key={exercise.exercise + exIndex} className="space-y-2 bg-slate-800/40 rounded-lg p-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm text-slate-200 font-medium">{exercise.exercise}</p>
-                  <select
-                    value={exercise.progressionMode ?? 'single'}
-                    onChange={e => { markDirty(); setWeightExercises(prev => prev.map((it, i) => i === exIndex ? {
-                      ...it,
-                      progressionMode: e.target.value as LoggedExerciseActual['progressionMode'],
-                    } : it)) }}
-                    className="bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-[11px] text-slate-200"
-                  >
-                    <option value="single">Single prog</option>
-                    <option value="double">Double prog</option>
-                    <option value="volume">Volume</option>
-                    <option value="maintenance">Maintenance</option>
-                  </select>
                 </div>
 
-                {exercise.sets.map((set, setIndex) => (
-                  <div key={setIndex} className="grid grid-cols-12 gap-1.5 items-center text-xs">
-                    <span className="col-span-2 text-slate-400">Set {setIndex + 1}</span>
+                <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
+                  <span className="col-span-1 text-center">#</span>
+                  <span className="col-span-3 text-center">Prev</span>
+                  <span className="col-span-3 text-center">Reps</span>
+                  <span className="col-span-3 text-center">Lbs</span>
+                  <span className="col-span-3 text-center">Done</span>
+                </div>
+
+                {exercise.sets.map((set, setIndex) => {
+                  const prev = previousSetsByExercise?.[exercise.exercise]?.[setIndex]
+                  const prevText = prev && prev.actualReps != null && prev.actualLoad != null
+                    ? `${prev.actualReps} x ${prev.actualLoad}lb`
+                    : '-'
+                  return (
+                  <div key={setIndex} className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 items-center text-xs">
+                    <span className="col-span-1 text-center text-slate-400">{setIndex + 1}</span>
+                    <span className="col-span-3 text-center text-slate-500 text-[10px]">{prevText}</span>
                     <input
                       type="number"
                       min="0"
@@ -377,7 +358,7 @@ export function OutcomeModal({
                         actualReps: e.target.value ? Number(e.target.value) : null,
                       })}
                       placeholder={String(set.targetReps ?? 'reps')}
-                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100"
+                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-slate-100 text-center"
                     />
                     <input
                       type="number"
@@ -387,23 +368,17 @@ export function OutcomeModal({
                       onChange={e => updateSet(exIndex, setIndex, {
                         actualLoad: e.target.value ? Number(e.target.value) : null,
                       })}
-                      placeholder={set.targetLoad ?? 'load'}
-                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100"
+                      placeholder={parseNumericLoad(set.targetLoad ?? undefined)?.toString() ?? 'lbs'}
+                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-slate-100 text-center"
                     />
                     <button
                       onClick={() => updateSet(exIndex, setIndex, { completed: !set.completed })}
-                      className={`col-span-2 px-1.5 py-1 rounded border ${set.completed ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-slate-700 border-slate-600 text-slate-400'}`}
+                      className={`col-span-3 px-1.5 py-1 rounded border ${set.completed ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-slate-700 border-slate-600 text-slate-400'}`}
                     >
-                      ✓
-                    </button>
-                    <button
-                      onClick={() => setRestTimerSeconds(set.restSeconds ?? 90)}
-                      className="col-span-2 px-1.5 py-1 rounded border border-slate-600 bg-slate-700 text-slate-300"
-                    >
-                      Rest
+                      {set.completed ? 'Completed' : 'Mark'}
                     </button>
                   </div>
-                ))}
+                )})}
               </div>
             ))}
           </div>
