@@ -1,3 +1,88 @@
+# Feature Review — Past Unlogged Days Nudge (TodayPage)
+
+Date: 2026-04-28
+Branch: `claude/great-mccarthy-6NVvu`
+Classification: **Keep**
+
+---
+
+## What was actually built
+
+1. `countPastUnloggedDays(planId, entries, planStartDate, today, lookbackDays = 7)`
+   — pure function in `historyStats.ts`. Iterates backward from yesterday
+   for up to `lookbackDays`, skipping days before `planStartDate`. Returns the
+   number of days that have no entry for the given plan.
+
+2. `src/pages/TodayPage.tsx` — a clickable info banner rendered below the stats
+   bar when `unloggedCount > 0`. Clicking navigates to CalendarPage. Styled as
+   a muted slate button (not a warning) to convey "informational, not alarming."
+
+3. 9 unit tests for `countPastUnloggedDays` covering all edge cases from the proposal.
+
+---
+
+## What assumptions were encoded
+
+- A 7-day lookback is sufficient signal without overwhelming users who have been
+  away for weeks. The count is capped at 7 (not the total since plan start).
+- Any day with ANY history entry (complete, skip, day_off) is "logged" — only
+  days with NO entry are counted.
+- Not dismissible. The nudge is transient; it disappears as the user logs days.
+
+---
+
+## What worked well
+
+- The pure helper is small (12 lines) and completely isolated from the rotation
+  engine. It avoids calling `getResolvedDaysRange` (which would add coupling and
+  cost), using a simple set-based lookup instead.
+- The tests cover all the nuances (plan start clamping, lookbackDays = 0, cross-
+  plan isolation, day_off treated as logged) without being brittle.
+- Styling is intentionally muted so it doesn't compete with the expiry banner or
+  adaptation note.
+
+---
+
+## What feels risky or incomplete
+
+- **False positives for intentional rest**: A user who took a planned vacation
+  week will see "7 days…" every time they open the app until they retroactively
+  log all those days. Mildly annoying but not harmful.
+- **No dismissibility**: Could become noisy for users who chose not to log past
+  workouts (e.g., they know they didn't work out and don't want to log it). A
+  follow-up pass could add a per-day "mark all as day off" quick action.
+- The nudge shows even when the plan has expired, which is a minor UX edge case.
+
+---
+
+## What to evaluate tomorrow
+
+1. Does the nudge appear correctly when you skip a few days and come back?
+2. Does it disappear after logging those days from CalendarPage?
+3. Does it feel appropriately subtle or does it compete with other banners?
+4. Is 7 days the right window? (Users who check in daily will never see it;
+   users who come back after 10 days still see "7" not "10".)
+
+---
+
+## Recommended next steps
+
+- If the false-positive annoyance is reported: add a dismiss with `useExpiryDismiss`-
+  style localStorage, auto-clearing when the count drops to 0.
+- Consider a "Mark all as day off" quick action in the nudge for users who just
+  want to clear the stall without individually logging each day.
+- Long-term: show the actual dates in a collapsed list on tap.
+
+---
+
+## Verdict: **Keep**
+
+The feature is small, isolated, and solves a real UX gap (the silent rotation
+stall). The nudge is appropriately muted and all tests pass. Recommend keeping
+as-is; add dismissibility if user feedback indicates it's annoying.
+
+---
+
 # Feature Review — Compact Stats Bar (TodayPage)
 
 Date: 2026-04-27

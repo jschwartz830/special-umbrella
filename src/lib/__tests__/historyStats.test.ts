@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 
 function entry(
@@ -560,5 +560,80 @@ describe('computeWorkoutTypeBreakdown', () => {
       [], extras, {}, null, { from: '2026-04-05', to: '2026-04-10' },
     )
     expect(result.yoga?.completed).toBe(1)
+  })
+})
+
+// ── countPastUnloggedDays ─────────────────────────────────────────────────────
+
+describe('countPastUnloggedDays', () => {
+  const TODAY = '2026-04-28'
+  const START = '2026-04-01'
+
+  it('returns 0 when there are no past days (plan just started today)', () => {
+    expect(countPastUnloggedDays('p1', [], TODAY, TODAY)).toBe(0)
+  })
+
+  it('returns 0 when all days in window are logged', () => {
+    const entries = [
+      entry('2026-04-27', 'complete'),
+      entry('2026-04-26', 'skip'),
+      entry('2026-04-25', 'day_off'),
+      entry('2026-04-24', 'complete'),
+      entry('2026-04-23', 'complete'),
+      entry('2026-04-22', 'complete'),
+      entry('2026-04-21', 'complete'),
+    ]
+    expect(countPastUnloggedDays('plan-1', entries, START, TODAY)).toBe(0)
+  })
+
+  it('returns full window count when nothing is logged', () => {
+    expect(countPastUnloggedDays('plan-1', [], START, TODAY)).toBe(7)
+  })
+
+  it('returns count of gaps within the window', () => {
+    const entries = [
+      entry('2026-04-27', 'complete'),
+      // 26 missing
+      entry('2026-04-25', 'complete'),
+      // 24 missing
+      entry('2026-04-23', 'complete'),
+      entry('2026-04-22', 'complete'),
+      entry('2026-04-21', 'complete'),
+    ]
+    expect(countPastUnloggedDays('plan-1', entries, START, TODAY)).toBe(2)
+  })
+
+  it('clamps to plan start date and does not count pre-plan days', () => {
+    // Plan started 3 days ago — only 3 days in range, 2 unlogged
+    const planStart = '2026-04-25'
+    const entries = [entry('2026-04-27', 'complete')]
+    expect(countPastUnloggedDays('plan-1', entries, planStart, TODAY)).toBe(2)
+  })
+
+  it('returns 0 when lookbackDays is 0', () => {
+    expect(countPastUnloggedDays('plan-1', [], START, TODAY, 0)).toBe(0)
+  })
+
+  it('respects a custom lookback window (3 days)', () => {
+    // Only checks 27, 26, 25; 27 is logged, 26 and 25 are not
+    const entries = [entry('2026-04-27', 'complete')]
+    expect(countPastUnloggedDays('plan-1', entries, START, TODAY, 3)).toBe(2)
+  })
+
+  it('ignores entries for a different plan', () => {
+    const entries = [
+      entry('2026-04-27', 'complete', 'other-plan'),
+      entry('2026-04-26', 'complete', 'other-plan'),
+    ]
+    // All 7 days unlogged for plan-1
+    expect(countPastUnloggedDays('plan-1', entries, START, TODAY)).toBe(7)
+  })
+
+  it('treats day_off and skip as logged (not unlogged)', () => {
+    const entries = [
+      entry('2026-04-27', 'day_off'),
+      entry('2026-04-26', 'skip'),
+    ]
+    expect(countPastUnloggedDays('plan-1', entries, START, TODAY)).toBe(5)
   })
 })

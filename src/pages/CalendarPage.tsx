@@ -621,7 +621,7 @@ function DayDetailModal({
               {isComplete && <CheckCircle2 size={16} className="text-emerald-400" />}
               {isSkipped && <SkipForward size={16} className="text-slate-400" />}
               <span className={`text-sm font-medium capitalize ${isComplete ? 'text-emerald-400' : 'text-slate-300'}`}>
-                {historyEntry?.action.replace('_', ' ')}
+                {historyEntry?.action.replaceAll('_', ' ')}
               </span>
             </div>
 

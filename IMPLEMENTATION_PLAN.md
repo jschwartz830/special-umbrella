@@ -1,5 +1,75 @@
 # Implementation Plan
 
+## 2026-04-28 — Overnight Audit (fifteenth pass)
+
+Branch: `claude/great-mccarthy-6NVvu`.
+Baseline on entry: **293 passing, 0 failing**.
+Exit state: **302 passing, 0 failing** (+9 tests).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the fourteenth pass.
+
+### What appears strong and well-designed (unchanged)
+
+- 302-test suite (up from 293) covering engine, stores, adaptation, lib, CSV,
+  and recommendation modules.
+- All prior bug fixes from passes 1–14 remain stable; no regressions.
+- `computeWorkoutTypeBreakdown` (twelfth pass) now has a UI home in HistoryPage.
+
+### Key issues found this pass
+
+1. **Three `.replace('_', ' ')` calls** (COSMETIC, low severity).
+   `HistoryPage`, `CalendarPage`, and `TodayPage` all used `.replace('_', ' ')`
+   to format action strings (e.g. `day_off → "day off"`). The pass-13 fix
+   applied `replaceAll` to workout types but missed action strings. Changed
+   to `.replaceAll` for consistency.
+
+2. **`computeWorkoutTypeBreakdown` unreachable from any page** (UX gap).
+   The pure function was implemented in pass 12 and comprehensively tested, but
+   was never wired into any UI. Users could not see their training distribution.
+   Fixed: HistoryPage now shows a compact type-count summary row.
+
+3. **Rotation stall invisible to users** (UX gap).
+   When past days are unlogged, the rotation engine intentionally stalls — but
+   users see a "wrong" day with no explanation. Added a `countPastUnloggedDays`
+   helper and a muted nudge on TodayPage to surface the root cause.
+
+### Features implemented
+
+4. **Training-mix summary row on HistoryPage** (FEATURE).
+   A compact text line (e.g. "12 weights · 5 runs · 2 yoga") appears below the
+   stats grid when there is history to show. Computed from `flatItems` inline
+   (avoids the multi-plan `planDaysById` keying complexity of
+   `computeWorkoutTypeBreakdown`). Sorted by count descending, capped at 4 types.
+
+5. **Past unlogged days nudge on TodayPage** (MEDIUM FEATURE).
+   New `countPastUnloggedDays` helper in `historyStats.ts` + 9 unit tests.
+   TodayPage shows a clickable slate-coloured nudge when count > 0, navigating
+   to CalendarPage. Not dismissible this pass.
+
+### Prioritized plan
+
+| # | Item | Action |
+|---|---|---|
+| 1 | Fix `.replace` → `.replaceAll` in 3 pages | **Implemented** |
+| 2 | Wire type breakdown into HistoryPage | **Implemented** |
+| 3 | `countPastUnloggedDays` helper + tests | **Implemented** |
+| 4 | Unlogged-days nudge on TodayPage | **Implemented** |
+| 5 | Dismissible nudge (follow-up if annoying) | Recommend only |
+| 6 | Suppress nudge after plan expiry | Recommend only |
+| 7 | `progressionStates` orphaning on plan delete | Recommend only |
+| 8 | TodayPage extraction (~930 lines) | Recommend only |
+
+### Rationale for sequencing
+
+Cosmetic fix first (smallest change, zero behavior impact). UI feature second
+(additive, no store changes). Medium feature last — most code touched, but all
+changes are isolated and independently revertable.
+
+---
+
 ## 2026-04-27 — Overnight Audit (fourteenth pass)
 
 Branch: `claude/great-mccarthy-GNrKl`.

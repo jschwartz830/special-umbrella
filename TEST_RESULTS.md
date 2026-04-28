@@ -1,5 +1,43 @@
 # Test Results
 
+## 2026-04-28 (fifteenth pass) — branch `claude/great-mccarthy-6NVvu`
+
+**Result: 302 passing, 0 failing** (+9 tests this pass)
+
+### Tests added
+
+All 9 new tests are in `src/lib/__tests__/historyStats.test.ts` under the
+`countPastUnloggedDays` describe block:
+
+| Test | What it covers |
+|------|---------------|
+| returns 0 when plan just started today | zero-length window (today = startDate) |
+| returns 0 when all days are logged | all 7 days have entries |
+| returns full window count when nothing is logged | 7/7 unlogged |
+| returns count of gaps within the window | 2 gaps in 7 days |
+| clamps to plan start date | plan start 3 days ago → max 3 days inspected |
+| returns 0 when lookbackDays is 0 | explicit zero window guard |
+| respects a custom lookback window (3 days) | window=3, 2 of 3 unlogged |
+| ignores entries for a different plan | cross-plan isolation |
+| treats day_off and skip as logged | all action types mark a day as "logged" |
+
+### Tests reviewed (no changes needed)
+
+All 293 tests from prior passes continue to pass. No regressions.
+
+### Important areas still untested
+
+- `TodayPage` rendering — no component tests exist for TodayPage; UI behaviour
+  of the nudge is not exercised in the test suite (consistent with prior policy
+  of not adding React component tests).
+- `typeMixLabel` computation in HistoryPage — derived inline from `flatItems`;
+  no dedicated unit test (the underlying plan/entry lookup is tested transitively
+  by the store tests).
+- Nudge visibility when plan is expired — currently shows; suppression logic
+  (if added) would need a test.
+
+---
+
 ## 2026-04-27 (fourteenth pass) — branch `claude/great-mccarthy-GNrKl`
 
 **Result: 293 passing, 0 failing** (+2 tests this pass)
