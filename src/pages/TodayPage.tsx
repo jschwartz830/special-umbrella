@@ -35,7 +35,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats } from '../lib/historyStats'
+import { computeHistoryStats, countPastUnloggedDays } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, PlanDay } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 
@@ -201,6 +201,9 @@ export function TodayPage() {
 
   // Stats for the compact stats bar (scoped to the active plan's history)
   const stats = computeHistoryStats(planEntries, planExtras, today)
+
+  // Count recent past days with no entry — used to show the stall nudge.
+  const unloggedCount = countPastUnloggedDays(plan.id, planEntries, plan.startDate, today)
 
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     setActiveTrackedExercises(exercises)
@@ -378,6 +381,20 @@ export function TodayPage() {
           </div>
         </div>
       </div>
+
+      {/* Unlogged past days nudge — shown when the rotation may be stalled */}
+      {unloggedCount > 0 && (
+        <button
+          onClick={() => navigate('/calendar')}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-700/50 border border-slate-600/50 text-left hover:bg-slate-700 transition-colors"
+        >
+          <Info size={13} className="text-slate-400 flex-shrink-0" />
+          <p className="flex-1 text-xs text-slate-400">
+            {unloggedCount} day{unloggedCount === 1 ? '' : 's'} in the past week without entries — rotation may be stalled.
+          </p>
+          <span className="text-xs text-sky-400 font-medium flex-shrink-0">Calendar →</span>
+        </button>
+      )}
 
       {/* Plan completion / expiry banner */}
       {planExpired && !expiryBannerDismissed && (
