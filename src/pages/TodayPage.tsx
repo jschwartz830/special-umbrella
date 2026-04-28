@@ -652,6 +652,7 @@ export function TodayPage() {
           planId={plan.id}
           calendarDate={today}
           planDay={primaryPlanDay}
+          previousSetsByExercise={previousSetsByExercise}
           existingOutcome={
             activeTrackedExercises
               ? {
@@ -755,7 +756,7 @@ export function TodayPage() {
                     loggingUpcoming.rd.historyEntry.action === 'complete' ? 'text-emerald-400' :
                     loggingUpcoming.rd.historyEntry.action === 'skip' ? 'text-slate-300' : 'text-amber-400'
                   }`}>
-                    {loggingUpcoming.rd.historyEntry.action.replaceAll('_', ' ')}
+                    {loggingUpcoming.rd.historyEntry.action.replace(/_/g, ' ')}
                   </span>
                 </div>
                 {loggingUpcoming.rd.historyEntry.action === 'complete' && (
