@@ -14,10 +14,9 @@ import { useHistoryStore } from '../store/historyStore'
 import { usePlanStore } from '../store/planStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { Modal } from '../components/shared/Modal'
-import { DifficultyBadge } from '../components/workout/DifficultyBadge'
-import { WorkoutBadge } from '../components/workout/WorkoutBadge'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { OutcomeMetrics } from '../components/workout/OutcomeMetrics'
+import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
@@ -347,8 +346,6 @@ export function HistoryPage() {
                 ? planDay.slots.map(s => s.name).join(' + ')
                 : 'Unknown workout'
 
-            const primarySlot = planDay?.slots[0]
-
             const actionColor = completionState === 'partially_completed' ? 'text-yellow-400'
               : completionState === 'deferred' ? 'text-purple-400'
               : completionState === 'swapped' ? 'text-sky-400'
@@ -370,22 +367,20 @@ export function HistoryPage() {
                         {format(parseISO(entry.calendarDate), 'EEE, MMM d, yyyy')}
                       </p>
 
-                      {/* Title row */}
-                      <div className="flex items-center gap-2">
-                        {primarySlot && entry.action !== 'day_off' && (
-                          <WorkoutBadge type={primarySlot.type} size="sm" />
-                        )}
-                        {entry.action === 'day_off' && <Coffee size={14} className="text-amber-400 flex-shrink-0" />}
-                        <p className="text-sm font-semibold text-slate-200 truncate">{workoutTitle}</p>
-                      </div>
-
-                      {/* Plan name + difficulty */}
-                      {plan && entry.action !== 'day_off' && (
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                          <p className="text-xs text-slate-500">{plan.name}</p>
-                          {planDay?.slots.map(s => s.difficulty && (
-                            <DifficultyBadge key={s.id} difficulty={s.difficulty} />
+                      {/* Title + workout detail */}
+                      {entry.action === 'day_off' ? (
+                        <div className="flex items-center gap-2">
+                          <Coffee size={14} className="text-amber-400 flex-shrink-0" />
+                          <p className="text-sm font-semibold text-slate-200 truncate">{workoutTitle}</p>
+                        </div>
+                      ) : (
+                        <div className={`space-y-2 ${planDay && planDay.slots.length > 1 ? 'divide-y divide-slate-700/50' : ''}`}>
+                          {planDay?.slots.map((slot, i) => (
+                            <WorkoutSlotDetails key={slot.id} slot={slot} className={i > 0 ? 'pt-2' : ''} />
                           ))}
+                          {plan && (
+                            <p className="text-xs text-slate-500">{plan.name}</p>
+                          )}
                         </div>
                       )}
 
@@ -471,12 +466,13 @@ export function HistoryPage() {
                       {format(parseISO(extra.calendarDate), 'EEE, MMM d, yyyy')}
                     </p>
 
-                    <div className="flex items-center gap-2">
-                      <WorkoutBadge type={extra.workoutType} size="sm" />
-                      <p className="text-sm font-semibold text-slate-200 truncate">{extra.workoutName}</p>
+                    <div className="space-y-1.5">
+                      <WorkoutSlotDetails
+                        slot={{ id: extra.id, type: extra.workoutType, name: extra.workoutName }}
+                      />
                       {extra.source === 'double_day'
-                        ? <span className="text-[10px] text-violet-400 bg-violet-400/10 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Bonus</span>
-                        : <span className="text-[10px] text-sky-400 bg-sky-400/10 px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">Extra</span>
+                        ? <span className="inline-flex text-[10px] text-violet-400 bg-violet-400/10 px-1.5 py-0.5 rounded-full font-medium">Bonus</span>
+                        : <span className="inline-flex text-[10px] text-sky-400 bg-sky-400/10 px-1.5 py-0.5 rounded-full font-medium">Extra</span>
                       }
                     </div>
 
