@@ -9,6 +9,7 @@ import {
   Plus,
   Trash2,
   ClipboardList,
+  Play,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useActivePlan } from '../hooks/useActivePlan'
@@ -16,6 +17,7 @@ import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { buildMonthGrid } from '../engine/calendarProjection'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
+import { ActiveWorkoutTracker } from '../components/workout/ActiveWorkoutTracker'
 import { WorkoutBadge } from '../components/workout/WorkoutBadge'
 import { OutcomeMetrics } from '../components/workout/OutcomeMetrics'
 import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
@@ -23,7 +25,9 @@ import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { Plan, ResolvedDay, ActionType, WorkoutType, ExtraWorkoutEntry, PlanDay } from '../types'
-import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
+import { useProgramStore } from '../store/programStore'
+import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -57,6 +61,15 @@ export function CalendarPage() {
     planDay: PlanDay
     instanceId: string
   } | null>(null)
+  const [activeWorkoutState, setActiveWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
+  const [activeWorkoutTarget, setActiveWorkoutTarget] = useState<{
+    calendarDate: string
+    planDay: PlanDay
+    slotId: string
+    workoutInstanceId: string
+  } | null>(null)
+  const [activeTrackedExercises, setActiveTrackedExercises] = useState<LoggedExerciseActual[] | null>(null)
+  const [activeTrackedDurationMin, setActiveTrackedDurationMin] = useState<number | null>(null)
 
   const { plan, today } = useActivePlan()
   const entries = useHistoryStore(s => s.entries)
@@ -72,6 +85,12 @@ export function CalendarPage() {
   const outcomes = useOutcomeStore(s => s.outcomes)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
+  const programVarsMap = useProgramStore(s => s.vars)
+
+  const planProgramVars = useMemo(
+    () => (plan ? (programVarsMap[plan.id] ?? {}) : {}),
+    [plan, programVarsMap],
+  )
 
   const weeks = useMemo(
     () => buildMonthGrid(year, month, plan, entries, overrides, today),
@@ -186,6 +205,33 @@ export function CalendarPage() {
       }
     }
     setOutcomeTarget(null)
+    setActiveTrackedExercises(null)
+    setActiveTrackedDurationMin(null)
+  }
+
+  function findPreviousSetsByExercise(
+    currentDate: string,
+    currentInstanceId: string,
+  ): Record<string, LoggedSetActual[]> {
+    if (!plan) return {}
+    const prefix = `${plan.id}_`
+    const sorted = Object.values(outcomes)
+      .filter(outcome => {
+        if (outcome.workoutInstanceId === currentInstanceId) return false
+        if (!outcome.workoutInstanceId.startsWith(prefix)) return false
+        const rest = outcome.workoutInstanceId.slice(prefix.length)
+        if (rest.startsWith(currentDate)) return false
+        return Boolean(outcome.weightsActual?.exercises?.length)
+      })
+      .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
+
+    const byExercise: Record<string, LoggedSetActual[]> = {}
+    for (const outcome of sorted) {
+      for (const ex of outcome.weightsActual?.exercises ?? []) {
+        if (!byExercise[ex.exercise]) byExercise[ex.exercise] = ex.sets
+      }
+    }
+    return byExercise
   }
 
   function clearDate(rd: ResolvedDay) {
@@ -194,6 +240,35 @@ export function CalendarPage() {
     removeEntry(plan.id, rd.calendarDate)
     removeOutcome(makeWorkoutInstanceId(plan.id, rd.calendarDate))
     setSelected(null)
+  }
+
+  function startHistoricalResume(planDay: PlanDay, calendarDate: string, instanceId: string, slotId?: string) {
+    const slot = slotId ? planDay.slots.find(s => s.id === slotId) : planDay.slots[0]
+    if (!slot) return
+    setSelected(null)
+    setOutcomeTarget(null)
+    setActiveTrackedExercises(null)
+    setActiveTrackedDurationMin(null)
+    setActiveWorkoutTarget({
+      calendarDate,
+      planDay,
+      slotId: slot.id,
+      workoutInstanceId: instanceId,
+    })
+    setActiveWorkoutState('open')
+  }
+
+  function handleHistoricalActiveComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
+    if (!activeWorkoutTarget || !plan) return
+    setActiveTrackedExercises(exercises)
+    setActiveTrackedDurationMin(Math.round(meta.totalElapsedSeconds / 60) || null)
+    setActiveWorkoutState('hidden')
+    setOutcomeTarget({
+      planId: plan.id,
+      calendarDate: activeWorkoutTarget.calendarDate,
+      planDay: activeWorkoutTarget.planDay,
+      instanceId: activeWorkoutTarget.workoutInstanceId,
+    })
   }
 
   // Extra workout helpers
@@ -326,6 +401,18 @@ export function CalendarPage() {
           onClear={() => clearDate(selected)}
           onEditOutcome={() => openEditOutcome(selected)}
           onEditExtraOutcome={(extra) => openExtraOutcome(extra)}
+          onResumeRotation={(planDay, calendarDate) => startHistoricalResume(
+            planDay,
+            calendarDate,
+            makeWorkoutInstanceId(plan.id, calendarDate),
+            planDay.slots[0]?.id,
+          )}
+          onResumeExtra={(extra) => startHistoricalResume(
+            extraToPlanDay(extra),
+            extra.calendarDate,
+            makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id),
+            extra.id,
+          )}
           onAddExtra={(type, name) => {
             if (!plan) return
             addExtraEntry({ planId: plan.id, calendarDate: selected.calendarDate, workoutType: type, workoutName: name, source: 'history' })
@@ -344,12 +431,52 @@ export function CalendarPage() {
           planId={outcomeTarget.planId}
           calendarDate={outcomeTarget.calendarDate}
           planDay={outcomeTarget.planDay}
-          existingOutcome={outcomes[outcomeTarget.instanceId] ?? null}
+          existingOutcome={
+            activeTrackedExercises
+              ? {
+                  workoutInstanceId: outcomeTarget.instanceId,
+                  completionState: 'completed',
+                  completedAt: new Date().toISOString(),
+                  durationActualMin: activeTrackedDurationMin,
+                  perceivedEffort: null,
+                  notes: null,
+                  runActual: null,
+                  swimActual: null,
+                  weightsActual: { exercises: activeTrackedExercises },
+                }
+              : (outcomes[outcomeTarget.instanceId] ?? null)
+          }
+          previousSetsByExercise={findPreviousSetsByExercise(outcomeTarget.calendarDate, outcomeTarget.instanceId)}
           workoutInstanceId={outcomeTarget.instanceId}
           onConfirm={handleOutcomeConfirm}
-          onClose={() => setOutcomeTarget(null)}
+          onClose={() => {
+            setOutcomeTarget(null)
+            setActiveTrackedExercises(null)
+            setActiveTrackedDurationMin(null)
+          }}
         />
       )}
+
+      {activeWorkoutState !== 'hidden' && activeWorkoutTarget && plan && (() => {
+        const slot = activeWorkoutTarget.planDay.slots.find(s => s.id === activeWorkoutTarget.slotId)
+          ?? activeWorkoutTarget.planDay.slots[0]
+        if (!slot) return null
+        return (
+          <ActiveWorkoutTracker
+            planId={plan.id}
+            planDay={activeWorkoutTarget.planDay}
+            slot={slot}
+            programVars={planProgramVars}
+            previousOutcome={null}
+            previousSetsByExercise={findPreviousSetsByExercise(activeWorkoutTarget.calendarDate, activeWorkoutTarget.workoutInstanceId)}
+            minimized={activeWorkoutState === 'minimized'}
+            onMinimize={() => setActiveWorkoutState('minimized')}
+            onResume={() => setActiveWorkoutState('open')}
+            onCancel={() => setActiveWorkoutState('hidden')}
+            onComplete={handleHistoricalActiveComplete}
+          />
+        )
+      })()}
     </div>
   )
 }
@@ -364,6 +491,8 @@ function DayDetailModal({
   onClear,
   onEditOutcome,
   onEditExtraOutcome,
+  onResumeRotation,
+  onResumeExtra,
   onAddExtra,
   onDeleteExtra,
   onClose,
@@ -377,6 +506,8 @@ function DayDetailModal({
   onClear: () => void
   onEditOutcome: () => void
   onEditExtraOutcome: (extra: ExtraWorkoutEntry) => void
+  onResumeRotation: (planDay: PlanDay, calendarDate: string) => void
+  onResumeExtra: (extra: ExtraWorkoutEntry) => void
   onAddExtra: (type: WorkoutType, name: string) => void
   onDeleteExtra: (extra: ExtraWorkoutEntry) => void
   onClose: () => void
@@ -453,12 +584,22 @@ function DayDetailModal({
               <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
             </button>
             {isCompleteForDirect && (
-              <button
-                onClick={() => setDetailTarget({ kind: 'rotation' })}
-                className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors px-1"
-              >
-                Manage entry (clear, change day…)
-              </button>
+              <div className="flex items-center gap-3 px-1">
+                <button
+                  onClick={() => setDetailTarget({ kind: 'rotation' })}
+                  className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
+                >
+                  Manage entry (clear, change day…)
+                </button>
+                {!isFuture && !isDayOff && (
+                  <button
+                    onClick={() => onResumeRotation(resolved.planDay, calendarDate)}
+                    className="text-[10px] text-sky-500 hover:text-sky-400 transition-colors"
+                  >
+                    Resume workout
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -548,6 +689,14 @@ function DayDetailModal({
           >
             <ClipboardList size={15} /> {extraOutcome ? 'Edit Details' : 'Log Details'}
           </button>
+          {!isFuture && (
+            <button
+              onClick={() => onResumeExtra(extra)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 text-sm font-medium transition-colors"
+            >
+              <Play size={15} /> Resume Workout
+            </button>
+          )}
 
           {confirmDeleteExtraId === extra.id ? (
             <div className="space-y-2 pt-1">
@@ -621,7 +770,7 @@ function DayDetailModal({
               {isComplete && <CheckCircle2 size={16} className="text-emerald-400" />}
               {isSkipped && <SkipForward size={16} className="text-slate-400" />}
               <span className={`text-sm font-medium capitalize ${isComplete ? 'text-emerald-400' : 'text-slate-300'}`}>
-                {historyEntry?.action.replaceAll('_', ' ')}
+                {historyEntry?.action.replace(/_/g, ' ')}
               </span>
             </div>
 
@@ -726,4 +875,3 @@ function DayDetailModal({
     </Modal>
   )
 }
-
