@@ -132,6 +132,47 @@ function shiftDay(date: string, delta: number): string {
   return `${yy}-${mm}-${dd}`
 }
 
+// ── Past-unlogged-days counter ────────────────────────────────────────────────
+
+/**
+ * Count days in the recent past (up to `lookbackDays` before today) that have
+ * no history entry for the given plan.
+ *
+ * A missing entry means the rotation pointer is stalled on that day; this count
+ * helps TodayPage surface a nudge when the user has not been logging workouts.
+ *
+ * Only days on or after `planStartDate` are considered.
+ * `day_off`, `skip`, and `complete` entries all count as "logged".
+ *
+ * @param planId        Plan to query.
+ * @param entries       All history entries (unfiltered; function filters by plan).
+ * @param planStartDate YYYY-MM-DD start date of the plan.
+ * @param today         YYYY-MM-DD reference date (exclusive upper bound).
+ * @param lookbackDays  How many days before today to inspect (default 7).
+ * @returns Number of unlogged days in [max(planStartDate, today−lookbackDays), yesterday].
+ */
+export function countPastUnloggedDays(
+  planId: string,
+  entries: import('../types').HistoryEntry[],
+  planStartDate: string,
+  today: string,
+  lookbackDays = 7,
+): number {
+  if (lookbackDays <= 0) return 0
+
+  const entryDates = new Set(
+    entries.filter(e => e.planId === planId).map(e => e.calendarDate),
+  )
+
+  let count = 0
+  for (let i = 1; i <= lookbackDays; i++) {
+    const date = shiftDay(today, -i)
+    if (date < planStartDate) break
+    if (!entryDates.has(date)) count++
+  }
+  return count
+}
+
 // ── Workout type breakdown ────────────────────────────────────────────────────
 
 export interface WorkoutTypeStat {
