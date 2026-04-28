@@ -235,10 +235,40 @@ export function HistoryPage() {
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
     if (!outcomeTarget) return
+    const originalDate = outcomeTarget.calendarDate
+    const completedDate = outcome.completedAt
+      ? format(new Date(outcome.completedAt), 'yyyy-MM-dd')
+      : originalDate
+    const isExtra = outcomeTarget.instanceId.includes('_extra_')
+    let finalOutcome = outcome
+
+    if (completedDate !== originalDate) {
+      if (isExtra) {
+        const extraId = outcomeTarget.instanceId.split('_extra_')[1]
+        if (extraId) {
+          updateExtraEntryDate(extraId, completedDate)
+          const nextId = makeExtraWorkoutInstanceId(outcomeTarget.planId, completedDate, extraId)
+          moveOutcome(outcomeTarget.instanceId, nextId)
+          finalOutcome = { ...outcome, workoutInstanceId: nextId }
+        }
+      } else {
+        const entryToMove = entries.find(
+          e => e.planId === outcomeTarget.planId && e.calendarDate === originalDate,
+        )
+        if (entryToMove) {
+          removeEntry(outcomeTarget.planId, completedDate)
+          updateEntryDate(entryToMove.id, completedDate)
+        }
+        const nextId = makeWorkoutInstanceId(outcomeTarget.planId, completedDate)
+        moveOutcome(outcomeTarget.instanceId, nextId)
+        finalOutcome = { ...outcome, workoutInstanceId: nextId }
+      }
+    }
+
     const slot = outcomeTarget.planDay.slots[0] ?? { id: '', type: 'rest' as WorkoutType, name: '' }
-    logOutcomeWithProgression(outcome, slot)
+    logOutcomeWithProgression(finalOutcome, slot)
     const entry = entries.find(
-      e => e.planId === outcomeTarget.planId && e.calendarDate === outcomeTarget.calendarDate,
+      e => e.planId === outcomeTarget.planId && e.calendarDate === completedDate,
     )
     if (entry && !outcomeTarget.instanceId.includes('_extra_')) {
       const action = completionStateToAction(outcome.completionState)

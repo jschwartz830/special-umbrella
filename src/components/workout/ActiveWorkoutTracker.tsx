@@ -17,7 +17,6 @@ interface SetTrackState {
 
 interface ExerciseTrackState {
   exercise: string
-  progressionMode: 'single' | 'double' | 'volume' | 'maintenance'
   sets: SetTrackState[]
   previousSets?: LoggedSetActual[]
 }
@@ -31,10 +30,12 @@ export interface WorkoutSessionMeta {
 
 interface Props {
   planId: string
+  workoutInstanceId: string
   planDay: PlanDay
   slot: WorkoutSlot
   programVars: Record<string, number>
   previousOutcome: WorkoutOutcome | null
+  resumeOutcome?: WorkoutOutcome | null
   previousSetsByExercise?: Record<string, LoggedSetActual[]>
   minimized: boolean
   onMinimize: () => void
@@ -120,10 +121,12 @@ function TimerCol({
 
 export function ActiveWorkoutTracker({
   planId: _planId,
+  workoutInstanceId,
   planDay,
   slot,
   programVars,
   previousOutcome,
+  resumeOutcome,
   previousSetsByExercise,
   minimized,
   onMinimize,
@@ -131,6 +134,7 @@ export function ActiveWorkoutTracker({
   onCancel,
   onComplete,
 }: Props) {
+  const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const workoutStartRef = useRef(new Date().toISOString())
   const pausePeriodsRef = useRef<{ start: string; end?: string }[]>([])
@@ -189,12 +193,86 @@ export function ActiveWorkoutTracker({
 
       return {
         exercise: ex.exercise,
-        progressionMode: 'single' as const,
         sets,
         previousSets: prevEx,
       }
     })
   })
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem(draftStorageKey)
+    if (!raw) {
+      if (resumeOutcome?.weightsActual?.exercises?.length) {
+        setExercises(prev => prev.map(ex => {
+          const fromOutcome = resumeOutcome.weightsActual?.exercises?.find(e => e.exercise === ex.exercise)
+          if (!fromOutcome) return ex
+          return {
+            ...ex,
+            sets: ex.sets.map((set, i) => ({
+              ...set,
+              actualReps: fromOutcome.sets[i]?.actualReps ?? set.actualReps,
+              actualLoad: fromOutcome.sets[i]?.actualLoad ?? set.actualLoad,
+              completed: fromOutcome.sets[i]?.completed ?? set.completed,
+            })),
+          }
+        }))
+      }
+      if (resumeOutcome?.durationActualMin && resumeOutcome.durationActualMin > 0) {
+        const secs = Math.round(resumeOutcome.durationActualMin * 60)
+        setWorkoutElapsed(secs)
+      }
+      return
+    }
+    try {
+      const draft = JSON.parse(raw) as {
+        workoutStart?: string
+        pausePeriods?: { start: string; end?: string }[]
+        workoutElapsed?: number
+        workoutRunning?: boolean
+        restRemaining?: number | null
+        restRunning?: boolean
+        activeSetTimer?: { exIdx: number; setIdx: number } | null
+        exercises?: ExerciseTrackState[]
+      }
+      if (draft.workoutStart) workoutStartRef.current = draft.workoutStart
+      if (draft.pausePeriods) pausePeriodsRef.current = draft.pausePeriods
+      if (typeof draft.workoutElapsed === 'number') setWorkoutElapsed(draft.workoutElapsed)
+      if (typeof draft.workoutRunning === 'boolean') {
+        setWorkoutRunning(draft.workoutRunning)
+        workoutRunRef.current = draft.workoutRunning
+      }
+      if (typeof draft.restRunning === 'boolean') {
+        setRestRunning(draft.restRunning)
+        restRunRef.current = draft.restRunning
+      }
+      if (draft.restRemaining != null) {
+        setRestRemaining(draft.restRemaining)
+        restRemRef.current = draft.restRemaining
+      }
+      if (draft.activeSetTimer) {
+        setActiveSetTimer(draft.activeSetTimer)
+        activeSetRef.current = draft.activeSetTimer
+      }
+      if (draft.exercises?.length) setExercises(draft.exercises)
+    } catch {
+      window.localStorage.removeItem(draftStorageKey)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftStorageKey])
+
+  useEffect(() => {
+    const draft = {
+      workoutStart: workoutStartRef.current,
+      pausePeriods: pausePeriodsRef.current,
+      workoutElapsed,
+      workoutRunning,
+      restRemaining,
+      restRunning,
+      activeSetTimer,
+      exercises,
+    }
+    window.localStorage.setItem(draftStorageKey, JSON.stringify(draft))
+  }, [draftStorageKey, workoutElapsed, workoutRunning, restRemaining, restRunning, activeSetTimer, exercises])
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -390,7 +468,7 @@ export function ActiveWorkoutTracker({
 
     const result: LoggedExerciseActual[] = exercises.map(ex => ({
       exercise: ex.exercise,
-      progressionMode: ex.progressionMode,
+      progressionMode: 'single',
       sets: ex.sets.map(s => ({
         targetReps: s.targetReps,
         targetLoad: s.targetLoad,
@@ -407,6 +485,7 @@ export function ActiveWorkoutTracker({
       pausePeriods: pausePeriodsRef.current.filter(p => p.end) as { start: string; end: string }[],
       totalElapsedSeconds: workoutElapsed,
     })
+    window.localStorage.removeItem(draftStorageKey)
   }
 
   if (minimized) {
@@ -511,25 +590,8 @@ export function ActiveWorkoutTracker({
         ) : (
           exercises.map((ex, exIdx) => (
             <div key={ex.exercise + exIdx} className="bg-slate-800/60 rounded-xl p-3 space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white leading-tight">{ex.exercise}</p>
-                </div>
-                <select
-                  value={ex.progressionMode}
-                  onChange={e => setExercises(prev => prev.map((it, i) => (
-                    i !== exIdx ? it : {
-                      ...it,
-                      progressionMode: e.target.value as ExerciseTrackState['progressionMode'],
-                    }
-                  )))}
-                  className="flex-shrink-0 bg-slate-700 border border-slate-600 rounded px-1.5 py-0.5 text-[10px] text-slate-300"
-                >
-                  <option value="single">Single</option>
-                  <option value="double">Double</option>
-                  <option value="volume">Volume</option>
-                  <option value="maintenance">Maint.</option>
-                </select>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white leading-tight">{ex.exercise}</p>
               </div>
 
               <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
@@ -638,7 +700,10 @@ export function ActiveWorkoutTracker({
               Keep going
             </button>
             <button
-              onClick={onCancel}
+              onClick={() => {
+                window.localStorage.removeItem(draftStorageKey)
+                onCancel()
+              }}
               className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
             >
               Cancel workout

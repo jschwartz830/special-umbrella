@@ -331,19 +331,6 @@ export function OutcomeModal({
               <div key={exercise.exercise + exIndex} className="space-y-2 bg-slate-800/40 rounded-lg p-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm text-slate-200 font-medium">{exercise.exercise}</p>
-                  <select
-                    value={exercise.progressionMode ?? 'single'}
-                    onChange={e => { markDirty(); setWeightExercises(prev => prev.map((it, i) => i === exIndex ? {
-                      ...it,
-                      progressionMode: e.target.value as LoggedExerciseActual['progressionMode'],
-                    } : it)) }}
-                    className="bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-[11px] text-slate-200"
-                  >
-                    <option value="single">Single prog</option>
-                    <option value="double">Double prog</option>
-                    <option value="volume">Volume</option>
-                    <option value="maintenance">Maintenance</option>
-                  </select>
                 </div>
 
                 <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
