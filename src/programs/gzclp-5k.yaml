@@ -1,273 +1,218 @@
-name: "GZCLP + 5K Build"
+name: "Hybrid Strength + Run Base"
 description: >
-  GZCLP linear strength progression (Squat/Bench/Deadlift/OHP/Row)
-  combined with a 5K base-building run plan.
-  6-day rotation: Lift A / Easy Run / Lift B / Tempo+Drills / Lift C / Intervals.
-  Weights add 5 lb each session (10 lb for deadlift); reset to 85 % on failure.
-  Run distances and interval reps increase when effort stays easy.
+  7-day repeating hybrid plan aligned to an upper/lower + cardio/recovery split.
+  Built for mixed equipment access with two upper sessions, two lower sessions,
+  one base cardio day, and two recovery-focused days.
 
 duration:
   type: weeks
-  value: 12
+  value: 36
 
-# ── Starting weights (lb) and run targets ────────────────────────────────────
 vars:
-  squat:          135
-  bench:           95
-  ohp:             65
-  deadlift:       155
-  row:             95
-  easy_miles:       3.0
-  tempo_miles:      2.0
-  interval_reps:    4
+  pull_ups_assist: 0
+  bench: 135
+  incline_db: 45
+  squat: 185
+  rdl: 155
+  ohp: 95
+  deadlift: 225
+  hip_thrust: 185
+  base_run_miles: 2.0
 
-# ── 6-day rotation ────────────────────────────────────────────────────────────
 days:
-
-  # ── Day 1: Squat + OHP ──────────────────────────────────────────────────────
-  - label: "Lift A — Squat + OHP"
+  - label: "Upper A"
     slots:
       - type: weights
-        name: "T1 Squat / T2 OHP"
+        name: "Upper A — Chest / Lats / Pull"
+        focus: upper
+        intent: hypertrophy
+        durationMin: 60
+        exercises:
+          - exercise: "Pull-Ups"
+            sets: 4
+            reps: "6-10"
+            load: pull_ups_assist
+            rest: 120s
+          - exercise: "Barbell Bench Press"
+            sets: 3
+            reps: "8-10"
+            load: bench
+            rest: 2m
+            progress:
+              if: all_reps
+              then: "bench += 2.5"
+          - exercise: "Dumbbell Incline Press"
+            sets: 3
+            reps: "10-12"
+            load: incline_db
+            rest: 90s
+          - exercise: "Straight Arm Pulldown"
+            sets: 3
+            reps: "12-15"
+            rest: 75s
+          - exercise: "Band Pull Aparts"
+            sets: 3
+            reps: "15-20"
+            rest: 60s
+          - exercise: "Dumbbell Curls"
+            sets: 2
+            reps: "10-12"
+            rest: 60s
+
+  - label: "Cardio Base"
+    slots:
+      - type: run
+        name: "Run / HIIT Base"
+        subtype: easy
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: easy
+          - type: easy
+            distance: "base_run_miles mi"
+            pace: easy
+          - type: cooldown
+            duration: 5m
+            pace: easy
+        progress:
+          if: "effort <= 3"
+          then: "base_run_miles = min(base_run_miles + 0.25, 10)"
+
+  - label: "Lower A"
+    slots:
+      - type: weights
+        name: "Lower A — Squat / Calves"
         focus: legs
         intent: strength
-        durationMin: 55
-
-        warmup:
-          - exercise: Squat
-            sets:
-              - { reps: 5,  load: "45lb",          isWarmup: true }
-              - { reps: 5,  load: "0.5 * squat",   isWarmup: true }
-              - { reps: 3,  load: "0.7 * squat",   isWarmup: true }
-              - { reps: 1,  load: "0.85 * squat",  isWarmup: true }
-
+        durationMin: 65
         exercises:
-          - exercise: Squat
-            sets: 5
-            reps: 3
+          - exercise: "Barbell Squat"
+            sets: 4
+            reps: "6-8"
             load: squat
             rest: 3m
-            tempo: "3-0-1-0"   # 3s down, 0 pause, 1s up, 0 top
             progress:
               if: all_reps
               then: "squat += 5"
-              else: "squat = round5(squat * 0.85)"
-
-          - exercise: OHP
+          - exercise: "Romanian Deadlift"
             sets: 3
-            reps: 10
-            load: ohp
+            reps: "8-10"
+            load: rdl
+            rest: 2m
+          - exercise: "Bulgarian Split Squat"
+            sets: 3
+            reps: "8-10 per leg"
             rest: 90s
-            progress:
-              if: all_reps
-              then: "ohp += 5"
-              else: "ohp = round5(ohp * 0.9)"
+          - exercise: "Single Leg Calf Raise"
+            sets: 4
+            reps: "12-15 per leg"
+            rest: 60s
+          - exercise: "Seated Calf Raise"
+            sets: 3
+            reps: "15-20"
+            rest: 60s
+          - exercise: "Ab Wheel / Plank"
+            sets: 3
+            reps: "15"
+            rest: 60s
 
-  # ── Day 2: Easy Run ──────────────────────────────────────────────────────────
-  - label: "Easy Run"
+  - label: "Recovery Combo"
     slots:
       - type: run
         name: "Easy Run"
-        subtype: easy
+        subtype: recovery
+        durationMin: 20
         segments:
-          - type: warmup
-            duration: 5m
-            pace: easy
-            notes: Walk/very easy jog
           - type: easy
-            distance: "easy_miles mi"
+            duration: 20m
             pace: easy
-          - type: cooldown
-            duration: 5m
-            pace: easy
-        progress:
-          if: "effort <= 3"
-          then: "easy_miles = min(easy_miles + 0.5, 8)"
+      - type: yoga
+        name: "Mobility Session"
+        durationMin: 30
+        focus: mobility
 
-  # ── Day 3: Bench + Row ───────────────────────────────────────────────────────
-  - label: "Lift B — Bench + Row"
+  - label: "Upper B"
     slots:
       - type: weights
-        name: "T1 Bench / T2 Row"
+        name: "Upper B — OHP / Push / Pull"
         focus: upper
-        intent: strength
-        durationMin: 55
-
-        warmup:
-          - exercise: "Bench Press"
-            sets:
-              - { reps: 10, load: "45lb",         isWarmup: true }
-              - { reps: 5,  load: "0.5 * bench",  isWarmup: true }
-              - { reps: 3,  load: "0.7 * bench",  isWarmup: true }
-              - { reps: 1,  load: "0.85 * bench", isWarmup: true }
-
+        intent: hypertrophy
+        durationMin: 60
         exercises:
-          - exercise: "Bench Press"
-            sets: 5
-            reps: 3
-            load: bench
-            rest: 3m
-            tempo: "2-1-1-0"
+          - exercise: "Barbell Overhead Press"
+            sets: 4
+            reps: "6-8"
+            load: ohp
+            rest: 2m
             progress:
               if: all_reps
-              then: "bench += 5"
-              else: "bench = round5(bench * 0.85)"
-
-          - exercise: "Barbell Row"
+              then: "ohp += 2.5"
+          - exercise: "Incline DB Press"
             sets: 3
-            reps: 10
-            load: row
+            reps: "8-10"
+            load: incline_db
             rest: 90s
-            progress:
-              if: all_reps
-              then: "row += 5"
-              else: "row = round5(row * 0.9)"
-
-  # ── Day 4: Tempo + Drills ────────────────────────────────────────────────────
-  - label: "Tempo Run + Drills"
-    slots:
-      - type: run
-        name: "Tempo with Drills"
-        subtype: tempo
-        durationMin: 40
-        difficulty: moderate
-        segments:
-          - type: warmup
-            duration: 10m
-            pace: easy
-
-          - type: drills
-            name: "Running Drills"
-            drills:
-              - name: "High Knees"
-                sets: 2
-                duration: 20s
-                rest: 30s
-              - name: "Butt Kicks"
-                sets: 2
-                duration: 20s
-                rest: 30s
-              - name: "A-Skips"
-                sets: 2
-                reps: 20
-                perSide: true
-                rest: 30s
-              - name: "B-Skips"
-                sets: 2
-                reps: 20
-                perSide: true
-                rest: 30s
-              - name: "Leg Swings (lateral)"
-                sets: 1
-                reps: 10
-                perSide: true
-              - name: "Leg Swings (fore-aft)"
-                sets: 1
-                reps: 10
-                perSide: true
-              - name: "Strides"
-                sets: 4
-                distance: 100m
-                pace: "mile"
-                rest: 60s
-
-          - type: tempo
-            distance: "tempo_miles mi"
-            pace: tempo
-            notes: Comfortably hard; able to speak in short sentences
-
-          - type: cooldown
-            duration: 5m
-            pace: easy
-
-        progress:
-          if: "effort <= 3"
-          then: "tempo_miles = min(tempo_miles + 0.25, 5)"
-
-  # ── Day 5: Deadlift + Core ───────────────────────────────────────────────────
-  - label: "Lift C — Deadlift + Core"
-    slots:
-      - type: weights
-        name: "T1 Deadlift / Core"
-        focus: full_body
-        intent: strength
-        durationMin: 50
-
-        warmup:
-          - exercise: Deadlift
-            sets:
-              - { reps: 5, load: "135lb",            isWarmup: true }
-              - { reps: 3, load: "0.6 * deadlift",   isWarmup: true }
-              - { reps: 2, load: "0.75 * deadlift",  isWarmup: true }
-              - { reps: 1, load: "0.875 * deadlift", isWarmup: true }
-
-        exercises:
-          - exercise: Deadlift
-            sets: 1
-            reps: 5
-            load: deadlift
-            rest: 5m
-            notes: Reset and brace between each rep (dead stop)
-            progress:
-              if: all_reps
-              then: "deadlift += 10"
-              else: "deadlift = round5(deadlift * 0.9)"
-
-          - exercise: "Romanian Deadlift"
+          - exercise: "Seated Cable Row"
             sets: 3
-            reps: 8
-            load: "0.5 * deadlift"
+            reps: "10-12"
             rest: 90s
-            notes: Hinge to mid-shin, slight knee bend
-
-          - exercise: Plank
+          - exercise: "Lat Pulldown"
             sets: 3
-            duration: 45s
+            reps: "10-12"
+            rest: 90s
+          - exercise: "Lateral Raise"
+            sets: 3
+            reps: "12-15"
+            rest: 60s
+          - exercise: "Tricep Pushdown"
+            sets: 2
+            reps: "12-15"
             rest: 60s
 
-          - exercise: "Dead Bug"
+  - label: "Lower B"
+    slots:
+      - type: weights
+        name: "Lower B — Deadlift / Posterior Chain"
+        focus: full_body
+        intent: strength
+        durationMin: 65
+        exercises:
+          - exercise: "Barbell Deadlift"
             sets: 3
-            reps: 10
-            rest: 45s
-            notes: Extend opposite arm/leg, keep lower back flush
-
-          - exercise: "Pallof Press"
+            reps: "5-6"
+            load: deadlift
+            rest: 3m
+            progress:
+              if: all_reps
+              then: "deadlift += 5"
+          - exercise: "Hip Thrust"
             sets: 3
-            reps: 12
-            rest: 45s
-            notes: Anti-rotation; use cable or band
+            reps: "10-12"
+            load: hip_thrust
+            rest: 2m
+          - exercise: "Nordic Curl"
+            sets: 3
+            reps: "3-6"
+            rest: 90s
+          - exercise: "Single Leg Calf Raise"
+            sets: 4
+            reps: "12-15 per leg"
+            rest: 60s
+          - exercise: "Farmer's Walk"
+            sets: 3
+            duration: 60s
+            rest: 90s
 
-  # ── Day 6: Interval Track ────────────────────────────────────────────────────
-  - label: "Track Intervals"
+  - label: "Recovery Optional"
     slots:
       - type: run
-        name: "800 m Repeats"
-        subtype: intervals
-        difficulty: hard
+        name: "Optional Easy Run"
+        subtype: easy
+        durationMin: 20
         segments:
-          - type: warmup
-            distance: 1mi
+          - type: easy
+            duration: 20m
             pace: easy
-
-          - type: drills
-            name: "Pre-workout activation"
-            drills:
-              - { name: "High Knees",  sets: 1, duration: 20s }
-              - { name: "A-Skips",     sets: 1, reps: 20, perSide: true }
-              - { name: "Strides",     sets: 2, distance: 100m, pace: "mile", rest: 60s }
-
-          - type: interval
-            name: "800 m Repeats"
-            distance: 800m
-            pace: "5K"
-            reps: interval_reps
-            rest: 2m
-            notes: Full recovery jog between reps
-
-          - type: cooldown
-            distance: 1mi
-            pace: easy
-
-        progress:
-          if: "effort <= 3"
-          then: "interval_reps = min(interval_reps + 1, 8)"
+      - type: rest
+        name: "Or Full Rest"
