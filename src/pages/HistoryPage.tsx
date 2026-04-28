@@ -354,7 +354,7 @@ export function HistoryPage() {
 
             const stateLabel = completionState
               ? COMPLETION_STATE_LABELS[completionState]
-              : entry.action.replace('_', ' ')
+              : entry.action.replaceAll('_', ' ')
 
             const isComplete = entry.action === 'complete'
 

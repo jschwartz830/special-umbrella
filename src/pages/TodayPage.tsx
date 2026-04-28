@@ -738,7 +738,7 @@ export function TodayPage() {
                     loggingUpcoming.rd.historyEntry.action === 'complete' ? 'text-emerald-400' :
                     loggingUpcoming.rd.historyEntry.action === 'skip' ? 'text-slate-300' : 'text-amber-400'
                   }`}>
-                    {loggingUpcoming.rd.historyEntry.action.replace('_', ' ')}
+                    {loggingUpcoming.rd.historyEntry.action.replaceAll('_', ' ')}
                   </span>
                 </div>
                 {loggingUpcoming.rd.historyEntry.action === 'complete' && (
