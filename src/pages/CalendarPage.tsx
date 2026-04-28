@@ -15,9 +15,10 @@ import { useActivePlan } from '../hooks/useActivePlan'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { buildMonthGrid } from '../engine/calendarProjection'
-import { WorkoutBadge } from '../components/workout/WorkoutBadge'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
+import { WorkoutBadge } from '../components/workout/WorkoutBadge'
 import { OutcomeMetrics } from '../components/workout/OutcomeMetrics'
+import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
@@ -583,12 +584,9 @@ function DayDetailModal({
             <span className="text-sm font-medium text-amber-400">Day Off</span>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className={`space-y-2 ${displayDay.slots.length > 1 ? 'divide-y divide-slate-700/50' : ''}`}>
             {displayDay.slots.map((slot, i) => (
-              <div key={slot.id} className={`flex items-center gap-2 ${i > 0 ? 'pt-2 border-t border-slate-700/50' : ''}`}>
-                <WorkoutBadge type={slot.type} size="sm" />
-                <span className="text-sm font-medium text-slate-200">{slot.name}</span>
-              </div>
+              <WorkoutSlotDetails key={slot.id} slot={slot} className={i > 0 ? 'pt-2' : ''} />
             ))}
           </div>
         )}
