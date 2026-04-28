@@ -365,6 +365,10 @@ export function ActiveWorkoutTracker({
       && !exercises[exIdx].sets[setIdx].completed
   }
 
+  const activeSetValue = activeSetTimer
+    ? fmt(exercises[activeSetTimer.exIdx]?.sets[activeSetTimer.setIdx]?.setElapsedSeconds ?? 0)
+    : '—'
+
   function previousSetDisplay(ex: ExerciseTrackState, setIdx: number): string {
     const previous = ex.previousSets?.[setIdx]
     if (!previous || previous.actualReps == null || previous.actualLoad == null) return '-'
@@ -428,6 +432,12 @@ export function ActiveWorkoutTracker({
         className="flex-shrink-0 mx-4 mt-3 border border-slate-700 rounded-xl bg-slate-800/60 cursor-pointer select-none"
         onClick={() => setTimersExpanded(v => !v)}
       >
+        <div className="px-3 pt-2.5">
+          <div className="flex items-center justify-between rounded-lg border border-slate-700/70 bg-slate-900/40 px-2.5 py-1.5">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Active Set</p>
+            <p className="text-sm font-mono font-bold text-amber-200">{activeSetValue}</p>
+          </div>
+        </div>
         <div className="grid grid-cols-2 divide-x divide-slate-700/60 py-2.5">
           <TimerCol
             label="Workout"
@@ -487,7 +497,7 @@ export function ActiveWorkoutTracker({
                 </select>
               </div>
 
-              <div className="grid grid-cols-12 gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
+              <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
                 <span className="col-span-1 text-center">#</span>
                 <span className="col-span-3 text-center">Prev</span>
                 <span className="col-span-3 text-center">Reps</span>
@@ -502,7 +512,7 @@ export function ActiveWorkoutTracker({
                 return (
                   <div
                     key={setIdx}
-                    className={`grid grid-cols-12 gap-1 items-center transition-opacity ${s.completed ? 'opacity-60' : ''}`}
+                    className={`grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 items-center transition-opacity ${s.completed ? 'opacity-60' : ''}`}
                   >
                     <span className="col-span-1 text-center text-slate-400 text-xs font-medium">
                       {setIdx + 1}
