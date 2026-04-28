@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { format, parseISO } from 'date-fns'
 import {
   CheckCircle2,
@@ -33,6 +33,15 @@ const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
   { type: 'yoga', label: 'Yoga' },
   { type: 'other', label: 'Other' },
 ]
+
+/** Plural display labels used in the training-mix summary row. */
+const TYPE_MIX_LABEL: Partial<Record<WorkoutType, string>> = {
+  weights: 'weights',
+  run: 'runs',
+  swim: 'swims',
+  yoga: 'yoga',
+  other: 'other',
+}
 
 function extraToPlanDay(extra: ExtraWorkoutEntry): PlanDay {
   return {
@@ -128,6 +137,32 @@ export function HistoryPage() {
 
   const todayKey = format(new Date(), 'yyyy-MM-dd')
   const stats = computeHistoryStats(filteredEntries, filteredExtras, todayKey)
+
+  // Count completed workouts by type for the training-mix summary row.
+  // Rotation entries use the plan day's first slot type; extras use workoutType.
+  const typeCountMap = useMemo(() => {
+    const counts = new Map<WorkoutType, number>()
+    for (const item of flatItems) {
+      let type: WorkoutType | undefined
+      if (item.kind === 'extra') {
+        type = item.extra.workoutType
+      } else if (item.entry.action === 'complete') {
+        const p = plans[item.entry.planId]
+        type = p?.days[item.entry.planDayIndex ?? -1]?.slots[0]?.type
+      }
+      if (type) counts.set(type, (counts.get(type) ?? 0) + 1)
+    }
+    return counts
+  }, [flatItems, plans])
+
+  const typeMixLabel = useMemo(() => {
+    if (typeCountMap.size === 0) return null
+    return [...typeCountMap.entries()]
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 4)
+      .map(([t, n]) => `${n} ${TYPE_MIX_LABEL[t] ?? t}`)
+      .join(' · ')
+  }, [typeCountMap])
 
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')
@@ -314,11 +349,16 @@ export function HistoryPage() {
         <CsvToolbar canExport={entries.length > 0 || extraEntries.length > 0} onExport={handleExport} onImport={handleImport} />
 
         {(filteredEntries.length > 0 || filteredExtras.length > 0) && (
-          <div className="grid grid-cols-4 gap-2">
-            <StatTile label="Streak" value={stats.currentStreak} suffix={stats.currentStreak === 1 ? 'day' : 'days'} />
-            <StatTile label="7-day" value={stats.last7Completed} />
-            <StatTile label="30-day" value={stats.last30Completed} />
-            <StatTile label="Total" value={stats.totalCompleted} />
+          <div className="space-y-2">
+            <div className="grid grid-cols-4 gap-2">
+              <StatTile label="Streak" value={stats.currentStreak} suffix={stats.currentStreak === 1 ? 'day' : 'days'} />
+              <StatTile label="7-day" value={stats.last7Completed} />
+              <StatTile label="30-day" value={stats.last30Completed} />
+              <StatTile label="Total" value={stats.totalCompleted} />
+            </div>
+            {typeMixLabel && (
+              <p className="text-xs text-slate-500 text-center">{typeMixLabel}</p>
+            )}
           </div>
         )}
       </div>
