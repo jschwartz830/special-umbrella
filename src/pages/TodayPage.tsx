@@ -37,7 +37,7 @@ import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, PlanDay } from '../types'
-import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
+import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 
 /** Find the most recent outcome with weights data for this plan (excluding today). */
 function findPreviousWeightsOutcome(
@@ -55,6 +55,34 @@ function findPreviousWeightsOutcome(
     if (!best || (outcome.completedAt ?? '') > (best.completedAt ?? '')) best = outcome
   }
   return best
+}
+
+/** Find latest prior sets per exercise for this plan (excluding today). */
+function findPreviousSetsByExercise(
+  planId: string,
+  currentDate: string,
+  outcomes: Record<string, WorkoutOutcome>,
+): Record<string, LoggedSetActual[]> {
+  const prefix = planId + '_'
+  const sortedOutcomes = Object.values(outcomes)
+    .filter(outcome => {
+      if (!outcome.workoutInstanceId.startsWith(prefix)) return false
+      const rest = outcome.workoutInstanceId.slice(prefix.length)
+      if (rest.startsWith(currentDate)) return false
+      return Boolean(outcome.weightsActual?.exercises?.length)
+    })
+    .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
+
+  const previousByExercise: Record<string, LoggedSetActual[]> = {}
+  for (const outcome of sortedOutcomes) {
+    for (const ex of outcome.weightsActual?.exercises ?? []) {
+      if (!previousByExercise[ex.exercise]) {
+        previousByExercise[ex.exercise] = ex.sets
+      }
+    }
+  }
+
+  return previousByExercise
 }
 
 function extraToPlanDay(extra: ExtraWorkoutEntry): PlanDay {
@@ -89,6 +117,10 @@ export function TodayPage() {
   )
   const previousWeightsOutcome = useMemo(
     () => (plan ? findPreviousWeightsOutcome(plan.id, today, allOutcomes) : null),
+    [plan, today, allOutcomes],
+  )
+  const previousSetsByExercise = useMemo(
+    () => (plan ? findPreviousSetsByExercise(plan.id, today, allOutcomes) : {}),
     [plan, today, allOutcomes],
   )
 
@@ -638,6 +670,7 @@ export function TodayPage() {
             slot={slot}
             programVars={planProgramVars}
             previousOutcome={previousWeightsOutcome}
+            previousSetsByExercise={previousSetsByExercise}
             onClose={() => setShowActiveWorkout(false)}
             onComplete={handleActiveWorkoutComplete}
           />
