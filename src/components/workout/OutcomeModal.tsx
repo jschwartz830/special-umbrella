@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircle2,
   MinusCircle,
@@ -10,6 +10,7 @@ import {
   Waves,
   Play,
   Pause,
+  AlertTriangle,
 } from 'lucide-react'
 import { Modal } from '../shared/Modal'
 import type { PlanDay, WorkoutSlot } from '../../types'
@@ -186,6 +187,19 @@ export function OutcomeModal({
   const [exerciseTimerSeconds, setExerciseTimerSeconds] = useState<number>(0)
   const [exerciseTimerRunning, setExerciseTimerRunning] = useState(false)
 
+  const isDirtyRef = useRef(false)
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
+
+  function markDirty() { isDirtyRef.current = true }
+
+  function handleClose() {
+    if (existingOutcome && isDirtyRef.current) {
+      setShowCloseConfirm(true)
+    } else {
+      onClose()
+    }
+  }
+
   useEffect(() => {
     if (restTimerSeconds == null || restTimerSeconds <= 0) return
     const id = window.setInterval(() => {
@@ -222,6 +236,7 @@ export function OutcomeModal({
   )
 
   function updateSet(exerciseIndex: number, setIndex: number, patch: Partial<LoggedSetActual>) {
+    markDirty()
     setWeightExercises(prev => prev.map((ex, ei) => {
       if (ei !== exerciseIndex) return ex
       return {
@@ -269,9 +284,10 @@ export function OutcomeModal({
   const stateLabel = completionState === 'partially_completed' ? 'Log Partial' : 'Mark Complete'
 
   return (
+    <>
     <Modal
       title="Log Workout"
-      onClose={onClose}
+      onClose={handleClose}
       footer={
         <button
           onClick={handleConfirm}
@@ -288,7 +304,7 @@ export function OutcomeModal({
             {STATE_OPTIONS.map(opt => (
               <button
                 key={opt.state}
-                onClick={() => setCompletionState(opt.state)}
+                onClick={() => { markDirty(); setCompletionState(opt.state) }}
                 className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[10px] font-semibold transition-colors ${
                   completionState === opt.state
                     ? opt.activeClass
@@ -337,10 +353,10 @@ export function OutcomeModal({
                   <p className="text-sm text-slate-200 font-medium">{exercise.exercise}</p>
                   <select
                     value={exercise.progressionMode ?? 'single'}
-                    onChange={e => setWeightExercises(prev => prev.map((it, i) => i === exIndex ? {
+                    onChange={e => { markDirty(); setWeightExercises(prev => prev.map((it, i) => i === exIndex ? {
                       ...it,
                       progressionMode: e.target.value as LoggedExerciseActual['progressionMode'],
-                    } : it))}
+                    } : it)) }}
                     className="bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-[11px] text-slate-200"
                   >
                     <option value="single">Single prog</option>
@@ -399,7 +415,7 @@ export function OutcomeModal({
             {([1, 2, 3, 4, 5] as PerceivedEffort[]).map(e => (
               <button
                 key={e}
-                onClick={() => setEffort(prev => (prev === e ? null : e))}
+                onClick={() => { markDirty(); setEffort(prev => (prev === e ? null : e)) }}
                 className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-colors ${
                   effort === e
                     ? e <= 2
@@ -428,7 +444,7 @@ export function OutcomeModal({
             min="0"
             step="1"
             value={durationMin}
-            onChange={e => setDurationMin(e.target.value)}
+            onChange={e => { markDirty(); setDurationMin(e.target.value) }}
             placeholder="Optional"
             className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
           />
@@ -440,11 +456,11 @@ export function OutcomeModal({
             <div className="grid grid-cols-2 gap-2">
               <label className="space-y-1">
                 <span className="flex items-center gap-1 text-xs text-slate-400"><Ruler size={11} /> Distance (mi)</span>
-                <input type="number" min="0" step="0.01" value={distanceMiles} onChange={e => setDistanceMiles(e.target.value)} placeholder="0.0" className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white" />
+                <input type="number" min="0" step="0.01" value={distanceMiles} onChange={e => { markDirty(); setDistanceMiles(e.target.value) }} placeholder="0.0" className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white" />
               </label>
               <label className="space-y-1">
                 <span className="flex items-center gap-1 text-xs text-slate-400"><Timer size={11} /> Time (min)</span>
-                <input type="number" min="0" step="1" value={runDurationMin} onChange={e => setRunDurationMin(e.target.value)} placeholder="0" className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white" />
+                <input type="number" min="0" step="1" value={runDurationMin} onChange={e => { markDirty(); setRunDurationMin(e.target.value) }} placeholder="0" className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white" />
               </label>
             </div>
             {derivedPace != null && <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-700/50 rounded-lg px-3 py-2"><Zap size={11} className="text-sky-400" /><span>Avg pace: <strong className="text-sky-300">{formatPace(derivedPace)}</strong></span></div>}
@@ -452,7 +468,7 @@ export function OutcomeModal({
               <p className="text-xs text-slate-400 mb-1.5">Completed as planned?</p>
               <div className="flex gap-2">
                 {([true, false] as const).map(val => (
-                  <button key={String(val)} onClick={() => setCompletedAsPlanned(prev => prev === val ? null : val)} className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${completedAsPlanned === val ? (val ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-red-500/20 border-red-500/50 text-red-400') : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'}`}>{val ? 'Yes' : 'No'}</button>
+                  <button key={String(val)} onClick={() => { markDirty(); setCompletedAsPlanned(prev => prev === val ? null : val) }} className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${completedAsPlanned === val ? (val ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-red-500/20 border-red-500/50 text-red-400') : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'}`}>{val ? 'Yes' : 'No'}</button>
                 ))}
               </div>
             </div>
@@ -463,13 +479,13 @@ export function OutcomeModal({
           <div className="space-y-3 border border-slate-700 rounded-xl p-3">
             <p className="text-xs text-slate-500 uppercase tracking-wide font-medium flex items-center gap-1"><Waves size={11} /> Swim Actuals</p>
             <div className="grid grid-cols-2 gap-2">
-              <input type="number" min="0" step="25" value={swimDistanceMeters} onChange={e => setSwimDistanceMeters(e.target.value)} placeholder="Distance (m)" className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white" />
-              <input type="number" min="0" step="1" value={swimDurationMin} onChange={e => setSwimDurationMin(e.target.value)} placeholder="Time (min)" className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white" />
+              <input type="number" min="0" step="25" value={swimDistanceMeters} onChange={e => { markDirty(); setSwimDistanceMeters(e.target.value) }} placeholder="Distance (m)" className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white" />
+              <input type="number" min="0" step="1" value={swimDurationMin} onChange={e => { markDirty(); setSwimDurationMin(e.target.value) }} placeholder="Time (min)" className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-2 text-sm text-white" />
             </div>
             {derivedSwimPace != null && <p className="text-xs text-sky-300">Avg pace: {formatSwimPace(derivedSwimPace)}</p>}
             <div className="flex gap-2">
               {([true, false] as const).map(val => (
-                <button key={`swim-${String(val)}`} onClick={() => setSwimCompletedAsPlanned(prev => prev === val ? null : val)} className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${swimCompletedAsPlanned === val ? (val ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-red-500/20 border-red-500/50 text-red-400') : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'}`}>{val ? 'As Planned' : 'Adjusted'}</button>
+                <button key={`swim-${String(val)}`} onClick={() => { markDirty(); setSwimCompletedAsPlanned(prev => prev === val ? null : val) }} className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${swimCompletedAsPlanned === val ? (val ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-red-500/20 border-red-500/50 text-red-400') : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'}`}>{val ? 'As Planned' : 'Adjusted'}</button>
               ))}
             </div>
           </div>
@@ -477,9 +493,37 @@ export function OutcomeModal({
 
         <div>
           <label className="text-xs text-slate-500 uppercase tracking-wide font-medium block mb-2">Notes</label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="How did it feel? Any notes..." rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none" />
+          <textarea value={notes} onChange={e => { markDirty(); setNotes(e.target.value) }} placeholder="How did it feel? Any notes..." rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none" />
         </div>
       </div>
     </Modal>
+
+    {showCloseConfirm && (
+      <Modal title="Discard changes?" onClose={() => setShowCloseConfirm(false)}>
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-slate-300">
+              You have unsaved changes. Close without saving?
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCloseConfirm(false)}
+              className="flex-1 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold transition-colors"
+            >
+              Keep editing
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      </Modal>
+    )}
+    </>
   )
 }

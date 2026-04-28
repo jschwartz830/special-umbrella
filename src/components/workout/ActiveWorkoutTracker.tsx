@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check } from 'lucide-react'
+import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2 } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import { resolveLoad, type EvalContext } from '../../lib/expressionEval'
@@ -36,7 +36,10 @@ interface Props {
   programVars: Record<string, number>
   previousOutcome: WorkoutOutcome | null
   previousSetsByExercise?: Record<string, LoggedSetActual[]>
-  onClose: () => void
+  minimized: boolean
+  onMinimize: () => void
+  onResume: () => void
+  onCancel: () => void
   onComplete: (exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) => void
 }
 
@@ -122,9 +125,13 @@ export function ActiveWorkoutTracker({
   programVars,
   previousOutcome,
   previousSetsByExercise,
-  onClose,
+  minimized,
+  onMinimize,
+  onResume,
+  onCancel,
   onComplete,
 }: Props) {
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const workoutStartRef = useRef(new Date().toISOString())
   const pausePeriodsRef = useRef<{ start: string; end?: string }[]>([])
   const pausedSetRef = useRef<{ exIdx: number; setIdx: number } | null>(null)
@@ -402,12 +409,33 @@ export function ActiveWorkoutTracker({
     })
   }
 
+  if (minimized) {
+    return (
+      <div className="fixed bottom-[72px] inset-x-0 z-50 px-4 pb-2">
+        <button
+          onClick={onResume}
+          className="w-full flex items-center gap-3 px-4 py-3 bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl active:scale-[0.98] transition-transform"
+        >
+          <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse flex-shrink-0" />
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-sm font-semibold text-white truncate">{slot.name}</p>
+            <p className="text-xs text-slate-400">Workout in progress — tap to resume</p>
+          </div>
+          <span className="font-mono text-sky-300 text-sm flex-shrink-0">{fmt(workoutElapsed)}</span>
+          <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />
+        </button>
+      </div>
+    )
+  }
+
   return (
+    <>
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
       <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-slate-800">
         <button
-          onClick={onClose}
+          onClick={onMinimize}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          title="Minimize workout"
         >
           <X size={18} />
         </button>
@@ -415,6 +443,13 @@ export function ActiveWorkoutTracker({
           <h1 className="text-sm font-bold text-white truncate">{planDay.label}</h1>
           <p className="text-xs text-slate-500 truncate">{slot.name}</p>
         </div>
+        <button
+          onClick={() => setShowCancelConfirm(true)}
+          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          title="Cancel workout"
+        >
+          <Trash2 size={16} />
+        </button>
         <button
           onClick={() => toggleWorkout()}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
@@ -584,5 +619,34 @@ export function ActiveWorkoutTracker({
         </button>
       </div>
     </div>
+
+    {showCancelConfirm && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-6">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
+          <div className="flex items-start gap-3">
+            <Trash2 size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-white font-semibold">Cancel workout?</p>
+              <p className="text-sm text-slate-400 mt-1">Your in-progress session won't be saved.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowCancelConfirm(false)}
+              className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold text-sm transition-colors"
+            >
+              Keep going
+            </button>
+            <button
+              onClick={onCancel}
+              className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
+            >
+              Cancel workout
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

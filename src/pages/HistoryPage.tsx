@@ -7,7 +7,6 @@ import {
   Pencil,
   Trash2,
   X,
-  ClipboardList,
   Plus,
 } from 'lucide-react'
 import { useHistoryStore } from '../store/historyStore'
@@ -357,9 +356,15 @@ export function HistoryPage() {
               ? COMPLETION_STATE_LABELS[completionState]
               : entry.action.replace('_', ' ')
 
+            const isComplete = entry.action === 'complete'
+
             return (
               <div key={entry.id}>
-                <div className="bg-slate-800/80 rounded-xl p-4 border border-slate-700/50">
+                <div
+                  className={`bg-slate-800/80 rounded-xl border border-slate-700/50 overflow-hidden ${isComplete ? 'cursor-pointer hover:border-slate-600 transition-colors active:scale-[0.99]' : ''}`}
+                  onClick={isComplete ? () => openOutcomeForEntry(entry) : undefined}
+                >
+                  <div className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       {/* Date */}
@@ -396,24 +401,20 @@ export function HistoryPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1 flex-shrink-0 mt-5">
+                    <div className="flex items-center gap-1 flex-shrink-0 mt-5" onClick={e => e.stopPropagation()}>
                       <span className={`text-xs font-medium capitalize ${actionColor}`}>{stateLabel}</span>
-                      {entry.action === 'complete' && (
-                        <button
-                          onClick={() => openOutcomeForEntry(entry)}
-                          className="ml-1 p-1.5 rounded-lg bg-slate-700 hover:bg-sky-500/20 text-slate-400 hover:text-sky-400 transition-colors"
-                          title="Edit workout details"
-                        >
-                          <ClipboardList size={12} />
-                        </button>
-                      )}
                       <button
                         onClick={() => openEdit(entry)}
                         className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"
+                        title="Edit entry"
                       >
                         <Pencil size={12} />
                       </button>
                     </div>
+                  </div>
+                  {isComplete && (
+                    <p className="text-[10px] text-slate-600 mt-2">Tap to view &amp; edit workout details</p>
+                  )}
                   </div>
                 </div>
 
@@ -459,7 +460,11 @@ export function HistoryPage() {
 
           return (
             <div key={extra.id}>
-              <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/30">
+              <div
+                className="bg-slate-800/60 rounded-xl border border-slate-700/30 overflow-hidden cursor-pointer hover:border-slate-600 transition-colors active:scale-[0.99]"
+                onClick={() => openOutcomeForExtra(extra)}
+              >
+                <div className="p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-slate-500 font-medium mb-1">
@@ -487,14 +492,7 @@ export function HistoryPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1 flex-shrink-0 mt-5">
-                    <button
-                      onClick={() => openOutcomeForExtra(extra)}
-                      className="p-1.5 rounded-lg bg-slate-700 hover:bg-sky-500/20 text-slate-400 hover:text-sky-400 transition-colors"
-                      title="Log/edit details"
-                    >
-                      <ClipboardList size={12} />
-                    </button>
+                  <div className="flex items-center gap-1 flex-shrink-0 mt-5" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => openExtraEdit(extra)}
                       className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"
@@ -509,6 +507,8 @@ export function HistoryPage() {
                       <Trash2 size={12} />
                     </button>
                   </div>
+                </div>
+                <p className="text-[10px] text-slate-600 mt-2">Tap to view &amp; edit workout details</p>
                 </div>
               </div>
 
@@ -598,7 +598,7 @@ export function HistoryPage() {
                 onClick={() => openOutcomeForEntry(editingEntry)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 text-sm font-medium transition-colors"
               >
-                <ClipboardList size={15} /> Edit Workout Details
+                Edit Workout Details
               </button>
             )}
 
