@@ -1,5 +1,107 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-28 (fifteenth pass) — branch `claude/great-mccarthy-6NVvu`
+
+### Executive summary
+
+1. **What changed**: One cosmetic consistency fix (`.replace` → `.replaceAll`
+   in 3 files), one small feature (training-mix summary in HistoryPage), and
+   one medium feature (past-unlogged-days nudge on TodayPage with 9 new tests).
+   302 tests now pass (was 293).
+
+2. **What is highest confidence**: The `replaceAll` fix — no behavior change for
+   current values; the training mix — purely additive UI from existing data; and
+   the pure `countPastUnloggedDays` helper — fully tested with clear invariants.
+
+3. **What is risky**: The TodayPage nudge may show false positives for users who
+   intentionally took time off. The "may be stalled" wording and muted styling
+   mitigate this but don't eliminate it.
+
+4. **What to review first**: The TodayPage nudge UX. Does it feel helpful or
+   noisy? If noisy, add dismissibility in the next pass.
+
+---
+
+### Biggest issues found this pass
+
+All prior high-severity issues from passes 1–14 remain fixed and stable. This
+pass found only cosmetic/consistency issues.
+
+1. **Three `.replace` calls** — should be `.replaceAll` for correctness and
+   consistency with the pass-13 fix. No user-visible impact today.
+
+2. **`computeWorkoutTypeBreakdown` had no UI home** — the pure function from
+   pass 12 was untethered. Now surfaces in HistoryPage.
+
+3. **Rotation stall invisible to users** — no signal when past unlogged days
+   were causing the rotation pointer to appear wrong.
+
+---
+
+### Improvements completed
+
+| # | Item | Type | Confidence |
+|---|------|------|-----------|
+| 1 | `replaceAll` in HistoryPage, CalendarPage, TodayPage | Bug (cosmetic) | High |
+| 2 | Training-mix summary in HistoryPage | Feature (small) | High |
+| 3 | `countPastUnloggedDays` helper + tests | Feature (medium) | High |
+| 4 | Unlogged-days nudge on TodayPage | Feature (medium) | Medium |
+
+---
+
+### Definitely keep
+
+- `replaceAll` fix — zero risk, correct behaviour
+- `countPastUnloggedDays` helper and its 9 tests — clean, isolated, well-covered
+- Training-mix summary — additive, useful at a glance, easy to revert
+
+### Probably keep but tweak
+
+- TodayPage nudge — useful, but may need dismissibility if users find it noisy
+  when they intentionally skipped workouts. Evaluate after a few days of use.
+
+### Do not keep
+
+- Nothing to remove this pass.
+
+### Recommendations only (not implemented)
+
+- **Dismissible nudge**: If the nudge generates noise complaints, wire in a
+  `useExpiryDismiss`-style localStorage dismiss that auto-clears when count = 0.
+- **"Mark all as day off"**: Quick-action button in the nudge to batch-log all
+  N missing days as day_off without going to CalendarPage.
+- **`progressionStates` orphaning on plan delete**: Still deferred. Still needs
+  a reverse index (planId → progressionGroupId set) or a periodic orphan sweep.
+- **TodayPage size**: Now ~930 lines. Still above the threshold for comfortable
+  editing; still recommend splitting into smaller components in a daytime session.
+- **Nudge on expired plans**: Nudge shows after plan expiry. Consider suppressing
+  when `planExpired === true` in a follow-up.
+
+---
+
+### Open questions
+
+1. Is 7 days the right lookback window for the nudge? Users away for 10 days see
+   "7 days" capped — should it show the actual gap?
+2. Should the nudge be suppressed when the plan is expired?
+3. Should the training-mix count skips as well as completions? Currently skipped
+   rotation entries are excluded (only completed + all extras).
+
+---
+
+### Known issues / incomplete work
+
+- Nudge is not dismissible (intentional, documented in FEATURE_REVIEW.md).
+- Nudge shows even after plan expiry (minor, documented as open question).
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-04-27 (fourteenth pass) — branch `claude/great-mccarthy-GNrKl`
 
 ### Executive summary

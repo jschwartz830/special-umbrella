@@ -1,3 +1,113 @@
+# Feature Proposal — Past Unlogged Days Nudge (TodayPage)
+
+Date: 2026-04-28
+Branch: `claude/great-mccarthy-6NVvu`
+Status: **Implemented this run**
+
+---
+
+## Feature selected
+
+A "past unlogged days" count and nudge on TodayPage. When the active plan has
+calendar days between its start date and yesterday that have no history entry,
+TodayPage shows a subtle informational banner: "N day(s) in the past [window]
+without entries — the rotation may be stalled. [View Calendar]"
+
+---
+
+## Why selected
+
+The rotation engine's "stall on unlogged past day" behaviour is intentional and
+correct, but it is invisible to users. A user who comes back after several days
+off sees today's workout looking "wrong" (it shows a day they already did weeks
+ago) with no explanation. The nudge surfaces the root cause inline and provides
+a direct path to resolution (CalendarPage retroactive logging).
+
+This is adjacent to existing TodayPage content, requires no store changes, and
+uses a tiny new pure helper that is independently testable.
+
+---
+
+## Expected user value
+
+- Removes confusion when the rotation appears "stale" after a break.
+- Directs users to CalendarPage to catch up with retroactive logging.
+- No action required — the nudge disappears as entries are added.
+
+---
+
+## Implementation scope for this run
+
+1. Pure helper `countPastUnloggedDays(planId, entries, startDate, today, lookbackDays)`
+   in `src/lib/historyStats.ts`. Returns the number of days in
+   `[max(plan.startDate, today − lookbackDays), yesterday]` that have no entry
+   for the given plan.
+2. Wire the helper into TodayPage beneath the stats bar. Show a single-line
+   info nudge with a "View Calendar" link when count > 0.
+3. Unit tests for the helper covering: all logged, none logged, partial, before
+   plan start clamping, window boundary, and window = 0.
+
+---
+
+## Assumptions
+
+- A lookback window of 7 days is enough signal without being overwhelming for
+  users who have been away longer.
+- The nudge is **not dismissible** — it is informational and goes away naturally
+  when the user logs the missing days.
+- Day-off entries count as "logged" (they have a history entry), so a planned
+  rest day does not trigger the nudge.
+- The helper is intentionally simple: it counts entries by planId + calendarDate
+  without running the full rotation engine. This means it counts any gap, not
+  just gaps that stall the pointer. Over-counting is acceptable (the nudge
+  says "may be stalled", not "is stalled").
+
+---
+
+## Open product / UX decisions
+
+- **Window size**: 7 days chosen as default. Could be configurable or dynamic
+  (e.g., since plan startDate if the plan is < 7 days old).
+- **Dismissibility**: Not dismissible this pass. Could add a per-plan dismiss
+  with `useExpiryDismiss`-style localStorage state in a future pass.
+- **Severity**: Styled as a soft info nudge (slate colour, no warning icon)
+  to avoid alarm for users who intentionally took time off.
+
+---
+
+## Architecture / schema impact
+
+- No store changes. No new localStorage keys.
+- One new exported pure function in `historyStats.ts`.
+- TodayPage gains one conditional render block (~10 lines JSX).
+
+---
+
+## Risks
+
+- **False positives for intentional rest**: Users who took a week off
+  deliberately will see the nudge even though they don't need to log anything.
+  Mitigated by mild styling and "may be stalled" phrasing.
+- **Perf**: Negligible — iterates over planEntries once per render, memoised.
+
+---
+
+## Rollback strategy
+
+`git revert` the two commits (helper + TodayPage wiring). Zero data changes,
+zero store migration required.
+
+---
+
+## What is intentionally not being built yet
+
+- Dismissibility (per-plan localStorage persist).
+- Per-day detail (which specific days are unlogged).
+- Automatic "mark as day off" for the gaps.
+- Dynamic window size based on plan age.
+
+---
+
 # Feature Proposal — Compact Stats Bar (TodayPage)
 
 Date: 2026-04-27

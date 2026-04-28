@@ -1,5 +1,86 @@
 # Overnight Changelog
 
+## 2026-04-28 (fifteenth pass) — branch `claude/great-mccarthy-6NVvu`
+
+Baseline on entry: **293 passing, 0 failing**.
+Exit state: **302 passing, 0 failing** (+9 tests).
+
+---
+
+### 1. Fix: `replace` → `replaceAll` for action string display (3 files)
+
+**Summary**: Three places displayed history action strings (e.g. `day_off`) using
+`.replace('_', ' ')`, which only replaces the first underscore. Changed to
+`.replaceAll` to be consistent with the fix applied to workout-type strings in
+pass 13.
+
+**Why it matters**: Currently harmless (action values have at most one underscore),
+but inconsistent with the rest of the codebase and would silently break if any
+future action type contained multiple underscores.
+
+**Files changed**:
+- `src/pages/HistoryPage.tsx` — stateLabel fallback
+- `src/pages/CalendarPage.tsx` — DayDetailModal rotation-entry action badge
+- `src/pages/TodayPage.tsx` — upcoming-log modal status badge
+
+**Risks / tradeoffs**: None. No behavior change for any current action value.
+
+**Rollback**: Revert commit `b35782a`.
+
+---
+
+### 2. Feature: Training-mix summary row on HistoryPage
+
+**Summary**: Below the four stat tiles (Streak / 7-day / 30-day / Total), a compact
+text line now shows the count of completed workouts per type for the current
+filter, e.g. "12 weights · 5 runs · 2 yoga". Sorted by count descending, capped
+at 4 types, hidden when no data.
+
+**Why it matters**: `computeWorkoutTypeBreakdown` has existed since pass 12 but
+was never surfaced in the UI. Users had no way to see their training distribution
+at a glance. The mix line gives instant visibility into whether the plan is
+balanced.
+
+**Files changed**:
+- `src/pages/HistoryPage.tsx` — adds `useMemo` import, `TYPE_MIX_LABEL` map,
+  `typeCountMap` / `typeMixLabel` memos, and the JSX row.
+
+**Risks / tradeoffs**: Inline computation rather than `computeWorkoutTypeBreakdown`
+(avoids the multi-plan `planDaysById` keying problem for "all plans" mode).
+No new tests needed (pure derivation from `flatItems` which is already tested
+transitively).
+
+**Rollback**: Revert commit `91075c9`.
+
+---
+
+### 3. Feature (medium): Past unlogged days nudge on TodayPage
+
+**Summary**: A new pure helper `countPastUnloggedDays` counts days in the past
+7 days with no history entry for the active plan. When count > 0, TodayPage
+shows a muted clickable banner — "N day(s) in the past week without entries —
+rotation may be stalled. [Calendar →]" — that navigates to CalendarPage on tap.
+
+**Why it matters**: The rotation engine intentionally stalls when past days are
+unlogged, but this is invisible to the user. A user returning after several days
+off sees a "wrong" workout with no explanation. The nudge surfaces the root cause
+and provides a direct path to resolution.
+
+**Files changed**:
+- `src/lib/historyStats.ts` — new exported `countPastUnloggedDays` function
+- `src/lib/__tests__/historyStats.test.ts` — 9 new tests for the helper
+- `src/pages/TodayPage.tsx` — import + `unloggedCount` computation + nudge JSX
+
+**Risks / tradeoffs**:
+- False positives: users who intentionally skipped a week see the nudge. Mitigated
+  by muted styling and "may be stalled" (not "is stalled") phrasing.
+- Not dismissible this pass — follow-up if user feedback shows it's annoying.
+- Nudge appears even after plan expiry (minor, cosmetically odd).
+
+**Rollback**: Revert commits `9c53fba` and `7c64fc7`.
+
+---
+
 ## 2026-04-27 (fourteenth pass) — branch `claude/great-mccarthy-GNrKl`
 
 Baseline on entry: **291 passing, 0 failing**.
