@@ -381,6 +381,7 @@ function DayDetailModal({
   onDeleteExtra: (extra: ExtraWorkoutEntry) => void
   onClose: () => void
 }) {
+  const isCompleteForDirect = resolved.status === 'past_complete' || resolved.status === 'today_complete'
   const { calendarDate, planDayIndex, status, historyEntry } = resolved
   const isPast = calendarDate < today
   const isToday = calendarDate === today
@@ -431,25 +432,35 @@ function DayDetailModal({
     return (
       <Modal title={dateLabel} onClose={onClose}>
         <div className="space-y-2">
-          {/* Rotation entry row */}
-          <button
-            onClick={() => setDetailTarget({ kind: 'rotation' })}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-700/40 border border-slate-700 hover:border-slate-600 text-left transition-colors active:scale-[0.98]"
-          >
-            {resolved.planDay.slots[0] && !isDayOff && (
-              <WorkoutBadge type={resolved.planDay.slots[0].type} size="sm" />
+          {/* Rotation entry row — completed entries go directly to OutcomeModal */}
+          <div className="space-y-1">
+            <button
+              onClick={() => isCompleteForDirect ? onEditOutcome() : setDetailTarget({ kind: 'rotation' })}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-700/40 border border-slate-700 hover:border-slate-600 text-left transition-colors active:scale-[0.98]"
+            >
+              {resolved.planDay.slots[0] && !isDayOff && (
+                <WorkoutBadge type={resolved.planDay.slots[0].type} size="sm" />
+              )}
+              {isDayOff && <Coffee size={14} className="text-amber-400 flex-shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-200 truncate">
+                  {isDayOff ? 'Day Off' : resolved.planDay.slots.map(s => s.name).join(' + ')}
+                </p>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${statusInfo.cls}`}>
+                {statusInfo.label}
+              </span>
+              <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
+            </button>
+            {isCompleteForDirect && (
+              <button
+                onClick={() => setDetailTarget({ kind: 'rotation' })}
+                className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors px-1"
+              >
+                Manage entry (clear, change day…)
+              </button>
             )}
-            {isDayOff && <Coffee size={14} className="text-amber-400 flex-shrink-0" />}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200 truncate">
-                {isDayOff ? 'Day Off' : resolved.planDay.slots.map(s => s.name).join(' + ')}
-              </p>
-            </div>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${statusInfo.cls}`}>
-              {statusInfo.label}
-            </span>
-            <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
-          </button>
+          </div>
 
           {/* Extra entries */}
           {extras.map(extra => {
@@ -458,7 +469,7 @@ function DayDetailModal({
             return (
               <button
                 key={extra.id}
-                onClick={() => setDetailTarget({ kind: 'extra', extraId: extra.id })}
+                onClick={() => hasOutcome ? onEditExtraOutcome(extra) : setDetailTarget({ kind: 'extra', extraId: extra.id })}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-700/30 border border-slate-700/50 hover:border-slate-600 text-left transition-colors active:scale-[0.98]"
               >
                 <WorkoutBadge type={extra.workoutType} size="sm" />
@@ -594,6 +605,15 @@ function DayDetailModal({
         {/* Already logged */}
         {hasEntry && !isDayOff && (
           <div className="space-y-3">
+            {isComplete && (
+              <button
+                onClick={onEditOutcome}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-sm font-semibold transition-colors"
+              >
+                <ClipboardList size={16} /> View &amp; Edit Workout Details
+              </button>
+            )}
+
             <div className={`flex items-center gap-2 py-2 px-3 rounded-xl ${
               isComplete ? 'bg-emerald-500/10 border border-emerald-500/20'
                 : 'bg-slate-700/50 border border-slate-600'
@@ -607,22 +627,12 @@ function DayDetailModal({
 
             {rotOutcome && <OutcomeMetrics outcome={rotOutcome} />}
 
-            <div className="flex gap-2">
-              {isComplete && (
-                <button
-                  onClick={onEditOutcome}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 text-sm font-medium transition-colors"
-                >
-                  <ClipboardList size={15} /> Edit Details
-                </button>
-              )}
-              <button
-                onClick={onClear}
-                className={`${isComplete ? '' : 'flex-1 '}flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-700 hover:bg-red-500/20 border border-slate-600 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-sm font-medium transition-colors`}
-              >
-                <X size={14} /> Clear
-              </button>
-            </div>
+            <button
+              onClick={onClear}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-700 hover:bg-red-500/20 border border-slate-600 hover:border-red-500/30 text-slate-400 hover:text-red-400 text-sm font-medium transition-colors"
+            >
+              <X size={14} /> Clear entry
+            </button>
           </div>
         )}
 

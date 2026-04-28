@@ -137,8 +137,8 @@ export function TodayPage() {
   const [bonusOutcome, setBonusOutcome] = useState<{ rd: ResolvedDay; extraId: string } | null>(null)
   const [editingExtra, setEditingExtra] = useState<ExtraWorkoutEntry | null>(null)
 
-  // Active workout tracker state
-  const [showActiveWorkout, setShowActiveWorkout] = useState(false)
+  // Active workout tracker state: hidden | open | minimized
+  const [activeWorkoutState, setActiveWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
   // Exercises tracked during active session — used to pre-fill OutcomeModal
   const [activeTrackedExercises, setActiveTrackedExercises] = useState<LoggedExerciseActual[] | null>(null)
   const [activeTrackedDurationMin, setActiveTrackedDurationMin] = useState<number | null>(null)
@@ -205,7 +205,7 @@ export function TodayPage() {
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     setActiveTrackedExercises(exercises)
     setActiveTrackedDurationMin(Math.round(meta.totalElapsedSeconds / 60) || null)
-    setShowActiveWorkout(false)
+    setActiveWorkoutState('hidden')
     setShowOutcomeModal(true)
   }
 
@@ -485,10 +485,10 @@ export function TodayPage() {
         </div>
       )}
 
-      {/* Start Workout button — only when pending */}
-      {isPending && (
+      {/* Start Workout button — only when pending and no active session */}
+      {isPending && activeWorkoutState === 'hidden' && (
         <button
-          onClick={() => setShowActiveWorkout(true)}
+          onClick={() => setActiveWorkoutState('open')}
           className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors active:scale-[0.98]"
         >
           <Play size={18} />
@@ -659,8 +659,8 @@ export function TodayPage() {
         />
       )}
 
-      {/* Active workout tracker */}
-      {showActiveWorkout && plan && todayResolved && (() => {
+      {/* Active workout tracker — kept mounted while open or minimized so timers keep running */}
+      {activeWorkoutState !== 'hidden' && plan && todayResolved && (() => {
         const slot = primaryPlanDay.slots[0]
         if (!slot) return null
         return (
@@ -671,7 +671,10 @@ export function TodayPage() {
             programVars={planProgramVars}
             previousOutcome={previousWeightsOutcome}
             previousSetsByExercise={previousSetsByExercise}
-            onClose={() => setShowActiveWorkout(false)}
+            minimized={activeWorkoutState === 'minimized'}
+            onMinimize={() => setActiveWorkoutState('minimized')}
+            onResume={() => setActiveWorkoutState('open')}
+            onCancel={() => setActiveWorkoutState('hidden')}
             onComplete={handleActiveWorkoutComplete}
           />
         )
