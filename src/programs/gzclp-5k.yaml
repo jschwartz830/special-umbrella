@@ -26,6 +26,16 @@ days:
         name: "Upper A — Chest / Lats / Pull"
         focus: upper
         intent: hypertrophy
+        warmup:
+          - exercise: "Band Shoulder Circuit"
+            sets: 2
+            reps: "12-15"
+            rest: 30s
+            notes: "Light pull-aparts + dislocates"
+          - exercise: "Push-Up + Scap Pull-Up Prep"
+            sets: 2
+            reps: "8-10 each"
+            rest: 45s
         durationMin: 60
         exercises:
           - exercise: "Pull-Ups"
@@ -58,6 +68,9 @@ days:
             sets: 2
             reps: "10-12"
             rest: 60s
+            progress:
+              if: all_reps
+              then: "incline_db += 2.5"
 
   - label: "Cardio Base"
     slots:
@@ -85,6 +98,15 @@ days:
         name: "Lower A — Squat / Calves"
         focus: legs
         intent: strength
+        warmup:
+          - exercise: "Bike + Dynamic Lower Prep"
+            sets: 1
+            duration: 5m
+            rest: 0s
+          - exercise: "Goblet Squat + Hip Opener"
+            sets: 2
+            reps: "8-10"
+            rest: 45s
         durationMin: 65
         exercises:
           - exercise: "Barbell Squat"
@@ -100,10 +122,16 @@ days:
             reps: "8-10"
             load: rdl
             rest: 2m
+            progress:
+              if: all_reps
+              then: "rdl += 5"
           - exercise: "Bulgarian Split Squat"
             sets: 3
             reps: "8-10 per leg"
             rest: 90s
+            progress:
+              if: all_reps
+              then: "squat += 2.5"
           - exercise: "Single Leg Calf Raise"
             sets: 4
             reps: "12-15 per leg"
@@ -116,6 +144,7 @@ days:
             sets: 3
             reps: "15"
             rest: 60s
+            notes: "Swap to 45-60s plank holds if needed"
 
   - label: "Recovery Combo"
     slots:
@@ -138,6 +167,15 @@ days:
         name: "Upper B — OHP / Push / Pull"
         focus: upper
         intent: hypertrophy
+        warmup:
+          - exercise: "Thoracic + Shoulder Mobility"
+            sets: 1
+            duration: 4m
+            rest: 0s
+          - exercise: "Empty Bar Press Complex"
+            sets: 2
+            reps: "8"
+            rest: 60s
         durationMin: 60
         exercises:
           - exercise: "Barbell Overhead Press"
@@ -153,6 +191,9 @@ days:
             reps: "8-10"
             load: incline_db
             rest: 90s
+            progress:
+              if: all_reps
+              then: "incline_db += 2.5"
           - exercise: "Seated Cable Row"
             sets: 3
             reps: "10-12"
@@ -161,6 +202,7 @@ days:
             sets: 3
             reps: "10-12"
             rest: 90s
+            notes: "Use medium-neutral grip where available"
           - exercise: "Lateral Raise"
             sets: 3
             reps: "12-15"
@@ -169,6 +211,9 @@ days:
             sets: 2
             reps: "12-15"
             rest: 60s
+            progress:
+              if: all_reps
+              then: "ohp += 2.5"
 
   - label: "Lower B"
     slots:
@@ -176,6 +221,25 @@ days:
         name: "Lower B — Deadlift / Posterior Chain"
         focus: full_body
         intent: strength
+        warmup:
+          - exercise: "Row + Hamstring Dynamic Prep"
+            sets: 1
+            duration: 5m
+            rest: 0s
+          - exercise: "Deadlift Ramp Sets"
+            sets:
+              - reps: 5
+                load: "0.4 * deadlift"
+                rest: 60s
+                isWarmup: true
+              - reps: 3
+                load: "0.6 * deadlift"
+                rest: 90s
+                isWarmup: true
+              - reps: 2
+                load: "0.75 * deadlift"
+                rest: 120s
+                isWarmup: true
         durationMin: 65
         exercises:
           - exercise: "Barbell Deadlift"
@@ -191,6 +255,9 @@ days:
             reps: "10-12"
             load: hip_thrust
             rest: 2m
+            progress:
+              if: all_reps
+              then: "hip_thrust += 5"
           - exercise: "Nordic Curl"
             sets: 3
             reps: "3-6"
@@ -203,6 +270,7 @@ days:
             sets: 3
             duration: 60s
             rest: 90s
+            notes: "Heavy but crisp posture; no straps"
 
   - label: "Recovery Optional"
     slots:
