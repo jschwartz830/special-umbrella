@@ -366,6 +366,44 @@ describe('computePlanProgress', () => {
       expect(result.completed).toBe(0)
       expect(result.percentComplete).toBe(0)
     })
+
+    // ── Week-indicator helpers (TodayPage uses completed+1 as currentWeek) ──
+
+    it('completed+1 === 1 (week 1) on plan start date and through day 6', () => {
+      const plan = makePlan({ duration: { type: 'weeks', value: 12 }, startDate: '2026-01-01' })
+      // Day 0 (start)
+      expect(computePlanProgress(plan, [], '2026-01-01').completed).toBe(0)
+      // Day 6 (still in week 1)
+      expect(computePlanProgress(plan, [], '2026-01-07').completed).toBe(0)
+    })
+
+    it('completed+1 === 2 (week 2) from day 7 through day 13', () => {
+      const plan = makePlan({ duration: { type: 'weeks', value: 12 }, startDate: '2026-01-01' })
+      // Day 7 — first day of week 2
+      expect(computePlanProgress(plan, [], '2026-01-08').completed).toBe(1)
+      // Day 13 — last day of week 2
+      expect(computePlanProgress(plan, [], '2026-01-14').completed).toBe(1)
+    })
+
+    it('identifies last week: completed === total-1 when one full week remains', () => {
+      // 4-week plan: last week is week 4 (completed=3)
+      const plan = makePlan({ duration: { type: 'weeks', value: 4 }, startDate: '2026-01-01' })
+      // 21 days elapsed = 3 full weeks completed → in last (4th) week
+      const result = computePlanProgress(plan, [], '2026-01-22')
+      expect(result.completed).toBe(3)
+      expect(result.total).toBe(4)
+      // TodayPage condition: completed + 1 === total → show "last week!"
+      expect(result.completed + 1).toBe(result.total)
+    })
+
+    it('completed >= total when plan is expired (week indicator should be hidden)', () => {
+      const plan = makePlan({ duration: { type: 'weeks', value: 4 }, startDate: '2026-01-01' })
+      // 28 days exactly = 4 weeks elapsed = expired
+      const result = computePlanProgress(plan, [], '2026-01-29')
+      expect(result.completed).toBe(4)
+      // TodayPage condition: completed < total → false → no week indicator shown
+      expect(result.completed < result.total).toBe(false)
+    })
   })
 })
 

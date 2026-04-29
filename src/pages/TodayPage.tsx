@@ -35,7 +35,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress } from '../lib/historyStats'
+import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress, computePlanProgress } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, PlanDay } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 
@@ -210,6 +210,11 @@ export function TodayPage() {
 
   // Rotation cycle progress — for rotations-duration plans only
   const cycleProgress = computeRotationCycleProgress(plan, planEntries)
+
+  // Week progress — for weeks-duration plans only (null for rotations plans)
+  const weekProgress = plan.duration.type === 'weeks'
+    ? computePlanProgress(plan, planEntries, today)
+    : null
 
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     setActiveTrackedExercises(exercises)
@@ -397,6 +402,14 @@ export function TodayPage() {
           )}
           {cycleProgress?.justCompletedRotation && (
             <span className="ml-1.5 text-emerald-400/80">· rotation complete!</span>
+          )}
+          {weekProgress && weekProgress.completed < weekProgress.total && (
+            <span className="ml-1.5">
+              · <span className="text-slate-400">Week {weekProgress.completed + 1} of {weekProgress.total}</span>
+              {weekProgress.completed + 1 === weekProgress.total && (
+                <span className="ml-1 text-emerald-400/80">· last week!</span>
+              )}
+            </span>
           )}
         </p>
       </div>
