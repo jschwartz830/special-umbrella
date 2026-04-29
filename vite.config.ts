@@ -1,8 +1,24 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'node:child_process'
+
+function getGitValue(command: string) {
+  try {
+    return execSync(command, { encoding: 'utf8' }).trim()
+  } catch {
+    return 'unknown'
+  }
+}
+
+const latestCommitIsoDate = getGitValue('git log -1 --format=%cI')
+const latestCommitTitle = getGitValue('git log -1 --format=%s')
 
 export default defineConfig({
+  define: {
+    __LATEST_COMMIT_ISO_DATE__: JSON.stringify(latestCommitIsoDate),
+    __LATEST_COMMIT_TITLE__: JSON.stringify(latestCommitTitle),
+  },
   test: {
     environment: 'node',
     include: ['src/**/__tests__/**/*.test.ts'],
