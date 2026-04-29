@@ -17,6 +17,7 @@ interface SetTrackState {
 
 interface ExerciseTrackState {
   exercise: string
+  isWarmup: boolean
   sets: SetTrackState[]
   previousSets?: LoggedSetActual[]
 }
@@ -157,8 +158,8 @@ export function ActiveWorkoutTracker({
 
   const [exercises, setExercises] = useState<ExerciseTrackState[]>(() => {
     const allExercises = [
-      ...(slot.warmup ?? []),
-      ...(slot.exercises ?? []),
+      ...(slot.warmup ?? []).map(ex => ({ ...ex, __isWarmup: true as const })),
+      ...(slot.exercises ?? []).map(ex => ({ ...ex, __isWarmup: false as const })),
     ]
     if (!allExercises.length) return []
 
@@ -185,14 +186,31 @@ export function ActiveWorkoutTracker({
 
       let sets: SetTrackState[]
       if (Array.isArray(ex.sets) && ex.sets.length > 0) {
-        sets = ex.sets.map(s => buildSet(s.load ?? ex.load, s.reps ?? ex.reps, s.rest ?? ex.rest))
+        sets = ex.sets.map((s, i) => {
+          const base = buildSet(s.load ?? ex.load, s.reps ?? ex.reps, s.rest ?? ex.rest)
+          const prev = prevEx?.[i]
+          return {
+            ...base,
+            actualReps: prev?.actualReps ?? base.actualReps,
+            actualLoad: prev?.actualLoad ?? base.actualLoad,
+          }
+        })
       } else {
         const n = typeof ex.sets === 'number' ? ex.sets : 3
-        sets = Array.from({ length: n }, () => buildSet(ex.load, ex.reps, ex.rest))
+        sets = Array.from({ length: n }, (_, i) => {
+          const base = buildSet(ex.load, ex.reps, ex.rest)
+          const prev = prevEx?.[i]
+          return {
+            ...base,
+            actualReps: prev?.actualReps ?? base.actualReps,
+            actualLoad: prev?.actualLoad ?? base.actualLoad,
+          }
+        })
       }
 
       return {
         exercise: ex.exercise,
+        isWarmup: ex.__isWarmup,
         sets,
         previousSets: prevEx,
       }
@@ -619,7 +637,11 @@ export function ActiveWorkoutTracker({
                     className={`grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 items-center transition-opacity ${s.completed ? 'opacity-60' : ''}`}
                   >
                     <span className="col-span-1 text-center text-slate-400 text-xs font-medium">
-                      {setIdx + 1}
+                      {ex.isWarmup ? (
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/20 text-orange-300 font-bold">W</span>
+                      ) : (
+                        setIdx + 1
+                      )}
                     </span>
                     <span className="col-span-3 text-center text-slate-500 text-[10px]">
                       {previousSetDisplay(ex, setIdx)}
