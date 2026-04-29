@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 
 function entry(
@@ -635,5 +635,86 @@ describe('countPastUnloggedDays', () => {
       entry('2026-04-26', 'skip'),
     ]
     expect(countPastUnloggedDays('plan-1', entries, START, TODAY)).toBe(5)
+  })
+})
+
+// ── computeRotationCycleProgress ──────────────────────────────────────────────
+
+describe('computeRotationCycleProgress', () => {
+  const THREE_DAY_PLAN = makePlan({ duration: { type: 'rotations', value: 4 } })
+  const WEEKS_PLAN = makePlan({ duration: { type: 'weeks', value: 12 } })
+
+  it('returns null for a weeks-duration plan', () => {
+    expect(computeRotationCycleProgress(WEEKS_PLAN, [])).toBeNull()
+  })
+
+  it('returns null for a plan with no days', () => {
+    const emptyPlan = makePlan({ days: [] })
+    expect(computeRotationCycleProgress(emptyPlan, [])).toBeNull()
+  })
+
+  it('returns doneInCycle=0, remaining=rotationLength for no history', () => {
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, [])
+    expect(result).not.toBeNull()
+    expect(result!.doneInCycle).toBe(0)
+    expect(result!.rotationLength).toBe(3)
+    expect(result!.remaining).toBe(3)
+    expect(result!.justCompletedRotation).toBe(false)
+  })
+
+  it('counts complete and skip entries within current cycle', () => {
+    const entries = [
+      entry('2026-01-01', 'complete'),
+      entry('2026-01-02', 'skip'),
+    ]
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
+    expect(result!.doneInCycle).toBe(2)
+    expect(result!.remaining).toBe(1)
+    expect(result!.justCompletedRotation).toBe(false)
+  })
+
+  it('day_off entries do not count toward cycle progress', () => {
+    const entries = [
+      entry('2026-01-01', 'complete'),
+      entry('2026-01-02', 'day_off'),
+    ]
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
+    expect(result!.doneInCycle).toBe(1)
+    expect(result!.remaining).toBe(2)
+  })
+
+  it('resets doneInCycle to 0 after a full rotation, setting justCompletedRotation=true', () => {
+    const entries = [
+      entry('2026-01-01', 'complete'),
+      entry('2026-01-02', 'complete'),
+      entry('2026-01-03', 'complete'),
+    ]
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
+    expect(result!.doneInCycle).toBe(0)
+    expect(result!.remaining).toBe(3)
+    expect(result!.justCompletedRotation).toBe(true)
+  })
+
+  it('counts into second cycle correctly (4 done in 3-day plan = 1 into second)', () => {
+    const entries = [
+      entry('2026-01-01', 'complete'),
+      entry('2026-01-02', 'complete'),
+      entry('2026-01-03', 'complete'),
+      entry('2026-01-04', 'complete'),
+    ]
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
+    expect(result!.doneInCycle).toBe(1)
+    expect(result!.remaining).toBe(2)
+    expect(result!.justCompletedRotation).toBe(false)
+  })
+
+  it('ignores entries for a different plan', () => {
+    const entries = [
+      entry('2026-01-01', 'complete', 'other-plan'),
+      entry('2026-01-02', 'complete', 'other-plan'),
+    ]
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
+    expect(result!.doneInCycle).toBe(0)
+    expect(result!.justCompletedRotation).toBe(false)
   })
 })

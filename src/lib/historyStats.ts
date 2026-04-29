@@ -112,6 +112,49 @@ export function computePlanProgress(
   return { completed, total, percentComplete }
 }
 
+// ── Rotation cycle progress ───────────────────────────────────────────────────
+
+export interface RotationCycleProgress {
+  /** How many complete/skip actions have been logged in the current cycle (0-based). */
+  doneInCycle: number
+  /** Total days per rotation (plan.days.length). */
+  rotationLength: number
+  /** How many more complete/skip actions are needed to finish this cycle. */
+  remaining: number
+  /** True when doneInCycle === 0 and at least one full rotation was already completed. */
+  justCompletedRotation: boolean
+}
+
+/**
+ * Returns cycle progress for `rotations`-duration plans only.
+ * Returns `null` for `weeks`-duration plans or plans with no days.
+ *
+ * A "cycle" is one full pass through all plan.days. Progress is measured by
+ * `complete` and `skip` entries — `day_off` entries do not advance the rotation
+ * and are excluded (mirrors `isPlanExpired`).
+ */
+export function computeRotationCycleProgress(
+  plan: Plan,
+  entries: HistoryEntry[],
+): RotationCycleProgress | null {
+  if (plan.duration.type !== 'rotations' || plan.days.length === 0) return null
+
+  const planEntries = entries.filter(
+    e => e.planId === plan.id && (e.action === 'complete' || e.action === 'skip'),
+  )
+  const totalDone = planEntries.length
+  const rotationLength = plan.days.length
+  const doneInCycle = totalDone % rotationLength
+  const remaining = rotationLength - doneInCycle
+
+  return {
+    doneInCycle,
+    rotationLength,
+    remaining,
+    justCompletedRotation: doneInCycle === 0 && totalDone > 0,
+  }
+}
+
 /** Difference in calendar days between two YYYY-MM-DD strings (b − a). */
 function dateDiffDays(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number)
