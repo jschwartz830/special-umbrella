@@ -84,7 +84,16 @@ function SlotEditor({
     onChange({ ...slot, exercises })
   }
 
+  function updateExercise(index: number, patch: Partial<ExerciseSpec>) {
+    const source = slot.exercises ?? []
+    const next = source.map((ex, i) => (i === index ? { ...ex, ...patch } : ex))
+    updateExercises(next)
+  }
 
+  function removeExercise(index: number) {
+    const source = slot.exercises ?? []
+    updateExercises(source.filter((_, i) => i !== index))
+  }
 
   function addExerciseFromInput() {
     const name = exerciseInput.trim()
@@ -487,19 +496,112 @@ function SlotEditor({
                   onDragOver={e => e.preventDefault()}
                   onDrop={() => { if (dragExerciseIdx !== null) moveExercise(dragExerciseIdx, i); setDragExerciseIdx(null) }}
                   onDragEnd={() => setDragExerciseIdx(null)}
-                  className="flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800/60 px-2 py-1.5"
+                  className="rounded-lg border border-slate-600 bg-slate-800/60 p-2 space-y-2"
                 >
-                  <GripVertical size={14} className="text-slate-500" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-xs text-slate-200 block truncate">{ex.exercise}</span>
-                    {(ex.type?.length || ex.target?.length || ex.synergist?.length) && (
-                      <span className="text-[10px] text-slate-400 block truncate">
-                        T: {(ex.type ?? []).join(', ')} · Target: {(ex.target ?? []).join(', ')} · Syn: {(ex.synergist ?? []).join(', ')}
-                      </span>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <GripVertical size={14} className="text-slate-500" />
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={ex.exercise}
+                        onChange={e => updateExercise(i, { exercise: e.target.value })}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-slate-200"
+                      />
+                      {(ex.type?.length || ex.target?.length || ex.synergist?.length) && (
+                        <span className="text-[10px] text-slate-400 block truncate mt-1">
+                          T: {(ex.type ?? []).join(', ')} · Target: {(ex.target ?? []).join(', ')} · Syn: {(ex.synergist ?? []).join(', ')}
+                        </span>
+                      )}
+                    </div>
+                    <button type="button" onClick={() => moveExercise(i, i - 1)} disabled={i === 0} className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"><ChevronUp size={12} /></button>
+                    <button type="button" onClick={() => moveExercise(i, i + 1)} disabled={i === (slot.exercises?.length ?? 0) - 1} className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"><ChevronDown size={12} /></button>
+                    <button type="button" onClick={() => removeExercise(i)} className="p-0.5 text-red-400/80 hover:text-red-300"><Trash2 size={12} /></button>
                   </div>
-                  <button type="button" onClick={() => moveExercise(i, i - 1)} disabled={i === 0} className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"><ChevronUp size={12} /></button>
-                  <button type="button" onClick={() => moveExercise(i, i + 1)} disabled={i === (slot.exercises?.length ?? 0) - 1} className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"><ChevronDown size={12} /></button>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <label className="space-y-1">
+                      <span className="text-[10px] text-slate-400">Sets</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={typeof ex.sets === 'number' ? ex.sets : ''}
+                        placeholder="3"
+                        onChange={e => updateExercise(i, { sets: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[10px] text-slate-400">Reps</span>
+                      <input
+                        type="text"
+                        value={ex.reps ?? ''}
+                        placeholder="8-12"
+                        onChange={e => updateExercise(i, { reps: e.target.value || undefined })}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[10px] text-slate-400">Load</span>
+                      <input
+                        type="text"
+                        value={ex.load ?? ''}
+                        placeholder="135lb"
+                        onChange={e => updateExercise(i, { load: e.target.value || undefined })}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-[10px] text-slate-400">Rest</span>
+                      <input
+                        type="text"
+                        value={ex.rest ?? ''}
+                        placeholder="90s"
+                        onChange={e => updateExercise(i, { rest: e.target.value || undefined })}
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">Progression logic</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        value={ex.progress?.if ?? ''}
+                        placeholder="if (optional) e.g. all_reps"
+                        onChange={e => updateExercise(i, { progress: { ...ex.progress, if: e.target.value || undefined, then: ex.progress?.then ?? '' } })}
+                        className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                      />
+                      <input
+                        type="text"
+                        value={ex.progress?.then ?? ''}
+                        placeholder="then (required) e.g. squat += 5"
+                        onChange={e => {
+                          const value = e.target.value
+                          if (!value && !ex.progress?.if && !ex.progress?.else) {
+                            updateExercise(i, { progress: undefined })
+                            return
+                          }
+                          updateExercise(i, { progress: { ...ex.progress, then: value } })
+                        }}
+                        className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                      />
+                      <input
+                        type="text"
+                        value={ex.progress?.else ?? ''}
+                        placeholder="else (optional)"
+                        onChange={e => {
+                          const elseVal = e.target.value || undefined
+                          if (!elseVal && !ex.progress?.if && !ex.progress?.then) {
+                            updateExercise(i, { progress: undefined })
+                            return
+                          }
+                          updateExercise(i, { progress: { ...ex.progress, else: elseVal, then: ex.progress?.then ?? '' } })
+                        }}
+                        className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                      />
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
