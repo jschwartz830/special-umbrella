@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://special-umbrella.local/schemas/workout-program.schema.json",
+  "title": "Workout Program YAML Schema",
+  "description": "Standardized YAML shape for importable workout programs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "duration", "days"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "duration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value"],
+      "properties": {
+        "type": { "enum": ["weeks", "rotations"] },
+        "value": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "vars": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "days": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/day" }
+    }
+  },
+  "$defs": {
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["then"],
+      "properties": {
+        "if": { "type": "string" },
+        "then": { "type": "string", "minLength": 1 },
+        "else": { "type": "string" }
+      }
+    },
+    "set": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "reps": { "oneOf": [{"type":"integer","minimum":0},{"type":"string"}] },
+        "load": { "type": "string" },
+        "duration": { "oneOf": [{"type":"string"},{"type":"number"}] },
+        "rest": { "oneOf": [{"type":"string"},{"type":"number"}] },
+        "isWarmup": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    },
+    "exercise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exercise"],
+      "properties": {
+        "exercise": { "type": "string", "minLength": 1 },
+        "sets": {
+          "oneOf": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/set" } }
+          ]
+        },
+        "reps": { "oneOf": [{"type":"integer","minimum":0},{"type":"string"}] },
+        "load": { "type": "string" },
+        "duration": { "oneOf": [{"type":"string"},{"type":"number"}] },
+        "rest": { "oneOf": [{"type":"string"},{"type":"number"}] },
+        "tempo": { "type": "string" },
+        "notes": { "type": "string" },
+        "progress": { "$ref": "#/$defs/progress" }
+      }
+    },
+    "drill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "sets": { "type": "integer", "minimum": 1 },
+        "reps": { "oneOf": [{"type":"integer","minimum":0},{"type":"string"}] },
+        "duration": { "oneOf": [{"type":"string"},{"type":"number"}] },
+        "rest": { "oneOf": [{"type":"string"},{"type":"number"}] },
+        "perSide": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["warmup", "cooldown", "easy", "tempo", "interval", "race_pace", "drills", "rest"] },
+        "name": { "type": "string" },
+        "distance": { "oneOf": [{"type":"string"},{"type":"number"}] },
+        "duration": { "oneOf": [{"type":"string"},{"type":"number"}] },
+        "pace": { "type": "string" },
+        "reps": { "oneOf": [{"type":"integer","minimum":0},{"type":"string"}] },
+        "rest": { "oneOf": [{"type":"string"},{"type":"number"}] },
+        "drills": { "type": "array", "items": { "$ref": "#/$defs/drill" } },
+        "notes": { "type": "string" }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["weights", "run", "swim", "yoga", "other", "weightlifting", "long_run", "recovery_run", "rest"] },
+        "name": { "type": "string" },
+        "focus": { "enum": ["upper", "lower", "full_body", "push", "pull", "legs", "core"] },
+        "intent": { "enum": ["strength", "hypertrophy", "power", "conditioning", "technique", "deload", "recovery_mobility"] },
+        "difficulty": { "enum": ["easy", "moderate", "hard"] },
+        "subtype": { "type": "string" },
+        "location": { "type": "string" },
+        "durationMin": { "type": "integer", "minimum": 0 },
+        "warmup": { "type": "array", "items": { "$ref": "#/$defs/exercise" } },
+        "exercises": { "type": "array", "items": { "$ref": "#/$defs/exercise" } },
+        "segments": { "type": "array", "items": { "$ref": "#/$defs/segment" } },
+        "progress": { "$ref": "#/$defs/progress" },
+        "notes": { "type": "string" }
+      }
+    },
+    "day": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "slots"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "slots": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/slot" }
+        }
+      }
+    }
+  }
+}

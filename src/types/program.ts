@@ -192,6 +192,7 @@ export interface YamlDay {
 }
 
 export interface YamlProgram {
+  schemaVersion?: 1
   name: string
   description?: string
   duration: { type: 'rotations' | 'weeks'; value: number }
