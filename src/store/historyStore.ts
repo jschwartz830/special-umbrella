@@ -66,10 +66,11 @@ interface HistoryState {
   updateExtraEntryDate: (id: string, newDate: string) => void
 }
 
-/** Keep the last entry for each (planId, calendarDate) pair in an array. */
+/** Keep the entry with the newest createdAt for each (planId, calendarDate) pair. */
 function deduplicateByDate(entries: HistoryEntry[]): HistoryEntry[] {
+  const sorted = [...entries].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const map = new Map<string, HistoryEntry>()
-  for (const e of entries) {
+  for (const e of sorted) {
     map.set(`${e.planId}__${e.calendarDate}`, e)
   }
   return Array.from(map.values())
