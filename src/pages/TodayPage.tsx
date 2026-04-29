@@ -905,6 +905,7 @@ export function TodayPage() {
           planDay={bonusOutcome.rd.planDay}
           workoutInstanceId={makeExtraWorkoutInstanceId(plan.id, today, bonusOutcome.extraId)}
           existingOutcome={getOutcome(makeExtraWorkoutInstanceId(plan.id, today, bonusOutcome.extraId))}
+          previousSetsByExercise={previousSetsByExercise}
           onConfirm={handleBonusOutcomeConfirm}
           onClose={handleBonusOutcomeDismiss}
         />
