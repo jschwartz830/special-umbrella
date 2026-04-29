@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { Dumbbell, CalendarDays, History, ListChecks } from 'lucide-react'
+import { Dumbbell, CalendarDays, History, ListChecks, Settings } from 'lucide-react'
 
 const tabs = [
   { to: '/today', icon: Dumbbell, label: 'Today' },
   { to: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/history', icon: History, label: 'History' },
   { to: '/plans', icon: ListChecks, label: 'Plans' },
+  { to: '/settings', icon: Settings, label: 'Settings' },
 ]
 
 export function BottomNav() {
