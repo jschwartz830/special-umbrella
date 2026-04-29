@@ -1,5 +1,116 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-29 (sixteenth pass) — branch `claude/great-mccarthy-TJqjV`
+
+### Executive summary
+
+1. **What changed**: One correctness fix (`deduplicateByDate` ordering), one
+   performance fix (memoize `flatItems`), one UX safety fix (confirm before
+   deleting extras), and one medium feature (rotation cycle progress on
+   TodayPage with 9 new tests). 311 tests now pass (was 302).
+
+2. **What is highest confidence**: The `deduplicateByDate` fix — it corrects a
+   real inconsistency with documented engine behavior and is directly tested.
+   The memoization fix — pure refactor with no behavior change. The delete
+   confirm — additive UI guard matching existing patterns.
+
+3. **What is risky**: The cycle-progress display on TodayPage is low risk but
+   the "rotation complete!" state shows until the user logs the next workout —
+   evaluate whether that brief state feels correct or confusing.
+
+4. **What to review first**: The TodayPage header — "Day X of N in rotation ·
+   3/6 done". Is the inline placement readable or does it feel crowded? If so,
+   moving it to a separate stat tile is easy.
+
+---
+
+### Biggest issues found this pass
+
+All prior high-severity issues from passes 1–15 remain fixed and stable.
+
+1. **`deduplicateByDate` insertion-order inconsistency** — could silently store
+   the wrong entry when an import batch arrived in reverse-chronological order.
+   Fixed with a `createdAt` sort.
+
+2. **`flatItems` not memoized in HistoryPage** — performance issue; full list
+   rebuild on every store subscription notification.
+
+3. **Immediate extra deletion in list view** — UX safety gap; no confirmation
+   before permanent data deletion.
+
+---
+
+### Improvements completed
+
+| # | Item | Type | Confidence |
+|---|------|------|------------|
+| 1 | `deduplicateByDate` sort by `createdAt` | Bug | High |
+| 2 | Memoize `flatItems` in HistoryPage | Performance | High |
+| 3 | Confirm before inline extra deletion | UX safety | High |
+| 4 | `computeRotationCycleProgress` + TodayPage display | Feature (medium) | Medium |
+
+---
+
+### Definitely keep
+
+- Fix 1 (`deduplicateByDate`): Correctness fix with test coverage.
+- Fix 2 (`flatItems` memo): Zero risk, measurable improvement.
+- Fix 3 (delete confirm): Matches existing modal confirm UX.
+
+### Probably keep but review UX
+
+- Feature 4 (cycle progress): The logic is solid and well-tested. The
+  display is minimal (inline text). Main question is whether the "rotation
+  complete!" state feels natural or like a false pending state.
+
+### Do not keep
+
+- Nothing to revert.
+
+### Recommendations only (not implemented)
+
+- **Extract `extraToPlanDay` + `WORKOUT_TYPES`** to a shared utility (`src/lib/workoutHelpers.ts`
+  or `src/lib/planHelpers.ts`). The function appears identically in TodayPage,
+  CalendarPage, and HistoryPage. Low risk, but touches 3 files and adds a new
+  shared dependency — worth doing in a dedicated cleanup pass.
+
+- **Move `PlanCard` outside `PlansPage`** body. Defining a React component
+  inside another component means it's re-created on every render (no memoization
+  can help). Trivial to fix but touching PlansPage while it's not the focus of
+  this pass seems unnecessary.
+
+- **Dismissible unlogged-days nudge** (TodayPage). The nudge from pass 15 has
+  no dismiss button. If users find it noisy for intentional rest periods, add a
+  per-plan dismiss similar to the expiry banner (`useExpiryDismiss` pattern).
+
+- **Suppress cycle progress when plan is expired**. If `isPlanExpired` is true,
+  the "rotation complete!" text appears redundantly alongside the expiry banner.
+  Add a guard: `cycleProgress && !planExpired`.
+
+---
+
+### Open questions for me
+
+1. Does the inline "3/6 done · last one!" header feel right, or should cycle
+   progress be a separate tile in the stats bar?
+2. Should the "rotation complete!" flash persist until the next workout is
+   logged, or disappear after N seconds?
+3. Is the two-tap delete confirm for extras in the list view sufficient, or
+   would a modal (matching rotation entry behavior) feel more consistent?
+
+---
+
+### Known issues / incomplete work
+
+- None introduced in this pass. Prior known issues (e.g. nudge false positives
+  for intentional rest periods) documented in pass-15 notes.
+
+### Dependencies added
+
+- None.
+
+---
+
 ## 2026-04-28 (fifteenth pass) — branch `claude/great-mccarthy-6NVvu`
 
 ### Executive summary

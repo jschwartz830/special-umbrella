@@ -80,6 +80,7 @@ export function HistoryPage() {
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [confirmDeleteExtraId, setConfirmDeleteExtraId] = useState<string | null>(null)
 
   const [outcomeTarget, setOutcomeTarget] = useState<{
     planId: string
@@ -108,15 +109,18 @@ export function HistoryPage() {
     activePlanHasHistory ? activePlanId! : 'all',
   )
 
-  const filteredEntries = [...entries]
-    .filter(e => filterPlanId === 'all' || e.planId === filterPlanId)
+  const filteredEntries = useMemo(
+    () => entries.filter(e => filterPlanId === 'all' || e.planId === filterPlanId),
+    [entries, filterPlanId],
+  )
 
-  const filteredExtras = extraEntries.filter(
-    e => filterPlanId === 'all' || e.planId === filterPlanId,
+  const filteredExtras = useMemo(
+    () => extraEntries.filter(e => filterPlanId === 'all' || e.planId === filterPlanId),
+    [extraEntries, filterPlanId],
   )
 
   // Build a unified flat list sorted newest-date-first; within a date: rotation before extras
-  const flatItems: FlatItem[] = [
+  const flatItems: FlatItem[] = useMemo(() => [
     ...filteredEntries.map(e => ({
       kind: 'rotation' as const,
       date: e.calendarDate,
@@ -133,7 +137,7 @@ export function HistoryPage() {
     if (b.date !== a.date) return b.date.localeCompare(a.date)
     if (a.kind !== b.kind) return a.kind === 'rotation' ? -1 : 1
     return b.sortKey.localeCompare(a.sortKey)
-  })
+  }), [filteredEntries, filteredExtras])
 
   const todayKey = format(new Date(), 'yyyy-MM-dd')
   const stats = computeHistoryStats(filteredEntries, filteredExtras, todayKey)
@@ -570,12 +574,30 @@ export function HistoryPage() {
                     >
                       <Pencil size={12} />
                     </button>
-                    <button
-                      onClick={() => { removeExtraEntry(extra.id); removeOutcome(instanceId) }}
-                      className="p-1.5 rounded-lg bg-slate-700 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    {confirmDeleteExtraId === extra.id ? (
+                      <>
+                        <button
+                          onClick={() => { removeExtraEntry(extra.id); removeOutcome(instanceId); setConfirmDeleteExtraId(null) }}
+                          className="px-2 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[10px] font-medium transition-colors"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteExtraId(null)}
+                          className="px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-[10px] font-medium transition-colors"
+                        >
+                          <X size={10} />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmDeleteExtraId(extra.id)}
+                        className="p-1.5 rounded-lg bg-slate-700 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-600 mt-2">Tap to view &amp; edit workout details</p>

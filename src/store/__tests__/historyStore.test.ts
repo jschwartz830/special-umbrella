@@ -528,6 +528,33 @@ describe('importEntries', () => {
     getState().importEntries([])
     expect(getState().entries).toHaveLength(1)
   })
+
+  it('picks the newest createdAt entry even when older entry appears last in array', () => {
+    // Deliberately put the OLDER entry last in the array.
+    // Before the fix, the last-in-array entry (older) would win.
+    // After the fix, the newer createdAt always wins.
+    getState().importEntries([
+      {
+        id: 'newer',
+        planId: 'plan-1',
+        calendarDate: '2026-01-10',
+        planDayIndex: 0,
+        action: 'complete',
+        createdAt: '2026-01-10T20:00:00Z',
+      },
+      {
+        id: 'older',
+        planId: 'plan-1',
+        calendarDate: '2026-01-10',
+        planDayIndex: 0,
+        action: 'skip',
+        createdAt: '2026-01-10T08:00:00Z',
+      },
+    ])
+    expect(getState().entries).toHaveLength(1)
+    expect(getState().entries[0].id).toBe('newer')
+    expect(getState().entries[0].action).toBe('complete')
+  })
 })
 
 // ── importExtraEntries ───────────────────────────────────────────────────────

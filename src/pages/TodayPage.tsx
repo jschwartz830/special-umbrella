@@ -35,7 +35,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, countPastUnloggedDays } from '../lib/historyStats'
+import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, PlanDay } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 
@@ -207,6 +207,9 @@ export function TodayPage() {
 
   // Count recent past days with no entry — used to show the stall nudge.
   const unloggedCount = countPastUnloggedDays(plan.id, planEntries, plan.startDate, today)
+
+  // Rotation cycle progress — for rotations-duration plans only
+  const cycleProgress = computeRotationCycleProgress(plan, planEntries)
 
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     setActiveTrackedExercises(exercises)
@@ -386,6 +389,15 @@ export function TodayPage() {
         <h1 className="text-2xl font-bold text-white mt-0.5">{plan.name}</h1>
         <p className="text-xs text-slate-500 mt-0.5">
           Day {todayResolved.planDayIndex + 1} of {plan.days.length} in rotation
+          {cycleProgress && !cycleProgress.justCompletedRotation && (
+            <span className="ml-1.5">
+              · <span className="text-slate-400">{cycleProgress.doneInCycle}/{cycleProgress.rotationLength} done</span>
+              {cycleProgress.remaining === 1 && <span className="ml-1 text-emerald-400/80">· last one!</span>}
+            </span>
+          )}
+          {cycleProgress?.justCompletedRotation && (
+            <span className="ml-1.5 text-emerald-400/80">· rotation complete!</span>
+          )}
         </p>
       </div>
 
