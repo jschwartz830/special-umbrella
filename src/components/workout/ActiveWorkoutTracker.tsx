@@ -389,9 +389,16 @@ export function ActiveWorkoutTracker({
   }
 
   function handleSetTimerToggle(exIdx: number, setIdx: number) {
-    if (!workoutRunning || restRunning || !isActiveSet(exIdx, setIdx)) return
+    if (!workoutRunning || !isActiveSet(exIdx, setIdx)) return
     const set = exercises[exIdx]?.sets[setIdx]
     if (!set || set.completed) return
+
+    if (restRunRef.current || restRemRef.current != null || restRunning) {
+      restRunRef.current = false
+      restRemRef.current = null
+      setRestRunning(false)
+      setRestRemaining(null)
+    }
 
     const current = activeSetRef.current
     if (current && current.exIdx === exIdx && current.setIdx === setIdx) {
@@ -644,7 +651,7 @@ export function ActiveWorkoutTracker({
                     />
                     <button
                       onClick={() => handleSetTimerToggle(exIdx, setIdx)}
-                      disabled={!active || s.completed || !workoutRunning || restRunning}
+                      disabled={!active || s.completed || !workoutRunning}
                       className={`col-span-2 h-7 flex items-center justify-center gap-1 rounded border font-mono text-[10px] transition-colors ${
                         timerRunning
                           ? 'bg-amber-500/20 border-amber-500/50 text-amber-200'
