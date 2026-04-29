@@ -1,5 +1,97 @@
 # Overnight Changelog
 
+## 2026-04-29 (seventeenth pass) — branch `claude/dreamy-mccarthy-vrC4L`
+
+Baseline on entry: **311 passing, 0 failing**.
+Exit state: **315 passing, 0 failing** (+4 tests).
+
+---
+
+### 1. Fix: suppress cycle progress "0/N done" at plan start
+
+**Summary**: On a `rotations`-duration plan with no logged workouts, the
+TodayPage subtitle showed "Day 1 of 6 in rotation · 0/6 done". Changed the
+display condition from `!cycleProgress.justCompletedRotation` to
+`cycleProgress.doneInCycle > 0` so the counter only appears once at least one
+`complete` or `skip` has been logged. The "rotation complete!" label is
+unaffected.
+
+**Why it matters**: "0/6 done" on day 1 is confusing noise — it implies partial
+progress when none exists.
+
+**Files changed**:
+- `src/pages/TodayPage.tsx` — condition on cycle progress display (1 line)
+
+**Risks / tradeoffs**: None.
+
+**Rollback**: Revert commit `09e45bf`.
+
+---
+
+### 2. Fix: pass `previousSetsByExercise` to double-day bonus OutcomeModal
+
+**Summary**: The bonus workout OutcomeModal (shown after confirming a double-day
+primary workout) was not receiving the `previousSetsByExercise` prop. This meant
+historical weight data was unavailable for pre-filling in the bonus modal, even
+though it was already computed and used everywhere else. One-line addition.
+
+**Why it matters**: Inconsistent — all other OutcomeModal call sites receive
+this prop; the bonus modal was silently missing it.
+
+**Files changed**:
+- `src/pages/TodayPage.tsx` — `bonusOutcome` OutcomeModal props (1 line)
+
+**Risks / tradeoffs**: None.
+
+**Rollback**: Revert commit `15f42e4`.
+
+---
+
+### 3. Fix: CalendarPage "Resume workout" uses logged planDayIndex
+
+**Summary**: The "Resume workout" link in DayDetailModal passed `resolved.planDay`
+(the rotation projection) to `startHistoricalResume`. If earlier entries were
+deleted/edited retroactively, the projection shifts and the wrong exercises load.
+Now uses `resolved.historyEntry?.planDayIndex ?? resolved.planDayIndex` to look
+up the correct PlanDay, with a safe fallback. Mirrors TodayPage's
+`primaryPlanDayIndex` pattern.
+
+**Why it matters**: Without this fix, retroactive history edits cause "Resume
+workout" to open the tracker with the wrong exercises.
+
+**Files changed**:
+- `src/pages/CalendarPage.tsx` — "Resume workout" onClick in DayDetailModal (5 lines)
+
+**Risks / tradeoffs**: Minimal. Fallback to `resolved.planDay` if the plan was
+edited after logging. No behavior change in the normal case.
+
+**Rollback**: Revert commit `5169a90`.
+
+---
+
+### 4. Feature: week progress indicator on TodayPage for weeks-duration plans
+
+**Summary**: Added "· Week X of Y" inline in the TodayPage subtitle for
+`weeks`-duration plans, mirroring the "3/6 done" rotation cycle progress from
+pass 16. Uses existing `computePlanProgress`. Shows current week (completed+1),
+"last week!" on the final week, suppressed when expired. No effect on rotation
+plans.
+
+**Why it matters**: Rotation users saw "3/6 done"; weeks users saw nothing.
+This creates parity for 8- or 12-week programs.
+
+**Files changed**:
+- `src/pages/TodayPage.tsx` — import + `weekProgress` computation + subtitle
+  JSX (~14 lines)
+- `src/lib/__tests__/historyStats.test.ts` — 4 new week-indicator boundary tests
+
+**Risks / tradeoffs**: Subtitle grows longer on weeks plans (same concern as
+pass 16). No store/schema change; purely display-side.
+
+**Rollback**: Revert commit `7a0a61f`.
+
+---
+
 ## 2026-04-29 (sixteenth pass) — branch `claude/great-mccarthy-TJqjV`
 
 Baseline on entry: **302 passing, 0 failing**.
