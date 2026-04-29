@@ -1,0 +1,211 @@
+name: "Upper/Lower Hybrid 12-Week (Liftosaur)"
+description: "4-day upper/lower split with home+gym days. Run 3 loading weeks, 1 deload week, then repeat for 12 weeks total."
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  bench: 125
+  incline_db_a: 35
+  one_arm_row: 35
+  bicep_curl: 30
+  squat: 200
+  rdl: 220
+  split_squat: 25
+  calf_load: 0
+  ohp: 95
+  incline_db_b: 45
+  seated_row: 105
+  lat_pulldown: 105
+  lateral_raise: 20
+  triceps_pushdown: 50
+  deadlift: 265
+  hip_thrust: 190
+  farmers_walk: 35
+
+days:
+  - label: "Upper A (Home)"
+    slots:
+      - type: weights
+        name: "Upper A"
+        focus: upper
+        intent: hypertrophy
+        exercises:
+          - exercise: "Pull Up"
+            sets: 3
+            reps: "6-10"
+            rest: 45s
+          - exercise: "Bench Press"
+            sets: 3
+            reps: "8-10"
+            load: bench
+            rest: 90s
+            progress:
+              if: all_reps
+              then: "bench += 5"
+          - exercise: "Incline Bench Press, Dumbbell"
+            sets: 3
+            reps: "8-12"
+            load: incline_db_a
+            rest: 75s
+            progress:
+              if: all_reps
+              then: "incline_db_a += 5"
+          - exercise: "Inverted Row"
+            sets: 3
+            reps: "15-20"
+            rest: 30s
+          - exercise: "Bent Over One Arm Row"
+            sets: 3
+            reps: "10-12"
+            load: one_arm_row
+            rest: 45s
+            progress:
+              if: all_reps
+              then: "one_arm_row += 5"
+          - exercise: "Bicep Curl"
+            sets: 2
+            reps: "10-12"
+            load: bicep_curl
+            rest: 45s
+            progress:
+              if: all_reps
+              then: "bicep_curl += 5"
+
+  - label: "Lower A (Home)"
+    slots:
+      - type: weights
+        name: "Lower A"
+        focus: legs
+        intent: strength
+        exercises:
+          - exercise: "Squat"
+            sets: 4
+            reps: "6-8"
+            load: squat
+            rest: 90s
+            progress:
+              if: all_reps
+              then: "squat += 5"
+          - exercise: "Romanian Deadlift, Barbell"
+            sets: 3
+            reps: "8-10"
+            load: rdl
+            rest: 90s
+            progress:
+              if: all_reps
+              then: "rdl += 5"
+          - exercise: "Bulgarian Split Squat"
+            sets: 3
+            reps: "8-10"
+            load: split_squat
+            rest: 30s
+            progress:
+              if: all_reps
+              then: "split_squat += 5"
+          - exercise: "Standing Calf Raise, Bodyweight"
+            sets: 4
+            reps: "12-15"
+            load: calf_load
+            rest: 30s
+          - exercise: "Ab Wheel"
+            sets: 2
+            reps: "30-60"
+            rest: 60s
+
+  - label: "Upper B (Gym)"
+    slots:
+      - type: weights
+        name: "Upper B"
+        focus: upper
+        intent: strength
+        exercises:
+          - exercise: "Overhead Press"
+            sets: 4
+            reps: "6-8"
+            load: ohp
+            rest: 90s
+            progress:
+              if: all_reps
+              then: "ohp += 5"
+          - exercise: "Incline Bench Press, Dumbbell"
+            sets: 3
+            reps: "8-10"
+            load: incline_db_b
+            rest: 75s
+            progress:
+              if: all_reps
+              then: "incline_db_b += 5"
+          - exercise: "Seated Row"
+            sets: 3
+            reps: "10-12"
+            load: seated_row
+            rest: 60s
+            progress:
+              if: all_reps
+              then: "seated_row += 5"
+          - exercise: "Lat Pulldown"
+            sets: 3
+            reps: "10-12"
+            load: lat_pulldown
+            rest: 75s
+            progress:
+              if: all_reps
+              then: "lat_pulldown += 5"
+          - exercise: "Lateral Raise"
+            sets: 3
+            reps: "12-15"
+            load: lateral_raise
+            rest: 45s
+            progress:
+              if: all_reps
+              then: "lateral_raise += 5"
+          - exercise: "Triceps Pushdown"
+            sets: 2
+            reps: "12-15"
+            load: triceps_pushdown
+            rest: 60s
+            progress:
+              if: all_reps
+              then: "triceps_pushdown += 5"
+
+  - label: "Lower B (Home)"
+    slots:
+      - type: weights
+        name: "Lower B"
+        focus: full_body
+        intent: strength
+        exercises:
+          - exercise: "Deadlift"
+            sets: 3
+            reps: "5-6"
+            load: deadlift
+            rest: 90s
+            progress:
+              if: all_reps
+              then: "deadlift += 10"
+          - exercise: "Hip Thrust"
+            sets: 3
+            reps: "10-12"
+            load: hip_thrust
+            rest: 90s
+            progress:
+              if: all_reps
+              then: "hip_thrust += 5"
+          - exercise: "Nordic Curl"
+            sets: 3
+            reps: "3-6"
+            rest: 30s
+          - exercise: "Standing Calf Raise, Bodyweight"
+            sets: 4
+            reps: "12-15"
+            load: calf_load
+            rest: 30s
+          - exercise: "Farmer's Walk"
+            sets: 3
+            reps: 40
+            load: farmers_walk
+            rest: 60s
+            progress:
+              if: all_reps
+              then: "farmers_walk += 5"

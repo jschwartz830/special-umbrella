@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react'
+import gzclp5kTemplate from '../programs/gzclp-5k.yaml?raw'
+import upperLowerTemplate from '../programs/upper-lower-hybrid-12w.yaml?raw'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Upload, AlertCircle, CheckCircle, ChevronDown, ChevronRight, Dumbbell, Footprints } from 'lucide-react'
 import { parseYamlProgram } from '../engine/programParser'
@@ -9,188 +11,10 @@ import type { ExerciseSpec, RunSegment } from '../types/program'
 
 // ── Example stub shown on first load ─────────────────────────────────────────
 
-const EXAMPLE_YAML = `name: "GZCLP + 5K Build"
-description: "Linear strength progression + 5K base building. 6-day rotation."
-duration:
-  type: weeks
-  value: 12
-
-vars:
-  squat: 135
-  bench: 95
-  ohp: 65
-  deadlift: 155
-  row: 95
-  easy_miles: 3.0
-  tempo_miles: 2.0
-  interval_reps: 4
-
-days:
-  - label: "Squat + OHP"
-    slots:
-      - type: weights
-        name: "T1 Squat / T2 OHP"
-        focus: legs
-        intent: strength
-        durationMin: 55
-
-        warmup:
-          - exercise: Squat
-            sets:
-              - { reps: 5, load: "45lb" }
-              - { reps: 3, load: "0.6 * squat" }
-              - { reps: 1, load: "0.8 * squat" }
-
-        exercises:
-          - exercise: Squat
-            sets: 5
-            reps: 3
-            load: squat
-            rest: 3m
-            progress:
-              if: all_reps
-              then: "squat += 5"
-              else: "squat = round5(squat * 0.85)"
-
-          - exercise: OHP
-            sets: 3
-            reps: 10
-            load: ohp
-            rest: 90s
-            progress:
-              if: all_reps
-              then: "ohp += 5"
-
-  - label: "Easy Run"
-    slots:
-      - type: run
-        name: "Easy Run"
-        subtype: easy
-        segments:
-          - type: easy
-            distance: "easy_miles mi"
-            pace: easy
-        progress:
-          if: "effort <= 3"
-          then: "easy_miles = min(easy_miles + 0.5, 8)"
-
-  - label: "Bench + Row"
-    slots:
-      - type: weights
-        name: "T1 Bench / T2 Row"
-        focus: upper
-        intent: strength
-        durationMin: 55
-        warmup:
-          - exercise: "Bench Press"
-            sets:
-              - { reps: 10, load: "45lb" }
-              - { reps: 5,  load: "0.6 * bench" }
-              - { reps: 1,  load: "0.8 * bench" }
-        exercises:
-          - exercise: "Bench Press"
-            sets: 5
-            reps: 3
-            load: bench
-            rest: 3m
-            progress:
-              if: all_reps
-              then: "bench += 5"
-              else: "bench = round5(bench * 0.85)"
-          - exercise: "Barbell Row"
-            sets: 3
-            reps: 10
-            load: row
-            rest: 90s
-            progress:
-              if: all_reps
-              then: "row += 5"
-
-  - label: "Tempo + Drills"
-    slots:
-      - type: run
-        name: "Tempo with Drills"
-        subtype: tempo
-        durationMin: 40
-        segments:
-          - type: warmup
-            duration: 10m
-            pace: easy
-          - type: drills
-            drills:
-              - { name: "High Knees",   sets: 2, duration: 20s, rest: 30s }
-              - { name: "A-Skips",      sets: 2, reps: 20,      rest: 30s }
-              - { name: "Leg Swings",   sets: 1, reps: 10 }
-          - type: tempo
-            distance: "tempo_miles mi"
-            pace: tempo
-          - type: cooldown
-            duration: 5m
-            pace: easy
-        progress:
-          if: "effort <= 3"
-          then: "tempo_miles = min(tempo_miles + 0.25, 5)"
-
-  - label: "Deadlift + Core"
-    slots:
-      - type: weights
-        name: "T1 Deadlift / Core"
-        focus: full_body
-        intent: strength
-        durationMin: 45
-        warmup:
-          - exercise: Deadlift
-            sets:
-              - { reps: 5, load: "135lb" }
-              - { reps: 3, load: "0.65 * deadlift" }
-              - { reps: 1, load: "0.8 * deadlift" }
-        exercises:
-          - exercise: Deadlift
-            sets: 1
-            reps: 5
-            load: deadlift
-            rest: 5m
-            progress:
-              if: all_reps
-              then: "deadlift += 10"
-              else: "deadlift = round5(deadlift * 0.9)"
-          - exercise: Plank
-            sets: 3
-            duration: 45s
-            rest: 60s
-          - exercise: "Dead Bug"
-            sets: 3
-            reps: 10
-            rest: 45s
-
-  - label: "Intervals"
-    slots:
-      - type: run
-        name: "800m Intervals"
-        subtype: intervals
-        segments:
-          - type: warmup
-            distance: 1mi
-            pace: easy
-          - type: interval
-            name: "800m Repeats"
-            distance: 800m
-            pace: "5K"
-            reps: interval_reps
-            rest: 2m
-          - type: cooldown
-            distance: 1mi
-            pace: easy
-        progress:
-          if: "effort <= 3"
-          then: "interval_reps = min(interval_reps + 1, 8)"
-
-  - label: "Rest"
-    slots:
-      - type: other
-        name: "Rest Day"
-        subtype: rest
-`
+const TEMPLATE_OPTIONS = [
+  { id: 'gzclp-5k', label: 'GZCLP + 5K Build', yaml: gzclp5kTemplate },
+  { id: 'upper-lower-12w', label: 'Upper/Lower Hybrid 12-Week', yaml: upperLowerTemplate },
+] as const
 
 // ── Preview components ────────────────────────────────────────────────────────
 
@@ -352,6 +176,7 @@ export function ProgramImportPage() {
     errors: string[]
   } | null>(null)
   const [imported, setImported] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<(typeof TEMPLATE_OPTIONS)[number]['id']>('gzclp-5k')
 
   const handleParse = useCallback(() => {
     if (!yaml.trim()) return
@@ -360,9 +185,10 @@ export function ProgramImportPage() {
     setImported(false)
   }, [yaml])
 
-  const handleLoadExample = useCallback(() => {
-    setYaml(EXAMPLE_YAML)
-    const result = parseYamlProgram(EXAMPLE_YAML)
+  const handleLoadExample = useCallback((templateId?: string) => {
+    const chosen = TEMPLATE_OPTIONS.find(t => t.id === templateId) ?? TEMPLATE_OPTIONS[0]
+    setYaml(chosen.yaml)
+    const result = parseYamlProgram(chosen.yaml)
     setParseResult(result)
     setImported(false)
   }, [])
@@ -404,12 +230,23 @@ export function ProgramImportPage() {
             <label className="text-xs text-slate-400 uppercase tracking-wider">
               Program YAML
             </label>
-            <button
-              onClick={handleLoadExample}
-              className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
-            >
-              Load example
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedTemplate}
+                onChange={e => setSelectedTemplate(e.target.value as (typeof TEMPLATE_OPTIONS)[number]['id'])}
+                className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-md px-2 py-1"
+              >
+                {TEMPLATE_OPTIONS.map(t => (
+                  <option key={t.id} value={t.id}>{t.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => handleLoadExample(selectedTemplate)}
+                className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
+              >
+                Load template
+              </button>
+            </div>
           </div>
           <textarea
             value={yaml}
