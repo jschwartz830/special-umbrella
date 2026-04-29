@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { DragEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -15,6 +16,7 @@ import { WORKOUT_META, WORKOUT_TYPES } from '../lib/constants'
 import { Modal } from '../components/shared/Modal'
 import { nanoid } from '../engine/rotationEngine'
 import type { Plan, PlanDay, WorkoutSlot } from '../types'
+import type { ExerciseSpec } from '../types/program'
 import type {
   WorkoutDifficulty,
   RunWorkoutSubtype,
@@ -72,6 +74,20 @@ function SlotEditor({
   const SWIM_SUBTYPES: SwimWorkoutSubtype[] = ['easy', 'endurance', 'intervals', 'technique', 'recovery']
   const YOGA_SUBTYPES: YogaWorkoutSubtype[] = ['mobility', 'flow', 'recovery', 'strength', 'stretch']
   const OTHER_SUBTYPES: OtherWorkoutSubtype[] = ['rest', 'walk', 'sport', 'pt_rehab', 'mobility', 'custom']
+  const [dragExerciseIdx, setDragExerciseIdx] = useState<number | null>(null)
+
+  function updateExercises(exercises: ExerciseSpec[]) {
+    onChange({ ...slot, exercises })
+  }
+
+  function moveExercise(from: number, to: number) {
+    const source = slot.exercises ?? []
+    if (from === to || from < 0 || to < 0 || from >= source.length || to >= source.length) return
+    const next = [...source]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    updateExercises(next)
+  }
 
   return (
     <div className="bg-slate-700/50 rounded-xl p-3 space-y-2">
@@ -424,6 +440,28 @@ function SlotEditor({
             </div>
           )}
 
+          {slot.exercises && slot.exercises.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-slate-400">Exercises</p>
+              {slot.exercises.map((ex, i) => (
+                <div
+                  key={`${ex.exercise}-${i}`}
+                  draggable
+                  onDragStart={() => setDragExerciseIdx(i)}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={() => { if (dragExerciseIdx !== null) moveExercise(dragExerciseIdx, i); setDragExerciseIdx(null) }}
+                  onDragEnd={() => setDragExerciseIdx(null)}
+                  className="flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800/60 px-2 py-1.5"
+                >
+                  <GripVertical size={14} className="text-slate-500" />
+                  <span className="text-xs text-slate-200 flex-1 truncate">{ex.exercise}</span>
+                  <button type="button" onClick={() => moveExercise(i, i - 1)} disabled={i === 0} className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"><ChevronUp size={12} /></button>
+                  <button type="button" onClick={() => moveExercise(i, i + 1)} disabled={i === (slot.exercises?.length ?? 0) - 1} className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"><ChevronDown size={12} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Notes */}
           {slot.type !== 'rest' && (
             <label className="block space-y-1">
@@ -480,6 +518,9 @@ function DayEditor({
   onMoveUp,
   onMoveDown,
   onDuplicate,
+  onDragStart,
+  onDragOver,
+  onDrop,
 }: {
   day: PlanDay
   index: number
@@ -489,6 +530,9 @@ function DayEditor({
   onMoveUp: () => void
   onMoveDown: () => void
   onDuplicate: () => void
+  onDragStart: () => void
+  onDragOver: (e: DragEvent<HTMLDivElement>) => void
+  onDrop: () => void
 }) {
   const [expanded, setExpanded] = useState(true)
 
@@ -509,7 +553,13 @@ function DayEditor({
   }
 
   return (
-    <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden"
+    >
       {/* Day header */}
       <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-800">
         <GripVertical size={16} className="text-slate-600 flex-shrink-0" />
@@ -595,6 +645,7 @@ export function PlanBuilderPage() {
   const [isDirty, setIsDirty] = useState(false)
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [pendingNav, setPendingNav] = useState<string | null>(null)
+  const [dragDayIdx, setDragDayIdx] = useState<number | null>(null)
 
   function markDirty() {
     if (!isDirty) setIsDirty(true)
@@ -617,12 +668,22 @@ export function PlanBuilderPage() {
     markDirty()
   }
 
+
+  function moveDay(from: number, to: number) {
+    if (from === to || from < 0 || to < 0 || from >= days.length || to >= days.length) return
+    const next = [...days]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
+    setDays(next)
+    markDirty()
+  }
+
   function removeDay(i: number) {
     setDays(days.filter((_, idx) => idx !== i))
     markDirty()
   }
 
-  function moveDay(i: number, dir: -1 | 1) {
+  function moveDayByDirection(i: number, dir: -1 | 1) {
     const next = [...days]
     const j = i + dir
     if (j < 0 || j >= next.length) return
@@ -743,9 +804,12 @@ export function PlanBuilderPage() {
                 total={days.length}
                 onChange={d => updateDay(i, d)}
                 onRemove={() => removeDay(i)}
-                onMoveUp={() => moveDay(i, -1)}
-                onMoveDown={() => moveDay(i, 1)}
+                onMoveUp={() => moveDayByDirection(i, -1)}
+                onMoveDown={() => moveDayByDirection(i, 1)}
                 onDuplicate={() => duplicateDay(i)}
+                onDragStart={() => setDragDayIdx(i)}
+                onDragOver={e => e.preventDefault()}
+                onDrop={() => { if (dragDayIdx !== null) moveDay(dragDayIdx, i); setDragDayIdx(null) }}
               />
             ))}
           </div>
