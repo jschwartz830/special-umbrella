@@ -22,6 +22,22 @@ interface ExerciseTrackState {
   previousSets?: LoggedSetActual[]
 }
 
+function resolveActualReps(actualReps: number | null, targetReps: number | string | null): number | null {
+  if (typeof actualReps === 'number') return actualReps
+  if (typeof targetReps === 'number') return targetReps
+  if (typeof targetReps !== 'string') return null
+
+  const range = targetReps.match(/^\s*(\d+)\s*-\s*(\d+)\s*$/)
+  if (range) {
+    const low = Number(range[1])
+    const high = Number(range[2])
+    return Number.isFinite(high) ? Math.max(low, high) : null
+  }
+
+  const single = Number(targetReps.trim())
+  return Number.isFinite(single) ? single : null
+}
+
 export interface WorkoutSessionMeta {
   startTime: string
   endTime: string
@@ -497,7 +513,7 @@ export function ActiveWorkoutTracker({
       sets: ex.sets.map(s => ({
         targetReps: s.targetReps,
         targetLoad: s.targetLoad,
-        actualReps: s.actualReps,
+        actualReps: resolveActualReps(s.actualReps, s.targetReps),
         actualLoad: s.actualLoad,
         completed: s.completed,
         restSeconds: s.restSeconds,
