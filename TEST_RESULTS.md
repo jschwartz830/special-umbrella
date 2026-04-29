@@ -1,5 +1,45 @@
 # Test Results
 
+## 2026-04-29 (seventeenth pass) — branch `claude/dreamy-mccarthy-vrC4L`
+
+**Result: 315 passing, 0 failing** (+4 tests this pass)
+
+### Tests reviewed
+
+All 11 test files reviewed for regressions. No existing tests were modified.
+
+### Tests added / updated
+
+**`src/lib/__tests__/historyStats.test.ts`** — 4 new tests in the
+`computePlanProgress > weeks-based plans` describe block:
+
+| Test | Purpose |
+|------|---------|
+| `completed+1 === 1 (week 1) on plan start date and through day 6` | Documents that `completed=0` on days 0–6 → "Week 1" |
+| `completed+1 === 2 (week 2) from day 7 through day 13` | Documents week-2 boundary |
+| `identifies last week: completed === total-1 when one full week remains` | Documents the "last week!" condition |
+| `completed >= total when plan is expired (week indicator should be hidden)` | Documents the expiry boundary; `completed < total` is false → no week indicator |
+
+All 4 tests pass.
+
+### Results
+
+```
+Test Files  11 passed (11)
+     Tests  315 passed (315)
+```
+
+### Important areas still untested
+
+- TodayPage JSX conditions (no component-level tests; covered by integration/
+  manual testing).
+- CalendarPage DayDetailModal "Resume workout" fix — the edge case (retroactive
+  entry deletion shifting the rotation) is complex to reproduce in a unit test.
+  The fix logic is a 4-line safe fallback with no branching risk.
+- Week progress display text (UI-level, not unit tested).
+
+---
+
 ## 2026-04-29 (sixteenth pass) — branch `claude/great-mccarthy-TJqjV`
 
 **Result: 311 passing, 0 failing** (+9 tests this pass)

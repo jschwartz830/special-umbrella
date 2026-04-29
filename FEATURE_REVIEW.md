@@ -1,3 +1,91 @@
+# Feature Review — Week Progress Indicator on TodayPage
+
+Date: 2026-04-29
+Branch: `claude/dreamy-mccarthy-vrC4L`
+Classification: **Keep (review subtitle length on small screens)**
+
+---
+
+## What was actually built
+
+1. `computePlanProgress` imported into `TodayPage` (was already used in
+   PlansPage and historyStats — no new helper needed).
+
+2. `weekProgress` — computed inline when `plan.duration.type === 'weeks'`,
+   null otherwise. Uses `computePlanProgress(plan, planEntries, today)`.
+
+3. **Subtitle display** in `src/pages/TodayPage.tsx`:
+   - Shows nothing for rotation plans (weekProgress is null).
+   - Shows "· Week X of Y" while the plan is in progress (`completed < total`).
+   - "last week!" micro-label when `completed + 1 === total`.
+   - Suppressed once the plan expires; the expiry banner handles that state.
+
+4. **4 unit tests** in `historyStats.test.ts` documenting the boundary
+   conditions the UI relies on.
+
+---
+
+## What assumptions were encoded
+
+- `currentWeek = completed + 1` where `completed` = full 7-day periods elapsed.
+  "Week 1 of 12" shows from day 0 through day 6 — intentional and accurate.
+- `completed < total` guards suppress the display once expired.
+- `computePlanProgress` is not re-memoized in TodayPage (consistent with
+  `cycleProgress` which is also a direct call).
+- "last week!" uses emerald text matching the rotation "last one!" label.
+
+---
+
+## What worked well
+
+- Zero new pure functions — the feature fell entirely out of existing tested
+  infrastructure. The entire change is 1 import + 5 computed lines + 10 JSX
+  lines.
+- Test strategy focused on documenting the specific boundary conditions the UI
+  relies on rather than re-testing `computePlanProgress` in bulk.
+- Symmetric with the pass-16 rotation cycle display; the UI pattern is
+  consistent across both plan types.
+
+---
+
+## What feels risky or incomplete
+
+- **Subtitle length**: "Day 6 of 6 in rotation · Week 12 of 12 · last week!"
+  is long. On a 320px-wide device this may wrap. Same concern was flagged for
+  the pass-16 rotation display, but has not been evaluated on a real device.
+- The two signals (rotation position + week number) are both in the same `<p>`.
+  A future pass could separate them: one for plan position, one for plan
+  progress.
+
+---
+
+## What I should evaluate tomorrow
+
+1. Open TodayPage on a physical device with a weeks-duration plan mid-progress.
+   Does "Day 4 of 6 in rotation · Week 3 of 12" fit on one line or wrap?
+2. Does "Week 1 of 12" on day 1 feel informative, or is it surprising? The
+   rotation variant hides "0/6 done" at start (bug fixed this pass), but weeks
+   shows "Week 1" immediately since it reflects real calendar progress.
+
+---
+
+## Recommended next steps
+
+- Evaluate on a narrow-screen device; if wrapping is an issue, extract into a
+  separate `<p>` row or consider a progress pill component.
+- If well-received, consider whether PlansPage should also show "Week 3 of 12"
+  alongside its progress bar (currently shows a percentage and bar only).
+
+---
+
+## Keep / revise / prototype / reject
+
+**Keep** — the display is additive, reverting has zero data impact, the logic
+is correct, and the value for weeks-plan users is clear. Revisit subtitle
+layout if wrapping is observed on device.
+
+---
+
 # Feature Review — Rotation Cycle Progress on TodayPage
 
 Date: 2026-04-29

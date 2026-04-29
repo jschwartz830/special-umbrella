@@ -1,5 +1,128 @@
 # Review Notes — Overnight Audit
 
+## 2026-04-29 (seventeenth pass) — branch `claude/dreamy-mccarthy-vrC4L`
+
+### Executive summary
+
+1. **What changed**: Three bug fixes (cycle-progress noise, missing bonus-modal
+   prop, calendar resume wrong planDay) and one medium feature (week progress
+   indicator for weeks-duration plans). 315 tests now pass (was 311).
+
+2. **What is highest confidence**: All three bug fixes — each is a narrow
+   correction to a specific misbehaviour, with no secondary effects. The
+   bonus-modal fix is one line. The cycle-progress fix is one condition change.
+   The calendar resume fix adds 4 lines and has a safe fallback.
+
+3. **What is risky**: The week progress subtitle text grows longer on small
+   screens ("Day 6 of 6 in rotation · Week 12 of 12 · last week!"). This is
+   the same wrapping concern noted for the pass-16 rotation cycle display. Both
+   should be evaluated on a real device.
+
+4. **What to review first**: The TodayPage subtitle on a narrow screen with both
+   plan types. If it wraps awkwardly, moving the week/cycle progress to a
+   second line or a separate stat tile is easy.
+
+---
+
+### Biggest issues found this pass
+
+All prior high-severity issues from passes 1–16 remain fixed and stable.
+
+1. **"0/N done" displayed at plan start** — subtitle noise before any workouts
+   logged; now suppressed until `doneInCycle > 0`.
+
+2. **Missing `previousSetsByExercise` in bonus OutcomeModal** — historical
+   weight prefill was silently absent for double-day bonus workouts.
+
+3. **"Resume workout" in CalendarPage used projected planDay** — retroactive
+   history edits caused the tracker to load the wrong exercises.
+
+---
+
+### Improvements completed
+
+| # | Item | Type | Confidence |
+|---|------|------|------------|
+| 1 | Suppress "0/N done" at plan start | UX bug | High |
+| 2 | Pass `previousSetsByExercise` to bonus modal | UX gap | High |
+| 3 | Calendar resume uses logged planDayIndex | Logic bug | High |
+| 4 | Week progress indicator on TodayPage | Feature | High |
+
+---
+
+### Small features added
+
+None.
+
+---
+
+### Medium-complexity feature explored
+
+**Week progress indicator on TodayPage for weeks-duration plans** — implemented.
+See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md.
+
+---
+
+### Definitely keep
+
+- All three bug fixes — narrow, safe, no tradeoffs.
+
+### Probably keep but tweak
+
+- Week progress subtitle — review wrapping on small screens. If it wraps,
+  consider a second-line or stat-tile approach.
+
+### Do not keep
+
+- Nothing recommended for removal.
+
+### Recommendations only (not implemented)
+
+- **Subtitle line length audit**: With both the rotation day index and
+  week/cycle progress, the subtitle can reach 50+ characters. A future pass
+  could extract this into a two-line compact display or a dedicated "progress
+  chip" row below the header.
+
+- **"Resume workout" in Calendar level-2**: The rotation detail view (level 2)
+  doesn't have a "Resume workout" button — only "View & Edit Workout Details"
+  and "Clear entry". Adding a resume button at level 2 would be consistent with
+  level 1, but is currently not a gap users are likely to notice.
+
+- **`importExtraEntries` update vs. add**: Re-importing a CSV with modified extra
+  entries won't update existing ones (ID-based skip). Consider adding an
+  "overwrite on re-import" mode, documented with a warning. Low priority.
+
+---
+
+### Open questions for me
+
+1. Does "Week 3 of 12" in the subtitle read well alongside "Day 4 of 6 in
+   rotation" on your device? Should one be made more prominent?
+
+2. The "rotation complete!" text persists until the next workout is logged
+   (noted in pass 16). Is this still acceptable UX or should there be an
+   auto-dismiss after, e.g., a day?
+
+3. For the CalendarPage resume fix: do you routinely delete/edit past entries
+   in ways that shift the rotation? If not, this fix is theoretical safety;
+   if yes, it matters in practice.
+
+---
+
+### Known issues / incomplete work
+
+- Week progress subtitle length on narrow screens — needs manual testing.
+- "Resume workout" not available in CalendarPage DayDetailModal level-2 view
+  (rotation detail). Left for a future pass.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-04-29 (sixteenth pass) — branch `claude/great-mccarthy-TJqjV`
 
 ### Executive summary

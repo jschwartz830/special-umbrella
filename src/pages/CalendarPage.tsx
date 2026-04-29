@@ -628,7 +628,11 @@ function DayDetailModal({
                 </button>
                 {!isFuture && !isDayOff && (
                   <button
-                    onClick={() => onResumeRotation(resolved.planDay, calendarDate)}
+                    onClick={() => {
+                      const loggedIdx = resolved.historyEntry?.planDayIndex ?? resolved.planDayIndex
+                      const resumeDay = plan.days[loggedIdx] ?? resolved.planDay
+                      onResumeRotation(resumeDay, calendarDate)
+                    }}
                     className="text-[10px] text-sky-500 hover:text-sky-400 transition-colors"
                   >
                     Resume workout
