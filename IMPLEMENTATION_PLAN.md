@@ -1,5 +1,79 @@
 # Implementation Plan
 
+## 2026-04-29 — Overnight Audit (sixteenth pass)
+
+Branch: `claude/great-mccarthy-TJqjV`.
+Baseline on entry: **302 passing, 0 failing**.
+Exit state: **311 passing, 0 failing** (+9 tests).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the fifteenth pass. All previous PRs (#27–#46)
+merged into this branch, so the baseline already includes active-workout
+tracking, historical workout logging, plan builder, YAML import, and the
+double-day + unlogged-days nudge features.
+
+### What appears strong and well-designed (unchanged)
+
+- 311-test suite covering engine, stores, adaptation, lib, CSV, and recommendation.
+- All prior bug fixes from passes 1–15 remain stable; no regressions.
+- Clean separation between pure engine logic and React UI.
+
+### Key issues found this pass
+
+1. **`deduplicateByDate` in `importEntries` uses insertion-order last-wins** (BUG).
+   The rotation engine resolves duplicate entries by newest `createdAt`, but the
+   import deduplication built a Map by inserting entries in array order — so the
+   last entry in the import batch won, regardless of `createdAt`. If entries
+   arrived in reverse-chronological order (which CSV exports can produce), the
+   older entry would silently overwrite the newer one. Fixed: sort by `createdAt`
+   before building the Map.
+
+2. **`flatItems` in HistoryPage not memoized** (PERFORMANCE).
+   The unified flat list (rotation + extra entries, sorted newest-first) was
+   recomputed every render. Both the list render and `typeCountMap` memo depended
+   on it, so any parent re-render (e.g., store subscription) triggered a full
+   rebuild. Memoized with `useMemo` and correct dependencies.
+
+3. **Inline extra deletion in HistoryPage has no confirmation** (UX RISK).
+   The trash icon on the extra workout card in the list view deleted immediately
+   on single tap — no confirmation. One accidental touch permanently removes
+   logged data. Added a two-step inline confirm (Delete / X) consistent with
+   the rotation-entry delete flow.
+
+### Features implemented
+
+4. **Rotation cycle progress on TodayPage** (FEATURE).
+   New `computeRotationCycleProgress` helper in `historyStats.ts` returns
+   `{ doneInCycle, rotationLength, remaining, justCompletedRotation }` for
+   `rotations`-duration plans (null for `weeks` plans). TodayPage displays
+   "3/6 done" inline with the existing rotation subtitle, and emits a
+   celebratory "last one!" or "rotation complete!" micro-label at the right
+   moments. 9 new tests cover the helper.
+
+### Prioritized plan
+
+| # | Item | Action |
+|---|---|----|
+| 1 | Fix `deduplicateByDate` createdAt ordering | **Implemented** |
+| 2 | Memoize `flatItems` in HistoryPage | **Implemented** |
+| 3 | Confirm extra deletion in list view | **Implemented** |
+| 4 | Rotation cycle progress feature + tests | **Implemented** |
+| 5 | Extract `extraToPlanDay` / `WORKOUT_TYPES` to shared module | Recommend only |
+| 6 | Move `PlanCard` outside `PlansPage` function body | Recommend only |
+| 7 | Dismissible unlogged-days nudge | Recommend only |
+
+### Rationale for sequencing
+
+Bug fix first (1) — narrow change to a utility function, fully testable.
+Performance fix second (2) — wrapping inline computation in `useMemo`, zero
+behavior change. UX safety third (3) — additive pattern matching existing
+rotation-entry deletion flow. Feature last (4) — new pure helper with tests
+before any UI wiring.
+
+---
+
 ## 2026-04-28 — Overnight Audit (fifteenth pass)
 
 Branch: `claude/great-mccarthy-6NVvu`.

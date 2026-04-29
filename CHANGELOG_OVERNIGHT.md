@@ -1,5 +1,107 @@
 # Overnight Changelog
 
+## 2026-04-29 (sixteenth pass) — branch `claude/great-mccarthy-TJqjV`
+
+Baseline on entry: **302 passing, 0 failing**.
+Exit state: **311 passing, 0 failing** (+9 tests).
+
+---
+
+### 1. Fix: `deduplicateByDate` uses `createdAt` ordering on import
+
+**Summary**: `importEntries` in `historyStore` deduplicated entries using
+insertion-order last-wins. The rotation engine uses newest-`createdAt`-wins
+when it encounters duplicates. If an import batch had entries in
+reverse-chronological order, the older entry would win — inconsistent with
+the engine. Fixed by sorting the batch by `createdAt` (ascending) before
+building the deduplication Map so the newest entry always wins.
+
+**Why it matters**: Import data can arrive in any order (CSV exports sort by
+date, not necessarily by `createdAt`). The rotation engine would correctly
+prefer the newer entry when computing the pointer, but the stored entry after
+import might have been the older one — a silent data discrepancy.
+
+**Files changed**:
+- `src/store/historyStore.ts` — `deduplicateByDate` function (3-line change)
+- `src/store/__tests__/historyStore.test.ts` — new test for reverse-order import
+
+**Risks / tradeoffs**: None. `createdAt`-newest-wins is the documented engine
+behavior; the change makes import consistent with it.
+
+**Rollback**: Revert the relevant commit.
+
+---
+
+### 2. Fix: Memoize `flatItems` in HistoryPage
+
+**Summary**: The unified sorted flat list of rotation + extra entries in
+`HistoryPage` was computed inline on every render. Wrapped it (and its
+`filteredEntries` / `filteredExtras` dependencies) in `useMemo` so the sort
+only runs when the underlying data or filter changes.
+
+**Why it matters**: Any Zustand store subscription in `HistoryPage` triggers a
+re-render, which previously re-sorted potentially hundreds of items. Also
+`typeCountMap` was already memoized on `flatItems`, so without memoizing
+`flatItems` itself the downstream memo was only partially effective.
+
+**Files changed**:
+- `src/pages/HistoryPage.tsx` — `filteredEntries`, `filteredExtras`, `flatItems`
+  wrapped in `useMemo`
+
+**Risks / tradeoffs**: None. Pure performance improvement, no behavior change.
+
+**Rollback**: Revert the relevant commit.
+
+---
+
+### 3. Fix: Confirm before deleting extras in HistoryPage list view
+
+**Summary**: The trash icon on extra workout cards in the HistoryPage flat
+list deleted immediately on single tap — no confirmation. Added a two-step
+inline confirm: first tap shows "Delete" + "✕" buttons; second tap (Delete)
+executes the deletion. The "✕" cancels back to the normal state.
+
+**Why it matters**: A single misclick permanently removes logged workout data.
+The rotation-entry delete already required a modal confirm; this brings extras
+to the same safety level for the faster inline action.
+
+**Files changed**:
+- `src/pages/HistoryPage.tsx` — `confirmDeleteExtraId` state + conditional render
+
+**Risks / tradeoffs**: Slightly more taps to delete; consistent with existing
+confirmation patterns elsewhere.
+
+**Rollback**: Revert the relevant commit.
+
+---
+
+### 4. Feature: Rotation cycle progress on TodayPage
+
+**Summary**: Added `computeRotationCycleProgress` to `historyStats.ts`. For
+`rotations`-duration plans it returns `{ doneInCycle, rotationLength, remaining,
+justCompletedRotation }`. TodayPage uses this to display "3/6 done" inline
+with the existing "Day X of N in rotation" subtitle, plus micro-labels at the
+last day ("last one!") and immediately after a full rotation completes
+("rotation complete!"). Returns `null` for `weeks`-duration plans.
+
+**Why it matters**: Users had no visible indicator of how far through their
+current rotation they were — the "Day X of N" shows the rotation pointer, not
+the count of logged workouts in the current cycle. This gives a concrete "how
+close am I to finishing this loop?" signal.
+
+**Files changed**:
+- `src/lib/historyStats.ts` — new `computeRotationCycleProgress` helper + export
+- `src/pages/TodayPage.tsx` — import + `cycleProgress` variable + header display
+- `src/lib/__tests__/historyStats.test.ts` — 9 new tests (import updated)
+
+**Risks / tradeoffs**: `day_off` entries don't count (mirrors `isPlanExpired`).
+The "rotation complete!" state (doneInCycle === 0 after at least one full cycle)
+shows briefly until the next workout is logged. Weeks plans see no change.
+
+**Rollback**: Revert the relevant commit.
+
+---
+
 ## 2026-04-28 (fifteenth pass) — branch `claude/great-mccarthy-6NVvu`
 
 Baseline on entry: **293 passing, 0 failing**.

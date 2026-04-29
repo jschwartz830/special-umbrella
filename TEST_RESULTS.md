@@ -1,5 +1,46 @@
 # Test Results
 
+## 2026-04-29 (sixteenth pass) — branch `claude/great-mccarthy-TJqjV`
+
+**Result: 311 passing, 0 failing** (+9 tests this pass)
+
+### Tests added
+
+**`src/store/__tests__/historyStore.test.ts`** — 1 new test in `importEntries` suite:
+
+| Test | What it covers |
+|------|---------------|
+| picks newest createdAt entry even when older entry appears last in array | regression guard for the `deduplicateByDate` fix |
+
+**`src/lib/__tests__/historyStats.test.ts`** — 8 new tests in new `computeRotationCycleProgress` suite:
+
+| Test | What it covers |
+|------|---------------|
+| returns null for a weeks-duration plan | plan type guard |
+| returns null for a plan with no days | empty-days guard |
+| returns doneInCycle=0, remaining=rotationLength for no history | zero-history baseline |
+| counts complete and skip entries within current cycle | basic cycle accumulation |
+| day_off entries do not count toward cycle progress | mirrors `isPlanExpired` behavior |
+| resets doneInCycle to 0 after full rotation, justCompletedRotation=true | rotation-boundary detection |
+| counts into second cycle correctly (4 done in 3-day plan = 1 into second) | multi-cycle wrapping |
+| ignores entries for a different plan | plan isolation |
+
+### Tests reviewed (no changes needed)
+
+All 302 tests from prior passes continue to pass. No regressions.
+
+### Important areas still untested
+
+- `TodayPage` rendering — no component tests; cycle-progress display not
+  directly testable without a React test environment. The underlying helper
+  (`computeRotationCycleProgress`) is fully tested.
+- HistoryPage `flatItems` memoization — performance characteristic, not
+  observable in unit tests.
+- Extra-deletion confirm UX — interactive state machine in HistoryPage; not
+  covered by existing unit tests.
+
+---
+
 ## 2026-04-28 (fifteenth pass) — branch `claude/great-mccarthy-6NVvu`
 
 **Result: 302 passing, 0 failing** (+9 tests this pass)
