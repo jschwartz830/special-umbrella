@@ -33,6 +33,9 @@ export interface ExerciseSpec {
   rest?: string
   tempo?: string
   notes?: string
+  type?: string[]
+  target?: string[]
+  synergist?: string[]
   progress?: ProgressionRule
 }
 
@@ -145,6 +148,9 @@ export interface YamlExerciseSpec {
   rest?: string
   tempo?: string
   notes?: string
+  type?: string[]
+  target?: string[]
+  synergist?: string[]
   progress?: { if?: string; then: string; else?: string }
 }
 

@@ -17,6 +17,7 @@ import { Modal } from '../components/shared/Modal'
 import { nanoid } from '../engine/rotationEngine'
 import type { Plan, PlanDay, WorkoutSlot } from '../types'
 import type { ExerciseSpec } from '../types/program'
+import { EXERCISE_LIBRARY, findExerciseByName } from '../lib/exerciseLibrary'
 import type {
   WorkoutDifficulty,
   RunWorkoutSubtype,
@@ -77,9 +78,23 @@ function SlotEditor({
   const YOGA_SUBTYPES: YogaWorkoutSubtype[] = ['mobility', 'flow', 'recovery', 'strength', 'stretch']
   const OTHER_SUBTYPES: OtherWorkoutSubtype[] = ['rest', 'walk', 'sport', 'pt_rehab', 'mobility', 'custom']
   const [dragExerciseIdx, setDragExerciseIdx] = useState<number | null>(null)
+  const [exerciseInput, setExerciseInput] = useState('')
 
   function updateExercises(exercises: ExerciseSpec[]) {
     onChange({ ...slot, exercises })
+  }
+
+
+
+  function addExerciseFromInput() {
+    const name = exerciseInput.trim()
+    if (!name) return
+    const fromLibrary = findExerciseByName(name)
+    const nextExercise: ExerciseSpec = fromLibrary
+      ? { exercise: fromLibrary.name, sets: 3, reps: '8-12', type: fromLibrary.type, target: fromLibrary.target, synergist: fromLibrary.synergist }
+      : { exercise: name, sets: 3, reps: '8-12' }
+    updateExercises([...(slot.exercises ?? []), nextExercise])
+    setExerciseInput('')
   }
 
   function moveExercise(from: number, to: number) {
@@ -442,6 +457,25 @@ function SlotEditor({
             </div>
           )}
 
+          {isWeights && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-slate-400">Add Exercise (Library or Custom)</p>
+              <div className="flex gap-2">
+                <input
+                  list="exercise-library"
+                  value={exerciseInput}
+                  onChange={e => setExerciseInput(e.target.value)}
+                  placeholder="Start typing exercise name"
+                  className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white"
+                />
+                <datalist id="exercise-library">
+                  {EXERCISE_LIBRARY.map(ex => <option key={ex.name} value={ex.name} />)}
+                </datalist>
+                <button type="button" onClick={addExerciseFromInput} className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs text-white">Add</button>
+              </div>
+            </div>
+          )}
+
           {slot.exercises && slot.exercises.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-xs text-slate-400">Exercises</p>
@@ -456,7 +490,14 @@ function SlotEditor({
                   className="flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800/60 px-2 py-1.5"
                 >
                   <GripVertical size={14} className="text-slate-500" />
-                  <span className="text-xs text-slate-200 flex-1 truncate">{ex.exercise}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs text-slate-200 block truncate">{ex.exercise}</span>
+                    {(ex.type?.length || ex.target?.length || ex.synergist?.length) && (
+                      <span className="text-[10px] text-slate-400 block truncate">
+                        T: {(ex.type ?? []).join(', ')} · Target: {(ex.target ?? []).join(', ')} · Syn: {(ex.synergist ?? []).join(', ')}
+                      </span>
+                    )}
+                  </div>
                   <button type="button" onClick={() => moveExercise(i, i - 1)} disabled={i === 0} className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"><ChevronUp size={12} /></button>
                   <button type="button" onClick={() => moveExercise(i, i + 1)} disabled={i === (slot.exercises?.length ?? 0) - 1} className="p-0.5 text-slate-500 hover:text-white disabled:opacity-30"><ChevronDown size={12} /></button>
                 </div>
