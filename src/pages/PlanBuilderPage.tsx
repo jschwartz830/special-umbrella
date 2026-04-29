@@ -33,6 +33,8 @@ import {
   defaultRunSubtype,
 } from '../modules/workout-metadata/types'
 import { format } from 'date-fns'
+import { dump as yamlDump } from 'js-yaml'
+import { parseYamlProgram } from '../engine/programParser'
 
 // ── Slot editor ──────────────────────────────────────────────────────────────
 
@@ -646,6 +648,9 @@ export function PlanBuilderPage() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [pendingNav, setPendingNav] = useState<string | null>(null)
   const [dragDayIdx, setDragDayIdx] = useState<number | null>(null)
+  const [showYamlEditor, setShowYamlEditor] = useState(false)
+  const [yamlText, setYamlText] = useState('')
+  const [yamlError, setYamlError] = useState<string | null>(null)
 
   function markDirty() {
     if (!isDirty) setIsDirty(true)
@@ -730,6 +735,51 @@ export function PlanBuilderPage() {
     }
   }
 
+  function openYamlEditor() {
+    const yamlDoc = {
+      name: name.trim() || 'Untitled Plan',
+      description: description.trim() || undefined,
+      duration: { type: durationType, value: durationValue },
+      vars: existing?.programMeta?.vars ?? undefined,
+      days: days.map(d => ({
+        label: d.label,
+        slots: d.slots.map(s => ({
+          type: s.type,
+          name: s.name,
+          focus: s.weightsFocusArea,
+          intent: s.weightsIntent,
+          subtype: s.subtype,
+          location: s.location,
+          durationMin: s.durationMin ?? s.targetTime ?? s.targetDuration,
+          warmup: s.warmup,
+          exercises: s.exercises,
+          segments: s.segments,
+          progress: s.slotProgress,
+          notes: s.notes,
+        })),
+      })),
+    }
+    setYamlText(yamlDump(yamlDoc, { lineWidth: 110 }))
+    setYamlError(null)
+    setShowYamlEditor(true)
+  }
+
+  function applyYamlChanges() {
+    const result = parseYamlProgram(yamlText)
+    if (result.errors.length > 0) {
+      setYamlError(result.errors[0])
+      return
+    }
+    setName(result.plan.name)
+    setDescription(result.plan.description ?? '')
+    setDurationType(result.plan.duration.type)
+    setDurationValue(result.plan.duration.value)
+    setDays(result.plan.days)
+    setYamlError(null)
+    setShowYamlEditor(false)
+    markDirty()
+  }
+
   return (
     <div className="px-4 pt-safe pb-8">
       {/* Header */}
@@ -741,6 +791,13 @@ export function PlanBuilderPage() {
         <h1 className="text-xl font-bold text-white flex-1">
           {isNew ? 'New Plan' : 'Edit Plan'}
         </h1>
+        <button
+          type="button"
+          onClick={openYamlEditor}
+          className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200"
+        >
+          Edit YAML
+        </button>
         <button onClick={handleSave} disabled={!name.trim()}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
             saved ? 'bg-emerald-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40'
@@ -748,6 +805,36 @@ export function PlanBuilderPage() {
           {saved ? <><Check size={14} /> Saved</> : 'Save'}
         </button>
       </div>
+
+      {showYamlEditor && (
+        <Modal
+          title="Advanced YAML Editor"
+          onClose={() => setShowYamlEditor(false)}
+          footer={
+            <div className="space-y-2 w-full">
+              <button
+                onClick={applyYamlChanges}
+                className="w-full py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-semibold"
+              >
+                Apply YAML to Plan
+              </button>
+              <p className="text-[11px] text-slate-400 text-center">
+                Warmups, set-level details, and progression rules are best edited here.
+              </p>
+            </div>
+          }
+        >
+          <div className="space-y-2">
+            <textarea
+              value={yamlText}
+              onChange={e => setYamlText(e.target.value)}
+              rows={18}
+              className="w-full font-mono text-xs bg-slate-900 border border-slate-700 rounded-xl p-3 text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
+            />
+            {yamlError && <p className="text-xs text-red-400">{yamlError}</p>}
+          </div>
+        </Modal>
+      )}
 
       <div className="space-y-5">
         {/* Plan meta */}
