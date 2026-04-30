@@ -785,7 +785,7 @@ function DayDetailModal({
         ) : (
           <div className={`space-y-2 ${displayDay.slots.length > 1 ? 'divide-y divide-slate-700/50' : ''}`}>
             {displayDay.slots.map((slot, i) => (
-              <WorkoutSlotDetails key={slot.id} slot={slot} className={i > 0 ? 'pt-2' : ''} />
+              <WorkoutSlotDetails key={slot.id} slot={slot} planId={plan.id} className={i > 0 ? 'pt-2' : ''} />
             ))}
           </div>
         )}

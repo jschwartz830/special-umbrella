@@ -2,6 +2,25 @@
 // These types represent the structured workout data that lives inside a
 // WorkoutSlot when a plan is imported from the YAML program format.
 
+// ── Progression type ─────────────────────────────────────────────────────────
+
+/**
+ * Labelled progression strategy for an exercise.
+ * Controls how load/reps advance over time; pairs with the `progress` rule field.
+ *
+ * single          – add a fixed load increment each session (linear)
+ * double          – increase reps to max rep target, then bump weight and reset reps
+ * dynamic_double  – auto-regulates load based on effort alongside rep range
+ * triple          – progress reps, then sets, then weight in sequence
+ * step_loading    – pre-set load blocks across a training cycle (block periodization)
+ */
+export type ProgressionType =
+  | 'single'
+  | 'double'
+  | 'dynamic_double'
+  | 'triple'
+  | 'step_loading'
+
 // ── Set & exercise specs (weightlifting) ─────────────────────────────────────
 
 /**
@@ -37,6 +56,7 @@ export interface ExerciseSpec {
   target?: string[]
   synergist?: string[]
   progress?: ProgressionRule
+  progressionType?: ProgressionType
 }
 
 // ── Run segments ─────────────────────────────────────────────────────────────
@@ -152,6 +172,7 @@ export interface YamlExerciseSpec {
   target?: string[]
   synergist?: string[]
   progress?: { if?: string; then: string; else?: string }
+  progressionType?: ProgressionType
 }
 
 export interface YamlDrillSpec {

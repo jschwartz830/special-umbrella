@@ -5,11 +5,12 @@ import { WorkoutSlotDetails } from './WorkoutSlotDetails'
 
 interface Props {
   resolved: ResolvedDay
+  planId?: string
   isToday?: boolean
   onClick?: () => void
 }
 
-export function WorkoutDayCard({ resolved, isToday, onClick }: Props) {
+export function WorkoutDayCard({ resolved, planId, isToday, onClick }: Props) {
   const { planDay, status, historyEntry } = resolved
   const meta = WORKOUT_META[planDay.slots[0].type]
 
@@ -52,7 +53,7 @@ export function WorkoutDayCard({ resolved, isToday, onClick }: Props) {
           <div className={`space-y-2 mt-1 ${planDay.slots.length > 1 ? 'divide-y divide-slate-700/50' : ''}`}>
             {planDay.slots.map((slot, i) => (
               <div key={slot.id} className={i > 0 ? 'pt-2' : ''}>
-                <WorkoutSlotDetails slot={slot} />
+                <WorkoutSlotDetails slot={slot} planId={planId} />
               </div>
             ))}
           </div>

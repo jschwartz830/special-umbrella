@@ -450,7 +450,7 @@ export function HistoryPage() {
                       ) : (
                         <div className={`space-y-2 ${planDay && planDay.slots.length > 1 ? 'divide-y divide-slate-700/50' : ''}`}>
                           {planDay?.slots.map((slot, i) => (
-                            <WorkoutSlotDetails key={slot.id} slot={slot} className={i > 0 ? 'pt-2' : ''} />
+                            <WorkoutSlotDetails key={slot.id} slot={slot} planId={entry.planId} className={i > 0 ? 'pt-2' : ''} />
                           ))}
                           {plan && (
                             <p className="text-xs text-slate-500">{plan.name}</p>

@@ -97,6 +97,7 @@ function parseExerciseSpec(raw: YamlExerciseSpec): ExerciseSpec {
     target: Array.isArray(raw.target) ? raw.target : undefined,
     synergist: Array.isArray(raw.synergist) ? raw.synergist : undefined,
     progress,
+    progressionType: raw.progressionType,
   }
 }
 

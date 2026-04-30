@@ -616,7 +616,7 @@ export function TodayPage() {
           </div>
         </div>
       ) : (
-        <WorkoutDayCard resolved={todayResolved} isToday />
+        <WorkoutDayCard resolved={todayResolved} planId={plan?.id} isToday />
       )}
 
       {/* Previous-session hint — visible only when pending, not in double-day mode */}
@@ -630,7 +630,7 @@ export function TodayPage() {
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <PlusCircle size={11} /> Also today
           </p>
-          <WorkoutDayCard resolved={upcoming[0]} />
+          <WorkoutDayCard resolved={upcoming[0]} planId={plan?.id} />
         </div>
       )}
 
@@ -764,7 +764,7 @@ export function TodayPage() {
                     </p>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <WorkoutDayCard resolved={rd} onClick={() => setLoggingUpcoming({ rd })} />
+                    <WorkoutDayCard resolved={rd} planId={plan?.id} onClick={() => setLoggingUpcoming({ rd })} />
                     {upcomingNote && (
                       <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
                         <TrendingUp size={10} />{upcomingNote}
