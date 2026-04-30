@@ -110,3 +110,116 @@ Revert the single TodayPage commit. No store, schema, or engine changes.
 - Week X of Y display on PlansPage (progress bar already shown there).
 - "N days remaining in this week" countdown.
 - Week-based streak counting.
+
+---
+
+# Feature Proposal — Previous-Session Inline Summary (TodayPage)
+
+Date: 2026-04-30
+Branch: `claude/dreamy-mccarthy-Ymdp2`
+Status: **Implemented this run**
+
+---
+
+## Feature selected
+
+**Compact "Last: …" hint below today's pending workout card.**
+
+When today's workout is pending, show a single line like
+`Last: 3×8 @ 135 lb` (weights) or `Last: 2.5 mi · 28 min` (run) directly
+below the `WorkoutDayCard` on TodayPage.
+
+---
+
+## Why selected
+
+The current TodayPage already calculates `previousSetsByExercise` and
+`previousWeightsOutcome` at render time and passes them only to `OutcomeModal`
+and `ActiveWorkoutTracker`. There is no surface where the user can see
+"what did I do last time?" without opening the outcome modal or starting a
+tracked session.
+
+This causes a concrete friction: a user who wants to know whether to add
+weight today must navigate away, open History, find the entry, and return.
+The data to answer this question is already in the same render cycle.
+
+Chosen because:
+- Zero new data-fetching (reuses `allOutcomes` + `planEntries` already held)
+- Purely additive — a single hint line, no new component
+- Removes the most common navigation round-trip for strength-plan users
+
+---
+
+## Expected user value
+
+- Immediate visibility of last session's weights / distance before
+  deciding to "Start Workout" or "Complete"
+- Supports the progressive-overload check without opening any modal
+- Most useful for repeating strength plans and structured run programs
+
+---
+
+## Implementation scope for this run
+
+1. Add `findPreviousSessionForPlanDay` pure function in TodayPage — searches
+   `planEntries` for the most recent `complete` with
+   `planDayIndex === primaryPlanDayIndex`, then looks up that date's outcome.
+2. Compute `lastSessionSummary: string | null` from the resolved outcome:
+   - Weights: first exercise with actual sets → "3×8 @ 135 lb" format
+   - Run: distance + duration → "2.5 mi · 28 min"
+   - Swim: distance + duration → "800 m · 30 min"
+3. Render a single `text-xs text-slate-500` line below WorkoutDayCard.
+   Visible only when: isPending, not doubleDay, lastSessionSummary != null.
+
+---
+
+## Assumptions made
+
+- Most recent `complete` matching `planDayIndex` is the right proxy for
+  "last time I did this specific workout". Correct for clean rotation plans;
+  may occasionally show wrong session after retroactive history edits.
+- One representative exercise (first with actual sets) is sufficient.
+  Showing all exercises would overflow the card on small screens.
+- Run summary prefers actual distance over distance derived from pace —
+  uses `runActual.actualDistanceMiles` if available.
+
+---
+
+## Open product / UX decisions
+
+1. **Per-exercise or first-exercise?** Showing only the first exercise keeps
+   the hint concise. Future pass could expand to a scrollable row.
+2. **Show when skipped/day_off?** Currently suppressed — showing it would
+   require "last time you completed X was …" preamble text.
+3. **Label wording**: settled on "Last:" as the shortest clear label.
+
+---
+
+## Architecture / schema impact
+
+None. No new store state. No new props on existing components. String computed
+locally in TodayPage.tsx from already-available data.
+
+---
+
+## Risks
+
+- Low — purely additive JSX. No store mutations.
+- If primaryPlanDayIndex is stale after retroactive edit, hint may show data
+  for the wrong planDay. Same caveat already applies to previousSetsByExercise.
+
+---
+
+## Rollback strategy
+
+Remove the three-line JSX block and the `findPreviousSessionForPlanDay`
+function. No data migration. No store changes to revert.
+
+---
+
+## What is intentionally not being built yet
+
+- Per-exercise progress arrows (↑/↓ vs. last time)
+- Multi-exercise scrollable row
+- "Best ever" vs. "last time" toggle
+- Run adaptation target inline (already surfaced via `todayAdaptationNote`)

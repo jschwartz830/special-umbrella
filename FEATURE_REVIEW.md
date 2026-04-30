@@ -168,3 +168,105 @@ Classification: **Keep (review UX placement)**
 The main question is display placement (inline vs. stat tile). Either approach
 is a small change. Recommend keeping as-is and evaluating on a real device
 before moving it.
+
+---
+
+# Feature Review — Previous-Session Inline Summary (TodayPage)
+
+Date: 2026-04-30
+Branch: `claude/dreamy-mccarthy-Ymdp2`
+Classification: **Keep — evaluate wording on device**
+
+---
+
+## What was actually built
+
+1. `findPreviousSessionForPlanDay(planId, planDayIndex, currentDate, entries, outcomes)`
+   — pure function in `TodayPage.tsx`. Filters `planEntries` for `complete`
+   entries matching the exact `planDayIndex`, sorts by descending date, then
+   returns the first outcome found.
+
+2. `buildLastSessionSummary(outcome)` — pure function in `TodayPage.tsx`.
+   Formats the outcome into a compact string:
+   - Weights: `"Last: 3×8 @ 135 lb Bench Press"` (first exercise with data)
+   - Run: `"Last: 3.1 mi · 29 min"`
+   - Swim: `"Last: 800 m · 20 min"`
+   - Other/no data: returns `null`
+
+3. **Render hint** in `src/pages/TodayPage.tsx`:
+   - One `<p className="text-xs text-slate-500 -mt-2 ml-1">` line.
+   - Visible only when `isPending` and `lastSessionSummary` is non-null.
+   - Suppressed in double-day mode to avoid layout clutter.
+   - Placed directly after the `WorkoutDayCard` section.
+
+---
+
+## What assumptions were encoded
+
+- Matching by `planDayIndex` is the right "same workout" signal for rotation
+  plans. Works well for clean rotation histories; less reliable after
+  retroactive edits that change planDayIndex values.
+- The first exercise with any actual data is representative. Users with
+  multi-exercise plans may want to see more, but one line keeps it readable.
+- `isPending` guard means the hint disappears once today is logged (correct —
+  once you've done the workout, the hint is no longer needed).
+- Run summary uses `actualDistanceMiles` over `targetDistance` to show real
+  performance, not planned target.
+
+---
+
+## What worked well
+
+- Zero new store state or props. Everything derived from already-rendered data.
+- `findPreviousSessionForPlanDay` is a clean, testable pure function.
+- The `-mt-2` spacing pulls the hint visually close to the card without
+  competing with the action buttons below.
+- TypeScript clean, no new type definitions needed.
+
+---
+
+## What feels risky or incomplete
+
+- **planDayIndex stability**: the planDayIndex that was logged on a past date
+  is not always the same as the "canonical" day for that position today
+  (overrides, jumps, retroactive edits can shift indices). This is an existing
+  concern for `previousSetsByExercise` too — not introduced here.
+- **Exercise name truncation**: long exercise names (e.g., "Romanian Deadlift")
+  will overflow on narrow screens without CSS truncation. The `<p>` has no
+  `truncate` class currently.
+- **Single exercise**: users with 4+ exercises logged per session may find
+  "Last: 3×8 @ 135 lb Bench Press" incomplete. Future iteration could show
+  "Last: 3 exercises" or a scrollable row.
+- No test added for the two pure helpers — they are logic-free enough that
+  unit tests would be testing string formatting rather than meaningful behavior.
+  The `findPreviousSessionForPlanDay` scan logic mirrors the existing
+  `findPreviousWeightsOutcome` pattern which is already tested indirectly.
+
+---
+
+## What I should evaluate tomorrow
+
+1. Open TodayPage with a few weeks of history. Does the "Last: 3×8 @ 135 lb
+   Bench Press" label feel useful or noisy in the context of the existing card?
+2. Does the spacing (`-mt-2`) feel right or is the hint too close to the card?
+3. Does "Last:" read naturally, or should it be "Last session:" or "Prev:"?
+4. Test on a narrow screen (320px) — does the exercise name need truncation?
+
+---
+
+## Recommended next steps
+
+- Add `truncate` class to the hint `<p>` element to prevent overflow on narrow
+  screens (safe, 1-line change).
+- If well-received, extend to show 2–3 exercises in a compact row rather than
+  one.
+- If too noisy, add a user preference in Settings to toggle the hint off.
+
+---
+
+## Keep / revise / prototype only / reject
+
+**Keep** — the feature is purely additive, the data was already computed, and
+the value for repeating strength plans is clear. The main open question is
+whether the single-exercise display is satisfying or frustrating for complex
+plans. Recommend keeping and iterating on the display format based on real use.

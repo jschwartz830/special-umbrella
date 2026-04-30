@@ -28,6 +28,7 @@ import type { Plan, ResolvedDay, ActionType, WorkoutType, ExtraWorkoutEntry, Pla
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 import { useProgramStore } from '../store/programStore'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
+import { extraToPlanDay } from '../lib/planDayUtils'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -38,15 +39,6 @@ const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
   { type: 'yoga', label: 'Yoga' },
   { type: 'other', label: 'Other' },
 ]
-
-/** Build a synthetic PlanDay from an ExtraWorkoutEntry so OutcomeModal can render it */
-function extraToPlanDay(extra: ExtraWorkoutEntry): PlanDay {
-  return {
-    id: extra.id,
-    label: extra.workoutName,
-    slots: [{ id: extra.id, type: extra.workoutType, name: extra.workoutName }],
-  }
-}
 
 export function CalendarPage() {
   const now = new Date()

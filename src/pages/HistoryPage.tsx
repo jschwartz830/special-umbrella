@@ -25,6 +25,7 @@ import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { ActionType, HistoryEntry, ExtraWorkoutEntry, WorkoutType, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import { COMPLETION_STATE_LABELS } from '../modules/workout-outcomes/types'
+import { extraToPlanDay } from '../lib/planDayUtils'
 
 const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
   { type: 'weights', label: 'Weights' },
@@ -41,14 +42,6 @@ const TYPE_MIX_LABEL: Partial<Record<WorkoutType, string>> = {
   swim: 'swims',
   yoga: 'yoga',
   other: 'other',
-}
-
-function extraToPlanDay(extra: ExtraWorkoutEntry): PlanDay {
-  return {
-    id: extra.id,
-    label: extra.workoutName,
-    slots: [{ id: extra.id, type: extra.workoutType, name: extra.workoutName }],
-  }
 }
 
 type FlatItem =
@@ -271,7 +264,9 @@ export function HistoryPage() {
 
     const slot = outcomeTarget.planDay.slots[0] ?? { id: '', type: 'rest' as WorkoutType, name: '' }
     logOutcomeWithProgression(finalOutcome, slot)
-    const entry = entries.find(
+    // Read fresh store state — `entries` closure is stale if updateEntryDate ran above
+    const freshEntries = useHistoryStore.getState().entries
+    const entry = freshEntries.find(
       e => e.planId === outcomeTarget.planId && e.calendarDate === completedDate,
     )
     if (entry && !outcomeTarget.instanceId.includes('_extra_')) {

@@ -894,3 +894,54 @@ All 141 tests pass. Zero failures.
 3. **CalendarPage retroactive logging flow** — integration behavior of `removeRetroJumpForDate` + `addOverride` + `addEntry`
 4. **PlanBuilderPage unsaved-changes guard** — UI behavior testing
 5. **TodayPage action handlers** — completion flow, skip flow, day-off flow
+
+---
+
+## 2026-04-30 (eighteenth pass) — branch `claude/dreamy-mccarthy-Ymdp2`
+
+**Result: 315 passing, 0 failing** (unchanged — suite already comprehensive)
+
+### Tests reviewed
+
+All 11 test files reviewed. Prior passes (especially the seventeenth) already
+added `computeWorkoutTypeBreakdown` tests (effort averaging, date ranges, extras)
+and `getResolvedDaysRange` direct tests. No gaps remain at the unit level for
+these functions.
+
+### Tests added / updated
+
+None. The test suite reached a stable comprehensive state in pass 17. No
+new test files were introduced this pass.
+
+### Impact of changes on test coverage
+
+| Change | Test impact |
+|--------|-------------|
+| HistoryPage stale-entries fix | No unit-testable path (React closure behavior; store actions already tested) |
+| `extraToPlanDay` extraction | Refactor only — no logic change, no new tests needed |
+| `findPreviousSessionForPlanDay` | New pure function — untested (simple scan over already-tested store) |
+| `buildLastSessionSummary` | New pure function — untested (string formatting, low test value) |
+
+### Important logic still untested
+
+#### Medium priority (unchanged from pass 17)
+
+1. **planStore** — `setActivePlan` (deactivates previously active plan),
+   `duplicatePlan`
+2. **Double-day rotation behavior** — advance override + complete entry on
+   the same day, verifying tomorrow starts 2 positions ahead
+
+#### New from this pass (lower priority)
+
+3. **`findPreviousSessionForPlanDay`** — pure function scan over entries.
+   Handles: no matching entries, multiple matching entries sorted by date,
+   entries without outcomes. Easy to add if the feature is kept.
+4. **`buildLastSessionSummary`** — string formatting for weights / run / swim.
+   Low test value but edge cases (missing actualReps but actualLoad present,
+   swim without distance) could be tested for correctness.
+
+#### Lower priority (unchanged from prior passes)
+
+5. **CalendarPage retroactive logging flow**
+6. **PlanBuilderPage unsaved-changes guard**
+7. **TodayPage action handlers**
