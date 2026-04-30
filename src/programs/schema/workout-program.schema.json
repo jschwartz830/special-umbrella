@@ -210,6 +210,16 @@
           "items": {
             "type": "string"
           }
+        },
+        "progressionType": {
+          "description": "Labelled progression strategy. single=linear load increment; double=reps-to-max then bump weight; dynamic_double=effort-adjusted double; triple=reps→sets→weight; step_loading=block periodization.",
+          "enum": [
+            "single",
+            "double",
+            "dynamic_double",
+            "triple",
+            "step_loading"
+          ]
         }
       }
     },

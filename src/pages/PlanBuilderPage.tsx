@@ -16,7 +16,7 @@ import { WORKOUT_META, WORKOUT_TYPES } from '../lib/constants'
 import { Modal } from '../components/shared/Modal'
 import { nanoid } from '../engine/rotationEngine'
 import type { Plan, PlanDay, WorkoutSlot } from '../types'
-import type { ExerciseSpec } from '../types/program'
+import type { ExerciseSpec, ProgressionType } from '../types/program'
 import { EXERCISE_LIBRARY, findExerciseByName } from '../lib/exerciseLibrary'
 import type {
   WorkoutDifficulty,
@@ -36,6 +36,52 @@ import {
 import { format } from 'date-fns'
 import { dump as yamlDump } from 'js-yaml'
 import { parseYamlProgram } from '../engine/programParser'
+
+// ── Progression type definitions ─────────────────────────────────────────────
+
+interface ProgressionTypeMeta {
+  type: ProgressionType
+  label: string
+  description: string
+  template: (varName: string) => { if?: string; then: string; else?: string }
+}
+
+const PROGRESSION_TYPE_META: ProgressionTypeMeta[] = [
+  {
+    type: 'single',
+    label: 'Single Progression (Linear)',
+    description: 'Add a fixed weight increment each session when all target reps are hit.',
+    template: v => ({ if: 'all_reps', then: `${v} += 2.5`, else: `${v} = round5(${v} * 0.9)` }),
+  },
+  {
+    type: 'double',
+    label: 'Double Progression',
+    description: 'Increase reps session-to-session; once max reps are hit, bump weight and reset.',
+    template: v => ({ if: 'all_reps', then: `${v} += 5` }),
+  },
+  {
+    type: 'dynamic_double',
+    label: 'Dynamic Double Progression',
+    description: 'Auto-regulates load based on effort; progress weight only when reps and effort both meet threshold.',
+    template: v => ({ if: 'all_reps and effort <= 3', then: `${v} += 2.5`, else: `${v} = round5(${v} * 0.95)` }),
+  },
+  {
+    type: 'triple',
+    label: 'Triple Progression',
+    description: 'Progress through reps, then sets, then weight across consecutive sessions.',
+    template: v => ({ if: 'all_reps and effort <= 2', then: `${v} += 2.5`, else: `${v} = round5(${v} * 0.9)` }),
+  },
+  {
+    type: 'step_loading',
+    label: 'Step Loading',
+    description: 'Pre-set loading blocks per training cycle with automatic weight jumps each block.',
+    template: v => ({ if: 'all_reps', then: `${v} += 5`, else: `${v} = round5(${v} * 0.85)` }),
+  },
+]
+
+function toVarName(exerciseName: string): string {
+  return exerciseName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'weight'
+}
 
 // ── Slot editor ──────────────────────────────────────────────────────────────
 
@@ -562,8 +608,55 @@ function SlotEditor({
                     </label>
                   </div>
 
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wide">Progression logic</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Progression</p>
+                    </div>
+
+                    {/* Progression type selector */}
+                    <div className="space-y-1">
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1 space-y-1">
+                          <label className="text-[10px] text-slate-500">Type</label>
+                          <select
+                            value={ex.progressionType ?? ''}
+                            onChange={e => {
+                              const val = (e.target.value || undefined) as ProgressionType | undefined
+                              updateExercise(i, { progressionType: val })
+                            }}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                          >
+                            <option value="">— none —</option>
+                            {PROGRESSION_TYPE_META.map(pt => (
+                              <option key={pt.type} value={pt.type}>{pt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {ex.progressionType && (
+                          <button
+                            type="button"
+                            title="Fill if/then/else fields with a template for this progression type"
+                            onClick={() => {
+                              const meta = PROGRESSION_TYPE_META.find(pt => pt.type === ex.progressionType)
+                              if (!meta) return
+                              const varName = toVarName(ex.exercise)
+                              const tpl = meta.template(varName)
+                              updateExercise(i, { progress: { if: tpl.if, then: tpl.then, else: tpl.else } })
+                            }}
+                            className="px-2 py-1 rounded-lg bg-sky-600/30 hover:bg-sky-600/50 border border-sky-600/50 text-sky-400 text-[10px] font-medium whitespace-nowrap transition-colors"
+                          >
+                            Apply template
+                          </button>
+                        )}
+                      </div>
+                      {ex.progressionType && (
+                        <p className="text-[10px] text-slate-500 italic">
+                          {PROGRESSION_TYPE_META.find(pt => pt.type === ex.progressionType)?.description}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* if / then / else rule fields */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <input
                         type="text"

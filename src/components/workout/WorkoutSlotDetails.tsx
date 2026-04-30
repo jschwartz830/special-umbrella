@@ -5,9 +5,12 @@ import type { WorkoutSlot } from '../../types'
 import { isRunType } from '../../modules/workout-metadata/types'
 import { resolveWorkoutDisplayTarget } from '../../modules/run-adaptation/selectors'
 import { useOutcomeStore } from '../../store/outcomeStore'
+import { useProgramStore } from '../../store/programStore'
+import { resolveLoad } from '../../lib/expressionEval'
 
 interface Props {
   slot: WorkoutSlot
+  planId?: string
   className?: string
 }
 
@@ -21,14 +24,46 @@ function formatPaceRange(minSpm: number, maxSpm?: number | null): string {
   return `${fmt(minSpm)} /mi`
 }
 
-function formatExercisePrescription(slot: WorkoutSlot): string[] {
+function resolveDisplayLoad(
+  loadExpr: string | undefined,
+  vars: Record<string, number>,
+): string | null {
+  if (!loadExpr) return null
+  const trimmed = loadExpr.trim()
+  const lower = trimmed.toLowerCase()
+
+  if (lower === 'bodyweight' || lower === 'bw') return 'BW'
+
+  // Plain numeric literal with optional lb/kg unit — no vars needed
+  const plainNum = trimmed.match(/^(\d+(?:\.\d+)?)\s*(lb|kg)?$/i)
+  if (plainNum) {
+    const unit = (plainNum[2] ?? 'lb').toLowerCase()
+    return `${plainNum[1]}${unit}`
+  }
+
+  // Expression with variable references — resolve using current vars
+  const resolved = resolveLoad(loadExpr, { vars })
+  if (resolved !== null && resolved > 0) {
+    const display = resolved % 1 === 0 ? String(resolved) : resolved.toFixed(1)
+    return `${display}lb`
+  }
+
+  // Can't resolve (vars not available or result is 0) — hide rather than show variable name
+  return null
+}
+
+function formatExercisePrescription(
+  slot: WorkoutSlot,
+  vars: Record<string, number>,
+): string[] {
   const lines: string[] = []
   for (const ex of slot.exercises ?? []) {
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
       const setText = ex.sets
         .map((set, idx) => {
           const repOrDur = set.reps ?? set.duration ?? ex.reps ?? ex.duration
-          const load = set.load ?? ex.load
+          const rawLoad = set.load ?? ex.load
+          const load = resolveDisplayLoad(rawLoad, vars)
           const rest = set.rest ?? ex.rest
           const parts = [repOrDur, load && `@ ${load}`, rest && `rest ${rest}`].filter(Boolean)
           return `S${idx + 1} ${parts.join(' • ')}`
@@ -40,10 +75,11 @@ function formatExercisePrescription(slot: WorkoutSlot): string[] {
 
     const setCount = typeof ex.sets === 'number' ? ex.sets : null
     const repOrDur = ex.reps ?? ex.duration
+    const load = resolveDisplayLoad(ex.load, vars)
     const base = [
       setCount != null ? `${setCount} sets` : null,
       repOrDur != null ? `${repOrDur}` : null,
-      ex.load ? `@ ${ex.load}` : null,
+      load ? `@ ${load}` : null,
       ex.rest ? `rest ${ex.rest}` : null,
     ].filter(Boolean).join(' • ')
     lines.push(base ? `${ex.exercise}: ${base}` : ex.exercise)
@@ -51,8 +87,9 @@ function formatExercisePrescription(slot: WorkoutSlot): string[] {
   return lines
 }
 
-export function WorkoutSlotDetails({ slot, className }: Props) {
+export function WorkoutSlotDetails({ slot, planId, className }: Props) {
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
+  const vars = useProgramStore(s => planId ? (s.vars[planId] ?? {}) : {})
 
   const isRun = isRunType(slot.type)
   const progressionState = isRun && slot.runConfig?.progressionGroupId
@@ -60,7 +97,7 @@ export function WorkoutSlotDetails({ slot, className }: Props) {
     : null
 
   const resolved = resolveWorkoutDisplayTarget(slot, progressionState)
-  const exerciseLines = formatExercisePrescription(slot)
+  const exerciseLines = formatExercisePrescription(slot, vars)
 
   return (
     <div className={className}>
