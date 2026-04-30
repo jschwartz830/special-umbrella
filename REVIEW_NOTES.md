@@ -1556,3 +1556,148 @@ None. All improvements used existing dependencies only.
 2. Plan expiry indicators — verify the expiry calculation matches your expectation for both "weeks" and "rotations" duration types
 
 **What I should review first tomorrow**: Start with the Skip bug fix test by clicking Skip on TodayPage and verifying the calendar shows it as "Skipped" and History shows the entry. Then check the rotation engine test file to confirm the behavioral assertions match what you intended.
+
+---
+
+## 2026-04-30 (eighteenth pass) — branch `claude/dreamy-mccarthy-Ymdp2`
+
+### Executive summary
+
+1. **What changed**: One logic bug fix (stale closure in HistoryPage), one
+   refactor (extracted shared `extraToPlanDay`), and one medium feature
+   (previous-session inline summary on TodayPage). Test count unchanged at
+   315 (suite was already comprehensive from prior passes).
+
+2. **What is highest confidence**: The HistoryPage stale-entries fix is a
+   narrow, well-reasoned correction to a real bug. The `extraToPlanDay`
+   extraction is a pure refactor — identical logic, fewer files. Both are safe
+   to keep without careful review.
+
+3. **What is risky**: The previous-session summary feature uses `planDayIndex`
+   as the "same workout" key. This is reliable for clean rotation histories
+   but can show the wrong session after retroactive edits. Evaluate on a real
+   device with several weeks of history.
+
+4. **What I should review first**: Open HistoryPage, find a past entry,
+   change both the date and the completion state (e.g., to "Partial") and save.
+   Verify the list label updates to "Partial" instead of staying as "Skip" or
+   "Complete".
+
+---
+
+### Bugs found and fixed
+
+#### 1. HistoryPage stale `entries` closure (LOGIC BUG — fixed)
+
+**File**: `src/pages/HistoryPage.tsx` — `handleOutcomeConfirm`
+
+When editing a workout outcome that changes both `completedAt` date AND
+completion state, the `updateAction` call at the end of the handler used the
+React closure-captured `entries` array. After `updateEntryDate` moved the entry
+to the new date, the closure was stale, so `entries.find(...)` at the new date
+returned `undefined` and `updateAction` was silently skipped.
+
+**Fix**: Use `useHistoryStore.getState().entries` for the post-move lookup.
+
+**Confidence**: High. Well-understood React closure trap. Pattern matches
+TodayPage's existing usage.
+
+---
+
+### Code quality improvements
+
+#### 2. `extraToPlanDay` shared utility (REFACTOR — completed)
+
+**Files**: `src/lib/planDayUtils.ts` (new), TodayPage, CalendarPage, HistoryPage
+
+Extracted the identical 6-line `extraToPlanDay` helper from three files into
+`src/lib/planDayUtils.ts`. No logic changes, no new tests needed.
+
+**Confidence**: High. Pure refactor. TypeScript confirmed clean.
+
+---
+
+### Feature implemented
+
+#### 3. Previous-session inline summary on TodayPage
+
+**File**: `src/pages/TodayPage.tsx`
+
+Added a compact `"Last: 3×8 @ 135 lb Bench Press"` or `"Last: 2.5 mi · 28 min"`
+hint line below today's pending `WorkoutDayCard`. Scoped to `planDayIndex`
+so rotation plans show the relevant session.
+
+**Two new pure functions** added to TodayPage.tsx:
+- `findPreviousSessionForPlanDay` — history scan, no side effects
+- `buildLastSessionSummary` — string formatter
+
+**Confidence**: Medium. Logic is simple and isolated. Main open questions are
+UX: is one exercise enough? Does "Last: …" read naturally?
+
+---
+
+### Definitely keep
+
+- HistoryPage stale-entries fix (bug fix, zero risk)
+- `extraToPlanDay` extraction (pure refactor, improves maintainability)
+
+### Probably keep but tweak
+
+- Previous-session summary — keep the feature, but consider:
+  - Adding `truncate` class to prevent overflow on narrow screens
+  - Evaluating whether the exercise name is too long ("Romanian Deadlift")
+  - Testing "Last:" vs "Prev:" wording
+
+### Do not keep
+
+Nothing to remove.
+
+### Recommendations only (not implemented)
+
+1. **Subtitle length**: The plan subtitle can grow long on small screens
+   ("Day 6 of 6 in rotation · Week 12 of 12 · last week!"). Consider
+   splitting into two `<p>` elements or a compact progress pill.
+
+2. **`buildWeightsRecommendation` progression mode** (`progression.ts`):
+   Uses `exercises[0].progressionMode` to determine mode for the whole
+   workout. If a session has mixed-mode exercises (unlikely but possible),
+   the recommendation may be wrong. Low priority — YAML programs control
+   the schema and typically use uniform modes.
+
+3. **Upcoming log "Already logged" state in TodayPage** is dead code:
+   `getUpcomingDays` never sets `historyEntry` on returned items, so
+   `loggingUpcoming.rd.historyEntry` is always `undefined` in TodayPage.
+   The "Already logged" branch in the upcoming modal is unreachable. Safe
+   to remove or leave as defensive code.
+
+---
+
+### Open questions for me
+
+1. After the HistoryPage fix: does the history list label now update correctly
+   when you change both date AND completion state in one edit?
+
+2. For the previous-session hint: is matching by `planDayIndex` the right
+   "same workout" signal, or would you prefer matching by exercise names
+   (more resilient to rotation pointer changes)?
+
+3. Should the previous-session hint show for skipped/day_off entries too
+   (showing the last completed session regardless of how recent days were
+   logged)?
+
+---
+
+### Known issues or incomplete work
+
+- **`truncate` on session hint**: The `"Last: …"` hint has no CSS overflow
+  protection. A long exercise name (≥ 30 chars) will overflow on a 320px
+  screen. One-line fix: add `truncate` to the `<p>`.
+- **No test for previous-session helpers**: `findPreviousSessionForPlanDay`
+  and `buildLastSessionSummary` are pure functions but untested. Low priority
+  given their simplicity, but future iterations should add coverage.
+
+---
+
+### Dependencies added
+
+None.

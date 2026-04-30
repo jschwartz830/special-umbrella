@@ -1498,3 +1498,97 @@ Changes are listed in commit order (oldest first).
 **Risk**: Low. The CalendarPage already handles `resolvedDay = undefined` (non-interactive neutral cell). The fix is additive — it only restricts the range passed to `getResolvedDaysRange`, not the range of cells rendered.
 
 **Rollback**: `git revert f1971d2`
+
+
+---
+
+## 2026-04-30 (eighteenth pass) — branch `claude/dreamy-mccarthy-Ymdp2`
+
+Baseline on entry: **315 passing, 0 failing**.
+Exit state: **315 passing, 0 failing** (no new tests — suite already comprehensive).
+
+---
+
+### 1. Fix: HistoryPage stale `entries` closure in `handleOutcomeConfirm`
+
+**Summary**: When editing a workout outcome in HistoryPage and simultaneously
+changing the `completedAt` date AND the completion state (e.g., `skip` →
+`partially_completed`), the `updateAction` call at the end of the handler
+silently failed. The handler captured `entries` from the React render closure.
+After `updateEntryDate(...)` moved the entry to the new date, the closure-stale
+`entries` array still had the entry at the *old* date, so
+`entries.find(e => e.calendarDate === completedDate)` returned `undefined` and
+`updateAction` was never called.
+
+**Impact**: History entry action label (shown in the list as "Completed" /
+"Skip" / "Partial") would not update when both date and completion state were
+changed in one save. The outcome itself saved correctly; only the backing
+HistoryEntry action was stale.
+
+**Fix**: Replace the closure-read `entries.find(...)` with
+`useHistoryStore.getState().entries.find(...)` to read fresh store state,
+consistent with the TodayPage pattern used in `handleOutcomeConfirm` there.
+
+**Files changed**: `src/pages/HistoryPage.tsx`
+
+**Risk**: None. `useHistoryStore.getState()` returns the current Zustand
+snapshot synchronously; the semantics are identical when the entry has not moved,
+and correct when it has.
+
+**Rollback**: Revert the one-line change in `handleOutcomeConfirm`.
+
+---
+
+### 2. Refactor: extract `extraToPlanDay` to shared utility
+
+**Summary**: An identical 6-line helper (`extraToPlanDay`) was duplicated in
+TodayPage, CalendarPage, and HistoryPage. Extracted to
+`src/lib/planDayUtils.ts` and imported in all three files. Also removed an
+unused `PlanDay` import in TodayPage (which had been used only by the now-
+removed local function).
+
+**Why it matters**: Any future change to how ExtraWorkoutEntry is adapted to
+PlanDay (e.g., adding `difficulty`, `notes`, or `durationMin`) would have
+required updating three identical copies. The shared module makes the change
+a single-file edit.
+
+**Files changed**:
+- `src/lib/planDayUtils.ts` (new)
+- `src/pages/TodayPage.tsx` (removed local def, added import)
+- `src/pages/CalendarPage.tsx` (removed local def, added import)
+- `src/pages/HistoryPage.tsx` (removed local def, added import)
+
+**Risk**: None. Pure refactor — same logic, same output, same tests passing.
+
+**Rollback**: Delete `planDayUtils.ts` and restore the local function in each
+page. No data or store changes.
+
+---
+
+### 3. Feature: previous-session inline summary on TodayPage
+
+**Summary**: Added a compact `"Last: 3×8 @ 135 lb Bench Press"` hint line
+below today's `WorkoutDayCard` when the workout is pending. Scoped to the same
+`planDayIndex` as today's workout so repeating rotation plans show the relevant
+session rather than any recent weights session.
+
+**Why it matters**: The most common friction point for strength-plan users is
+"what weight did I use last time?", which previously required opening the
+outcome modal or navigating to History. The answer was already computed in the
+same render cycle — surfacing it required no new data fetching.
+
+**What was added**:
+- `findPreviousSessionForPlanDay` — pure function, scans `planEntries` for the
+  most recent `complete` entry matching `planDayIndex`, returns its outcome.
+- `buildLastSessionSummary` — pure function, formats the outcome as a compact
+  string (weights / run / swim).
+- One `<p>` hint line rendered below `WorkoutDayCard` when `isPending` and not
+  in double-day mode.
+
+**Files changed**: `src/pages/TodayPage.tsx`
+
+**Risk**: Low. Purely additive. The hint line is visible only when pending and
+a prior session exists. No store mutations. TypeScript clean.
+
+**Rollback**: Remove the `<p>` block and the two helper functions from
+TodayPage.tsx. No data to clean up.
