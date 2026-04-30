@@ -56,14 +56,14 @@ const PROGRESSION_TYPE_META: ProgressionTypeMeta[] = [
   {
     type: 'double',
     label: 'Double Progression',
-    description: 'Increase reps session-to-session; once max reps are hit, bump weight and reset.',
-    template: v => ({ if: 'all_reps', then: `${v} += 5` }),
+    description: 'Work within a rep range at fixed weight. Climb reps each session; once all sets hit the top of the range, add weight and reset reps to the bottom. Needs two vars: e.g. bench (weight) + bench_reps (current target).',
+    template: v => ({ if: `${v}_reps >= 12`, then: `${v} += 5, ${v}_reps = 8`, else: `${v}_reps += 1` }),
   },
   {
     type: 'dynamic_double',
     label: 'Dynamic Double Progression',
-    description: 'Auto-regulates load based on effort; progress weight only when reps and effort both meet threshold.',
-    template: v => ({ if: 'all_reps and effort <= 3', then: `${v} += 2.5`, else: `${v} = round5(${v} * 0.95)` }),
+    description: 'Per-set auto-regulation: as soon as you hit all prescribed reps on a set, that set\'s weight goes up next session — no waiting for a rep-range ceiling.',
+    template: v => ({ if: 'all_reps', then: `${v} += 2.5` }),
   },
   {
     type: 'triple',
