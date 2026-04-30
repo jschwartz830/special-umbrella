@@ -457,6 +457,9 @@ export function ActiveWorkoutTracker({
             ...s,
             completed: completing,
             setElapsedSeconds: completing ? s.setElapsedSeconds : 0,
+            actualReps: completing
+              ? resolveActualReps(s.actualReps, s.targetReps)
+              : s.actualReps,
           }
         )),
       }
