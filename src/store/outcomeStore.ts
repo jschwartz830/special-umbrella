@@ -9,6 +9,33 @@ import {
 } from '../modules/run-adaptation/engine'
 import type { WorkoutSlot } from '../types'
 import { useProgramStore } from './programStore'
+import { usePlanStore } from './planStore'
+import { useHistoryStore } from './historyStore'
+import { useExerciseHistoryStore } from './exerciseHistoryStore'
+
+/** Resolve plan/workout name context and sync a weights outcome to exerciseHistoryStore. */
+function syncExerciseHistory(outcome: WorkoutOutcome): void {
+  if (!outcome.weightsActual?.exercises?.length) return
+  const parts = outcome.workoutInstanceId.split('_')
+  const planId = parts[0]
+  const calendarDate = parts[1]
+  if (!planId || !calendarDate) return
+
+  const plan = usePlanStore.getState().plans[planId]
+  const planName = plan?.name ?? null
+
+  let workoutName: string | null = null
+  if (plan) {
+    const histEntry = useHistoryStore.getState().entries.find(
+      e => e.planId === planId && e.calendarDate === calendarDate,
+    )
+    if (histEntry?.planDayIndex !== undefined) {
+      workoutName = plan.days[histEntry.planDayIndex]?.label ?? null
+    }
+  }
+
+  useExerciseHistoryStore.getState().upsertFromOutcome(outcome, { planName, workoutName })
+}
 
 interface OutcomeState {
   /** Keyed by workoutInstanceId = `${planId}_${calendarDate}` */
@@ -58,6 +85,7 @@ export const useOutcomeStore = create<OutcomeState>()(
         set(s => ({
           outcomes: { ...s.outcomes, [outcome.workoutInstanceId]: outcome },
         }))
+        syncExerciseHistory(outcome)
       },
 
       getOutcome(workoutInstanceId) {
@@ -150,6 +178,7 @@ export const useOutcomeStore = create<OutcomeState>()(
           const { [workoutInstanceId]: _removed, ...rest } = s.outcomes
           return { outcomes: rest }
         })
+        useExerciseHistoryStore.getState().removeByWorkoutInstance(workoutInstanceId)
       },
 
       clearPlanOutcomes(planId) {
@@ -159,6 +188,7 @@ export const useOutcomeStore = create<OutcomeState>()(
             Object.entries(s.outcomes).filter(([k]) => !k.startsWith(prefix)),
           ),
         }))
+        useExerciseHistoryStore.getState().clearByPlanId(planId)
       },
 
       importOutcomes(incoming) {
@@ -168,6 +198,8 @@ export const useOutcomeStore = create<OutcomeState>()(
           for (const o of incoming) next[o.workoutInstanceId] = o
           return { outcomes: next }
         })
+        const exStore = useExerciseHistoryStore.getState()
+        for (const o of incoming) exStore.upsertFromOutcome(o)
       },
 
       moveOutcome(oldInstanceId, newInstanceId) {
@@ -182,6 +214,7 @@ export const useOutcomeStore = create<OutcomeState>()(
             },
           }
         })
+        useExerciseHistoryStore.getState().moveByWorkoutInstance(oldInstanceId, newInstanceId)
       },
     }),
     { name: 'wpt_outcomes' },
