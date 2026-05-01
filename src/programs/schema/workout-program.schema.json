@@ -212,7 +212,7 @@
           }
         },
         "progressionType": {
-          "description": "Labelled progression strategy. single=linear load increment; double=reps-to-max then bump weight; dynamic_double=effort-adjusted double; triple=reps→sets→weight; step_loading=block periodization.",
+          "description": "Labelled progression strategy. single=linear load increment; double=reps-to-max then bump weight; dynamic_double=per-set auto-regulation; triple=reps→sets→weight; step_loading=block periodization.",
           "enum": [
             "single",
             "double",
@@ -220,6 +220,27 @@
             "triple",
             "step_loading"
           ]
+        },
+        "minReps": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Lower bound of the rep range (double progression reset target)."
+        },
+        "maxReps": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Upper bound of the rep range; once all sets hit this, weight increases."
+        },
+        "weightIncrement": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Lbs to add per progression step (e.g. 2.5 or 5)."
+        },
+        "deloadFactor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Multiplier applied to weight on a significant miss (e.g. 0.9 = 10% drop)."
         }
       }
     },

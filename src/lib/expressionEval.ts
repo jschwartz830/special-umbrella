@@ -250,6 +250,14 @@ export interface EvalContext {
   effort?: number | null
   all_reps?: boolean
   session_complete?: boolean
+  /** Per-exercise rep-miss metrics — injected when evaluating per-exercise progression rules. */
+  sets_hit?: number
+  sets_failed?: number
+  total_sets?: number
+  /** Fraction of sets that missed their target reps (0.0–1.0). Use: `failed_ratio >= 0.25` */
+  failed_ratio?: number
+  /** 1 if the first set did not reach its target reps, 0 otherwise. */
+  first_set_failed?: number
 }
 
 function buildVars(ctx: EvalContext): Record<string, number> {
@@ -258,6 +266,11 @@ function buildVars(ctx: EvalContext): Record<string, number> {
     effort: ctx.effort ?? 0,
     all_reps: ctx.all_reps ? 1 : 0,
     session_complete: ctx.session_complete ? 1 : 0,
+    sets_hit: ctx.sets_hit ?? 0,
+    sets_failed: ctx.sets_failed ?? 0,
+    total_sets: ctx.total_sets ?? 0,
+    failed_ratio: ctx.failed_ratio ?? 0,
+    first_set_failed: ctx.first_set_failed ?? 0,
   }
 }
 

@@ -42,6 +42,12 @@ export interface SetSpec {
  * One exercise within a weights slot.
  * When `sets` is a number, `reps` and `load` act as defaults for all sets.
  * When `sets` is an array of SetSpec, each set is fully specified.
+ *
+ * Progression config fields (used alongside `progressionType` and `progress`):
+ *   minReps        – lower bound of the rep range (e.g. 8)
+ *   maxReps        – upper bound of the rep range (e.g. 12); used by double progression
+ *   weightIncrement – lbs to add when progressing (e.g. 2.5 or 5)
+ *   deloadFactor   – multiplier applied on a significant miss (e.g. 0.9 = 10% drop)
  */
 export interface ExerciseSpec {
   exercise: string
@@ -57,6 +63,10 @@ export interface ExerciseSpec {
   synergist?: string[]
   progress?: ProgressionRule
   progressionType?: ProgressionType
+  minReps?: number
+  maxReps?: number
+  weightIncrement?: number
+  deloadFactor?: number
 }
 
 // ── Run segments ─────────────────────────────────────────────────────────────
@@ -173,6 +183,10 @@ export interface YamlExerciseSpec {
   synergist?: string[]
   progress?: { if?: string; then: string; else?: string }
   progressionType?: ProgressionType
+  minReps?: number
+  maxReps?: number
+  weightIncrement?: number
+  deloadFactor?: number
 }
 
 export interface YamlDrillSpec {

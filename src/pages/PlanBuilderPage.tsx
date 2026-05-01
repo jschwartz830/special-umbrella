@@ -39,45 +39,93 @@ import { parseYamlProgram } from '../engine/programParser'
 
 // ── Progression type definitions ─────────────────────────────────────────────
 
+interface ProgressionConfig {
+  varName: string
+  minReps: number   // lower bound of rep range
+  maxReps: number   // upper bound of rep range
+  increment: number // lbs to add on progress
+  deload: number    // deload multiplier, e.g. 0.9
+}
+
 interface ProgressionTypeMeta {
   type: ProgressionType
   label: string
   description: string
-  template: (varName: string) => { if?: string; then: string; else?: string }
+  /** Fields shown in the config section for this type. */
+  configFields: ('minReps' | 'maxReps' | 'increment' | 'deload')[]
+  template: (cfg: ProgressionConfig) => { if?: string; then: string; else?: string }
 }
 
 const PROGRESSION_TYPE_META: ProgressionTypeMeta[] = [
   {
     type: 'single',
     label: 'Single Progression (Linear)',
-    description: 'Add a fixed weight increment each session when all target reps are hit.',
-    template: v => ({ if: 'all_reps', then: `${v} += 2.5`, else: `${v} = round5(${v} * 0.9)` }),
+    description: 'Add a fixed weight increment each session when all reps are hit; deload by factor on any miss.',
+    configFields: ['increment', 'deload'],
+    template: ({ varName: v, increment, deload }) => ({
+      if: 'all_reps',
+      then: `${v} += ${increment}`,
+      else: `${v} = round5(${v} * ${deload})`,
+    }),
   },
   {
     type: 'double',
     label: 'Double Progression',
-    description: 'Work within a rep range at fixed weight. Climb reps each session; once all sets hit the top of the range, add weight and reset reps to the bottom. Needs two vars: e.g. bench (weight) + bench_reps (current target).',
-    template: v => ({ if: `${v}_reps >= 12`, then: `${v} += 5, ${v}_reps = 8`, else: `${v}_reps += 1` }),
+    description: 'Fixed weight until you hit all sets at the top of the rep range, then add weight and reset reps to the bottom. Requires a second var for current rep target (e.g. bench_reps).',
+    configFields: ['minReps', 'maxReps', 'increment'],
+    template: ({ varName: v, minReps, maxReps, increment }) => ({
+      if: `${v}_reps >= ${maxReps}`,
+      then: `${v} += ${increment}, ${v}_reps = ${minReps}`,
+      else: `${v}_reps += 1`,
+    }),
   },
   {
     type: 'dynamic_double',
     label: 'Dynamic Double Progression',
-    description: 'Per-set auto-regulation: as soon as you hit all prescribed reps on a set, that set\'s weight goes up next session — no waiting for a rep-range ceiling.',
-    template: v => ({ if: 'all_reps', then: `${v} += 2.5` }),
+    description: 'Per-set auto-regulation: weight goes up immediately when you hit all prescribed reps. Deloads only on significant miss (≥25% sets fail or first set fails).',
+    configFields: ['increment', 'deload'],
+    template: ({ varName: v, increment, deload }) => {
+      const shortfall = +(1 - deload).toFixed(4)
+      return {
+        if: 'all_reps',
+        then: `${v} += ${increment}`,
+        else: `${v} = round5(${v} * (1 - (failed_ratio >= 0.25 or first_set_failed) * ${shortfall}))`,
+      }
+    },
   },
   {
     type: 'triple',
     label: 'Triple Progression',
-    description: 'Progress through reps, then sets, then weight across consecutive sessions.',
-    template: v => ({ if: 'all_reps and effort <= 2', then: `${v} += 2.5`, else: `${v} = round5(${v} * 0.9)` }),
+    description: 'Progress reps → sets → weight in sequence. Only adds weight when low effort and all reps complete; deloads on significant miss.',
+    configFields: ['minReps', 'maxReps', 'increment', 'deload'],
+    template: ({ varName: v, increment, deload }) => {
+      const shortfall = +(1 - deload).toFixed(4)
+      return {
+        if: 'all_reps and effort <= 2',
+        then: `${v} += ${increment}`,
+        else: `${v} = round5(${v} * (1 - (failed_ratio >= 0.25 or first_set_failed) * ${shortfall}))`,
+      }
+    },
   },
   {
     type: 'step_loading',
     label: 'Step Loading',
-    description: 'Pre-set loading blocks per training cycle with automatic weight jumps each block.',
-    template: v => ({ if: 'all_reps', then: `${v} += 5`, else: `${v} = round5(${v} * 0.85)` }),
+    description: 'Pre-set loading blocks: weight jumps each time the block is completed; deloads aggressively on miss.',
+    configFields: ['increment', 'deload'],
+    template: ({ varName: v, increment, deload }) => ({
+      if: 'all_reps',
+      then: `${v} += ${increment}`,
+      else: `${v} = round5(${v} * ${deload})`,
+    }),
   },
 ]
+
+const PROGRESSION_DEFAULTS: Omit<ProgressionConfig, 'varName'> = {
+  minReps: 8,
+  maxReps: 12,
+  increment: 2.5,
+  deload: 0.9,
+}
 
 function toVarName(exerciseName: string): string {
   return exerciseName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'weight'
@@ -608,93 +656,153 @@ function SlotEditor({
                     </label>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Progression</p>
-                    </div>
+                  {(() => {
+                    const ptMeta = PROGRESSION_TYPE_META.find(pt => pt.type === ex.progressionType)
+                    const cfg = ptMeta?.configFields ?? []
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Progression</p>
 
-                    {/* Progression type selector */}
-                    <div className="space-y-1">
-                      <div className="flex gap-2 items-end">
-                        <div className="flex-1 space-y-1">
-                          <label className="text-[10px] text-slate-500">Type</label>
-                          <select
-                            value={ex.progressionType ?? ''}
-                            onChange={e => {
-                              const val = (e.target.value || undefined) as ProgressionType | undefined
-                              updateExercise(i, { progressionType: val })
-                            }}
-                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
-                          >
-                            <option value="">— none —</option>
-                            {PROGRESSION_TYPE_META.map(pt => (
-                              <option key={pt.type} value={pt.type}>{pt.label}</option>
-                            ))}
-                          </select>
+                        {/* Type selector + Apply template */}
+                        <div className="space-y-1">
+                          <div className="flex gap-2 items-end">
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[10px] text-slate-500">Type</label>
+                              <select
+                                value={ex.progressionType ?? ''}
+                                onChange={e => {
+                                  const val = (e.target.value || undefined) as ProgressionType | undefined
+                                  updateExercise(i, { progressionType: val })
+                                }}
+                                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-sky-500"
+                              >
+                                <option value="">— none —</option>
+                                {PROGRESSION_TYPE_META.map(pt => (
+                                  <option key={pt.type} value={pt.type}>{pt.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                            {ptMeta && (
+                              <button
+                                type="button"
+                                title="Fill rule fields with a template using the config values below"
+                                onClick={() => {
+                                  const varName = toVarName(ex.exercise)
+                                  const tpl = ptMeta.template({
+                                    varName,
+                                    minReps: ex.minReps ?? PROGRESSION_DEFAULTS.minReps,
+                                    maxReps: ex.maxReps ?? PROGRESSION_DEFAULTS.maxReps,
+                                    increment: ex.weightIncrement ?? PROGRESSION_DEFAULTS.increment,
+                                    deload: ex.deloadFactor ?? PROGRESSION_DEFAULTS.deload,
+                                  })
+                                  updateExercise(i, { progress: { if: tpl.if, then: tpl.then, else: tpl.else } })
+                                }}
+                                className="px-2 py-1 rounded-lg bg-sky-600/30 hover:bg-sky-600/50 border border-sky-600/50 text-sky-400 text-[10px] font-medium whitespace-nowrap transition-colors"
+                              >
+                                Apply template
+                              </button>
+                            )}
+                          </div>
+                          {ptMeta && (
+                            <p className="text-[10px] text-slate-500 italic">{ptMeta.description}</p>
+                          )}
                         </div>
-                        {ex.progressionType && (
-                          <button
-                            type="button"
-                            title="Fill if/then/else fields with a template for this progression type"
-                            onClick={() => {
-                              const meta = PROGRESSION_TYPE_META.find(pt => pt.type === ex.progressionType)
-                              if (!meta) return
-                              const varName = toVarName(ex.exercise)
-                              const tpl = meta.template(varName)
-                              updateExercise(i, { progress: { if: tpl.if, then: tpl.then, else: tpl.else } })
-                            }}
-                            className="px-2 py-1 rounded-lg bg-sky-600/30 hover:bg-sky-600/50 border border-sky-600/50 text-sky-400 text-[10px] font-medium whitespace-nowrap transition-colors"
-                          >
-                            Apply template
-                          </button>
-                        )}
-                      </div>
-                      {ex.progressionType && (
-                        <p className="text-[10px] text-slate-500 italic">
-                          {PROGRESSION_TYPE_META.find(pt => pt.type === ex.progressionType)?.description}
-                        </p>
-                      )}
-                    </div>
 
-                    {/* if / then / else rule fields */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        value={ex.progress?.if ?? ''}
-                        placeholder="if (optional) e.g. all_reps"
-                        onChange={e => updateExercise(i, { progress: { ...ex.progress, if: e.target.value || undefined, then: ex.progress?.then ?? '' } })}
-                        className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
-                      />
-                      <input
-                        type="text"
-                        value={ex.progress?.then ?? ''}
-                        placeholder="then (required) e.g. squat += 5"
-                        onChange={e => {
-                          const value = e.target.value
-                          if (!value && !ex.progress?.if && !ex.progress?.else) {
-                            updateExercise(i, { progress: undefined })
-                            return
-                          }
-                          updateExercise(i, { progress: { ...ex.progress, then: value } })
-                        }}
-                        className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
-                      />
-                      <input
-                        type="text"
-                        value={ex.progress?.else ?? ''}
-                        placeholder="else (optional)"
-                        onChange={e => {
-                          const elseVal = e.target.value || undefined
-                          if (!elseVal && !ex.progress?.if && !ex.progress?.then) {
-                            updateExercise(i, { progress: undefined })
-                            return
-                          }
-                          updateExercise(i, { progress: { ...ex.progress, else: elseVal, then: ex.progress?.then ?? '' } })
-                        }}
-                        className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
-                      />
-                    </div>
-                  </div>
+                        {/* Per-type config fields */}
+                        {ptMeta && cfg.length > 0 && (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-1 border-l-2 border-slate-600/50">
+                            {cfg.includes('minReps') && (
+                              <label className="space-y-1">
+                                <span className="text-[10px] text-slate-500">Min reps</span>
+                                <input
+                                  type="number" min="1"
+                                  value={ex.minReps ?? ''}
+                                  placeholder={String(PROGRESSION_DEFAULTS.minReps)}
+                                  onChange={e => updateExercise(i, { minReps: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                                />
+                              </label>
+                            )}
+                            {cfg.includes('maxReps') && (
+                              <label className="space-y-1">
+                                <span className="text-[10px] text-slate-500">Max reps</span>
+                                <input
+                                  type="number" min="1"
+                                  value={ex.maxReps ?? ''}
+                                  placeholder={String(PROGRESSION_DEFAULTS.maxReps)}
+                                  onChange={e => updateExercise(i, { maxReps: e.target.value ? parseInt(e.target.value, 10) : undefined })}
+                                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                                />
+                              </label>
+                            )}
+                            {cfg.includes('increment') && (
+                              <label className="space-y-1">
+                                <span className="text-[10px] text-slate-500">Increment (lb)</span>
+                                <input
+                                  type="number" min="0.5" step="0.5"
+                                  value={ex.weightIncrement ?? ''}
+                                  placeholder={String(PROGRESSION_DEFAULTS.increment)}
+                                  onChange={e => updateExercise(i, { weightIncrement: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                                />
+                              </label>
+                            )}
+                            {cfg.includes('deload') && (
+                              <label className="space-y-1">
+                                <span className="text-[10px] text-slate-500">Deload factor</span>
+                                <input
+                                  type="number" min="0.5" max="0.99" step="0.01"
+                                  value={ex.deloadFactor ?? ''}
+                                  placeholder={String(PROGRESSION_DEFAULTS.deload)}
+                                  onChange={e => updateExercise(i, { deloadFactor: e.target.value ? parseFloat(e.target.value) : undefined })}
+                                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                                />
+                              </label>
+                            )}
+                          </div>
+                        )}
+
+                        {/* if / then / else rule fields */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <input
+                            type="text"
+                            value={ex.progress?.if ?? ''}
+                            placeholder="if (optional) e.g. all_reps"
+                            onChange={e => updateExercise(i, { progress: { ...ex.progress, if: e.target.value || undefined, then: ex.progress?.then ?? '' } })}
+                            className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                          />
+                          <input
+                            type="text"
+                            value={ex.progress?.then ?? ''}
+                            placeholder="then (required) e.g. squat += 5"
+                            onChange={e => {
+                              const value = e.target.value
+                              if (!value && !ex.progress?.if && !ex.progress?.else) {
+                                updateExercise(i, { progress: undefined })
+                                return
+                              }
+                              updateExercise(i, { progress: { ...ex.progress, then: value } })
+                            }}
+                            className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                          />
+                          <input
+                            type="text"
+                            value={ex.progress?.else ?? ''}
+                            placeholder="else (optional)"
+                            onChange={e => {
+                              const elseVal = e.target.value || undefined
+                              if (!elseVal && !ex.progress?.if && !ex.progress?.then) {
+                                updateExercise(i, { progress: undefined })
+                                return
+                              }
+                              updateExercise(i, { progress: { ...ex.progress, else: elseVal, then: ex.progress?.then ?? '' } })
+                            }}
+                            className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               ))}
             </div>

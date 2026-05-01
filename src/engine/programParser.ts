@@ -98,6 +98,10 @@ function parseExerciseSpec(raw: YamlExerciseSpec): ExerciseSpec {
     synergist: Array.isArray(raw.synergist) ? raw.synergist : undefined,
     progress,
     progressionType: raw.progressionType,
+    minReps: typeof raw.minReps === 'number' ? raw.minReps : undefined,
+    maxReps: typeof raw.maxReps === 'number' ? raw.maxReps : undefined,
+    weightIncrement: typeof raw.weightIncrement === 'number' ? raw.weightIncrement : undefined,
+    deloadFactor: typeof raw.deloadFactor === 'number' ? raw.deloadFactor : undefined,
   }
 }
 

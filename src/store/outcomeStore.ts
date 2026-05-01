@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { buildProgressionRecommendation } from '../modules/workout-outcomes/progression'
 import type { RunProgressionState } from '../modules/run-adaptation/types'
 import {
@@ -9,6 +9,44 @@ import {
 } from '../modules/run-adaptation/engine'
 import type { WorkoutSlot } from '../types'
 import { useProgramStore } from './programStore'
+
+// ── Rep-miss metrics ──────────────────────────────────────────────────────────
+
+function parseTargetReps(raw: number | string | null | undefined): number | null {
+  if (typeof raw === 'number') return raw
+  if (typeof raw === 'string') {
+    const m = raw.match(/\d+/)
+    return m ? parseInt(m[0], 10) : null
+  }
+  return null
+}
+
+function computeRepMetrics(loggedEx: LoggedExerciseActual | undefined) {
+  if (!loggedEx || loggedEx.sets.length === 0) {
+    return { sets_hit: 0, sets_failed: 0, total_sets: 0, failed_ratio: 0, first_set_failed: 0 }
+  }
+  let hit = 0, failed = 0, total = 0
+  for (const set of loggedEx.sets) {
+    const actual = set.actualReps
+    const target = parseTargetReps(set.targetReps)
+    if (actual == null || target == null) continue
+    total++
+    if (actual >= target) hit++
+    else failed++
+  }
+  const firstSet = loggedEx.sets[0]
+  const firstActual = firstSet?.actualReps
+  const firstTarget = parseTargetReps(firstSet?.targetReps)
+  const first_set_failed =
+    firstActual != null && firstTarget != null && firstActual < firstTarget ? 1 : 0
+  return {
+    sets_hit: hit,
+    sets_failed: failed,
+    total_sets: total,
+    failed_ratio: total > 0 ? failed / total : 0,
+    first_set_failed,
+  }
+}
 
 interface OutcomeState {
   /** Keyed by workoutInstanceId = `${planId}_${calendarDate}` */
@@ -123,10 +161,12 @@ export const useOutcomeStore = create<OutcomeState>()(
 
         // 3b. Per-exercise progression (weights slots)
         if (slot.exercises) {
+          const loggedExercises = outcome.weightsActual?.exercises ?? []
           for (const ex of slot.exercises) {
-            if (ex.progress) {
-              programStore.applyProgressionRule(planId, ex.progress, ctxBase)
-            }
+            if (!ex.progress) continue
+            const loggedEx = loggedExercises.find(le => le.exercise === ex.exercise)
+            const repMetrics = computeRepMetrics(loggedEx)
+            programStore.applyProgressionRule(planId, ex.progress, { ...ctxBase, ...repMetrics })
           }
         }
       },
