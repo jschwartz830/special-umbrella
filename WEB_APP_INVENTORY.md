@@ -1,143 +1,128 @@
 # WEB_APP_INVENTORY
 
 ## Screens / Routes
-- `/` redirects to `/today` using `<Navigate to="/today" replace />`; there is no persisted home dashboard route. (`src/App.tsx`)
-- `/today` (`TodayPage`):
-  - Displays active plan’s resolved current day and upcoming days from `useActivePlan`.
-  - Logs primary completion / skip / day-off to `historyStore.logAction`.
-  - Supports manual overrides (`advance`, `go_back`, `jump`, `swap_slot`) via `usePlanActions`.
-  - Supports “double day” logging, including extra workout creation (`historyStore.addExtraEntry`) and `_extra_` outcome instance IDs (`makeExtraWorkoutInstanceId`).
-  - Includes Active Workout Tracker launch/minimize/resume flow and post-session prefill into `OutcomeModal`.
-  - Shows run adaptation notes (`generateRunAdaptationNote`) and spacing warning (`generateDifficultySpacingWarning`).
-  - Shows expiry banner controls via `useExpiryDismiss`.
-- `/calendar` (`CalendarPage`):
-  - Renders month grid from `buildMonthGrid`.
-  - Allows per-date complete / skip / day-off logging.
-  - Handles retroactive day-index anchoring by removing same-day jump override first (`removeRetroJumpForDate`) and optionally re-adding noon jump (`addOverride` with `${date}T12:00:00.000`).
-  - Supports extra workouts add/edit/delete and extra-outcome editing.
-  - Supports historical active-workout resume flow.
-  - Supports outcome date-move behavior for both planned and extra entries (`updateEntryDate`, `updateExtraEntryDate`, `moveOutcome`).
-- `/history` (`HistoryPage`):
-  - Historical log browsing, scope filters, and notes editing.
-  - CSV import/export workflows through `CsvToolbar`, `lib/csv.ts`, and scope helpers in `lib/historyScope.ts`.
-- `/plans` (`PlansPage`):
-  - Active/inactive/archived grouping.
-  - Activate/deactivate, duplicate, archive, delete.
-- `/plans/new` + `/plans/:id/edit` (`PlanBuilderPage`):
-  - Plan day/slot editing, type-specific slot config, duration setup.
-- `/plans/import` (`ProgramImportPage`):
-  - YAML program ingestion via parser/engine modules (`engine/programParser.ts`), schema-backed structure, and conversion to plan state.
-- `/settings` (`SettingsPage`):
-  - Data tools, diagnostics, and maintenance actions.
+- `/` redirects to `/today` via `<Navigate to="/today" replace />` (no separate home screen).
+- `/today` (`TodayPage`)
+  - Active plan projection (`useActivePlan`) with today + upcoming cards.
+  - Primary log actions (complete / skip / day off) plus override controls (`advance`, `go_back`, `jump`, `swap_slot`) through `usePlanActions`.
+  - Double-day flow: logs primary planned entry plus bonus extra workout (`historyStore.addExtraEntry`, source=`double_day`) and distinct outcome instance IDs via `makeExtraWorkoutInstanceId`.
+  - Active workout tracker lifecycle: launch → minimize → resume → completion prefill into `OutcomeModal`.
+  - Inline insights: run adaptation notes, difficulty spacing warnings, cycle/week progress, last-session summary, unlogged-day nudge.
+  - Expiry banner dismissal persisted per-plan (`useExpiryDismiss`, localStorage key prefix `wpt_expiry_dismissed_v1_`).
+- `/calendar` (`CalendarPage`)
+  - Month grid rendering (`buildMonthGrid`) and day detail actions.
+  - Retroactive logging: removes existing same-date jump overrides first, then optionally writes a noon jump anchor (`${date}T12:00:00.000`).
+  - Completion flow launches `OutcomeModal`; outcome completion-state can back-sync `HistoryEntry.action`.
+  - Supports planned and extra outcome editing, outcome date moves, clear-day behavior, extra workout add/remove, and historical active-workout resume.
+- `/history` (`HistoryPage`)
+  - Timeline + scoped summaries using history scope/stat helpers.
+  - Notes editing and CSV import/export orchestration through `CsvToolbar` + `lib/csv.ts`.
+- `/plans` (`PlansPage`)
+  - Active / inactive / archived grouping.
+  - Actions: activate/deactivate, duplicate, archive, delete.
+- `/plans/new` and `/plans/:id/edit` (`PlanBuilderPage`)
+  - Plan metadata + day/slot authoring (including type-specific slot fields).
+- `/plans/import` (`ProgramImportPage`)
+  - YAML intake/parsing/normalization (`engine/programParser.ts`) and conversion into plan/program state.
+- `/settings` (`SettingsPage`)
+  - PWA/web-cache recovery flow: updates + unregisters service workers, clears Cache Storage, reloads with cache-busting query param.
+  - Build metadata modal from injected constants (`__LATEST_COMMIT_ISO_DATE__`, `__LATEST_COMMIT_TITLE__`).
 
 ## Components
 - Layout
-  - `AppShell`: global shell with safe-area spacing and nested route outlet.
-  - `BottomNav`: persistent five-tab navigation.
-- Workout interaction
-  - `WorkoutDayCard`: card-level surface for planned day details and actions.
-  - `WorkoutSlotDetails`: slot metadata rendering (run, weights, and generic).
-  - `OutcomeModal`: canonical completion-state + metrics capture and edit UI.
-  - `ActiveWorkoutTracker`: session timer/logging view with minimized mode handoff.
-  - `OutcomeMetrics`: compact prior/outcome metric display in list/card contexts.
-  - `WorkoutBadge`, `DifficultyBadge`: semantic chips for workout type/difficulty.
-- Shared
-  - `Modal`: shared modal shell.
-  - `EmptyState`: no-data/no-plan call-to-action surface.
-  - `CsvToolbar`: CSV import/export controls + file interaction.
+  - `AppShell`: shell chrome + route outlet.
+  - `BottomNav`: persistent tab-like navigation.
+- Workout domain UI
+  - `WorkoutDayCard`, `WorkoutSlotDetails`, `WorkoutBadge`, `DifficultyBadge`.
+  - `OutcomeModal`: canonical outcome capture/edit surface.
+  - `OutcomeMetrics`: compact metrics preview.
+  - `ActiveWorkoutTracker`: in-session tracking with minimized mode handoff.
+- Shared infra components
+  - `Modal`, `EmptyState`, `CsvToolbar`.
 
 ## User Flows
 1. **Plan lifecycle**
-   - Create/edit/import plan → activate plan (`setActivePlan`) → previous active plan auto-set inactive in store loop → current plan drives projection.
-2. **Primary daily logging (Today)**
-   - User logs complete/skip/day-off → history entry replaced per (`planId`, `date`) uniqueness (`addEntry`) → outcome optionally saved/edited (`OutcomeModal`) → completion state syncs entry action through `completionStateToAction`.
-3. **Double-day / additional workout logging**
-   - User enables “double day” or logs extra/upcoming workout → `ExtraWorkoutEntry` persisted with source (`history` or `double_day`) → outcome keyed as `{planId}_{date}_extra_{extraId}`.
-4. **Calendar retroactive correction**
-   - User logs historical date with plan-day selector → same-date jump is removed first to avoid stale-anchor drift, then new jump optionally added if needed.
+   - Create/edit/import plan → activate (`setActivePlan`) → current active plan (if any) auto-demoted to inactive → projection recalculates from new anchor.
+2. **Today primary logging**
+   - User logs action via quick controls or outcome modal.
+   - Planned entry uniqueness enforced per (`planId`,`calendarDate`) (new write replaces old).
+   - Outcome save may also trigger progression recommendation and variable/run-state updates.
+3. **Additional workouts (double-day/ad hoc)**
+   - Add extra workout row (`ExtraWorkoutEntry`) with provenance (`double_day` or `history`) → log/edit outcome with `_extra_` key.
+4. **Retro calendar correction**
+   - Logging a historical date can write/replace jump anchor so future projection preserves intended day alignment.
 5. **Outcome date move**
-   - User edits completion date in outcome modal.
-   - Planned entry path: destination date’s planned entry is removed, source entry moved, outcome key moved.
-   - Extra path: extra entry date updated by id, outcome key moved.
-6. **Undo/clear behavior**
-   - Clearing a planned day removes planned history + planned outcome + retro jump for that date.
-   - Extra entries are managed separately and may remain unless explicitly removed.
-7. **Import/export flows**
-   - History import deduplicates by (`planId`,`calendarDate`) with newest `createdAt` retained.
-   - Extra import deduplicates by `id` only.
-   - Outcome import is key overwrite (last-write-wins per `workoutInstanceId`).
+   - Planned: destination planned entry removed, source entry date changed, outcome key moved.
+   - Extra: extra row date changed by extra id, outcome key moved.
+6. **Clear / undo operations**
+   - Clear planned date removes planned entry + planned outcome + retro jump for that date.
+   - Extra entries require separate deletion.
+7. **Import/export**
+   - Planned history import dedupe: newest `createdAt` per (`planId`,`calendarDate`).
+   - Extra import dedupe: `id`-only.
+   - Outcome import: overwrite by `workoutInstanceId` (last-write-wins).
 
 ## Data Models
-- `Plan`
-  - Core fields: `id`, `name`, `status`, `days[]`, `duration`, `startDate`, `startDayIndex`, `createdAt`, `updatedAt`, optional `programMeta`.
-- `PlanDay`
-  - `id`, `label`, 1..N `slots` (UI commonly assumes first slot as primary in some contexts).
-- `WorkoutSlot`
-  - Canonical types include `weights`, `run`, `swim`, `yoga`, `other`.
-  - Migration path supports legacy types (`weightlifting`, `long_run`, `recovery_run`, `rest`) normalized in `migrateSlot`.
-  - May contain advanced structured programming data (`warmup`, `exercises`, `segments`, `slotProgress`).
-- `HistoryEntry`
-  - Represents planned-day action for a date (`complete`, `skip`, `day_off`), one row per (`planId`,`calendarDate`).
-- `ExtraWorkoutEntry`
-  - Additional workout entry keyed by generated `id`, with `source` provenance and freeform metadata.
-- `OverrideEntry`
-  - Rotation overrides including `advance`, `go_back`, `jump`, `swap_slot` and optional target fields.
-- `WorkoutOutcome`
-  - Stored in map by `workoutInstanceId`, with completion state, notes, and modality-specific actuals (run/swim/weights).
-- `RunProgressionState`
-  - Stored by progression group id, updated by legacy run-adaptation engine.
-- Program variable state
-  - `vars[planId][varName] = number`, initialized idempotently from `programMeta.vars`.
+- `Plan`: id/status/name, days, duration, start anchor, timestamps, optional `programMeta`.
+- `PlanDay`: id/label/slots[].
+- `WorkoutSlot`: normalized types (`weights`,`run`,`swim`,`yoga`,`other`) plus legacy migration from old enums.
+- `HistoryEntry`: one planned action per (`planId`,`calendarDate`).
+- `ExtraWorkoutEntry`: ad-hoc workout rows keyed by generated `id` with `source` provenance.
+- `OverrideEntry`: rotation modifiers (`advance`, `go_back`, `jump`, `swap_slot`) + optional target data.
+- `WorkoutOutcome`: keyed by workout-instance id; stores completion state, notes, perceived effort, and modality-specific actuals.
+- `RunProgressionState`: progression state by progression group id.
+- Program vars map: `vars[planId][varName]` numeric values.
+- Exercise history projection (secondary model): derived/stored index of weight exercises in `exerciseHistoryStore` for historical lift references.
 
 ## Business Logic / Calculations
-- **Rotation/day projection**
-  - `engine/rotationEngine.ts` resolves effective day index using plan anchors + history + overrides.
-  - `engine/calendarProjection.ts` builds month grid and resolved-day metadata.
-- **Stats and progress**
-  - `computeHistoryStats`, `countPastUnloggedDays`, `computeRotationCycleProgress`, `computePlanProgress` (`lib/historyStats.ts`).
-- **Outcome-driven progression stack**
-  1. `buildProgressionRecommendation` attaches recommendation payload to each saved outcome.
-  2. Run adaptation checks (`evaluateRunProgression`) and state updates (`applyRunProgressionDecision`) when eligible.
-  3. YAML/program progression rule eval via expression engine (`evaluateCondition`, `evaluateUpdates`) through `programStore.applyProgressionRule`.
-- **Date-change logic**
-  - Moving completion date mutates both history/extra entities and outcome instance key, but operations are currently non-transactional across stores.
-- **Plan migration and defaults**
-  - `planStore` migration normalizes legacy slot types and derives location/focus from tags.
-  - `makeSlot` and `makeDay` create default day/slot scaffolding with type-based defaults.
+- Rotation/day resolution: `engine/rotationEngine.ts`.
+- Calendar month projection: `engine/calendarProjection.ts`.
+- Stats/progress: `computeHistoryStats`, `countPastUnloggedDays`, `computeRotationCycleProgress`, `computePlanProgress`.
+- Outcome progression pipeline (`outcomeStore.logOutcomeWithProgression`):
+  1. Attach recommendation (`buildProgressionRecommendation`).
+  2. Evaluate/apply run progression (`evaluateRunProgression`, `applyRunProgressionDecision`).
+  3. Evaluate program rule expressions (`programStore.applyProgressionRule` via `expressionEval`).
+- Notes synchronization: history note edits may update linked outcome notes.
+- Plan migration/defaulting: slot type normalization and tag-derived metadata in `planStore.migrateSlot` + `makeSlot`/`makeDay` defaults.
 
 ## Persistence / API Behavior
-- Entire app is local-first with persisted Zustand stores:
-  - `wpt_plans` (`planStore`), with schema `version: 2` + migration hook.
-  - `wpt_history` (`historyStore`).
-  - `wpt_outcomes` (`outcomeStore`).
+- Local-first only; no backend/network API in core product flows.
+- Persisted Zustand stores:
+  - `wpt_plans` (`planStore`, versioned migration currently at v2).
+  - `wpt_history` (`historyStore`: entries + overrides + extras).
+  - `wpt_outcomes` (`outcomeStore`: outcomes + run progression states).
   - `wpt_program_vars` (`programStore`).
-- No network API is used in core workflows.
-- CSV/YAML operations are client-side transforms.
-- Cross-store operations are orchestration-based in UI handlers (no ACID transaction boundary).
+  - `wpt_exercise_history` (`exerciseHistoryStore`, derived from outcomes).
+- Additional localStorage usage: per-plan expiry-banner dismissal key prefix `wpt_expiry_dismissed_v1_`.
+- Import/export and YAML parse are fully client-side.
+- Cross-store mutations are orchestrated from UI/store methods and are not transactionally guaranteed.
 
 ## Edge Cases
-- No active plan: Today/Calendar surfaces empty state and route-to-plans CTA.
-- Day-off action clears/omits `planDayIndex` intentionally.
-- `setActivePlan` deactivates existing active plans but does not guard nonexistent `id` before spread assignment.
-- Retro jump date matching uses `format(new Date(appliedAt), 'yyyy-MM-dd')`; timezone interpretation can shift day in edge locales.
-- Planned date move removes destination planned entry before moving source (implicit overwrite).
-- Extra date move for outcomes depends on parsing `_extra_` id suffix.
-- Program vars only initialize missing keys (re-activation does not reset modified vars).
-- `removeEntry` does not automatically remove extras for same date; cleanup depends on caller flow.
+- No active plan: Today/Calendar render empty state and CTA.
+- Day-off entries intentionally unset `planDayIndex`.
+- `setActivePlan` writes `updated[id] = { ...updated[id], ... }` without explicit missing-id guard.
+- Retro jump match uses `new Date(appliedAt)` then local date formatting; timezone parsing can move day.
+- Planned outcome date move implicitly overwrites destination planned entry.
+- Extra outcome moves rely on parsing `_extra_` suffix from instance id.
+- Program vars initialize missing keys only (reactivation does not reset changed values).
+- `removeEntry` does not remove extras for same date.
+- Exercise-history sync assumes `workoutInstanceId` format split by `_`; malformed IDs silently degrade indexing.
 
 ## Known Bugs / UX Quirks
-- Non-atomic multi-store writes (history/outcome/program vars) can briefly diverge on interrupted flows.
-- Extra import dedupe by `id` can admit semantic duplicates (same date/name/type with different ids).
-- “One planned entry per date” replacement can feel destructive when users expect multiple planned logs in one day.
-- Noon jump anchor is implicit/internal and not user-visible, yet materially affects rotation projection.
-- Several UI paths treat `planDay.slots[0]` as primary, which can underrepresent secondary slot data in multi-slot plans.
+- Multi-store mutations (history/outcome/program vars/exercise history) are non-atomic and can drift on interrupted operations.
+- Extra import dedupe by `id` can create semantic duplicates.
+- “One planned entry per day” replacement can feel destructive for users expecting multiple planned logs/day.
+- Hidden noon jump anchor affects projection but has limited user-facing visibility.
+- Several flows treat `planDay.slots[0]` as canonical, under-representing secondary slots.
+- Settings “force refresh” is destructive for offline cache and may surprise users if not clearly messaged (web-specific behavior).
 
-## Open Questions / Ambiguities
-1. Is single planned `HistoryEntry` per date a hard product rule, or should same-day planned multi-session logging be supported?
-2. On outcome date move collisions, should behavior remain silent replace, become merge-aware, or require user confirmation?
-3. Should progression state and program vars be recomputed when users edit or delete historical outcomes that originally advanced progression?
-4. Should `swap_slot` overrides be first-class in UI flows, or remain model-level only for now?
-5. Should extra-entry dedupe logic evolve from `id`-only to semantic dedupe keys?
-6. What is the canonical timezone/date policy for `calendarDate` and jump `appliedAt` across travel/DST?
-7. When deleting or archiving plans, what long-term retention/cascade policy is desired for related history, outcomes, extras, and program vars?
-8. Should historical Active Workout Tracker resume be allowed to create/update outcomes without corresponding history entry validation?
+## Open Questions / Ambiguities (Updated with Product Direction)
+1. **Planned sessions per day**: Multi-planned sessions/day are allowed. Default projection logic should still assume each rotation item maps to subsequent days unless explicitly marked day off or otherwise overridden.
+2. **Collision behavior when moving/logging outcomes**: Plan should be treated as guidance, not a hard limit. If a different workout is performed on a planned day, that day's originally planned workout should be deferred to the following day by default. Users can still log multiple workouts on the same day.
+3. **Retroactive edits recomputation**: Yes—retroactive edits/deletes must trigger recomputation of run progression state, program variables, and derived exercise history.
+4. **`swap_slot` UX intent**: User-visible controls are desired for changing rotation order within plans (current model-level capability should become explicit UI behavior).
+5. **Import dedupe policy for extras**: Move from ID-only dedupe to semantic dedupe keys (at least date + workout type + name/source, with clear tie-break rules).
+6. **Timezone policy**: Canonical policy is device local timezone for date mapping (`calendarDate`), jump anchoring, and DST/travel behavior.
+7. **Archive/delete retention policy**: Archiving/deleting a plan should **not** delete completed workout records. Historical workouts remain on calendar/history, but are not counted toward the active/latest plan rotation metrics.
+8. **Historical resume without matching planned/extra row**: Allowed. Outcome/workout records are first-class entities and should be saveable even without plan linkage.
+9. **Settings force-refresh in iOS**: Not required as a user-facing iOS feature; web-specific recovery behavior should remain web-only.
