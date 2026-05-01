@@ -85,6 +85,7 @@ new surface area and creates parity between the two plan-duration types.
 
 ## 2026-04-30 — Overnight Audit (eighteenth pass)
 
+
 Branch: `claude/dreamy-mccarthy-Ymdp2`.
 Baseline on entry: **315 passing, 0 failing**.
 
@@ -168,3 +169,75 @@ Bug fix first (1), then refactor (2), then tests (3–4) to improve baseline
 confidence before adding the feature (5). The feature was selected because
 `findPreviousWeightsOutcome` and `previousSetsByExercise` were already computed
 at the TodayPage level — adding the summary required no new data fetching.
+
+---
+
+## 2026-05-01 — Overnight Audit (nineteenth pass)
+
+Branch: `claude/dreamy-mccarthy-15kIJ`.
+Baseline on entry: **315 passing, 0 failing**.
+
+### Architecture summary (unchanged)
+
+Stack and layering match all prior audits. No architectural drift since pass 18.
+
+### What appears strong and well-designed (unchanged)
+
+- 315-test suite stable across 18 passes, no regressions.
+- Pure-function rotation engine with excellent coverage.
+- Clean store isolation; Zustand + localStorage persistence is solid.
+- `getResolvedDaysRange` (added in pass 18) now has direct test coverage.
+- `computeWorkoutTypeBreakdown` coverage added in pass 18.
+- `extraToPlanDay` refactored into `src/lib/planDayUtils.ts` in pass 18.
+
+### Key issues found this pass
+
+1. **Plan delete does not call `clearPlanVars`** (DATA LEAK BUG).
+   `PlansPage.tsx` delete handler calls `clearPlanHistory + clearPlanOutcomes + deletePlan`
+   but never `useProgramStore.clearPlanVars`. YAML-imported plan variables (weights,
+   run distances, etc.) remain in `wpt_program_vars` localStorage entry indefinitely
+   after the plan is deleted. Over repeated import-delete cycles this accumulates
+   unboundedly. Fix is a one-line addition.
+
+2. **`expressionEval.ts` has zero unit tests** (CRITICAL TEST GAP).
+   The DSL parser + evaluator is the core engine for all YAML plan progressions.
+   It implements a recursive-descent parser (tokenizer → AST → evaluator) with
+   multiple code paths: arithmetic, comparison, logical operators, 8 built-in
+   functions, variable resolution, and multi-statement update expressions with
+   5 assignment operators. Zero tests. Any regression silently breaks all
+   YAML-imported plan progressions.
+
+3. **`programStore.applyProgressionRule` has no unit tests** (TEST GAP).
+   The bridge between `expressionEval.ts` and persistent program vars has no coverage.
+   This integration path (condition evaluation → var updates → store write) is
+   exercised only indirectly by the UI. Added a focused test file covering the
+   main paths: condition true → applies `then`, condition false → applies `else`,
+   condition false with no `else` → no-op, vars updated correctly.
+
+4. **`planDeleteCleanup.test.ts` does not assert `clearPlanVars`** (TEST GAP).
+   The integration test that validates plan-delete cascades does not include
+   program variables, leaving the above bug untested.
+
+### Feature selected
+
+None this pass. The test gaps (items 2–4) and confirmed bug (item 1) provide
+sufficient stabilisation work. No clearly scoped adjacent feature met the bar:
+- All obvious adjacent features touch UI pages that cannot be browser-tested
+- The existing stats infrastructure is already well-designed; adding more stats
+  without UI testing would be premature
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| 1 | Fix `clearPlanVars` missing from delete handler | Very low | ✅ Done |
+| 2 | Update planDeleteCleanup test to cover vars | None | ✅ Done |
+| 3 | Add `expressionEval.test.ts` | None | ✅ Done |
+| 4 | Add `programStore.test.ts` | None | ✅ Done |
+
+### Rationale for sequencing
+
+Bug fix first (confirmed data leak with simple fix), then close the test loop
+on the delete behavior, then the largest test gap (expressionEval), then the
+programStore integration layer. Feature work explicitly skipped per audit rules
+(stabilisation over expansion when test coverage is lacking).

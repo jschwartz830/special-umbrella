@@ -944,4 +944,86 @@ new test files were introduced this pass.
 
 5. **CalendarPage retroactive logging flow**
 6. **PlanBuilderPage unsaved-changes guard**
+
+---
+
+## 2026-05-01 (nineteenth pass) — branch `claude/dreamy-mccarthy-15kIJ`
+
+**Result: 440 passing, 0 failing** (+125 tests from baseline of 315).
+
+### Tests reviewed
+
+All existing 11 test files reviewed as part of the gap audit. Two files were
+identified as entirely missing: `expressionEval.test.ts` and
+`programStore.test.ts`.
+
+### Tests added / updated
+
+| File | New tests | Notes |
+|------|-----------|-------|
+| `src/lib/__tests__/expressionEval.test.ts` | 100 | New file |
+| `src/store/__tests__/programStore.test.ts` | 23 | New file |
+| `src/store/__tests__/planDeleteCleanup.test.ts` | +2 | Added to existing file |
+
+**Total new tests: 125**
+
+#### expressionEval.test.ts breakdown
+
+| Group | Tests | What's covered |
+|-------|-------|----------------|
+| `evaluateExpression` | ~35 | Arithmetic, precedence, comparisons, logical ops, all 8 functions, variables, unknown vars → 0 |
+| `evaluateCondition` | ~15 | Bare keywords, compound expressions, missing condition → true |
+| `evaluateUpdates` | ~25 | All 5 assignment operators, complex rhs, multi-statement, paren-safe commas |
+| `resolveLoad` | ~10 | `lb`/`kg` suffix, expressions, null for missing |
+| `resolveQuantityString` | ~15 | Unit suffixes, bare numerics, variable-only expressions |
+
+#### programStore.test.ts breakdown
+
+| Group | Tests | What's covered |
+|-------|-------|----------------|
+| `initVars` | 4 | Initial set, idempotent, merge new keys, plan isolation |
+| `getVars` | 2 | Unknown plan → `{}`, known plan returns vars |
+| `setVars` | 3 | Merge patch, create for new plan, no cross-plan leak |
+| `clearPlanVars` | 3 | Removes all, no cross-plan leak, no-op for nonexistent |
+| `applyProgressionRule` | 11 | Condition branches, complex expressions, persistence |
+
+### Tests that caught real bugs
+
+The `expressionEval.test.ts` tests immediately caught the `splitStatements` bug
+(tests 3 and 4 in the `evaluateUpdates` paren-safe group failed on first run):
+
+```
+✗ rhs can use min to cap a value
+✗ rhs can use min that does not cap
+```
+
+These failures pointed directly to the naive `split(',')` in `evaluateUpdates`.
+The fix (`splitStatements()`) was added to `expressionEval.ts` and both tests
+passed. This is the intended workflow — tests find bugs the human didn't know
+existed.
+
+### Impact of changes on test coverage
+
+| Change | Test impact |
+|--------|-------------|
+| `PlansPage` clearVars bug fix | Covered by 2 new `planDeleteCleanup` integration tests |
+| `splitStatements` bug fix | Covered by `evaluateUpdates` paren-safe tests |
+| `expressionEval.ts` full DSL | 100 new tests, 5 public exports now fully covered |
+| `programStore` all actions | 23 new tests, all 5 public actions now fully covered |
+
+### Important logic still untested
+
+#### Medium priority (unchanged from pass 18)
+
+1. **planStore** — `setActivePlan` (deactivates previously active plan),
+   `duplicatePlan`
+2. **Double-day rotation behavior** — advance override + complete entry on
+   the same day, verifying tomorrow starts 2 positions ahead
+
+#### Lower priority (carry-over)
+
+3. **`findPreviousSessionForPlanDay`** / **`buildLastSessionSummary`** —
+   pure helper functions added in pass 18, untested.
+4. **CalendarPage retroactive logging flow**
+5. **PlanBuilderPage unsaved-changes guard**
 7. **TodayPage action handlers**

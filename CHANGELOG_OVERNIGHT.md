@@ -1592,3 +1592,114 @@ a prior session exists. No store mutations. TypeScript clean.
 
 **Rollback**: Remove the `<p>` block and the two helper functions from
 TodayPage.tsx. No data to clean up.
+
+---
+
+## 2026-05-01 (nineteenth pass) — branch `claude/dreamy-mccarthy-15kIJ`
+
+Baseline on entry: **315 passing, 0 failing**.
+Exit state: **440 passing, 0 failing** (+125 tests).
+
+---
+
+### 1. Fix: PlansPage delete handler did not clear program vars
+
+**Summary**: When a YAML-imported plan was deleted, `clearPlanVars` was never
+called. History and outcomes were cleaned up, but `programStore.vars[planId]`
+was left as an orphaned entry. On a large app lifecycle this leaks memory and
+could produce stale var state if a plan ID was ever reused.
+
+**Root cause**: The three-call delete sequence in `PlansPage.tsx` was written
+before `programStore` and its `clearPlanVars` action existed. The store action
+was added in a later pass without updating the delete handler.
+
+**Fix**: Added `useProgramStore` import and `clearVars` selector to `PlansPage`,
+inserted `clearVars(confirmDelete)` between `clearOutcomes` and `deletePlan` in
+the delete-confirm button `onClick`.
+
+**Files changed**:
+- `src/pages/PlansPage.tsx` — delete handler (2 lines added)
+- `src/store/__tests__/planDeleteCleanup.test.ts` — 2 new integration tests,
+  `useProgramStore` import and reset added to `beforeEach`
+
+**Risks / tradeoffs**: None. Purely additive to an existing cleanup sequence.
+
+**Rollback**: Revert the `clearVars` line from the delete handler.
+
+---
+
+### 2. Fix: `evaluateUpdates` split on `,` naively, breaking multi-arg function calls
+
+**Summary**: The update expression evaluator in `expressionEval.ts` split the
+comma-separated statement string using `updateStr.split(',')`. This broke any
+update containing a multi-argument function call, for example:
+
+```
+easy_miles = min(easy_miles + 0.5, 8)
+```
+
+would be split into `easy_miles = min(easy_miles + 0.5` (invalid → evaluates to
+0) and `8)` (no `var = rhs` match → silently discarded). The effective result was
+that `easy_miles` was zeroed whenever a `min()`/`max()` cap appeared in an update
+expression.
+
+**Fix**: Added a paren-aware `splitStatements()` helper that tracks bracket depth
+and only splits on commas at depth 0. The naive `split(',')` call in
+`evaluateUpdates` was replaced with `splitStatements(updateStr)`.
+
+**Files changed**:
+- `src/lib/expressionEval.ts` — new `splitStatements` function + updated
+  `evaluateUpdates` call site + expanded JSDoc
+
+**Risks / tradeoffs**: None. The new function is a strict improvement with no
+behavioral change for statements that don't contain function calls.
+
+**Rollback**: Revert commit that introduced `splitStatements`; restore
+`updateStr.split(',').map(s => s.trim()).filter(Boolean)`.
+
+---
+
+### 3. Tests: `expressionEval.ts` — 100 new unit tests
+
+**Summary**: `src/lib/__tests__/expressionEval.test.ts` was missing entirely.
+Added 100 tests covering all five public exports:
+
+- `evaluateExpression`: arithmetic, operator precedence, comparison operators,
+  `and`/`or`/`not` with short-circuit, all 8 built-in functions (`min`, `max`,
+  `round`, `floor`, `ceil`, `abs`, `round5`, `round2_5`), variables from
+  context, unknown variables default to 0.
+- `evaluateCondition`: bare `all_reps`/`session_complete` keywords, compound
+  expressions, missing/empty condition defaults to true.
+- `evaluateUpdates`: all five assignment operators (`=`, `+=`, `-=`, `*=`, `/=`),
+  complex rhs expressions, multi-statement updates, paren-safe comma handling.
+- `resolveLoad`: `lb`/`kg` suffix stripping, expression evaluation, null for
+  missing input.
+- `resolveQuantityString`: unit suffixes (`mi`, `km`, `m`, `s`, `min`, `h`),
+  bare numeric strings, variable-only expressions.
+
+These tests directly caught the `splitStatements` bug before production — the
+`min`-capped update tests failed, revealing the regression.
+
+**Files changed**:
+- `src/lib/__tests__/expressionEval.test.ts` (new, 100 tests)
+
+---
+
+### 4. Tests: `programStore` — 23 new unit tests
+
+**Summary**: `src/store/__tests__/programStore.test.ts` was missing. Added 23
+tests covering all public store actions:
+
+- `initVars`: sets initial values, idempotent on re-activation (does not
+  overwrite), merges new keys while preserving existing, isolated per plan.
+- `getVars`: empty object for unknown plan, returns known plan vars.
+- `setVars`: merge patch, creates vars for new plan, does not affect other plans.
+- `clearPlanVars`: removes all vars, does not affect other plans, no-op for
+  nonexistent plan.
+- `applyProgressionRule`: condition evaluation (`all_reps`, `effort <= 3`,
+  true/false branches, no-else no-op, undefined condition = always fire),
+  complex rhs (`round5(squat * 0.85)`), min-capped update, multi-variable
+  update, persistence across multiple applications, plan isolation.
+
+**Files changed**:
+- `src/store/__tests__/programStore.test.ts` (new, 23 tests)
