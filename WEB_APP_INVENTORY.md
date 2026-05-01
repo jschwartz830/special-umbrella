@@ -114,6 +114,7 @@
 - “One planned entry per day” replacement can feel destructive for users expecting multiple planned logs/day.
 - Hidden noon jump anchor affects projection but has limited user-facing visibility.
 - Several flows treat `planDay.slots[0]` as canonical, under-representing secondary slots.
+<<<<<<< codex/update-web_app_inventory.md-and-ios_implementation_spec.md-in1hbo
 - Settings “force refresh” is destructive for offline cache and may surprise users if not clearly messaged (web-specific behavior).
 
 ## Open Questions / Ambiguities (Updated with Product Direction)
@@ -126,3 +127,17 @@
 7. **Archive/delete retention policy**: Archiving/deleting a plan should **not** delete completed workout records. Historical workouts remain on calendar/history, but are not counted toward the active/latest plan rotation metrics.
 8. **Historical resume without matching planned/extra row**: Allowed. Outcome/workout records are first-class entities and should be saveable even without plan linkage.
 9. **Settings force-refresh in iOS**: Not required as a user-facing iOS feature; web-specific recovery behavior should remain web-only.
+=======
+- Settings “force refresh” is destructive for offline cache and may surprise users if not clearly messaged.
+
+## Open Questions / Ambiguities
+1. Is one planned `HistoryEntry` per date an intentional permanent rule, or should multi-planned sessions/day exist?
+2. For planned-date collisions during outcome move, should behavior remain silent overwrite, become merge-aware, or prompt user choice?
+3. When outcomes/history are edited retroactively, should run progression state + program vars + exercise history be recomputed?
+4. Should `swap_slot` overrides become user-visible controls beyond current model hooks?
+5. Should extra import dedupe evolve from ID-only to semantic dedupe keys?
+6. What canonical timezone policy should govern `calendarDate`, jump anchors, and travel/DST behavior?
+7. On archive/delete, what retention/cascade policy is required for history, outcomes, extras, overrides, vars, and exercise history?
+8. Is historical Active Workout resume allowed to create outcomes if matching planned/extra entry is missing?
+9. Should Settings force-refresh remain a user-facing action in native iOS, and what equivalent recovery behavior is required?
+>>>>>>> main
