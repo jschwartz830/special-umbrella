@@ -78,7 +78,11 @@
 - **Calendar**
   - Pageable month with accessible day cells and status markers.
   - Day detail sheet: log actions, adjust plan-day selection for retro entries, manage extras, edit outcomes.
+<<<<<<< codex/update-web_app_inventory.md-and-ios_implementation_spec.md-in1hbo
+  - Treat plan as guidance: allow multiple logged workouts/day, and defer displaced planned workout to following day by default.
+=======
   - Explicit UX for date-move collisions (do not silently hide overwrite effects).
+>>>>>>> main
 - **History**
   - Timeline with filter chips/scope picker and summary cards.
   - Notes editing and read-friendly workout detail drill-in.
@@ -91,8 +95,13 @@
   - Document picker, parse results, schema errors/warnings list, import preview.
 - **Settings**
   - Native diagnostics + data tools.
+<<<<<<< codex/update-web_app_inventory.md-and-ios_implementation_spec.md-in1hbo
+  - Version/build metadata screen.
+  - No web-style force-refresh control in v1 iOS (web service-worker concern does not apply).
+=======
   - “App refresh recovery” adapted from web force-refresh intent (clear app caches/local DB only when user confirms).
   - Version/build metadata screen.
+>>>>>>> main
 
 ## Native iOS UI/UX adaptations (not web parity)
 - Prefer iOS interaction idioms: swipe actions, menus, segmented controls, and detented sheets.
@@ -140,6 +149,18 @@
   - Large history dataset scrolling/performance.
   - Accessibility snapshots and VoiceOver navigation.
 
+<<<<<<< codex/update-web_app_inventory.md-and-ios_implementation_spec.md-in1hbo
+## Open Questions / Ambiguities (Resolved + Remaining)
+1. **Workout identity strategy** (still open): decide whether persistence uses web-compatible string keys directly or internal relational IDs with adapter translation.
+2. **Collision policy** (resolved): allow multiple logs/day; if a non-planned workout is logged, default behavior defers displaced planned workout to the next day (excluding day-off semantics).
+3. **Retro recompute** (resolved): progression state, program variables, and exercise-history indexes must recompute from latest corrected history/outcomes.
+4. **Rotation-order controls** (resolved intent): expose user-visible controls to adjust rotation order (including semantics currently represented by `swap_slot`).
+5. **Timezone policy** (resolved): local device timezone is canonical for date-only logging and jump anchoring.
+6. **Archive/delete retention** (resolved): plan archive/delete does not remove completed workouts; historical workouts remain visible but excluded from active-plan rotation metrics.
+7. **Extra import dedupe** (resolved direction): use semantic dedupe keys rather than ID-only dedupe.
+8. **Historical resume outcome saves** (resolved): must allow outcome creation even when no matching planned/extra row exists.
+9. **Settings recovery** (resolved): do not ship a user-facing iOS equivalent of web force-refresh in v1.
+=======
 ## Open Questions / Ambiguities
 1. Should iOS persist web-compatible outcome key strings directly, or use internal relational IDs with a compatibility adapter at import/export boundaries?
 2. What exact collision policy is required when moving planned outcomes to dates that already contain planned entries?
@@ -150,3 +171,4 @@
 7. Should extra-workout import dedupe remain ID-based or become semantic?
 8. Is historical Active Workout resume mandatory for v1, including cases where matching history rows are missing?
 9. What is the iOS equivalent of web “force refresh” (cache/service-worker reset), and should it be end-user visible or debug-only?
+>>>>>>> main

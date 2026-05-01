@@ -114,6 +114,20 @@
 - “One planned entry per day” replacement can feel destructive for users expecting multiple planned logs/day.
 - Hidden noon jump anchor affects projection but has limited user-facing visibility.
 - Several flows treat `planDay.slots[0]` as canonical, under-representing secondary slots.
+<<<<<<< codex/update-web_app_inventory.md-and-ios_implementation_spec.md-in1hbo
+- Settings “force refresh” is destructive for offline cache and may surprise users if not clearly messaged (web-specific behavior).
+
+## Open Questions / Ambiguities (Updated with Product Direction)
+1. **Planned sessions per day**: Multi-planned sessions/day are allowed. Default projection logic should still assume each rotation item maps to subsequent days unless explicitly marked day off or otherwise overridden.
+2. **Collision behavior when moving/logging outcomes**: Plan should be treated as guidance, not a hard limit. If a different workout is performed on a planned day, that day's originally planned workout should be deferred to the following day by default. Users can still log multiple workouts on the same day.
+3. **Retroactive edits recomputation**: Yes—retroactive edits/deletes must trigger recomputation of run progression state, program variables, and derived exercise history.
+4. **`swap_slot` UX intent**: User-visible controls are desired for changing rotation order within plans (current model-level capability should become explicit UI behavior).
+5. **Import dedupe policy for extras**: Move from ID-only dedupe to semantic dedupe keys (at least date + workout type + name/source, with clear tie-break rules).
+6. **Timezone policy**: Canonical policy is device local timezone for date mapping (`calendarDate`), jump anchoring, and DST/travel behavior.
+7. **Archive/delete retention policy**: Archiving/deleting a plan should **not** delete completed workout records. Historical workouts remain on calendar/history, but are not counted toward the active/latest plan rotation metrics.
+8. **Historical resume without matching planned/extra row**: Allowed. Outcome/workout records are first-class entities and should be saveable even without plan linkage.
+9. **Settings force-refresh in iOS**: Not required as a user-facing iOS feature; web-specific recovery behavior should remain web-only.
+=======
 - Settings “force refresh” is destructive for offline cache and may surprise users if not clearly messaged.
 
 ## Open Questions / Ambiguities
@@ -126,3 +140,4 @@
 7. On archive/delete, what retention/cascade policy is required for history, outcomes, extras, overrides, vars, and exercise history?
 8. Is historical Active Workout resume allowed to create outcomes if matching planned/extra entry is missing?
 9. Should Settings force-refresh remain a user-facing action in native iOS, and what equivalent recovery behavior is required?
+>>>>>>> main
