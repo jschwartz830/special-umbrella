@@ -17,6 +17,8 @@ import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } fr
 // eslint-disable-next-line import/first
 import { usePlanStore } from '../planStore'
 // eslint-disable-next-line import/first
+import { useProgramStore } from '../programStore'
+// eslint-disable-next-line import/first
 import type { Plan } from '../../types'
 // eslint-disable-next-line import/first
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
@@ -52,6 +54,7 @@ beforeEach(() => {
   usePlanStore.setState({ plans: {}, activePlanId: null })
   useHistoryStore.setState({ entries: [], overrides: [], extraEntries: [] })
   useOutcomeStore.setState({ outcomes: {}, progressionStates: {} })
+  useProgramStore.setState({ vars: {} })
 })
 
 describe('plan delete cleanup (integration)', () => {
@@ -146,5 +149,39 @@ describe('plan delete cleanup (integration)', () => {
     expect(remainingOutcomeKeys[0]).toBe(
       makeExtraWorkoutInstanceId('plan-B', '2026-04-01', extraBId),
     )
+  })
+
+  it('clears program variables for the deleted plan, leaving other plans intact', () => {
+    // Simulate two YAML-imported plans that each have program vars seeded
+    const planA = makePlan('plan-A', 'Alpha')
+    const planB = makePlan('plan-B', 'Bravo')
+    usePlanStore.setState({ plans: { [planA.id]: planA, [planB.id]: planB } })
+
+    // Seed program vars for both plans
+    useProgramStore.getState().initVars('plan-A', { squat: 135, bench: 95 })
+    useProgramStore.getState().initVars('plan-B', { easy_miles: 3.5 })
+
+    expect(useProgramStore.getState().getVars('plan-A')).toMatchObject({ squat: 135, bench: 95 })
+    expect(useProgramStore.getState().getVars('plan-B')).toMatchObject({ easy_miles: 3.5 })
+
+    // Simulate the PlansPage delete handler (including the fix: clearPlanVars)
+    useHistoryStore.getState().clearPlanHistory('plan-A')
+    useOutcomeStore.getState().clearPlanOutcomes('plan-A')
+    useProgramStore.getState().clearPlanVars('plan-A')
+    usePlanStore.getState().deletePlan('plan-A')
+
+    // Plan A vars removed; plan B vars untouched
+    expect(useProgramStore.getState().getVars('plan-A')).toEqual({})
+    expect(useProgramStore.getState().getVars('plan-B')).toMatchObject({ easy_miles: 3.5 })
+  })
+
+  it('clearPlanVars is a no-op for plans that had no program vars (non-YAML plans)', () => {
+    const plan = makePlan('plan-A', 'Alpha')
+    usePlanStore.setState({ plans: { [plan.id]: plan } })
+    // No initVars — plain plan with no YAML program
+    expect(() => {
+      useProgramStore.getState().clearPlanVars('plan-A')
+    }).not.toThrow()
+    expect(useProgramStore.getState().getVars('plan-A')).toEqual({})
   })
 })
