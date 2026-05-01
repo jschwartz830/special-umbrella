@@ -16,6 +16,7 @@ import { usePlanStore } from '../store/planStore'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore } from '../store/outcomeStore'
 import { useProgramStore } from '../store/programStore'
+import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computePlanProgress } from '../lib/historyStats'
 import { Modal } from '../components/shared/Modal'
@@ -36,6 +37,7 @@ export function PlansPage() {
   const clearHistory = useHistoryStore(s => s.clearPlanHistory)
   const clearOutcomes = useOutcomeStore(s => s.clearPlanOutcomes)
   const clearVars = useProgramStore(s => s.clearPlanVars)
+  const clearExerciseHistory = useExerciseHistoryStore(s => s.clearByPlanId)
   const entries = useHistoryStore(s => s.entries)
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -323,6 +325,7 @@ export function PlansPage() {
                   clearHistory(confirmDelete)
                   clearOutcomes(confirmDelete)
                   clearVars(confirmDelete)
+                  clearExerciseHistory(confirmDelete)
                   deletePlan(confirmDelete)
                   setConfirmDelete(null)
                 }}
