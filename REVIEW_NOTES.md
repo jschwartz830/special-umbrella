@@ -1701,3 +1701,89 @@ Nothing to remove.
 ### Dependencies added
 
 None.
+
+---
+
+## 2026-05-01 (nineteenth pass) — branch `claude/dreamy-mccarthy-15kIJ`
+
+**Baseline**: 315 passing, 0 failing → **Exit**: 440 passing, 0 failing (+125).
+
+---
+
+### Executive summary
+
+Two real bugs were found and fixed. A critical test gap (zero coverage of the
+expression evaluator and program store) was closed with 125 new tests. The tests
+themselves surfaced the second bug. No feature work was done — the codebase
+needed stabilization first.
+
+---
+
+### Biggest issues found this pass
+
+1. **`evaluateUpdates` silently zeroed min/max-capped update expressions** —
+   Any YAML program rule using `easy_miles = min(easy_miles + 0.5, 8)` would
+   quietly set `easy_miles` to 0 rather than the capped value. This is a data
+   corruption bug for anyone using the running program feature with distance caps.
+
+2. **PlansPage delete handler left orphaned program vars** — `clearPlanVars` was
+   never called when deleting a plan. For YAML-imported plans this left stale
+   state in the persistence layer. Harmless for most users (plans are rarely
+   deleted and IDs are nanoid), but violates the cleanup contract.
+
+---
+
+### Improvements completed
+
+| # | Change | Risk | Rollback |
+|---|--------|------|---------|
+| 1 | `PlansPage` delete: add `clearVars` call | None | 1-line revert |
+| 2 | `expressionEval`: paren-aware `splitStatements` | None | Revert to naive split |
+| 3 | 100 tests for `expressionEval.ts` | None | Delete file |
+| 4 | 23 tests for `programStore` | None | Delete file |
+
+---
+
+### Definitely keep
+
+- `splitStatements()` in `expressionEval.ts` — fixes silent data corruption.
+- `clearVars` in `PlansPage` delete handler — fixes orphan leak.
+- Both new test files — 125 tests covering previously untested critical paths.
+
+### Probably keep
+
+- Two new integration tests in `planDeleteCleanup.test.ts` — directly verify
+  the bug fix and the no-op edge case.
+
+### Do not keep / recommendations only
+
+- Nothing was added as a recommendation-only item this pass.
+
+---
+
+### Open questions
+
+1. Are there other YAML update expressions in the wild that rely on `min`/`max`
+   caps? If so, existing stored `easy_miles` values may already be 0 from prior
+   evaluations and would need manual reset.
+
+2. Should `programStore.applyProgressionRule` warn (console.warn) when an
+   update expression evaluates to 0 due to a parse error, rather than silently
+   accepting 0?
+
+---
+
+### Known issues or incomplete work
+
+- **`truncate` on session hint** (carry-over from pass 18): The `"Last: …"` hint
+  has no CSS overflow protection on narrow screens.
+- **`findPreviousSessionForPlanDay` / `buildLastSessionSummary`** still untested
+  (carry-over from pass 18). Low priority.
+- **`planStore.setActivePlan` / `duplicatePlan`** still untested (carry-over
+  from pass 17). Medium priority.
+
+---
+
+### Dependencies added
+
+None.

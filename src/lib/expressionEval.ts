@@ -291,6 +291,31 @@ export function evaluateCondition(cond: string | undefined, ctx: EvalContext): b
 }
 
 /**
+ * Split a comma-separated update string into individual statements while
+ * respecting parentheses depth — commas inside function calls (e.g., the
+ * comma in `min(a, b)`) are not treated as statement separators.
+ */
+function splitStatements(s: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+  for (const ch of s) {
+    if (ch === '(') { depth++; current += ch }
+    else if (ch === ')') { depth--; current += ch }
+    else if (ch === ',' && depth === 0) {
+      const trimmed = current.trim()
+      if (trimmed) parts.push(trimmed)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  const last = current.trim()
+  if (last) parts.push(last)
+  return parts
+}
+
+/**
  * Parse and apply one or more update expressions (comma-separated).
  * Returns an object of { varName: newValue } for all updated vars.
  *
@@ -300,6 +325,7 @@ export function evaluateCondition(cond: string | undefined, ctx: EvalContext): b
  *   squat *= 0.85
  *   squat /= 2
  *   squat = round5(squat * 0.85)
+ *   easy_miles = min(easy_miles + 0.5, 8)   ← commas in function args are safe
  */
 export function evaluateUpdates(
   updateStr: string,
@@ -308,7 +334,7 @@ export function evaluateUpdates(
   const vars = buildVars(ctx)
   const result: Record<string, number> = {}
 
-  const statements = updateStr.split(',').map(s => s.trim()).filter(Boolean)
+  const statements = splitStatements(updateStr)
   for (const stmt of statements) {
     // Match: varName [+|-|*|/]= expression
     const m = stmt.match(/^([a-zA-Z_]\w*)\s*(\+|-|\*|\/)?=\s*(.+)$/)
