@@ -270,3 +270,108 @@ Classification: **Keep — evaluate wording on device**
 the value for repeating strength plans is clear. The main open question is
 whether the single-exercise display is satisfying or frustrating for complex
 plans. Recommend keeping and iterating on the display format based on real use.
+
+---
+
+# Feature Review — Personal Best (PB) Detection in Session Hint
+
+Date: 2026-05-02
+Branch: `claude/dreamy-mccarthy-WJaAU`
+Classification: **Keep**
+
+---
+
+## What was actually built
+
+1. `buildLastSessionSummary` in `src/lib/sessionSummary.ts` extended with an
+   optional `maxLoadByExercise?: Record<string, number>` parameter. When the
+   first actual set's load equals `maxLoadByExercise[exerciseName]`, " · PB" is
+   appended to the returned string. No behaviour change when the parameter is
+   omitted (run/swim callers, tests without PB context).
+
+2. In `TodayPage`:
+   - `exerciseRecords = useExerciseHistoryStore(s => s.records)` — first use of
+     this store in TodayPage. Single selector minimises re-renders.
+   - `maxLoadByExercise = useMemo(...)` — iterates records to build
+     `{ exerciseName: maxLoad }` map. Memoized on `exerciseRecords`.
+   - `buildLastSessionSummary(prevSessionOutcome, maxLoadByExercise)` — updated
+     call site.
+
+3. **Tests** (in `sessionSummary.test.ts`):
+   - PB marker shown when load equals all-time max.
+   - No PB when load is below max.
+   - No PB when the exercise is not in the map.
+
+---
+
+## What assumptions were encoded
+
+- All-time max across all exercise records (including records from deleted
+  plans). This is intentional — the load is valid data regardless of which plan
+  it was logged under.
+- Equality comparison (`=== maxLoadByExercise[exercise]`): PB fires only on an
+  exact match to the all-time high. A user who logged 135 lb → 145 lb → 135 lb
+  will see "· PB" on the 145 lb session, not the most recent 135 lb one.
+- Only weights PB detection. Run and swim are unchanged.
+
+---
+
+## What worked well
+
+- The feature fell entirely out of the existing `exerciseHistoryStore` (which
+  has been populated since pass 6 but was only exposed in one place). No schema
+  changes, no new store state.
+- Extracting `buildLastSessionSummary` to `sessionSummary.ts` this pass made
+  the PB parameter a natural extension of an already-refactored function.
+- The `maxLoadByExercise` memo is O(n sets) — cheap even for heavy users with
+  hundreds of sessions.
+
+---
+
+## What feels risky or incomplete
+
+- **First `exerciseHistoryStore` subscription in TodayPage**: the store is
+  large (one record per exercise per session). On an old device with 2+ years
+  of data, the memo could be slow. Measured O(n) on records, not sets, so in
+  practice at most a few thousand iterations — acceptable.
+- **Equality, not range**: "· PB" only fires when the previous session *exactly
+  matched* the all-time high. If the user logged 225 lb once, then logged 200 lb
+  three times, "· PB" never shows on the 200 lb sessions (correct: they aren't
+  PRs), but won't show on new 225 lb sessions if somehow two records exist with
+  the same load. Edge case, tolerable.
+- **No indicator for run/swim best**: users who primarily track running may feel
+  the feature is incomplete. Low priority since run adaptation already gives
+  pace/distance guidance.
+
+---
+
+## What I should evaluate
+
+1. Does "Last: 3×8 @ 225 lb Squat · PB" render legibly in the hint line
+   alongside the `truncate` class? On a narrow screen the PB marker might be
+   clipped. Check on a 360px device.
+2. Does the `exerciseHistoryStore` subscription cause any perceptible extra
+   render on TodayPage? The store only changes when a workout is logged, so
+   steady-state renders are unaffected.
+3. Is the PB marker visually distinct enough in muted slate text, or does it
+   need colour (e.g., `text-amber-400`)?
+
+---
+
+## Recommended next steps
+
+- If the PB marker is too easy to miss, style "· PB" in `text-amber-400` for
+  a gold highlight. One-line CSS change.
+- Consider adding a `maxDistanceByType` equivalent for run outcomes in a future
+  pass.
+- A "personal records" section in HistoryPage or SettingsPage (all-time bests
+  per exercise, sortable) is a natural next feature that would use the same
+  `maxLoadByExercise` computation.
+
+---
+
+## Keep / revise / prototype only / reject
+
+**Keep** — passive, zero-friction PB detection using fully available data.
+The only open question is styling (plain text vs. colour highlight). The
+feature is complete and correct; styling can be tuned without any logic change.

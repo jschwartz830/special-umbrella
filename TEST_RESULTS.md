@@ -1027,3 +1027,77 @@ existed.
 4. **CalendarPage retroactive logging flow**
 5. **PlanBuilderPage unsaved-changes guard**
 7. **TodayPage action handlers**
+
+---
+
+## 2026-05-02 (twentieth pass) — branch `claude/dreamy-mccarthy-WJaAU`
+
+**Result: 484 passing, 0 failing** (+44 tests from baseline of 440).
+
+### Tests reviewed
+
+All existing test files reviewed for regressions. Three files added, one
+updated. No existing tests were modified; no regressions introduced.
+
+### Tests added / updated
+
+| File | New tests | Notes |
+|------|-----------|-------|
+| `src/lib/__tests__/sessionSummary.test.ts` | 21 | New file |
+| `src/store/__tests__/planStore.test.ts` | 22 | New file |
+| `src/store/__tests__/planDeleteCleanup.test.ts` | +1 | Added to existing file |
+
+**Total new tests: 44**
+
+#### sessionSummary.test.ts breakdown
+
+| Group | Tests | What's covered |
+|-------|-------|----------------|
+| `findPreviousSessionForPlanDay` | 8 | Empty entries, missing outcome, most-recent wins, today excluded, wrong planDayIndex ignored, skip/day_off ignored, wrong planId, fallback to earlier |
+| `buildLastSessionSummary — weights` | 5 | No data → null, N×reps format, no-load, PB marker, below-max no PB |
+| `buildLastSessionSummary — PB map edge cases` | 3 | No map → no PB, exercise absent from map, explicit no-PB |
+| `buildLastSessionSummary — run` | 4 | Distance+duration, distance only, duration only, empty → null |
+| `buildLastSessionSummary — swim` | 1 | Distance+duration format |
+
+#### planStore.test.ts breakdown
+
+| Group | Tests | What's covered |
+|-------|-------|----------------|
+| `createPlan` | 3 | Id assigned, timestamps, multiple plans independent |
+| `setActivePlan` | 5 | Status set, prior deactivated, startDate override, startDayIndex override, default today |
+| `deactivatePlan` | 2 | Clears activePlanId, no-op when none |
+| `archivePlan` | 3 | Status set, activePlanId cleared, sibling untouched |
+| `deletePlan` | 3 | Removed, activePlanId cleared, sibling untouched |
+| `duplicatePlan` | 6 | New id, "(copy)" suffix, always inactive, new day/slot ids, original intact, missing id → "" |
+
+#### planDeleteCleanup.test.ts addition
+
+Added "clears exercise history records for the deleted plan only":
+- Seeds records in `exerciseHistoryStore` for two plans
+- Runs the full 5-step cascade (clearPlanHistory, clearPlanOutcomes, clearPlanVars, clearByPlanId, deletePlan)
+- Asserts plan A records removed, plan B records intact
+
+### Tests that caught real bugs
+
+None this pass — the UX fix and feature were identified by code inspection,
+not failing tests. The test additions close structural coverage gaps.
+
+### Impact of changes on test coverage
+
+| Change | Test impact |
+|--------|-------------|
+| `!planExpired` guard on cycle spans | Display-only; covered by code review |
+| Session summary extraction to lib | Enabled the 21 new sessionSummary tests |
+| PB detection feature | 3 of the 21 sessionSummary tests specifically cover PB paths |
+| `planStore` all actions | 22 new tests; all 6 public actions now covered |
+| exerciseHistory cascade in delete | 1 new integration test |
+
+### Important logic still untested
+
+#### Lower priority (carry-over)
+
+1. **Double-day rotation behavior** — advance override + complete on the same
+   day; tomorrow should start 2 positions ahead.
+2. **CalendarPage retroactive logging flow**
+3. **PlanBuilderPage unsaved-changes guard**
+4. **TodayPage action handlers** (startWorkout, confirmPrimary, etc.)

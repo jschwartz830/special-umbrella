@@ -241,3 +241,75 @@ Bug fix first (confirmed data leak with simple fix), then close the test loop
 on the delete behavior, then the largest test gap (expressionEval), then the
 programStore integration layer. Feature work explicitly skipped per audit rules
 (stabilisation over expansion when test coverage is lacking).
+
+---
+
+## 2026-05-02 — Overnight Audit (twentieth pass)
+
+Branch: `claude/dreamy-mccarthy-WJaAU`.
+Baseline on entry: **440 passing, 0 failing**.
+Exit state: **484 passing, 0 failing** (+44 tests).
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since the nineteenth pass. All previous PRs (#27–#63)
+merged into this branch.
+
+### What appears strong and well-designed (unchanged)
+
+- 484-test suite now covering engine, stores, adaptation, lib, CSV,
+  recommendation, session summary, and planStore.
+- All prior bug fixes from passes 1–19 remain stable; no regressions.
+- `exerciseHistoryStore` has been accumulating data since pass 6 and is now
+  read for the first time in TodayPage for PB detection.
+
+### Key issues found this pass
+
+1. **Cycle/week progress text shown when plan is expired** (UX noise).
+   The subtitle showed "3/6 done" and "rotation complete!" alongside the
+   purple "Plan complete!" banner. Redundant and contradictory. Fixed with
+   `!planExpired` guard on both rotation cycle spans. The weeks-plan span
+   was already guarded by `completed < total`.
+
+2. **`findPreviousSessionForPlanDay` + `buildLastSessionSummary` untested**
+   (TEST GAP — carry-over from pass 18). Both helpers were pure functions
+   inlined in TodayPage with zero test coverage. Extracted to
+   `src/lib/sessionSummary.ts` and covered with 21 tests.
+
+3. **`planStore.setActivePlan` / `duplicatePlan` (and other actions) untested**
+   (TEST GAP — carry-over from pass 17). Created `planStore.test.ts` with
+   22 tests covering all six public store actions.
+
+4. **`planDeleteCleanup.test.ts` did not assert `clearExerciseHistory`**
+   (TEST GAP). The PlansPage delete handler calls `clearByPlanId` on
+   `exerciseHistoryStore` as step four, but this was never verified in the
+   integration test. Added import, `beforeEach` reset, and one new test.
+
+### Feature selected: PB detection in session hint
+
+Extended `buildLastSessionSummary` to append " · PB" when the previous
+session's displayed load equals the user's all-time max for that exercise.
+Uses `exerciseHistoryStore.records` (first TodayPage subscription) via a
+single `useMemo`. Fully tested (3 additional tests in `sessionSummary.test.ts`).
+
+See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md for full rationale.
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| 1 | Suppress cycle/week progress when expired | None | ✅ Done |
+| 2 | Extract session summary helpers to lib | None | ✅ Done |
+| 3 | Tests for session summary helpers | None | ✅ Done |
+| 4 | `planStore.test.ts` (22 tests) | None | ✅ Done |
+| 5 | `planDeleteCleanup` exerciseHistory coverage | None | ✅ Done |
+| 6 | PB detection feature | Low | ✅ Done |
+
+### Rationale for sequencing
+
+UX fix first (clean, 2-line guard). Refactor second (enabling testability is
+higher priority than adding tests directly). Tests third for the refactored
+functions. New test file for planStore (long-standing gap). Integration test
+gap closed. Feature last — code base was stable enough for a feature after the
+test gaps were addressed.
