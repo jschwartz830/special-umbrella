@@ -39,6 +39,8 @@ import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgres
 import type { ResolvedDay, ExtraWorkoutEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
+import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
+import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 
 /** Find the most recent outcome with weights data for this plan (excluding today). */
 function findPreviousWeightsOutcome(
@@ -86,66 +88,6 @@ function findPreviousSetsByExercise(
   return previousByExercise
 }
 
-/**
- * Find the most recent completed outcome for the exact planDayIndex being
- * performed today, excluding today's date. Used to surface a "last session"
- * summary without requiring the user to open the outcome modal.
- */
-function findPreviousSessionForPlanDay(
-  planId: string,
-  planDayIndex: number,
-  currentDate: string,
-  entries: import('../types').HistoryEntry[],
-  outcomes: Record<string, WorkoutOutcome>,
-): WorkoutOutcome | null {
-  const candidates = entries.filter(
-    e =>
-      e.planId === planId &&
-      e.action === 'complete' &&
-      e.planDayIndex === planDayIndex &&
-      e.calendarDate !== currentDate,
-  )
-  if (candidates.length === 0) return null
-  candidates.sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
-  for (const e of candidates) {
-    const outcome = outcomes[`${planId}_${e.calendarDate}`]
-    if (outcome) return outcome
-  }
-  return null
-}
-
-/** Format a compact one-line summary of a previous workout outcome. */
-function buildLastSessionSummary(outcome: WorkoutOutcome): string | null {
-  // Weights: first exercise with at least one actual set
-  const ex = outcome.weightsActual?.exercises?.find(e => e.sets.some(s => s.actualReps != null || s.actualLoad != null))
-  if (ex) {
-    const s = ex.sets.find(s => s.actualReps != null || s.actualLoad != null)
-    if (s) {
-      const sets = ex.sets.filter(s => s.actualReps != null || s.actualLoad != null).length
-      const reps = s.actualReps != null ? s.actualReps : s.targetReps
-      const load = s.actualLoad != null ? `@ ${s.actualLoad} lb` : ''
-      return `Last: ${sets}×${reps}${load ? ' ' + load : ''} ${ex.exercise}`
-    }
-  }
-  // Run: distance and/or duration
-  const run = outcome.runActual
-  if (run) {
-    const parts: string[] = []
-    if (run.actualDistanceMiles != null) parts.push(`${run.actualDistanceMiles} mi`)
-    if (run.actualDurationMin != null) parts.push(`${run.actualDurationMin} min`)
-    if (parts.length) return `Last: ${parts.join(' · ')}`
-  }
-  // Swim: distance and/or duration
-  const swim = outcome.swimActual
-  if (swim) {
-    const parts: string[] = []
-    if (swim.actualDistanceMeters != null) parts.push(`${swim.actualDistanceMeters} m`)
-    if (swim.actualDurationMin != null) parts.push(`${swim.actualDurationMin} min`)
-    if (parts.length) return `Last: ${parts.join(' · ')}`
-  }
-  return null
-}
-
 export function TodayPage() {
   const navigate = useNavigate()
   const { plan, todayResolved, upcoming, planEntries } = useActivePlan()
@@ -179,6 +121,20 @@ export function TodayPage() {
     () => (plan ? findPreviousSetsByExercise(plan.id, today, allOutcomes) : {}),
     [plan, today, allOutcomes],
   )
+
+  // Build all-time max load per exercise for PB detection in the session hint.
+  const exerciseRecords = useExerciseHistoryStore(s => s.records)
+  const maxLoadByExercise = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const r of exerciseRecords) {
+      for (const s of r.sets) {
+        if (s.load !== null && s.completed) {
+          map[r.exerciseName] = Math.max(map[r.exerciseName] ?? 0, s.load)
+        }
+      }
+    }
+    return map
+  }, [exerciseRecords])
 
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
@@ -275,7 +231,7 @@ export function TodayPage() {
   const prevSessionOutcome = isPending
     ? findPreviousSessionForPlanDay(plan.id, primaryPlanDayIndex, today, planEntries, allOutcomes)
     : null
-  const lastSessionSummary = prevSessionOutcome ? buildLastSessionSummary(prevSessionOutcome) : null
+  const lastSessionSummary = prevSessionOutcome ? buildLastSessionSummary(prevSessionOutcome, maxLoadByExercise) : null
 
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     setActiveTrackedExercises(exercises)
