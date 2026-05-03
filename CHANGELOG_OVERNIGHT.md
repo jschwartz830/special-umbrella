@@ -1703,3 +1703,70 @@ tests covering all public store actions:
 
 **Files changed**:
 - `src/store/__tests__/programStore.test.ts` (new, 23 tests)
+
+---
+
+## 2026-05-03 (twentieth pass) — branch `claude/dreamy-mccarthy-SwIxl`
+
+Baseline on entry: **440 passing, 0 failing**.
+Exit state: **469 passing, 0 failing** (+29 tests).
+
+---
+
+### 1. Tests: `exerciseHistoryStore` — 29 new unit tests
+
+**Summary**: `src/store/__tests__/exerciseHistoryStore.test.ts` was missing
+entirely. The store added in PR #66 had no test coverage for any of its six
+public methods. Added a comprehensive 29-test suite.
+
+Methods covered and key scenarios:
+
+- **`upsertFromOutcome`**: creates one record per exercise in the outcome,
+  computes correct summary values (totalVolume = Σ sets, maxLoad = max set load,
+  maxReps = max set reps), skips outcomes with no exercises, is idempotent
+  (second call replaces the first), parses `calendarDate` from both standard
+  (`planId_date`) and extra (`planId_date_extra_id`) instanceId formats.
+- **`removeByWorkoutInstance`**: removes all records for the given instanceId,
+  leaves other instanceIds untouched, no-op for unknown id.
+- **`moveByWorkoutInstance`**: updates `calendarDate` on all matching records,
+  no-op for unknown id.
+- **`clearByPlanId`**: removes all records for the given planId, leaves other
+  plans untouched, no-op for unknown planId.
+- **`getByExerciseName`**: returns records sorted descending by `calendarDate`
+  (most recent first), returns empty array for unknown name, is case-sensitive.
+- **`getAllExerciseNames`**: returns deduplicated names sorted alphabetically,
+  returns empty array when store is empty.
+
+One test was initially written incorrectly (assumed an exercise with empty sets
+would produce zero records; the store creates a record with null summaries). Fix
+applied during implementation.
+
+**Files changed**:
+- `src/store/__tests__/exerciseHistoryStore.test.ts` (new, 29 tests)
+
+---
+
+### 2. Feat: Personal Records section in History tab
+
+**Summary**: Added a collapsible **Personal Records** section to the top of the
+History tab (`HistoryPage.tsx`). The section renders a 3-column table showing
+each exercise's all-time best weight, best reps, session count, and the date
+each PR was set. Records are automatically scoped to the active plan filter.
+
+The section only renders when `personalRecords.length > 0`, so users without
+weight-logging data see no change.
+
+**Bug fixed during implementation**: The first draft of `PersonalRecordsSection`
+contained a dead-code branch — `{hasMore && !expanded && (...)}` inside an
+`{expanded && (...)}` block. Because `!expanded` is always `false` inside the
+`expanded &&` wrapper, the "show more" button never rendered. Simplified to a
+plain expand/collapse toggle; removed `MAX_PR_ROWS_COLLAPSED`, `visible`, and
+`hasMore` variables.
+
+**New exports** (pure, testable):
+- `computePersonalRecords(records, planId)` — derives `PersonalRecord[]` from
+  `ExerciseSessionRecord[]`, scoped to a plan or global
+- `PersonalRecord` interface
+
+**Files changed**:
+- `src/pages/HistoryPage.tsx` (+137 lines)

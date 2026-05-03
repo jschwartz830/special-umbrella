@@ -270,3 +270,71 @@ Classification: **Keep — evaluate wording on device**
 the value for repeating strength plans is clear. The main open question is
 whether the single-exercise display is satisfying or frustrating for complex
 plans. Recommend keeping and iterating on the display format based on real use.
+
+---
+
+# Feature Review — Personal Records Section (pass 20)
+
+Date: 2026-05-03
+Branch: `claude/dreamy-mccarthy-SwIxl`
+
+---
+
+## What was implemented
+
+A collapsible **Personal Records** section added to the top of the History tab.
+Tapping the header reveals a 3-column table (Exercise · Best weight · Best reps)
+with session count and date beneath each value. Records are scoped to the
+current plan filter automatically.
+
+Key code:
+- `computePersonalRecords(records, planId)` — pure function, exported
+- `PersonalRecord` interface — exported
+- `PersonalRecordsSection` component — collapse toggle only, no pagination
+
+Bug found and fixed during implementation: the first draft had a dead-code
+branch `{hasMore && !expanded && (...)}` inside an `{expanded && (...)}` block.
+`!expanded` is always `false` inside that block, so the "show more" button
+never rendered. Simplified to a plain expand/collapse toggle and removed the
+`MAX_PR_ROWS_COLLAPSED` constant and `visible`/`hasMore` variables that were no
+longer needed.
+
+---
+
+## Assessment
+
+**Correctness**: `computePersonalRecords` is a straightforward reduce over the
+`records` array. Plan scoping (`planId ? records.filter(...) : records`) is
+correct. Alphabetical sort by `exerciseName` is predictable.
+
+**Performance**: The `useMemo` around `computePersonalRecords` re-derives only
+when `allExerciseRecords` or `filterPlanId` changes, which is infrequent.
+Iterating over all records once is O(n) and acceptable for typical training log
+sizes.
+
+**UX**: The section only renders when `personalRecords.length > 0`, so users
+without weight-logging data never see an empty table. The collapsed-by-default
+header keeps the History tab's main list prominent.
+
+---
+
+## Risks
+
+None beyond what was stated in the proposal. Read-only view.
+
+---
+
+## Recommended next steps
+
+- Add `truncate` overflow protection on the exercise name column for very long
+  names (one-line CSS change).
+- Add unit tests for `computePersonalRecords` — function is exported and easily
+  testable with no mocks.
+- Consider volume (`totalVolume`) as a third PR column in a future pass.
+
+---
+
+## Keep / revise / prototype only / reject
+
+**Keep** — purely additive, no risk, directly powered by the exercise history
+infrastructure that was already built for this purpose.

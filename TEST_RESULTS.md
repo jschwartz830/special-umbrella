@@ -1027,3 +1027,50 @@ existed.
 4. **CalendarPage retroactive logging flow**
 5. **PlanBuilderPage unsaved-changes guard**
 7. **TodayPage action handlers**
+
+---
+
+## 2026-05-03 (twentieth pass) — branch `claude/dreamy-mccarthy-SwIxl`
+
+**Result: 469 passing, 0 failing** (+29 tests this pass)
+
+### Tests reviewed
+
+All 14 test files reviewed for regressions. No existing tests were modified.
+
+### Tests added
+
+**`src/store/__tests__/exerciseHistoryStore.test.ts`** — new file, 29 tests.
+
+| Describe block | Count | What it verifies |
+|---|---|---|
+| `upsertFromOutcome — basic record creation` | 5 | One record per exercise, correct summaries, skips empty exercises |
+| `upsertFromOutcome — idempotency` | 2 | Second call replaces first; no duplicates |
+| `upsertFromOutcome — instanceId parsing` | 2 | Standard and extra instanceId formats parse date correctly |
+| `removeByWorkoutInstance` | 3 | Removes matching, leaves others, no-op for unknown |
+| `moveByWorkoutInstance` | 3 | Updates calendarDate, leaves others, no-op for unknown |
+| `clearByPlanId` | 3 | Removes all for plan, leaves other plans, no-op for unknown |
+| `getByExerciseName` | 3 | Sorted desc by date, empty for unknown, case-sensitive |
+| `getAllExerciseNames` | 3 | Deduplicated, alphabetical, empty when no records |
+| (fix) `clearByPlanId` correction | 1 | Exercise with empty sets creates a record; test corrected |
+
+One test initially failed: `clearByPlanId — removes all records for the given
+planId, leaves other plans intact`. Root cause: test assumed an exercise with
+`sets: []` would produce 0 records. The store creates a record with null
+summaries for any exercise entry regardless of sets. Fix: rewrote the test to
+use exercises with actual sets.
+
+### Remaining gaps (carry-forward)
+
+#### Low priority (new this pass)
+1. **`computePersonalRecords`** — exported pure function, not yet unit-tested.
+
+#### Medium priority (unchanged)
+2. **planStore** — `setActivePlan`, `duplicatePlan`
+3. **Double-day rotation behavior**
+
+#### Lower priority (carry-over)
+4. **`findPreviousSessionForPlanDay`** / **`buildLastSessionSummary`**
+5. **CalendarPage retroactive logging flow**
+6. **PlanBuilderPage unsaved-changes guard**
+7. **TodayPage action handlers**

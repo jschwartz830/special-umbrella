@@ -241,3 +241,41 @@ Bug fix first (confirmed data leak with simple fix), then close the test loop
 on the delete behavior, then the largest test gap (expressionEval), then the
 programStore integration layer. Feature work explicitly skipped per audit rules
 (stabilisation over expansion when test coverage is lacking).
+
+---
+
+## Pass 20 — 2026-05-03 (branch `claude/dreamy-mccarthy-SwIxl`)
+
+### Observations on entry
+
+- `exerciseHistoryStore` (added in PR #66) had **zero tests** despite containing
+  non-trivial logic: `upsertFromOutcome` (idempotent replace, instanceId parsing,
+  per-exercise summary computation), `removeByWorkoutInstance`,
+  `moveByWorkoutInstance`, `clearByPlanId`, `getByExerciseName`, and
+  `getAllExerciseNames`.
+- `computePersonalRecords` had been partially written into `HistoryPage.tsx`
+  during a prior partial session but not committed; had a dead-code bug.
+- No obvious new bugs in existing committed code.
+- All previously identified carry-over gaps (planStore, double-day rotation,
+  `findPreviousSessionForPlanDay`) remain open but none are regressions.
+
+### Decisions
+
+- **Close the exerciseHistoryStore test gap** — highest-priority uncovered logic,
+  verified by reading the store implementation thoroughly first.
+- **Complete the Personal Records feature** — the store was purpose-built for
+  this; narrowest viable slice that makes the data visible to users.
+- Skip planStore and double-day tests (remain medium priority, no regressions).
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| 1 | Add `exerciseHistoryStore.test.ts` (29 tests) | None | ✅ Done |
+| 2 | Fix dead-code branch in `PersonalRecordsSection` | Very low | ✅ Done |
+| 3 | Implement + commit Personal Records feature | Low | ✅ Done |
+
+### Rationale for sequencing
+
+Test gap first (directly verifies the store the feature depends on), then fix
+the implementation bug, then commit the feature with clean tests and types.

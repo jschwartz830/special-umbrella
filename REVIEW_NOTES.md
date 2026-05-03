@@ -1787,3 +1787,67 @@ needed stabilization first.
 ### Dependencies added
 
 None.
+
+---
+
+## 2026-05-03 (twentieth pass) — branch `claude/dreamy-mccarthy-SwIxl`
+
+### Executive summary
+
+1. **What changed**: 29 new unit tests for `exerciseHistoryStore` (no prior
+   coverage), and the Personal Records feature added to the History tab — a
+   collapsible table showing per-exercise best weight, best reps, and session
+   count. A dead-code bug in `PersonalRecordsSection` was found and fixed. 469
+   tests now pass (was 440).
+
+2. **What is highest confidence**: The test suite — all 29 new tests are
+   straightforward unit tests against pure logic with no external dependencies.
+   The `computePersonalRecords` function is a single-pass reduce with clear
+   invariants. The dead-code fix is mechanical (removed unreachable branch).
+
+3. **What is risky**: `PersonalRecordsSection` is a new UI component that hasn't
+   been browser-tested. The component is display-only with no side effects, so
+   the risk is limited to visual rendering (layout, overflow, empty states).
+
+---
+
+### What changed
+
+#### Test: `exerciseHistoryStore` (29 new tests)
+
+`src/store/__tests__/exerciseHistoryStore.test.ts` — new file. Covers all six
+public methods of the store added in PR #66 that had zero prior coverage.
+
+Notable: the `upsertFromOutcome` method parses `planId` and `calendarDate` from
+the `workoutInstanceId` string. Both the standard format (`planId_date`) and the
+extra format (`planId_date_extra_id`) are tested. The idempotency invariant
+(second call replaces, not appends) is verified explicitly.
+
+#### Feat: Personal Records in History tab
+
+`src/pages/HistoryPage.tsx` — new `PersonalRecordsSection` component, new
+`computePersonalRecords` pure function, new `PersonalRecord` interface. The
+section renders only when there are records; it collapses by default.
+
+Dead-code fix: `{hasMore && !expanded && (...)}` was inside `{expanded && (...)}`,
+making the `!expanded` guard always `false`. Removed the dead branch and
+simplified the component to a plain toggle.
+
+---
+
+### Known issues or incomplete work
+
+- **`computePersonalRecords` unit tests** not yet written. The function is
+  exported and easily testable; carrying forward as a low-priority gap.
+- **`truncate` overflow on exercise names** in the PR table — long exercise
+  names may overflow the first column on narrow screens. Low priority.
+- **`truncate` on session hint** (carry-over from pass 18). Low priority.
+- **`findPreviousSessionForPlanDay` / `buildLastSessionSummary`** still
+  untested. Low priority.
+- **`planStore.setActivePlan` / `duplicatePlan`** still untested. Medium.
+
+---
+
+### Dependencies added
+
+None.
