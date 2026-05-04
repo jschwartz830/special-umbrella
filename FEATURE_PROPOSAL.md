@@ -223,3 +223,68 @@ function. No data migration. No store changes to revert.
 - Multi-exercise scrollable row
 - "Best ever" vs. "last time" toggle
 - Run adaptation target inline (already surfaced via `todayAdaptationNote`)
+
+---
+
+# Feature Proposal — Personal Records Section in History Tab
+
+Date: 2026-05-03
+Branch: `claude/dreamy-mccarthy-SwIxl`
+Status: **Implemented this run**
+
+---
+
+## Feature selected
+
+A collapsible **Personal Records** section at the top of the History tab that
+lists, per exercise: best weight ever lifted, best reps in a single set, session
+count, and the date each PR was achieved.
+
+---
+
+## Why selected
+
+The `exerciseHistoryStore` (added in the previous session, PR #66) was designed
+precisely to enable this view. Its `records` array already contains per-session
+`maxLoad` and `maxReps` values. No new data collection, no schema changes, no
+new dependencies — the store just needed a display surface.
+
+---
+
+## Alternatives considered
+
+| Option | Cost | Note |
+|---|---|---|
+| Full per-exercise trend chart | High | Requires a charting library |
+| PR badges inline on each history entry | Medium | Cross-entry comparison at render time |
+| **Collapsible table in History tab** | **Low** | Reuses existing store data, one new component |
+
+---
+
+## Scope
+
+In scope:
+- `PersonalRecordsSection` collapsible component in `HistoryPage.tsx`
+- `computePersonalRecords(records, planId)` pure helper — exported and testable
+- `PersonalRecord` TypeScript interface — exported
+- Plan-filter scoping via existing `filterPlanId` state
+
+Out of scope (future):
+- Per-exercise history trend charts
+- Volume PRs (total weight moved in a session)
+- PR progress arrows (↑/↓ vs. last session)
+
+---
+
+## Risks
+
+Low. Read-only. No writes. No store mutations. The only new state is a
+`boolean` inside the component.
+
+---
+
+## Rollback strategy
+
+Delete the `PersonalRecordsSection` component, the `computePersonalRecords`
+helper, the `PersonalRecord` interface, and the three `useMemo`/JSX lines in
+`HistoryPage`. No data migration needed.
