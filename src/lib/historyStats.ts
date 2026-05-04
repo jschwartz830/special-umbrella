@@ -314,3 +314,29 @@ export function computeWorkoutTypeBreakdown(
   }
   return result
 }
+
+// ── Per-plan-day completion counter ──────────────────────────────────────────
+
+/**
+ * Count how many times a specific plan day (by index) has been completed
+ * for a given plan. Useful for surfacing "Session N" context on today's card.
+ *
+ * @param planId        Plan to query.
+ * @param planDayIndex  The rotation day index to count.
+ * @param entries       All history entries for this plan (pre-filtered or not).
+ * @param excludeDate   Optional YYYY-MM-DD date to exclude (e.g. today, to get prior count).
+ */
+export function countPlanDayCompletions(
+  planId: string,
+  planDayIndex: number,
+  entries: HistoryEntry[],
+  excludeDate?: string,
+): number {
+  return entries.filter(
+    e =>
+      e.planId === planId &&
+      e.planDayIndex === planDayIndex &&
+      e.action === 'complete' &&
+      e.calendarDate !== excludeDate,
+  ).length
+}

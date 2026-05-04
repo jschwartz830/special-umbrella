@@ -7,10 +7,12 @@ interface Props {
   resolved: ResolvedDay
   planId?: string
   isToday?: boolean
+  /** How many times this plan day has been completed before (excluding today). */
+  sessionCount?: number
   onClick?: () => void
 }
 
-export function WorkoutDayCard({ resolved, planId, isToday, onClick }: Props) {
+export function WorkoutDayCard({ resolved, planId, isToday, sessionCount, onClick }: Props) {
   const { planDay, status, historyEntry } = resolved
   const meta = WORKOUT_META[planDay.slots[0].type]
 
@@ -45,6 +47,11 @@ export function WorkoutDayCard({ resolved, planId, isToday, onClick }: Props) {
             {isToday && isPending && (
               <span className="flex-shrink-0 text-xs bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded-full font-medium">
                 Today
+              </span>
+            )}
+            {sessionCount !== undefined && sessionCount > 0 && (
+              <span className="flex-shrink-0 text-xs text-slate-500 font-medium">
+                ×{sessionCount} done
               </span>
             )}
           </div>
