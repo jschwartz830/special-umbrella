@@ -1,5 +1,50 @@
 # Test Results
 
+## 2026-05-04 (twenty-first pass) — branch `claude/dreamy-mccarthy-sA0Ai`
+
+**Result: 493 passing, 0 failing** (+24 tests from 469 baseline)
+
+### Tests reviewed
+
+All 14 test files reviewed as part of codebase audit:
+- `rotationEngine.test.ts` — comprehensive coverage of `mod`, `computeCurrentDayIndex`, `getTodayResolvedDay`, `getUpcomingDays`, `isPlanExpired`; now also covers `getResolvedDaysRange`
+- `calendarProjection.test.ts` — tests `buildMonthGrid`
+- `historyStore.test.ts` — store CRUD, deduplication, override handling
+- `outcomeStore.test.ts` — outcome persistence, moveOutcome
+- `exerciseHistoryStore.test.ts` — upsert, remove, move, PR detection
+- `programStore.test.ts` — var management, progression rule application
+- `planDeleteCleanup.test.ts` — cross-store cascade on plan delete
+- `expressionEval.test.ts` — full evaluator coverage (literals, vars, operators, functions, updates)
+- `historyStats.test.ts` — stats, plan progress, cycle progress, unlogged days
+- `historyScope.test.ts` — scope filtering helpers
+- `csv.test.ts` — CSV import/export
+- `useExpiryDismiss.test.ts` — expiry banner state hook
+- `explanation.test.ts` — run adaptation note generation
+- `engine.test.ts` (run-adaptation) — progression decision logic
+
+### Tests added this pass
+
+| File | Added | Description |
+|------|-------|-------------|
+| `rotationEngine.test.ts` | +17 | `getResolvedDaysRange` suite |
+| `rotationEngine.test.ts` | +1 | `isPlanExpired` zero-value guard |
+| `historyStats.test.ts` | +5 | `countPlanDayCompletions` suite |
+| **Total** | **+23** | (one test failed initial authoring, corrected before commit) |
+
+### Results
+
+All 493 tests pass. No regressions introduced.
+
+### Important areas still untested
+
+- `TodayPage` and `CalendarPage` interactive flows (modal state, undo, double-day) — require browser/React testing framework
+- Backdate-overwrite full flow (history entry + outcome + exercise records) — integration test gap
+- Plan builder validation (no tests for UI form submission)
+- `ActiveWorkoutTracker` timer and set-tracking logic — no unit tests
+- `WorkoutDayCard` rendering variations (status, sessionCount display) — no component tests
+
+---
+
 ## 2026-04-29 (seventeenth pass) — branch `claude/dreamy-mccarthy-vrC4L`
 
 **Result: 315 passing, 0 failing** (+4 tests this pass)

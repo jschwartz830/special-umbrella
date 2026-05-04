@@ -1,3 +1,69 @@
+# Feature Proposal — Session Count Indicator on Today's Workout Card
+
+Date: 2026-05-04
+Branch: `claude/dreamy-mccarthy-sA0Ai`
+Status: **Implemented this run**
+
+## Feature selected
+
+Show a small "×N done" counter next to the workout title on today's pending `WorkoutDayCard`, indicating how many times that specific rotation day has been previously completed.
+
+## Why it was selected
+
+- Directly adjacent to the existing `lastSessionSummary` hint (already shows "Last: 3×225 Bench Press")
+- Users frequently want "have I done this workout before, and how many times?" context before starting
+- All data is already available at the TodayPage render level (`planEntries` filtered by `planDayIndex`)
+- No new data fetching, no new store subscriptions, no state changes
+- Narrowest possible slice: one utility function + one optional prop + one badge
+
+## Expected user value
+
+- Motivation: "I've done this 4 times before" → feeling of progress in a repeating plan
+- Orientation: on long plans, quickly know if this is a new workout type or a familiar one
+- Zero noise: badge only appears when count > 0 (new plans show nothing)
+
+## Implementation scope for this run
+
+- `countPlanDayCompletions(planId, planDayIndex, entries, excludeDate?)` in `historyStats.ts`
+- Optional `sessionCount?: number` prop on `WorkoutDayCard`
+- Render: `×N done` as a small `text-slate-500` label in the card header
+- Computed in `TodayPage` as `todaySessionCount`, passed only to the pending today card
+- 5 unit tests for the new utility function
+
+## Assumptions being made
+
+- "Session" = prior `complete` actions for this `planDayIndex`; skips and day-offs are excluded
+- Count excludes today (using `excludeDate = today`) so it reflects only prior sessions
+- Only shown on today's pending card, not on upcoming or resolved cards
+
+## Open product / UX decisions
+
+- Should skipped sessions count? Currently no. Could argue either way.
+- Should upcoming cards also show session count? Not implemented; easy extension.
+- Label copy: "×N done" vs "Session N+1" vs a numeric badge. Using "×N done" (shows historical count, not "you are on session N+1").
+
+## Architecture / schema impact
+
+None. No new fields, no schema changes, no new store subscriptions.
+
+## Risks
+
+- WorkoutDayCard prop interface change — additive (`sessionCount?`), zero risk to existing call sites
+- Count is O(n) over `planEntries` — negligible for typical data sizes
+
+## Rollback strategy
+
+Remove `sessionCount` prop from WorkoutDayCard, the `todaySessionCount` line in TodayPage, and `countPlanDayCompletions` + its tests from historyStats. Four-file revert, no data migration.
+
+## What is intentionally not being built yet
+
+- "Session N+1" framing (would require count + 1 and different copy)
+- Upcoming card session counts
+- Milestone/achievement display ("First time!" / "10th session!")
+- Streak-per-workout-day tracking
+
+---
+
 # Feature Proposal — Week Progress Indicator on TodayPage
 
 Date: 2026-04-29
