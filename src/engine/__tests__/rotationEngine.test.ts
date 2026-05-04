@@ -450,6 +450,13 @@ describe('isPlanExpired', () => {
       const plan = makePlan(0, { duration: { type: 'rotations', value: 999 } })
       expect(isPlanExpired(plan, [], '2099-12-31')).toBe(false)
     })
+
+    it('is never expired when duration value is 0 (invalid config guard)', () => {
+      // A plan with 0 required rotations would otherwise expire immediately
+      // (0 >= 0 is always true). Guard returns false so no false "plan complete" banner.
+      const plan = makePlan(3, { duration: { type: 'rotations', value: 0 } })
+      expect(isPlanExpired(plan, [], '2026-01-01')).toBe(false)
+    })
   })
 })
 
