@@ -305,6 +305,9 @@ export function TodayPage() {
         removeEntry(plan!.id, completedDate)
         updateEntryDate(todayEntry.id, completedDate)
       }
+      // Remove any existing outcome at the target date so its exercise history
+      // records don't become orphaned when the new outcome overwrites the key.
+      removeOutcome(makeWorkoutInstanceId(plan!.id, completedDate))
       moveOutcome(
         makeWorkoutInstanceId(plan!.id, today),
         makeWorkoutInstanceId(plan!.id, completedDate),
