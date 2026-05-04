@@ -1,5 +1,72 @@
 # Overnight Changelog
 
+## 2026-05-04 (twenty-first pass) — branch `claude/dreamy-mccarthy-sA0Ai`
+
+Baseline on entry: **469 passing, 0 failing**.
+Exit state: **493 passing, 0 failing** (+24 tests).
+
+---
+
+### 1. Tests: `getResolvedDaysRange` coverage (17 new tests)
+
+**Summary:** Added 17 tests for `getResolvedDaysRange` in `rotationEngine.test.ts`. This function is used by CalendarPage to resolve all workout days in a month but had zero test coverage.
+
+**Why it matters:** This is the most complex function in the engine — it handles past/today/future status assignment, pointer advancement for complete/skip/day_off/unlogged days, override application, and rotation wrapping. A bug here would silently produce wrong calendar displays.
+
+**Files changed:** `src/engine/__tests__/rotationEngine.test.ts`
+
+**Risks / tradeoffs:** Purely additive. One test expectation was corrected during authoring (future-day pointer is 0-based from `fromDate`, not pre-advanced like `getUpcomingDays`).
+
+**Rollback:** Delete the new `getResolvedDaysRange` describe block.
+
+---
+
+### 2. Fix: `isPlanExpired` silent always-true for `duration.value === 0`
+
+**Summary:** Added `value <= 0` guard to the rotations-based case of `isPlanExpired`, preventing a zero-rotation plan from immediately triggering the "Plan complete!" banner.
+
+**Why it matters:** `Math.floor(n / days) >= 0` is always true (any non-negative integer is ≥ 0), so a plan created with `duration.value = 0` would flash the expiry banner on first load with zero history. `computePlanProgress` already had this guard (`total <= 0` → return zeros); `isPlanExpired` did not.
+
+**Files changed:** `src/engine/rotationEngine.ts`, `src/engine/__tests__/rotationEngine.test.ts`
+
+**Risks / tradeoffs:** `value = 0` is an invalid config; returning `false` (never expired) is the most conservative safe option. Alternatively one could validate in the plan builder UI; that's a separate UX improvement.
+
+**Rollback:** Remove the `|| value <= 0` from the guard condition.
+
+---
+
+### 3. Fix: Exercise history orphaning on backdate overwrite
+
+**Summary:** When a user backdates a workout to a date that already has a "complete" entry with weights data, the old outcome's `exerciseHistoryStore` records were not cleaned up if the new outcome contained no weights data. Added an explicit `removeOutcome(targetId)` call before `moveOutcome` in both `TodayPage.handleOutcomeConfirm` and `CalendarPage.handleOutcomeConfirm`.
+
+**Why it matters:** `setOutcome` (via `syncExerciseHistory`) only upserts exercise records for the *new* outcome. If the new outcome has no `weightsActual`, old exercise session records at the target key are never removed, growing the exerciseHistoryStore indefinitely and producing stale PRs.
+
+**Files changed:** `src/pages/TodayPage.tsx`, `src/pages/CalendarPage.tsx`
+
+**Risks / tradeoffs:** `removeOutcome` is idempotent (no-op if key doesn't exist), so the extra call is safe. The only scenario where behavior changes is when overwriting an existing complete entry via backdating — the old outcome is now explicitly cleared before the new one is written.
+
+**Rollback:** Remove the two `removeOutcome(targetId)` calls (one in each page).
+
+---
+
+### 4. Feature: Prior session count on today's pending workout card
+
+**Summary:** When today's workout is pending, the `WorkoutDayCard` now shows a small "×N done" label next to the workout title indicating how many times this specific plan day (by rotation index) has been completed previously.
+
+**Why it matters:** Users often want to know "have I done this workout before, and how many times?" before starting. The session count provides quick motivation context without requiring them to open the history view. It's scoped to the exact rotation day so repeating plans show the right count.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — added `countPlanDayCompletions()` utility
+- `src/lib/__tests__/historyStats.test.ts` — 5 tests for the new function
+- `src/components/workout/WorkoutDayCard.tsx` — added optional `sessionCount` prop
+- `src/pages/TodayPage.tsx` — computes and passes count to today's card only
+
+**Risks / tradeoffs:** The badge only appears on the pending today card (not upcoming or resolved cards). It's zero when no prior completions exist so no visual noise for new plans. The prop is optional so all other WorkoutDayCard usages are unaffected.
+
+**Rollback:** Remove `sessionCount` prop from WorkoutDayCard and its render logic; remove the `todaySessionCount` computation from TodayPage; remove `countPlanDayCompletions` from historyStats (and its tests).
+
+---
+
 ## 2026-04-29 (seventeenth pass) — branch `claude/dreamy-mccarthy-vrC4L`
 
 Baseline on entry: **311 passing, 0 failing**.

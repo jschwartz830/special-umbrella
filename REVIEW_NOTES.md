@@ -1,5 +1,88 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-04 (twenty-first pass) — branch `claude/dreamy-mccarthy-sA0Ai`
+
+### Executive summary
+
+1. **What changed:** 4 commits — 17 new `getResolvedDaysRange` tests, `isPlanExpired` zero-value guard, exercise history orphan fix on backdate, and a session count badge on today's pending card.
+2. **Highest confidence:** The `isPlanExpired` fix and the orphan cleanup are the most clear-cut correctness improvements. The tests are purely additive.
+3. **What is risky:** The session count feature changes WorkoutDayCard's prop interface (additive, optional). The backdate fix removes an outcome before writing the new one — safe since `removeOutcome` is idempotent, but it changes observable behavior when overwriting existing entries.
+4. **Review first:** Start with the backdate fix (`TodayPage.tsx:308`, `CalendarPage.tsx:211`) — it's the most consequential behavior change and deserves manual testing if you've backdated workouts.
+
+---
+
+### Biggest issues found
+
+1. **`getResolvedDaysRange` had zero tests** despite being the calendar projection function used by CalendarPage. Fixed.
+2. **`isPlanExpired` silently expired plans with `duration.value = 0`** by always returning `true`. Fixed.
+3. **Exercise history orphaned when backdating over an existing complete entry** — old weights records stayed in `exerciseHistoryStore` if the new outcome had no weights data. Fixed.
+
+---
+
+### Improvements completed
+
+| # | Type | Description |
+|---|------|-------------|
+| 1 | Tests | 17 `getResolvedDaysRange` tests covering all status/pointer/override scenarios |
+| 2 | Fix | `isPlanExpired` guard for `value <= 0` on rotations-based plans |
+| 3 | Fix | `removeOutcome` cleanup in backdate path of TodayPage + CalendarPage |
+| 4 | Tests | 5 `countPlanDayCompletions` tests in historyStats |
+
+---
+
+### Small feature added
+
+**Session count indicator on today's workout card.**
+
+When today's workout is pending, the plan day card shows "×N done" next to the workout name, counting prior completions of this specific rotation day. Uses new `countPlanDayCompletions()` in `historyStats.ts` and an optional `sessionCount` prop on `WorkoutDayCard`. Fully additive — no existing behavior changed.
+
+Classification: **Keep** — the data is free (already computed), the display is minimal, and it directly addresses the "how many times have I done this?" question without requiring history navigation.
+
+---
+
+### Definitely keep
+
+- `getResolvedDaysRange` tests — pure test additions, zero risk
+- `isPlanExpired` guard — prevents a definite silent bug
+- `countPlanDayCompletions` tests — pure additions
+
+### Probably keep but tweak
+
+- **Exercise history orphan fix** — correct behavior, but worth a manual backdate test before merging to verify edge cases (backdating a weights workout over a prior weights workout, backdating a run over a prior weights workout, etc.)
+- **Session count feature** — works well functionally; the "×N done" label style is minimal and readable, but you may prefer different phrasing ("Session N" / "Done N times" / a number badge)
+
+### Do not keep
+
+Nothing in this pass warrants rejection.
+
+### Recommendations only (not implemented)
+
+1. **Plan builder validation** — prevent creating a plan with `duration.value = 0`; the `isPlanExpired` fix is a safety net but the real fix is UI validation.
+2. **Narrow Zustand selectors** — CalendarPage subscribes to `s.outcomes` (whole object). Switch to a per-key selector for the rendered modal to reduce re-renders.
+3. **Progression system documentation** — `logOutcomeWithProgression` runs two parallel progression systems. Document which one is authoritative and the migration path.
+4. **Expression evaluator error reporting** — typos in progression rule expressions silently return 0. Surface errors in the progression rule UI.
+
+---
+
+### Open questions for you
+
+- Should "×N done" show for plan days that were only _skipped_ previously, not completed? Current implementation counts only `complete` actions.
+- Should the session count badge appear on upcoming cards too, not just today's pending card? It's computed lazily so it could easily be extended.
+- When backdating overwrites an existing entry, should the UI warn the user? Currently it silently removes the old entry and outcome.
+
+---
+
+### Known issues / incomplete work
+
+- `WorkoutDayCard` session count is only passed from `TodayPage` for the today card; upcoming cards don't show it. This is intentional for this pass but easy to extend.
+- No integration test covering the full backdate-overwrite flow. Manual testing recommended.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-04-29 (seventeenth pass) — branch `claude/dreamy-mccarthy-vrC4L`
 
 ### Executive summary

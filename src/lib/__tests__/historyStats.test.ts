@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 
 function entry(
@@ -754,5 +754,50 @@ describe('computeRotationCycleProgress', () => {
     const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
     expect(result!.doneInCycle).toBe(0)
     expect(result!.justCompletedRotation).toBe(false)
+  })
+})
+
+// ── countPlanDayCompletions ───────────────────────────────────────────────────
+
+describe('countPlanDayCompletions', () => {
+  it('returns 0 when no entries exist', () => {
+    expect(countPlanDayCompletions('plan-1', 0, [])).toBe(0)
+  })
+
+  it('counts only complete entries for the given planDayIndex', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-01-01', 'complete'),
+      entry('2026-01-03', 'complete'),
+      entry('2026-01-05', 'skip'),
+      entry('2026-01-07', 'day_off'),
+    ]
+    // Only 2 complete entries with planDayIndex=0 (default in entry helper)
+    expect(countPlanDayCompletions('plan-1', 0, entries)).toBe(2)
+  })
+
+  it('excludes the given date when excludeDate is provided', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-01-01', 'complete'),
+      entry('2026-01-03', 'complete'),
+    ]
+    // Exclude Jan 3 — only Jan 1 counts
+    expect(countPlanDayCompletions('plan-1', 0, entries, '2026-01-03')).toBe(1)
+  })
+
+  it('ignores entries for a different plan', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-01-01', 'complete', 'plan-1'),
+      entry('2026-01-02', 'complete', 'plan-2'),
+    ]
+    expect(countPlanDayCompletions('plan-1', 0, entries)).toBe(1)
+  })
+
+  it('ignores entries for a different planDayIndex', () => {
+    const entries: HistoryEntry[] = [
+      { id: 'a', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T00:00:00Z' },
+      { id: 'b', planId: 'plan-1', calendarDate: '2026-01-02', planDayIndex: 1, action: 'complete', createdAt: '2026-01-02T00:00:00Z' },
+    ]
+    expect(countPlanDayCompletions('plan-1', 0, entries)).toBe(1)
+    expect(countPlanDayCompletions('plan-1', 1, entries)).toBe(1)
   })
 })

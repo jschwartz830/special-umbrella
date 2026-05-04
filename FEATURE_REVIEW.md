@@ -1,3 +1,48 @@
+# Feature Review — Session Count Indicator on Today's Workout Card
+
+Date: 2026-05-04
+Branch: `claude/dreamy-mccarthy-sA0Ai`
+Classification: **Keep**
+
+## What was actually built
+
+A `countPlanDayCompletions()` utility function and an optional `sessionCount` prop on `WorkoutDayCard` that renders a small "×N done" label next to the workout title. Passed from TodayPage only when the workout is pending and a prior completion exists.
+
+## What assumptions were encoded
+
+- `complete` action = "done"; `skip` and `day_off` don't count toward session history
+- Count excludes today (shows prior sessions only, not counting the one about to happen)
+- Label style: `text-slate-500 font-medium` — subdued, not attention-grabbing
+
+## What worked well
+
+- Zero impact on existing WorkoutDayCard usages (prop is optional)
+- `countPlanDayCompletions` is a pure, well-tested utility
+- The badge integrates naturally with the existing card header layout alongside the "Today" badge
+
+## What feels risky or incomplete
+
+- The label only appears on the pending today card. If users want it on upcoming cards, it requires passing `planEntries` + computing counts there — slightly more work
+- "×N done" copy might be confusing ("done" vs "completions" vs "sessions") — worth a quick UX check
+- No visual distinction between "first time ever" (no badge) and "done once before" (×1 done)
+
+## What I should evaluate tomorrow
+
+- Does the badge feel crowded on small screens when both "Today" and "×N done" are shown? Both are `text-xs` in the header flex row with `truncate`, so overflow is handled, but worth checking.
+- Do you want to extend it to upcoming cards?
+
+## Recommended next steps
+
+1. Check on a narrow viewport (375px) that "Today" + "×N done" don't collide with the workout label
+2. Consider whether "×N done" should also appear in double-day mode for the bonus card
+3. If keeping: extend to upcoming cards (5-line change in TodayPage upcoming loop)
+
+## Classification
+
+**Keep** — functional, minimal, no breaking changes, easy to extend or revert.
+
+---
+
 # Feature Review — Week Progress Indicator on TodayPage
 
 Date: 2026-04-29

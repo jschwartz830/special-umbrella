@@ -4,6 +4,7 @@ import {
   computeCurrentDayIndex,
   getTodayResolvedDay,
   getUpcomingDays,
+  getResolvedDaysRange,
   isPlanExpired,
 } from '../rotationEngine'
 import type { Plan, HistoryEntry, OverrideEntry } from '../../types'
@@ -449,5 +450,178 @@ describe('isPlanExpired', () => {
       const plan = makePlan(0, { duration: { type: 'rotations', value: 999 } })
       expect(isPlanExpired(plan, [], '2099-12-31')).toBe(false)
     })
+
+    it('is never expired when duration value is 0 (invalid config guard)', () => {
+      // A plan with 0 required rotations would otherwise expire immediately
+      // (0 >= 0 is always true). Guard returns false so no false "plan complete" banner.
+      const plan = makePlan(3, { duration: { type: 'rotations', value: 0 } })
+      expect(isPlanExpired(plan, [], '2026-01-01')).toBe(false)
+    })
+  })
+})
+
+// ── getResolvedDaysRange ──────────────────────────────────────────────────────
+
+describe('getResolvedDaysRange', () => {
+  it('returns empty array for plan with 0 days', () => {
+    const plan = makePlan(0)
+    expect(getResolvedDaysRange(plan, [], [], '2026-01-05', '2026-01-01', '2026-01-07')).toEqual([])
+  })
+
+  it('returns one entry for a single-day range', () => {
+    const plan = makePlan(4)
+    const result = getResolvedDaysRange(plan, [], [], '2026-01-05', '2026-01-03', '2026-01-03')
+    expect(result).toHaveLength(1)
+    expect(result[0].calendarDate).toBe('2026-01-03')
+  })
+
+  it('returns correct count for a multi-day range', () => {
+    const plan = makePlan(4)
+    const result = getResolvedDaysRange(plan, [], [], '2026-01-10', '2026-01-01', '2026-01-07')
+    expect(result).toHaveLength(7)
+  })
+
+  it('past unlogged days have status past_unlogged and do not advance pointer', () => {
+    const plan = makePlan(4)
+    // No entries — all past days are unlogged; pointer stays at 0
+    const result = getResolvedDaysRange(plan, [], [], '2026-01-10', '2026-01-01', '2026-01-05')
+    expect(result[0].status).toBe('past_unlogged')
+    expect(result[0].planDayIndex).toBe(0)
+    // Pointer does not advance for unlogged past days
+    expect(result[4].planDayIndex).toBe(0)
+  })
+
+  it('past complete days have status past_complete and advance the pointer', () => {
+    const plan = makePlan(4)
+    const entries = [makeEntry('2026-01-01', 'complete', 0)]
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-10', '2026-01-01', '2026-01-03')
+    expect(result[0].status).toBe('past_complete')
+    expect(result[0].planDayIndex).toBe(0)
+    // Jan 2: pointer advanced to 1 after Jan 1 complete
+    expect(result[1].planDayIndex).toBe(1)
+  })
+
+  it('past skip days have status past_skip and advance the pointer', () => {
+    const plan = makePlan(4)
+    const entries = [makeEntry('2026-01-01', 'skip', 0)]
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-10', '2026-01-01', '2026-01-02')
+    expect(result[0].status).toBe('past_skip')
+    expect(result[1].planDayIndex).toBe(1)
+  })
+
+  it('past day_off days have status past_day_off and advance the pointer', () => {
+    const plan = makePlan(4)
+    const entries = [makeEntry('2026-01-01', 'day_off')]
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-10', '2026-01-01', '2026-01-02')
+    expect(result[0].status).toBe('past_day_off')
+    expect(result[1].planDayIndex).toBe(1)
+  })
+
+  it('today pending has status today_pending and pointer advances (future projection)', () => {
+    const plan = makePlan(4)
+    // today = Jan 5, no entry
+    const result = getResolvedDaysRange(plan, [], [], '2026-01-05', '2026-01-05', '2026-01-06')
+    expect(result[0].status).toBe('today_pending')
+    // Pending today still projects forward — pointer advances for Jan 6
+    expect(result[1].planDayIndex).toBe(1)
+  })
+
+  it('today complete has status today_complete', () => {
+    const plan = makePlan(4)
+    const entries = [makeEntry('2026-01-05', 'complete', 0)]
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-05', '2026-01-05', '2026-01-05')
+    expect(result[0].status).toBe('today_complete')
+  })
+
+  it('today skip has status today_skip', () => {
+    const plan = makePlan(4)
+    const entries = [makeEntry('2026-01-05', 'skip', 0)]
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-05', '2026-01-05', '2026-01-05')
+    expect(result[0].status).toBe('today_skip')
+  })
+
+  it('today day_off has status today_day_off', () => {
+    const plan = makePlan(4)
+    const entries = [makeEntry('2026-01-05', 'day_off')]
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-05', '2026-01-05', '2026-01-05')
+    expect(result[0].status).toBe('today_day_off')
+  })
+
+  it('future days have status future and always advance pointer', () => {
+    const plan = makePlan(4)
+    const result = getResolvedDaysRange(plan, [], [], '2026-01-01', '2026-01-02', '2026-01-05')
+    expect(result.every(r => r.status === 'future')).toBe(true)
+    // Pointer at start of Jan 2: computeCurrentDayIndex processes Jan 1 (no entry → stays 0)
+    expect(result[0].planDayIndex).toBe(0) // Jan 2 shows day 0
+    expect(result[1].planDayIndex).toBe(1) // Jan 3 shows day 1 (Jan 2 was future → advanced)
+    expect(result[2].planDayIndex).toBe(2)
+    expect(result[3].planDayIndex).toBe(3)
+  })
+
+  it('attaches the history entry to the resolved day', () => {
+    const plan = makePlan(4)
+    const entries = [makeEntry('2026-01-01', 'complete', 0)]
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-10', '2026-01-01', '2026-01-01')
+    expect(result[0].historyEntry).toBeDefined()
+    expect(result[0].historyEntry?.action).toBe('complete')
+  })
+
+  it('applies overrides before reading planDay on each date', () => {
+    const plan = makePlan(4)
+    const overrides = [makeOverride('2026-01-03T12:00:00Z', 'jump', { targetDayIndex: 3 })]
+    // Jan 1-2 unlogged (pointer stays 0); Jan 3 gets jump override to day 3
+    const result = getResolvedDaysRange(plan, [], overrides, '2026-01-10', '2026-01-03', '2026-01-03')
+    expect(result[0].planDayIndex).toBe(3)
+    expect(result[0].planDay.label).toBe('Day 4')
+  })
+
+  it('pointer correctly reflects mix of complete, skip, day_off and unlogged days', () => {
+    // 5-day plan. Jan 1: complete (→ pointer 1), Jan 2: unlogged (→ stays 1),
+    // Jan 3: skip (→ pointer 2), Jan 4: day_off (→ pointer 3), Jan 5 = today
+    const plan = makePlan(5)
+    const entries = [
+      makeEntry('2026-01-01', 'complete', 0),
+      makeEntry('2026-01-03', 'skip', 1),
+      makeEntry('2026-01-04', 'day_off'),
+    ]
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-05', '2026-01-01', '2026-01-05')
+    expect(result[0].planDayIndex).toBe(0) // Jan 1: complete at 0
+    expect(result[1].planDayIndex).toBe(1) // Jan 2: unlogged, pointer stayed at 1 (advanced after Jan 1 complete)
+    expect(result[2].planDayIndex).toBe(1) // Jan 3: skip at 1
+    expect(result[3].planDayIndex).toBe(2) // Jan 4: day_off at 2
+    expect(result[4].planDayIndex).toBe(3) // Jan 5 (today): pending at 3
+  })
+
+  it('rotation wraps correctly at plan boundary', () => {
+    const plan = makePlan(3) // days 0, 1, 2
+    const entries = [
+      makeEntry('2026-01-01', 'complete', 0),
+      makeEntry('2026-01-02', 'complete', 1),
+      makeEntry('2026-01-03', 'complete', 2),
+    ]
+    // After 3 completes, pointer wraps back to 0
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-10', '2026-01-04', '2026-01-04')
+    expect(result[0].planDayIndex).toBe(0)
+  })
+
+  it('range starting before plan start date produces correct initial pointer', () => {
+    // Plan starts 2026-01-05; range starts 2026-01-01 (before plan start)
+    // computeCurrentDayIndex for 2026-01-01 returns startDayIndex since it's before plan start
+    const plan = makePlan(4, { startDate: '2026-01-05', startDayIndex: 2 })
+    const result = getResolvedDaysRange(plan, [], [], '2026-01-10', '2026-01-01', '2026-01-03')
+    // All pre-plan days show pointer at startDayIndex (2) since no history before startDate
+    expect(result[0].planDayIndex).toBe(2)
+    expect(result[1].planDayIndex).toBe(2)
+  })
+
+  it('uses most recent entry when multiple exist for the same date', () => {
+    const plan = makePlan(4)
+    const entries: HistoryEntry[] = [
+      { ...makeEntry('2026-01-01', 'complete', 0), id: 'e1', createdAt: '2026-01-01T08:00:00Z' },
+      { ...makeEntry('2026-01-01', 'skip', 1), id: 'e2', createdAt: '2026-01-01T20:00:00Z' },
+    ]
+    // Most recent = skip, so pointer advances by 1 and status is past_skip
+    const result = getResolvedDaysRange(plan, entries, [], '2026-01-10', '2026-01-01', '2026-01-01')
+    expect(result[0].status).toBe('past_skip')
   })
 })

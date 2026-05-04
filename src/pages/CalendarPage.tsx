@@ -209,6 +209,9 @@ export function CalendarPage() {
           updateEntryDate(entry.id, completedDate)
         }
         const nextId = makeWorkoutInstanceId(outcomeTarget.planId, completedDate)
+        // Remove any existing outcome at the target date so its exercise history
+        // records don't become orphaned when the new outcome overwrites the key.
+        removeOutcome(nextId)
         moveOutcome(outcomeTarget.instanceId, nextId)
         finalOutcome = { ...outcome, workoutInstanceId: nextId }
       }

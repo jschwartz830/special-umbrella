@@ -35,7 +35,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress, computePlanProgress } from '../lib/historyStats'
+import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
@@ -233,6 +233,12 @@ export function TodayPage() {
     : null
   const lastSessionSummary = prevSessionOutcome ? buildLastSessionSummary(prevSessionOutcome, maxLoadByExercise) : null
 
+  // How many times this specific plan day has been completed before today.
+  // Shown on the card as "×N done" to give session-over-session context.
+  const todaySessionCount = isPending
+    ? countPlanDayCompletions(plan.id, primaryPlanDayIndex, planEntries, today)
+    : undefined
+
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     setActiveTrackedExercises(exercises)
     setActiveTrackedDurationMin(Math.round(meta.totalElapsedSeconds / 60) || null)
@@ -261,6 +267,9 @@ export function TodayPage() {
         removeEntry(plan!.id, completedDate)
         updateEntryDate(todayEntry.id, completedDate)
       }
+      // Remove any existing outcome at the target date so its exercise history
+      // records don't become orphaned when the new outcome overwrites the key.
+      removeOutcome(makeWorkoutInstanceId(plan!.id, completedDate))
       moveOutcome(
         makeWorkoutInstanceId(plan!.id, today),
         makeWorkoutInstanceId(plan!.id, completedDate),
@@ -572,7 +581,7 @@ export function TodayPage() {
           </div>
         </div>
       ) : (
-        <WorkoutDayCard resolved={todayResolved} planId={plan?.id} isToday />
+        <WorkoutDayCard resolved={todayResolved} planId={plan?.id} isToday sessionCount={todaySessionCount} />
       )}
 
       {/* Previous-session hint — visible only when pending, not in double-day mode */}

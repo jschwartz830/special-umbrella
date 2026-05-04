@@ -308,8 +308,53 @@ See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md for full rationale.
 
 ### Rationale for sequencing
 
-UX fix first (clean, 2-line guard). Refactor second (enabling testability is
-higher priority than adding tests directly). Tests third for the refactored
-functions. New test file for planStore (long-standing gap). Integration test
-gap closed. Feature last — code base was stable enough for a feature after the
-test gaps were addressed.
+Test gap first (directly verifies the store the feature depends on), then fix
+the implementation bug, then commit the feature with clean tests and types.
+
+---
+
+## Pass 21 — 2026-05-04 (branch `claude/dreamy-mccarthy-sA0Ai`)
+
+### Observations on entry
+
+- Baseline: **469 passing, 0 failing** (after node_modules install on fresh env).
+- `getResolvedDaysRange` — despite being the core calendar-range resolver used
+  by `CalendarPage` — had **zero tests** (pass 18 added 6 `buildMonthGrid` tests
+  to `calendarProjection.test.ts` but didn't test `getResolvedDaysRange` itself).
+- `isPlanExpired` had a silent bug: a rotations-based plan with `duration.value === 0`
+  would always return `true` (`Math.floor(n / days) >= 0` is always true), triggering
+  a "Plan complete!" banner immediately. `computePlanProgress` already guards against
+  `total <= 0`; `isPlanExpired` did not.
+- Exercise history orphan bug in backdate paths: when backdating a workout to a
+  date that already had a complete entry with weights data, the old outcome's
+  `exerciseHistoryStore` records were not cleaned up if the new outcome had no
+  weights data. `setOutcome → syncExerciseHistory` only syncs the new outcome,
+  leaving old records orphaned.
+- No obvious regressions from pass 20.
+
+### Decisions
+
+- **Add `getResolvedDaysRange` tests** — highest priority test gap, critical calendar logic.
+- **Fix `isPlanExpired` zero-value bug** — confirmed silent bug, one-line fix.
+- **Fix exercise history orphaning** — data integrity fix in both backdate paths.
+- **Feature: session count indicator on today's card** — adjacent, narrow, uses existing data.
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|----------|------|-------|--------|
+| 1 | Add `getResolvedDaysRange` tests (17 tests) | None | ✅ Done |
+| 2 | Fix `isPlanExpired` for `value <= 0` | Very low | ✅ Done |
+| 3 | Fix exercise history orphaning on backdate | Low | ✅ Done |
+| 4 | Session count indicator on today's card | Low | ✅ Done |
+
+### Exit state
+
+**493 passing, 0 failing** (+24 tests from baseline).
+
+### Carry-over open items
+
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path (legacy RunProgressionState vs new ProgressionRecommendation)
+- Expression evaluator should surface errors to UI for malformed progression rules
