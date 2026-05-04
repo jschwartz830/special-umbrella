@@ -1,8 +1,9 @@
 /**
- * Integration-style test: deleting a plan should cascade to history and
- * outcomes, leaving no orphaned records. Mirrors the wiring in PlansPage
- * where the delete confirm handler calls clearPlanHistory, clearPlanOutcomes
- * and deletePlan together.
+ * Integration-style test: deleting a plan should cascade to history, outcomes,
+ * program vars, and exercise history — leaving no orphaned records. Mirrors the
+ * wiring in PlansPage where the delete confirm handler calls clearPlanHistory,
+ * clearPlanOutcomes, clearPlanVars, clearByPlanId (exerciseHistory), and
+ * deletePlan together.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
@@ -18,6 +19,8 @@ import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } fr
 import { usePlanStore } from '../planStore'
 // eslint-disable-next-line import/first
 import { useProgramStore } from '../programStore'
+// eslint-disable-next-line import/first
+import { useExerciseHistoryStore } from '../exerciseHistoryStore'
 // eslint-disable-next-line import/first
 import type { Plan } from '../../types'
 // eslint-disable-next-line import/first
@@ -55,6 +58,7 @@ beforeEach(() => {
   useHistoryStore.setState({ entries: [], overrides: [], extraEntries: [] })
   useOutcomeStore.setState({ outcomes: {}, progressionStates: {} })
   useProgramStore.setState({ vars: {} })
+  useExerciseHistoryStore.setState({ records: [] })
 })
 
 describe('plan delete cleanup (integration)', () => {
@@ -183,5 +187,57 @@ describe('plan delete cleanup (integration)', () => {
       useProgramStore.getState().clearPlanVars('plan-A')
     }).not.toThrow()
     expect(useProgramStore.getState().getVars('plan-A')).toEqual({})
+  })
+
+  it('clears exercise history records for the deleted plan only', () => {
+    const planA = makePlan('plan-A', 'Alpha')
+    const planB = makePlan('plan-B', 'Bravo')
+    usePlanStore.setState({ plans: { [planA.id]: planA, [planB.id]: planB } })
+
+    // Seed exercise records for both plans
+    useExerciseHistoryStore.setState({
+      records: [
+        {
+          id: 'rec-a1',
+          exerciseName: 'Squat',
+          calendarDate: '2026-04-01',
+          planId: 'plan-A',
+          planName: 'Alpha',
+          workoutName: 'Day 1',
+          workoutInstanceId: 'plan-A_2026-04-01',
+          sets: [{ reps: 5, load: 135, volume: 675, completed: true }],
+          totalVolume: 675,
+          maxLoad: 135,
+          maxReps: 5,
+          createdAt: '2026-04-01T12:00:00Z',
+        },
+        {
+          id: 'rec-b1',
+          exerciseName: 'Deadlift',
+          calendarDate: '2026-04-01',
+          planId: 'plan-B',
+          planName: 'Bravo',
+          workoutName: 'Day 1',
+          workoutInstanceId: 'plan-B_2026-04-01',
+          sets: [{ reps: 5, load: 185, volume: 925, completed: true }],
+          totalVolume: 925,
+          maxLoad: 185,
+          maxReps: 5,
+          createdAt: '2026-04-01T12:00:00Z',
+        },
+      ],
+    })
+
+    // Simulate the full PlansPage delete handler
+    useHistoryStore.getState().clearPlanHistory('plan-A')
+    useOutcomeStore.getState().clearPlanOutcomes('plan-A')
+    useProgramStore.getState().clearPlanVars('plan-A')
+    useExerciseHistoryStore.getState().clearByPlanId('plan-A')
+    usePlanStore.getState().deletePlan('plan-A')
+
+    // Plan A exercise records removed; plan B record intact
+    const remaining = useExerciseHistoryStore.getState().records
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0].planId).toBe('plan-B')
   })
 })

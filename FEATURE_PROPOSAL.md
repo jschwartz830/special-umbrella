@@ -292,65 +292,126 @@ function. No data migration. No store changes to revert.
 
 ---
 
-# Feature Proposal — Personal Records Section in History Tab
+# Feature Proposal — Personal Best (PB) Detection in Session Hint
 
-Date: 2026-05-03
-Branch: `claude/dreamy-mccarthy-SwIxl`
+Date: 2026-05-02
+Branch: `claude/dreamy-mccarthy-WJaAU`
 Status: **Implemented this run**
 
 ---
 
 ## Feature selected
 
-A collapsible **Personal Records** section at the top of the History tab that
-lists, per exercise: best weight ever lifted, best reps in a single set, session
-count, and the date each PR was achieved.
+Extend the "Last: 3×8 @ 135 lb Bench Press" session hint on TodayPage to
+append "· PB" when the displayed load equals the user's all-time max load for
+that exercise.
 
 ---
 
 ## Why selected
 
-The `exerciseHistoryStore` (added in the previous session, PR #66) was designed
-precisely to enable this view. Its `records` array already contains per-session
-`maxLoad` and `maxReps` values. No new data collection, no schema changes, no
-new dependencies — the store just needed a display surface.
+The previous-session hint (added in pass 18) shows the most recent completed
+load. Users often want to know "was that my best?" to decide whether to push
+harder today. The `exerciseHistoryStore` already stores per-set load records
+and has been populated since pass 6 — the data for PB detection exists and
+was only waiting to be surfaced.
+
+The feature required no schema changes, no new store state, and no new API.
+The narrowest slice was: compute `maxLoadByExercise` in TodayPage via a
+`useMemo` over the already-present `exerciseHistoryStore.records`, then pass
+the map as an optional parameter to `buildLastSessionSummary` (already being
+refactored and extracted this pass).
 
 ---
 
-## Alternatives considered
+## Expected user value
 
-| Option | Cost | Note |
-|---|---|---|
-| Full per-exercise trend chart | High | Requires a charting library |
-| PR badges inline on each history entry | Medium | Cross-entry comparison at render time |
-| **Collapsible table in History tab** | **Low** | Reuses existing store data, one new component |
+- "Last: 3×8 @ 225 lb Squat · PB" immediately tells the user their last session
+  was a personal best, motivating them to attempt the same or higher today.
+- "Last: 3×8 @ 185 lb Squat" (no PB marker) signals there's room to build.
+- Entirely passive — no additional taps or modals. The hint already rendered;
+  this just adds a two-character marker when warranted.
 
 ---
 
-## Scope
+## Implementation scope for this run
 
-In scope:
-- `PersonalRecordsSection` collapsible component in `HistoryPage.tsx`
-- `computePersonalRecords(records, planId)` pure helper — exported and testable
-- `PersonalRecord` TypeScript interface — exported
-- Plan-filter scoping via existing `filterPlanId` state
+1. `buildLastSessionSummary` in `src/lib/sessionSummary.ts` accepts an optional
+   `maxLoadByExercise?: Record<string, number>` parameter. When the first set's
+   `actualLoad` equals the map value for that exercise, " · PB" is appended.
 
-Out of scope (future):
-- Per-exercise history trend charts
-- Volume PRs (total weight moved in a session)
-- PR progress arrows (↑/↓ vs. last session)
+2. In `TodayPage`, one new store subscription:
+   `const exerciseRecords = useExerciseHistoryStore(s => s.records)`
+
+3. One new `useMemo` computing `maxLoadByExercise` from `exerciseRecords`.
+
+4. `buildLastSessionSummary(prevSessionOutcome, maxLoadByExercise)` — existing
+   call updated to pass the map.
+
+5. Tests for the PB marker in `sessionSummary.test.ts` (3 cases: PB shown, no
+   PB below max, no PB when exercise not in map).
+
+---
+
+## Assumptions made
+
+- "Personal best" means the highest `actualLoad` in any completed set across
+  all logged sessions for that exercise, including today's records. This is
+  intentional: if the user logged a heavier set today and then checks tomorrow,
+  they'll see "· PB" on yesterday's entry.
+- The comparison is equality (`===`), not `>=`. This means a PB is shown
+  precisely when the last session hit the all-time high, not just "close to it."
+- Only the first displayed exercise is checked (the existing behaviour — one
+  exercise per hint line).
+- PB detection applies only to weights outcomes. Run and swim hints are
+  unchanged.
+
+---
+
+## Open product / UX decisions
+
+- Should "· PB" be highlighted in a different colour (e.g., amber/gold) rather
+  than plain slate text? Deferred — keeping it in the same muted style avoids
+  visual noise; can be styled later if users find it hard to notice.
+- Should swim/run show a distance PB ("· PB" when best-ever distance)?
+  Deferred — run adaptation already handles pace/distance targets; this would
+  need a separate distance-max calculation.
+- Should PB history be time-bounded (e.g., "PB in the last 6 months") rather
+  than all-time? Deferred — all-time is the simplest and most motivating signal.
+
+---
+
+## Architecture / schema impact
+
+None. `exerciseHistoryStore` already persists via `wpt_exercise_history`.
+`maxLoadByExercise` is derived in TodayPage as a `useMemo` — no persistence,
+no migration, no new localStorage key.
 
 ---
 
 ## Risks
 
-Low. Read-only. No writes. No store mutations. The only new state is a
-`boolean` inside the component.
+- `exerciseHistoryStore` is subscribed for the first time in TodayPage (all
+  other callers go through `outcomeStore.logOutcomeWithProgression`). The
+  subscription is a single `.records` selector, so it only re-renders when the
+  records array changes (i.e., after a workout is logged).
+- All-time PB comparison includes records from deleted plans (planId stored as
+  a snapshot). This is a minor inconsistency but not a bug — the load itself is
+  valid exercise data.
 
 ---
 
 ## Rollback strategy
 
-Delete the `PersonalRecordsSection` component, the `computePersonalRecords`
-helper, the `PersonalRecord` interface, and the three `useMemo`/JSX lines in
-`HistoryPage`. No data migration needed.
+Remove the three lines in TodayPage (`exerciseRecords`, `maxLoadByExercise`,
+parameter in `buildLastSessionSummary` call). Remove the optional parameter
+from `buildLastSessionSummary` in `sessionSummary.ts`. No data to migrate.
+
+---
+
+## What is intentionally not being built yet
+
+- Run/swim PB detection
+- PB in the active workout tracker (live comparison during a session)
+- All-time PR board / personal records page
+- Time-bounded PB windows (e.g., "PR in last 90 days")
