@@ -8,6 +8,9 @@ import {
   Trash2,
   X,
   Plus,
+  Trophy,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { useHistoryStore } from '../store/historyStore'
 import { usePlanStore } from '../store/planStore'
@@ -21,6 +24,8 @@ import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
 import { computeHistoryStats } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
+import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
+import type { ExerciseSessionRecord } from '../store/exerciseHistoryStore'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { ActionType, HistoryEntry, ExtraWorkoutEntry, WorkoutType, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
@@ -160,6 +165,12 @@ export function HistoryPage() {
       .map(([t, n]) => `${n} ${TYPE_MIX_LABEL[t] ?? t}`)
       .join(' · ')
   }, [typeCountMap])
+
+  const allExerciseRecords = useExerciseHistoryStore(s => s.records)
+  const personalRecords = useMemo(
+    () => computePersonalRecords(allExerciseRecords, filterPlanId === 'all' ? null : filterPlanId),
+    [allExerciseRecords, filterPlanId],
+  )
 
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')
@@ -391,6 +402,10 @@ export function HistoryPage() {
           </div>
         )}
       </div>
+
+      {personalRecords.length > 0 && (
+        <PersonalRecordsSection records={personalRecords} />
+      )}
 
       {flatItems.length === 0 && filterPlanId !== 'all' && (
         <p className="text-sm text-slate-500 text-center py-8">No entries for this plan.</p>
@@ -804,6 +819,128 @@ function StatTile({ label, value, suffix }: { label: string; value: number; suff
       <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{label}</p>
       <p className="text-lg font-bold text-slate-100 leading-tight mt-0.5">{value}</p>
       {suffix && <p className="text-[10px] text-slate-500 leading-tight">{suffix}</p>}
+    </div>
+  )
+}
+
+// ── Personal Records ──────────────────────────────────────────────────────────
+
+export interface PersonalRecord {
+  exerciseName: string
+  maxLoad: number | null
+  maxLoadDate: string | null
+  maxReps: number | null
+  maxRepsDate: string | null
+  sessionCount: number
+}
+
+/**
+ * Derive one PR row per exercise from a flat list of exercise session records.
+ * Optionally scoped to a single plan.
+ */
+export function computePersonalRecords(
+  records: ExerciseSessionRecord[],
+  planId: string | null,
+): PersonalRecord[] {
+  const scoped = planId ? records.filter(r => r.planId === planId) : records
+
+  const byExercise = new Map<string, PersonalRecord>()
+
+  for (const r of scoped) {
+    const existing = byExercise.get(r.exerciseName)
+    if (!existing) {
+      byExercise.set(r.exerciseName, {
+        exerciseName: r.exerciseName,
+        maxLoad: r.maxLoad,
+        maxLoadDate: r.maxLoad !== null ? r.calendarDate : null,
+        maxReps: r.maxReps,
+        maxRepsDate: r.maxReps !== null ? r.calendarDate : null,
+        sessionCount: 1,
+      })
+      continue
+    }
+
+    existing.sessionCount++
+
+    if (r.maxLoad !== null && (existing.maxLoad === null || r.maxLoad > existing.maxLoad)) {
+      existing.maxLoad = r.maxLoad
+      existing.maxLoadDate = r.calendarDate
+    }
+    if (r.maxReps !== null && (existing.maxReps === null || r.maxReps > existing.maxReps)) {
+      existing.maxReps = r.maxReps
+      existing.maxRepsDate = r.calendarDate
+    }
+  }
+
+  return [...byExercise.values()].sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
+}
+
+function PersonalRecordsSection({ records }: { records: PersonalRecord[] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-1 py-1 text-left group"
+        aria-expanded={expanded}
+      >
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <Trophy size={12} className="text-yellow-500/80" />
+          Personal Records
+          <span className="font-normal text-slate-600 normal-case tracking-normal">({records.length})</span>
+        </span>
+        {expanded ? (
+          <ChevronUp size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+        ) : (
+          <ChevronDown size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="mt-1 rounded-xl border border-slate-700/50 bg-slate-800/40 overflow-hidden">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-1.5 border-b border-slate-700/40">
+            <span className="text-[10px] text-slate-600 uppercase tracking-wider font-medium">Exercise</span>
+            <span className="text-[10px] text-slate-600 uppercase tracking-wider font-medium text-right">Best weight</span>
+            <span className="text-[10px] text-slate-600 uppercase tracking-wider font-medium text-right">Best reps</span>
+          </div>
+          {records.map(pr => (
+            <div
+              key={pr.exerciseName}
+              className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-2 border-b border-slate-700/30 last:border-0"
+            >
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-slate-200 truncate">{pr.exerciseName}</p>
+                <p className="text-[10px] text-slate-600">{pr.sessionCount} session{pr.sessionCount !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                {pr.maxLoad !== null ? (
+                  <>
+                    <p className="text-xs font-semibold text-slate-200">{pr.maxLoad} lb</p>
+                    {pr.maxLoadDate && (
+                      <p className="text-[10px] text-slate-600">{format(parseISO(pr.maxLoadDate), 'MMM d')}</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-600">—</p>
+                )}
+              </div>
+              <div className="text-right flex-shrink-0">
+                {pr.maxReps !== null ? (
+                  <>
+                    <p className="text-xs font-semibold text-slate-200">{pr.maxReps} reps</p>
+                    {pr.maxRepsDate && (
+                      <p className="text-[10px] text-slate-600">{format(parseISO(pr.maxRepsDate), 'MMM d')}</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-600">—</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
