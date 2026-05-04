@@ -1790,6 +1790,86 @@ None.
 
 ---
 
+<<<<<<< claude/dreamy-mccarthy-WJaAU
+## 2026-05-02 (twentieth pass) — branch `claude/dreamy-mccarthy-WJaAU`
+
+**Baseline**: 440 passing, 0 failing → **Exit**: 484 passing, 0 failing (+44).
+
+---
+
+### Executive summary
+
+One UX fix, one refactor that enabled testability, one medium feature (PB
+detection), and three test files closing long-standing gaps. All carry-over
+items from passes 17–19 are now resolved.
+
+---
+
+### Biggest issues found this pass
+
+1. **Cycle/week progress spans had no `planExpired` guard** — "3/6 done" and
+   "rotation complete!" were both visible alongside the "Plan complete!" banner.
+   Contradictory UX on a state users hit once per plan.
+
+2. **`findPreviousSessionForPlanDay` and `buildLastSessionSummary` were untested
+   pure functions** — both were inlined in a page component making them
+   structurally untestable without a full render. Carry-over from pass 18.
+
+3. **`planStore` had zero unit tests** — the six public store actions (including
+   `duplicatePlan` and `setActivePlan`) were exercised only via UI. Carry-over
+   from pass 17.
+
+4. **`planDeleteCleanup` didn't cover `exerciseHistoryStore`** — the integration
+   test verified 4 of 5 cleanup steps but left the exercise-history cascade
+   unverified.
+
+---
+
+### Improvements completed
+
+| # | Change | Risk | Rollback |
+|---|--------|------|---------|
+| 1 | TodayPage: `!planExpired` guard on cycle spans | None | 1-commit revert |
+| 2 | Extract session summary helpers to `src/lib/sessionSummary.ts` | None | Revert commit |
+| 3 | PB detection in session hint | Low | Remove 3 TodayPage lines + opt param |
+| 4 | 21 tests for `sessionSummary.ts` | None | Delete file |
+| 5 | 22 tests for `planStore` | None | Delete file |
+| 6 | +1 test in `planDeleteCleanup` for exerciseHistory cascade | None | Delete test |
+
+---
+
+### Definitely keep
+
+- `!planExpired` guard — fixes real UX contradiction.
+- `sessionSummary.ts` extraction — enables testability; zero behaviour change.
+- All three new test files — closes the remaining test gaps from passes 17–19.
+
+### Probably keep
+
+- PB detection feature — passive, zero-friction. The only question is whether
+  `" · PB"` in muted slate text is visible enough. Could style with
+  `text-amber-400` in a follow-up if users find it easy to miss.
+
+### Do not keep / recommendations only
+
+- Consider styling `" · PB"` in amber/gold for more visibility.
+- A "Personal Records" section on HistoryPage or SettingsPage is a natural
+  next feature using the same `maxLoadByExercise` computation.
+- Run/swim PB detection deferred — run adaptation already handles distance
+  guidance; would need a separate `maxDistanceByType` computation.
+
+---
+
+### Open questions
+
+1. Should `" · PB"` have distinct colour styling? Currently in the same muted
+   `text-slate-500` as the rest of the hint — easy to miss on a quick glance.
+
+2. Is there a case where `findPreviousSessionForPlanDay` returns the wrong
+   session after retroactive history edits that shift planDayIndex values? If
+   so, the hint shows stale data. The same concern applies to
+   `previousSetsByExercise` (pre-existing, not introduced here).
+=======
 ## 2026-05-03 (twentieth pass) — branch `claude/dreamy-mccarthy-SwIxl`
 
 ### Executive summary
@@ -1832,11 +1912,19 @@ section renders only when there are records; it collapses by default.
 Dead-code fix: `{hasMore && !expanded && (...)}` was inside `{expanded && (...)}`,
 making the `!expanded` guard always `false`. Removed the dead branch and
 simplified the component to a plain toggle.
+>>>>>>> main
 
 ---
 
 ### Known issues or incomplete work
 
+<<<<<<< claude/dreamy-mccarthy-WJaAU
+- **`" · PB"` styling** — plain slate text may be too subtle. Evaluate on
+  device; `text-amber-400` is a one-line CSS change.
+- **Run/swim PB** — no PB detection for run or swim outcomes.
+- **Double-day rotation behavior** — advance override + complete on the same
+  day still untested.
+=======
 - **`computePersonalRecords` unit tests** not yet written. The function is
   exported and easily testable; carrying forward as a low-priority gap.
 - **`truncate` overflow on exercise names** in the PR table — long exercise
@@ -1845,6 +1933,7 @@ simplified the component to a plain toggle.
 - **`findPreviousSessionForPlanDay` / `buildLastSessionSummary`** still
   untested. Low priority.
 - **`planStore.setActivePlan` / `duplicatePlan`** still untested. Medium.
+>>>>>>> main
 
 ---
 

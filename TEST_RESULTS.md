@@ -1030,47 +1030,74 @@ existed.
 
 ---
 
-## 2026-05-03 (twentieth pass) — branch `claude/dreamy-mccarthy-SwIxl`
+## 2026-05-02 (twentieth pass) — branch `claude/dreamy-mccarthy-WJaAU`
 
-**Result: 469 passing, 0 failing** (+29 tests this pass)
+**Result: 484 passing, 0 failing** (+44 tests from baseline of 440).
 
 ### Tests reviewed
 
-All 14 test files reviewed for regressions. No existing tests were modified.
+All existing test files reviewed for regressions. Three files added, one
+updated. No existing tests were modified; no regressions introduced.
 
-### Tests added
+### Tests added / updated
 
-**`src/store/__tests__/exerciseHistoryStore.test.ts`** — new file, 29 tests.
+| File | New tests | Notes |
+|------|-----------|-------|
+| `src/lib/__tests__/sessionSummary.test.ts` | 21 | New file |
+| `src/store/__tests__/planStore.test.ts` | 22 | New file |
+| `src/store/__tests__/planDeleteCleanup.test.ts` | +1 | Added to existing file |
 
-| Describe block | Count | What it verifies |
-|---|---|---|
-| `upsertFromOutcome — basic record creation` | 5 | One record per exercise, correct summaries, skips empty exercises |
-| `upsertFromOutcome — idempotency` | 2 | Second call replaces first; no duplicates |
-| `upsertFromOutcome — instanceId parsing` | 2 | Standard and extra instanceId formats parse date correctly |
-| `removeByWorkoutInstance` | 3 | Removes matching, leaves others, no-op for unknown |
-| `moveByWorkoutInstance` | 3 | Updates calendarDate, leaves others, no-op for unknown |
-| `clearByPlanId` | 3 | Removes all for plan, leaves other plans, no-op for unknown |
-| `getByExerciseName` | 3 | Sorted desc by date, empty for unknown, case-sensitive |
-| `getAllExerciseNames` | 3 | Deduplicated, alphabetical, empty when no records |
-| (fix) `clearByPlanId` correction | 1 | Exercise with empty sets creates a record; test corrected |
+**Total new tests: 44**
 
-One test initially failed: `clearByPlanId — removes all records for the given
-planId, leaves other plans intact`. Root cause: test assumed an exercise with
-`sets: []` would produce 0 records. The store creates a record with null
-summaries for any exercise entry regardless of sets. Fix: rewrote the test to
-use exercises with actual sets.
+#### sessionSummary.test.ts breakdown
 
-### Remaining gaps (carry-forward)
+| Group | Tests | What's covered |
+|-------|-------|----------------|
+| `findPreviousSessionForPlanDay` | 8 | Empty entries, missing outcome, most-recent wins, today excluded, wrong planDayIndex ignored, skip/day_off ignored, wrong planId, fallback to earlier |
+| `buildLastSessionSummary — weights` | 5 | No data → null, N×reps format, no-load, PB marker, below-max no PB |
+| `buildLastSessionSummary — PB map edge cases` | 3 | No map → no PB, exercise absent from map, explicit no-PB |
+| `buildLastSessionSummary — run` | 4 | Distance+duration, distance only, duration only, empty → null |
+| `buildLastSessionSummary — swim` | 1 | Distance+duration format |
 
-#### Low priority (new this pass)
-1. **`computePersonalRecords`** — exported pure function, not yet unit-tested.
+#### planStore.test.ts breakdown
 
-#### Medium priority (unchanged)
-2. **planStore** — `setActivePlan`, `duplicatePlan`
-3. **Double-day rotation behavior**
+| Group | Tests | What's covered |
+|-------|-------|----------------|
+| `createPlan` | 3 | Id assigned, timestamps, multiple plans independent |
+| `setActivePlan` | 5 | Status set, prior deactivated, startDate override, startDayIndex override, default today |
+| `deactivatePlan` | 2 | Clears activePlanId, no-op when none |
+| `archivePlan` | 3 | Status set, activePlanId cleared, sibling untouched |
+| `deletePlan` | 3 | Removed, activePlanId cleared, sibling untouched |
+| `duplicatePlan` | 6 | New id, "(copy)" suffix, always inactive, new day/slot ids, original intact, missing id → "" |
+
+#### planDeleteCleanup.test.ts addition
+
+Added "clears exercise history records for the deleted plan only":
+- Seeds records in `exerciseHistoryStore` for two plans
+- Runs the full 5-step cascade (clearPlanHistory, clearPlanOutcomes, clearPlanVars, clearByPlanId, deletePlan)
+- Asserts plan A records removed, plan B records intact
+
+### Tests that caught real bugs
+
+None this pass — the UX fix and feature were identified by code inspection,
+not failing tests. The test additions close structural coverage gaps.
+
+### Impact of changes on test coverage
+
+| Change | Test impact |
+|--------|-------------|
+| `!planExpired` guard on cycle spans | Display-only; covered by code review |
+| Session summary extraction to lib | Enabled the 21 new sessionSummary tests |
+| PB detection feature | 3 of the 21 sessionSummary tests specifically cover PB paths |
+| `planStore` all actions | 22 new tests; all 6 public actions now covered |
+| exerciseHistory cascade in delete | 1 new integration test |
+
+### Important logic still untested
 
 #### Lower priority (carry-over)
-4. **`findPreviousSessionForPlanDay`** / **`buildLastSessionSummary`**
-5. **CalendarPage retroactive logging flow**
-6. **PlanBuilderPage unsaved-changes guard**
-7. **TodayPage action handlers**
+
+1. **Double-day rotation behavior** — advance override + complete on the same
+   day; tomorrow should start 2 positions ahead.
+2. **CalendarPage retroactive logging flow**
+3. **PlanBuilderPage unsaved-changes guard**
+4. **TodayPage action handlers** (startWorkout, confirmPrimary, etc.)

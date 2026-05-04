@@ -1706,67 +1706,148 @@ tests covering all public store actions:
 
 ---
 
-## 2026-05-03 (twentieth pass) — branch `claude/dreamy-mccarthy-SwIxl`
+## 2026-05-02 (twentieth pass) — branch `claude/dreamy-mccarthy-WJaAU`
 
 Baseline on entry: **440 passing, 0 failing**.
-Exit state: **469 passing, 0 failing** (+29 tests).
+Exit state: **484 passing, 0 failing** (+44 tests).
 
 ---
 
-### 1. Tests: `exerciseHistoryStore` — 29 new unit tests
+### 1. Fix: cycle/week progress text shown when plan is expired
 
-**Summary**: `src/store/__tests__/exerciseHistoryStore.test.ts` was missing
-entirely. The store added in PR #66 had no test coverage for any of its six
-public methods. Added a comprehensive 29-test suite.
+**Summary**: The TodayPage subtitle displayed "3/6 done" and "rotation
+complete!" alongside the purple "Plan complete!" banner. These signals are
+redundant and contradictory — the expiry banner is the canonical state for
+a completed plan.
 
-Methods covered and key scenarios:
+**Root cause**: The cycle-progress spans had no guard for `planExpired`. The
+weeks-plan span was already guarded by `completed < total`, but the two
+rotation cycle spans were missing the corresponding check.
 
-- **`upsertFromOutcome`**: creates one record per exercise in the outcome,
-  computes correct summary values (totalVolume = Σ sets, maxLoad = max set load,
-  maxReps = max set reps), skips outcomes with no exercises, is idempotent
-  (second call replaces the first), parses `calendarDate` from both standard
-  (`planId_date`) and extra (`planId_date_extra_id`) instanceId formats.
-- **`removeByWorkoutInstance`**: removes all records for the given instanceId,
-  leaves other instanceIds untouched, no-op for unknown id.
-- **`moveByWorkoutInstance`**: updates `calendarDate` on all matching records,
-  no-op for unknown id.
-- **`clearByPlanId`**: removes all records for the given planId, leaves other
-  plans untouched, no-op for unknown planId.
-- **`getByExerciseName`**: returns records sorted descending by `calendarDate`
-  (most recent first), returns empty array for unknown name, is case-sensitive.
-- **`getAllExerciseNames`**: returns deduplicated names sorted alphabetically,
-  returns empty array when store is empty.
-
-One test was initially written incorrectly (assumed an exercise with empty sets
-would produce zero records; the store creates a record with null summaries). Fix
-applied during implementation.
+**Fix**: Added `!planExpired &&` to both rotation cycle spans:
+- `cycleProgress && cycleProgress.doneInCycle > 0 && !planExpired`
+- `cycleProgress?.justCompletedRotation && !planExpired`
 
 **Files changed**:
-- `src/store/__tests__/exerciseHistoryStore.test.ts` (new, 29 tests)
+- `src/pages/TodayPage.tsx` — 2 JSX condition changes
+
+**Risks / tradeoffs**: None. Purely subtractive UI change — a corner state
+the user will rarely see becomes cleaner.
+
+**Rollback**: Revert commit `fb653bd`.
 
 ---
 
-### 2. Feat: Personal Records section in History tab
+### 2. Refactor: extract session summary helpers to `src/lib/sessionSummary.ts`
 
-**Summary**: Added a collapsible **Personal Records** section to the top of the
-History tab (`HistoryPage.tsx`). The section renders a 3-column table showing
-each exercise's all-time best weight, best reps, session count, and the date
-each PR was set. Records are automatically scoped to the active plan filter.
-
-The section only renders when `personalRecords.length > 0`, so users without
-weight-logging data see no change.
-
-**Bug fixed during implementation**: The first draft of `PersonalRecordsSection`
-contained a dead-code branch — `{hasMore && !expanded && (...)}` inside an
-`{expanded && (...)}` block. Because `!expanded` is always `false` inside the
-`expanded &&` wrapper, the "show more" button never rendered. Simplified to a
-plain expand/collapse toggle; removed `MAX_PR_ROWS_COLLAPSED`, `visible`, and
-`hasMore` variables.
-
-**New exports** (pure, testable):
-- `computePersonalRecords(records, planId)` — derives `PersonalRecord[]` from
-  `ExerciseSessionRecord[]`, scoped to a plan or global
-- `PersonalRecord` interface
+**Summary**: `findPreviousSessionForPlanDay` and `buildLastSessionSummary`
+were inlined as module-level functions inside `TodayPage.tsx`. Being inside
+a page file made them impossible to unit test without rendering the full
+component. Extracted to `src/lib/sessionSummary.ts` and imported back from
+TodayPage — zero behaviour change.
 
 **Files changed**:
-- `src/pages/HistoryPage.tsx` (+137 lines)
+- `src/lib/sessionSummary.ts` (new — 2 exported pure functions)
+- `src/pages/TodayPage.tsx` — replaced inline definitions with import; updated
+  `buildLastSessionSummary` call to pass optional `maxLoadByExercise` map
+
+**Risks / tradeoffs**: None. Pure refactor; function signatures unchanged.
+
+**Rollback**: Revert commit `0ecf042`.
+
+---
+
+### 3. Feature: personal best (PB) detection in session hint
+
+**Summary**: Extended `buildLastSessionSummary` with an optional
+`maxLoadByExercise?: Record<string, number>` parameter. When the first set's
+load exactly equals the all-time max for that exercise, " · PB" is appended
+to the summary string.
+
+In TodayPage, subscribed to `useExerciseHistoryStore(s => s.records)` (first
+use of this store in TodayPage) and computed `maxLoadByExercise` via a
+`useMemo`. The existing `buildLastSessionSummary` call was updated to pass
+the map.
+
+**Why**: The session hint added in pass 18 showed "Last: 3×8 @ 225 lb Squat"
+but gave no indication of whether that load was the user's best. The
+`exerciseHistoryStore` had the data since pass 6 but had never been read in
+TodayPage.
+
+**Files changed**:
+- `src/lib/sessionSummary.ts` — optional `maxLoadByExercise` param + PB logic
+- `src/pages/TodayPage.tsx` — `exerciseRecords` subscription, `maxLoadByExercise`
+  useMemo, updated call
+
+**Risks / tradeoffs**: First `exerciseHistoryStore` subscription in TodayPage.
+Single selector (`s.records`) so re-renders only on new workout log. The
+`useMemo` is O(n sets) — cheap for any realistic data volume.
+
+**Rollback**: Remove the three lines in TodayPage and the optional param in
+`sessionSummary.ts`.
+
+---
+
+### 4. Tests: `sessionSummary.ts` — 21 new unit tests
+
+**Summary**: Covered both exported helpers in a new test file:
+
+`findPreviousSessionForPlanDay` (8 tests):
+- Empty entries → null
+- Entry without outcome → null
+- Most-recent complete entry wins
+- Today's date excluded
+- Wrong planDayIndex ignored
+- Skip/day_off entries ignored
+- Wrong planId ignored
+- Falls back to earlier entry when latest has no outcome
+
+`buildLastSessionSummary` (13 tests):
+- No data → null
+- Weights format: N×reps @ load exerciseName
+- No-load variant (bodyweight)
+- PB marker shown when load equals all-time max
+- No PB marker when load is below max
+- No PB when exercise absent from map
+- Run formats: distance + duration, distance only, duration only, empty → null
+- Swim format
+- Weights take precedence over run when both present
+
+**Files changed**:
+- `src/lib/__tests__/sessionSummary.test.ts` (new, 21 tests)
+
+---
+
+### 5. Tests: `planStore` — 22 new unit tests
+
+**Summary**: Long-standing gap (noted since pass 17). Created
+`src/store/__tests__/planStore.test.ts` covering all six public store actions:
+
+- `createPlan` (3): id assigned, timestamps set, multiple plans independent
+- `setActivePlan` (5): status set to active, prior deactivated, startDate
+  override, startDayIndex override, default today
+- `deactivatePlan` (2): clears activePlanId, no-op when none active
+- `archivePlan` (3): status set, activePlanId cleared when archived was active,
+  sibling untouched
+- `deletePlan` (3): removed, activePlanId cleared, sibling untouched
+- `duplicatePlan` (6): new id, "(copy)" suffix, always inactive, new day/slot
+  ids, original intact, missing id → ""
+
+**Files changed**:
+- `src/store/__tests__/planStore.test.ts` (new, 22 tests)
+
+---
+
+### 6. Tests: `planDeleteCleanup` — exerciseHistoryStore coverage
+
+**Summary**: The PlansPage delete handler calls `clearByPlanId` on
+`exerciseHistoryStore` as the fourth step in its cleanup sequence, but the
+integration test never verified this. Added:
+
+- `useExerciseHistoryStore` import and `beforeEach` reset
+- New test: "clears exercise history records for the deleted plan only"
+  Seeds two plans' exercise records, runs the full 5-step cascade, verifies
+  plan A records removed and plan B record intact.
+
+**Files changed**:
+- `src/store/__tests__/planDeleteCleanup.test.ts` — +1 test, updated beforeEach
