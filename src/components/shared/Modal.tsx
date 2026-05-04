@@ -18,6 +18,15 @@ export function Modal({ title, onClose, children, footer }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
+  // Lock background scroll while open (targets the <main> scroll container)
+  useEffect(() => {
+    const el = document.querySelector('main') as HTMLElement | null
+    if (!el) return
+    const prev = el.style.overflow
+    el.style.overflow = 'hidden'
+    return () => { el.style.overflow = prev }
+  }, [])
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
@@ -26,8 +35,11 @@ export function Modal({ title, onClose, children, footer }: Props) {
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Sheet */}
-      <div className="relative z-10 w-full max-w-lg bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-slate-700 flex flex-col max-h-[90vh]">
+      {/* Sheet — capped so it never slides behind the Dynamic Island / status bar */}
+      <div
+        className="relative z-10 w-full max-w-lg bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-slate-700 flex flex-col"
+        style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-top) - 8px)' }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700 flex-shrink-0">
           <h2 className="text-base font-semibold text-white">{title}</h2>
@@ -42,9 +54,14 @@ export function Modal({ title, onClose, children, footer }: Props) {
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-5 py-4">{children}</div>
 
-        {/* Footer */}
+        {/* Footer — extra bottom padding for home indicator */}
         {footer && (
-          <div className="px-5 py-4 border-t border-slate-700 flex-shrink-0">{footer}</div>
+          <div
+            className="px-5 pt-4 border-t border-slate-700 flex-shrink-0"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          >
+            {footer}
+          </div>
         )}
       </div>
     </div>
