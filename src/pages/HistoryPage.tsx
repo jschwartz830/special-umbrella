@@ -22,10 +22,10 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
-import { computeHistoryStats } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords } from '../lib/historyStats'
+import type { PersonalRecord } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
-import type { ExerciseSessionRecord } from '../store/exerciseHistoryStore'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { ActionType, HistoryEntry, ExtraWorkoutEntry, WorkoutType, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
@@ -821,58 +821,6 @@ function StatTile({ label, value, suffix }: { label: string; value: number; suff
       {suffix && <p className="text-[10px] text-slate-500 leading-tight">{suffix}</p>}
     </div>
   )
-}
-
-// ── Personal Records ──────────────────────────────────────────────────────────
-
-export interface PersonalRecord {
-  exerciseName: string
-  maxLoad: number | null
-  maxLoadDate: string | null
-  maxReps: number | null
-  maxRepsDate: string | null
-  sessionCount: number
-}
-
-/**
- * Derive one PR row per exercise from a flat list of exercise session records.
- * Optionally scoped to a single plan.
- */
-export function computePersonalRecords(
-  records: ExerciseSessionRecord[],
-  planId: string | null,
-): PersonalRecord[] {
-  const scoped = planId ? records.filter(r => r.planId === planId) : records
-
-  const byExercise = new Map<string, PersonalRecord>()
-
-  for (const r of scoped) {
-    const existing = byExercise.get(r.exerciseName)
-    if (!existing) {
-      byExercise.set(r.exerciseName, {
-        exerciseName: r.exerciseName,
-        maxLoad: r.maxLoad,
-        maxLoadDate: r.maxLoad !== null ? r.calendarDate : null,
-        maxReps: r.maxReps,
-        maxRepsDate: r.maxReps !== null ? r.calendarDate : null,
-        sessionCount: 1,
-      })
-      continue
-    }
-
-    existing.sessionCount++
-
-    if (r.maxLoad !== null && (existing.maxLoad === null || r.maxLoad > existing.maxLoad)) {
-      existing.maxLoad = r.maxLoad
-      existing.maxLoadDate = r.calendarDate
-    }
-    if (r.maxReps !== null && (existing.maxReps === null || r.maxReps > existing.maxReps)) {
-      existing.maxReps = r.maxReps
-      existing.maxRepsDate = r.calendarDate
-    }
-  }
-
-  return [...byExercise.values()].sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
 }
 
 function PersonalRecordsSection({ records }: { records: PersonalRecord[] }) {

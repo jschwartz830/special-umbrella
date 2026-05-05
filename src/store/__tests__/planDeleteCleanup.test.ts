@@ -1,9 +1,9 @@
 /**
  * Integration-style test: deleting a plan should cascade to history, outcomes,
- * program vars, and exercise history — leaving no orphaned records. Mirrors the
- * wiring in PlansPage where the delete confirm handler calls clearPlanHistory,
- * clearPlanOutcomes, clearPlanVars, clearByPlanId (exerciseHistory), and
- * deletePlan together.
+ * progression states, program vars, and exercise history — leaving no orphaned
+ * records. Mirrors the wiring in PlansPage where the delete confirm handler calls
+ * clearPlanHistory, clearPlanOutcomes, removeProgressionStates, clearPlanVars,
+ * clearByPlanId (exerciseHistory), and deletePlan together.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
@@ -187,6 +187,68 @@ describe('plan delete cleanup (integration)', () => {
       useProgramStore.getState().clearPlanVars('plan-A')
     }).not.toThrow()
     expect(useProgramStore.getState().getVars('plan-A')).toEqual({})
+  })
+
+  it('removes progressionStates for the deleted plan, leaving other plans intact', () => {
+    const planA: Plan = {
+      ...makePlan('plan-A', 'Alpha'),
+      days: [{
+        id: 'd1',
+        label: 'Day 1',
+        slots: [{
+          id: 's1',
+          type: 'run',
+          name: 'Easy Run',
+          runConfig: { subtype: 'easy', progressionGroupId: 'plan-A_easy', progressionEligible: true },
+        }],
+      }],
+    }
+    const planB: Plan = {
+      ...makePlan('plan-B', 'Bravo'),
+      days: [{
+        id: 'd1',
+        label: 'Day 1',
+        slots: [{
+          id: 's2',
+          type: 'run',
+          name: 'Long Run',
+          runConfig: { subtype: 'long', progressionGroupId: 'plan-B_long', progressionEligible: true },
+        }],
+      }],
+    }
+    usePlanStore.setState({ plans: { [planA.id]: planA, [planB.id]: planB } })
+
+    // Seed progression states for both plans
+    useOutcomeStore.setState({
+      outcomes: {},
+      progressionStates: {
+        'plan-A_easy': { progressionGroupId: 'plan-A_easy', currentTargetDistanceMiles: 3, lastResult: 'progress', updatedAt: '2026-04-01T12:00:00Z' },
+        'plan-B_long': { progressionGroupId: 'plan-B_long', currentTargetDistanceMiles: 8, lastResult: 'hold', updatedAt: '2026-04-01T12:00:00Z' },
+      },
+    })
+
+    // Collect group IDs and simulate the PlansPage delete handler
+    const groupIds = planA.days
+      .flatMap(d => d.slots)
+      .flatMap(s => s.runConfig?.progressionGroupId ? [s.runConfig.progressionGroupId] : [])
+    useOutcomeStore.getState().removeProgressionStates(groupIds)
+    usePlanStore.getState().deletePlan('plan-A')
+
+    const remaining = useOutcomeStore.getState().progressionStates
+    expect(Object.keys(remaining)).toHaveLength(1)
+    expect(remaining['plan-A_easy']).toBeUndefined()
+    expect(remaining['plan-B_long']).toBeDefined()
+  })
+
+  it('removeProgressionStates is a no-op when groupIds is empty', () => {
+    useOutcomeStore.setState({
+      outcomes: {},
+      progressionStates: {
+        'grp-1': { progressionGroupId: 'grp-1', currentTargetDistanceMiles: 3, lastResult: 'hold', updatedAt: '2026-01-01T12:00:00Z' },
+      },
+    })
+    useOutcomeStore.getState().removeProgressionStates([])
+    expect(Object.keys(useOutcomeStore.getState().progressionStates)).toHaveLength(1)
   })
 
   it('clears exercise history records for the deleted plan only', () => {

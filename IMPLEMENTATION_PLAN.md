@@ -1,5 +1,63 @@
 # Implementation Plan
 
+## Pass 22 — 2026-05-05 (branch `claude/dreamy-mccarthy-phNna`)
+
+### Observations on entry
+
+- Baseline: **537 passing, 0 failing** (after `npm install` on fresh env).
+- `buildLastSessionSummary` used `ex.sets.find(...)` (first set with any data)
+  for both display and PB comparison, meaning a warmup set (135 lb) would be
+  shown instead of the heavier working sets (185 lb), and the PB detection would
+  miss a true personal best if the first set was a warmup.
+- The unlogged-days nudge ("N days without entries — rotation may be stalled")
+  had no guard against `planExpired`, so it could appear alongside the "Plan
+  complete!" banner — contradictory UX.
+- The upcoming workout modal had a dead `historyEntry` branch: `getUpcomingDays`
+  never populates `historyEntry` on `ResolvedDay` objects it returns, so the
+  "Already logged — show status + edit/clear" branch was unreachable.
+- `computePersonalRecords` and its `PersonalRecord` interface were defined as
+  `export` inside `HistoryPage.tsx` — untestable without rendering the page.
+- `progressionStates` in `outcomeStore` were never removed on plan delete,
+  creating a permanent storage leak for run-progression plans. Deferred since
+  pass 15.
+
+### Decisions
+
+- **Fix PB detection** — use heaviest set (by `actualLoad`) for both display
+  and PB comparison; add 2 targeted tests with mixed warmup/working sets.
+- **Suppress unlogged-days nudge when plan expired** — one-character conditional
+  change; no test needed (behavior is visually obvious).
+- **Remove dead upcoming modal branch** — pure deletion of ~33 lines, reduces
+  confusion; safe because the branch was provably unreachable.
+- **Extract `computePersonalRecords` to `historyStats.ts`** — adds testability
+  without changing behavior; add 7 unit tests.
+- **Fix `progressionStates` orphaning** — add `removeProgressionStates` to
+  `outcomeStore`; wire into `PlansPage` delete handler; add 2 integration tests.
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| 1 | Suppress nudge when plan expired | None | ✅ Done |
+| 2 | Remove dead upcoming modal branch | None | ✅ Done |
+| 3 | Fix PB detection (heaviest set) + tests | Low | ✅ Done |
+| 4 | Extract computePersonalRecords + tests | None | ✅ Done |
+| 5 | Fix progressionStates orphaning + tests | Low | ✅ Done |
+
+### Exit state
+
+**548 passing, 0 failing** (+11 tests from baseline).
+
+### Carry-over open items
+
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path (legacy RunProgressionState vs new ProgressionRecommendation)
+- Expression evaluator should surface errors to UI for malformed progression rules
+- `PlanCard` component defined inside `PlansPage` function body (no memoization; low priority)
+
+---
+
 ## 2026-04-29 — Overnight Audit (seventeenth pass)
 
 Branch: `claude/dreamy-mccarthy-vrC4L`.
