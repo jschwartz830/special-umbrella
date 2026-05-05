@@ -1,5 +1,91 @@
 # Overnight Changelog
 
+## 2026-05-05 (twenty-second pass) — branch `claude/dreamy-mccarthy-phNna`
+
+Baseline on entry: **537 passing, 0 failing**.
+Exit state: **548 passing, 0 failing** (+11 tests).
+
+---
+
+### 1. Bug fix: PB detection uses heaviest set, not first set
+
+**File:** `src/lib/sessionSummary.ts`
+
+`buildLastSessionSummary` previously used `ex.sets.find(...)` to select the
+first set with any data for both the summary line and PB comparison. If a
+session had a warmup set (e.g. 135 lb) followed by heavier working sets
+(e.g. 185 lb), the displayed weight would show the warmup and the PB detector
+would compare the warmup load — missing a true personal best entirely.
+
+Fixed to select the set with the maximum `actualLoad` (falling back to the
+first active set when no loads are recorded). The set count still reflects all
+active sets.
+
+**Tests added** (`src/lib/__tests__/sessionSummary.test.ts`):
+- "uses heaviest set for display when sets have mixed loads"
+- "detects PB using heaviest set, not first set"
+
+---
+
+### 2. Bug fix: suppress unlogged-days nudge when plan is expired
+
+**File:** `src/pages/TodayPage.tsx`
+
+The "N days without entries — rotation may be stalled" nudge had no guard
+against `planExpired === true`. A user who completed a plan could see both the
+"Plan complete!" banner and the stall nudge simultaneously — contradictory UX.
+Added `!planExpired &&` to the nudge's conditional.
+
+---
+
+### 3. Dead code removal: unreachable upcoming modal branch
+
+**File:** `src/pages/TodayPage.tsx`
+
+`getUpcomingDays` returns `ResolvedDay` objects with no `historyEntry` field
+populated. The upcoming workout modal contained a 33-line "Already logged —
+show status + edit/clear" branch guarded by `loggingUpcoming.rd.historyEntry`,
+which is always `undefined`. The entire branch was unreachable. Removed the
+dead code and the now-unused `handleUpcomingClear` helper function, leaving
+only the action-buttons branch.
+
+---
+
+### 4. Refactor: extract `computePersonalRecords` to `historyStats.ts`
+
+**Files:** `src/lib/historyStats.ts`, `src/pages/HistoryPage.tsx`
+
+`computePersonalRecords` and its `PersonalRecord` interface were defined inside
+`HistoryPage.tsx` as exported symbols — making them impossible to test without
+rendering the full page. Moved both to `src/lib/historyStats.ts` alongside the
+other pure stats helpers. `HistoryPage.tsx` now imports them from there.
+
+**Tests added** (`src/lib/__tests__/historyStats.test.ts`): 7 new tests covering
+no-data, single exercise, max-load tracking, max-reps tracking, plan scoping,
+all-time mode, and null-load handling.
+
+---
+
+### 5. Feature: fix `progressionStates` orphaning on plan delete
+
+**Files:** `src/store/outcomeStore.ts`, `src/pages/PlansPage.tsx`
+
+`progressionStates` in `outcomeStore` are keyed by `progressionGroupId` (a
+free-text ID on run slots). When a plan was deleted, its associated progression
+states were never removed — they accumulated silently in localStorage across
+plan lifecycles.
+
+Added `removeProgressionStates(groupIds: string[])` to `OutcomeState` and its
+implementation. Wired into `PlansPage`'s delete confirm handler: before calling
+`deletePlan`, the handler now collects all `runConfig.progressionGroupId` values
+from the plan's slots and passes them to `removeProgressionStates`.
+
+**Tests added** (`src/store/__tests__/planDeleteCleanup.test.ts`):
+- "removes progressionStates for the deleted plan, leaving other plans intact"
+- "removeProgressionStates is a no-op when groupIds is empty"
+
+---
+
 ## 2026-05-04 (twenty-first pass) — branch `claude/dreamy-mccarthy-sA0Ai`
 
 Baseline on entry: **469 passing, 0 failing**.

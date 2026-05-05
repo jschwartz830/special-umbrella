@@ -1,5 +1,23 @@
 # Test Results
 
+## 2026-05-05 (twenty-second pass) — branch `claude/dreamy-mccarthy-phNna`
+
+**Result: 548 passing, 0 failing** (+11 tests from 537 baseline)
+
+### Tests added this pass
+
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `sessionSummary.test.ts` | +2 | Mixed warmup/working-set display; PB detection with warmup as first set |
+| `historyStats.test.ts` | +7 | `computePersonalRecords`: empty input, per-exercise rows, max-load tracking, max-reps tracking, plan-scoped filter, all-time mode, null-load handling |
+| `planDeleteCleanup.test.ts` | +2 | `removeProgressionStates` cascade on plan delete; no-op for empty groupIds |
+
+### TypeScript
+
+`npx tsc --noEmit` exits clean (0 errors).
+
+---
+
 ## 2026-05-04 (twenty-first pass) — branch `claude/dreamy-mccarthy-sA0Ai`
 
 **Result: 493 passing, 0 failing** (+24 tests from 469 baseline)

@@ -2023,3 +2023,45 @@ simplified the component to a plain toggle.
 ### Dependencies added
 
 None.
+
+---
+
+## Pass 22 — 2026-05-05
+
+### Summary
+
+Five changes landing on this pass:
+
+1. **PB detection fixed** (`sessionSummary.ts`): was using first set with data;
+   now uses the set with maximum `actualLoad`, so warmup sets no longer mask
+   a true personal best. Two new tests with mixed warmup/working set fixtures.
+
+2. **Nudge suppressed when plan expired** (`TodayPage.tsx`): added
+   `!planExpired &&` guard so "rotation may be stalled" doesn't contradict the
+   "Plan complete!" banner.
+
+3. **Dead code removed** (`TodayPage.tsx`): the "Already logged" branch in the
+   upcoming workout modal was provably unreachable (`getUpcomingDays` never
+   sets `historyEntry` on future `ResolvedDay` objects). Removed ~33 lines of
+   dead JSX and the `handleUpcomingClear` helper.
+
+4. **`computePersonalRecords` extracted** (`historyStats.ts`): moved from
+   `HistoryPage.tsx` where it was untestable, to `historyStats.ts` alongside
+   other pure stats helpers. 7 unit tests added.
+
+5. **`progressionStates` orphaning fixed** (`outcomeStore.ts`, `PlansPage.tsx`):
+   added `removeProgressionStates(groupIds)` action; plan delete handler now
+   collects and clears progression group IDs before removing the plan. 2
+   integration tests added.
+
+### Remaining open items
+
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path (legacy RunProgressionState vs new ProgressionRecommendation)
+- Expression evaluator should surface errors to UI for malformed progression rules
+- `PlanCard` defined inside `PlansPage` function body (low priority)
+
+### Dependencies added
+
+None.
