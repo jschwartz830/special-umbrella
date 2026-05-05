@@ -54,9 +54,14 @@ export function buildLastSessionSummary(
     e => e.sets.some(s => s.actualReps != null || s.actualLoad != null),
   )
   if (ex) {
-    const s = ex.sets.find(s => s.actualReps != null || s.actualLoad != null)
-    if (s) {
-      const sets = ex.sets.filter(s => s.actualReps != null || s.actualLoad != null).length
+    const activeSets = ex.sets.filter(s => s.actualReps != null || s.actualLoad != null)
+    if (activeSets.length > 0) {
+      // Use heaviest set for display and PB comparison; fall back to first active set
+      const setsWithLoad = activeSets.filter(s => s.actualLoad != null)
+      const s = setsWithLoad.length > 0
+        ? setsWithLoad.reduce((best, cur) => (cur.actualLoad! > best.actualLoad! ? cur : best))
+        : activeSets[0]
+      const sets = activeSets.length
       const reps = s.actualReps != null ? s.actualReps : s.targetReps
       const load = s.actualLoad != null ? `@ ${s.actualLoad} lb` : ''
       const isPB =

@@ -261,6 +261,56 @@ describe('buildLastSessionSummary', () => {
     expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min')
   })
 
+  it('uses heaviest set for display when sets have mixed loads', () => {
+    // Warmup 135 lb, working sets 185 lb — should display the 185 lb set
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T12:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      weightsActual: {
+        exercises: [{
+          exercise: 'Bench Press',
+          sets: [
+            { targetReps: 10, actualReps: 10, actualLoad: 135, completed: true },
+            { targetReps: 8, actualReps: 8, actualLoad: 185, completed: true },
+            { targetReps: 8, actualReps: 8, actualLoad: 185, completed: true },
+          ],
+        }],
+      },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3×8 @ 185 lb Bench Press')
+  })
+
+  it('detects PB using heaviest set, not first set', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T12:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      weightsActual: {
+        exercises: [{
+          exercise: 'Bench Press',
+          sets: [
+            { targetReps: 10, actualReps: 10, actualLoad: 135, completed: true },
+            { targetReps: 8, actualReps: 8, actualLoad: 185, completed: true },
+          ],
+        }],
+      },
+    }
+    // 185 is the all-time max; first set is 135 (warmup) — old code would miss this PB
+    const maxLoadByExercise = { 'Bench Press': 185 }
+    expect(buildLastSessionSummary(outcome, maxLoadByExercise)).toBe('Last: 2×8 @ 185 lb Bench Press · PB')
+  })
+
   it('prefers weights over run data when both are present', () => {
     const outcome: WorkoutOutcome = {
       workoutInstanceId: 'p1_2026-05-01',
