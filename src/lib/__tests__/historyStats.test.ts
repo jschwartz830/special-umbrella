@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
+import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
 function entry(
   date: string,
@@ -799,5 +800,100 @@ describe('countPlanDayCompletions', () => {
     ]
     expect(countPlanDayCompletions('plan-1', 0, entries)).toBe(1)
     expect(countPlanDayCompletions('plan-1', 1, entries)).toBe(1)
+  })
+})
+
+// ── computePersonalRecords ────────────────────────────────────────────────────
+
+function rec(
+  exerciseName: string,
+  maxLoad: number | null,
+  maxReps: number | null,
+  calendarDate = '2026-01-01',
+  planId = 'plan-1',
+): ExerciseSessionRecord {
+  return {
+    id: `${planId}_${calendarDate}_${exerciseName}`,
+    exerciseName,
+    maxLoad,
+    maxReps,
+    calendarDate,
+    planId,
+    planName: null,
+    workoutName: null,
+    workoutInstanceId: `${planId}_${calendarDate}`,
+    sets: [],
+    totalVolume: null,
+    createdAt: `${calendarDate}T12:00:00Z`,
+  }
+}
+
+describe('computePersonalRecords', () => {
+  it('returns empty array for no records', () => {
+    expect(computePersonalRecords([], null)).toEqual([])
+  })
+
+  it('creates one row per exercise with correct values', () => {
+    const records = [
+      rec('Squat', 225, 5, '2026-01-01'),
+      rec('Bench Press', 185, 8, '2026-01-02'),
+    ]
+    const result = computePersonalRecords(records, null)
+    expect(result).toHaveLength(2)
+    // sorted alphabetically
+    expect(result[0].exerciseName).toBe('Bench Press')
+    expect(result[1].exerciseName).toBe('Squat')
+  })
+
+  it('tracks max load across sessions for the same exercise', () => {
+    const records = [
+      rec('Squat', 185, 5, '2026-01-01'),
+      rec('Squat', 225, 3, '2026-01-08'),
+      rec('Squat', 205, 4, '2026-01-15'),
+    ]
+    const result = computePersonalRecords(records, null)
+    expect(result).toHaveLength(1)
+    expect(result[0].maxLoad).toBe(225)
+    expect(result[0].maxLoadDate).toBe('2026-01-08')
+    expect(result[0].sessionCount).toBe(3)
+  })
+
+  it('tracks max reps independently of max load', () => {
+    const records = [
+      rec('Pull-up', null, 8, '2026-01-01'),
+      rec('Pull-up', null, 12, '2026-01-08'),
+    ]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].maxReps).toBe(12)
+    expect(result[0].maxRepsDate).toBe('2026-01-08')
+    expect(result[0].maxLoad).toBeNull()
+  })
+
+  it('filters by planId when provided', () => {
+    const records = [
+      rec('Squat', 225, 5, '2026-01-01', 'plan-1'),
+      rec('Squat', 275, 3, '2026-01-08', 'plan-2'),
+    ]
+    const result = computePersonalRecords(records, 'plan-1')
+    expect(result).toHaveLength(1)
+    expect(result[0].maxLoad).toBe(225)
+  })
+
+  it('returns all-time records when planId is null', () => {
+    const records = [
+      rec('Deadlift', 315, 1, '2026-01-01', 'plan-1'),
+      rec('Deadlift', 365, 1, '2026-01-08', 'plan-2'),
+    ]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].maxLoad).toBe(365)
+  })
+
+  it('sets maxLoadDate only when maxLoad is non-null', () => {
+    const records = [rec('Push-up', null, 20, '2026-01-01')]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].maxLoad).toBeNull()
+    expect(result[0].maxLoadDate).toBeNull()
+    expect(result[0].maxReps).toBe(20)
+    expect(result[0].maxRepsDate).toBe('2026-01-01')
   })
 })

@@ -1,4 +1,5 @@
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutType, WorkoutOutcome } from '../types'
+import type { ExerciseSessionRecord } from '../store/exerciseHistoryStore'
 
 export interface HistoryStats {
   totalLogged: number
@@ -313,6 +314,58 @@ export function computeWorkoutTypeBreakdown(
     }
   }
   return result
+}
+
+// ── Personal Records ──────────────────────────────────────────────────────────
+
+export interface PersonalRecord {
+  exerciseName: string
+  maxLoad: number | null
+  maxLoadDate: string | null
+  maxReps: number | null
+  maxRepsDate: string | null
+  sessionCount: number
+}
+
+/**
+ * Derive one PR row per exercise from a flat list of exercise session records.
+ * Optionally scoped to a single plan via `planId` (pass `null` for all-time).
+ */
+export function computePersonalRecords(
+  records: ExerciseSessionRecord[],
+  planId: string | null,
+): PersonalRecord[] {
+  const scoped = planId ? records.filter(r => r.planId === planId) : records
+
+  const byExercise = new Map<string, PersonalRecord>()
+
+  for (const r of scoped) {
+    const existing = byExercise.get(r.exerciseName)
+    if (!existing) {
+      byExercise.set(r.exerciseName, {
+        exerciseName: r.exerciseName,
+        maxLoad: r.maxLoad,
+        maxLoadDate: r.maxLoad !== null ? r.calendarDate : null,
+        maxReps: r.maxReps,
+        maxRepsDate: r.maxReps !== null ? r.calendarDate : null,
+        sessionCount: 1,
+      })
+      continue
+    }
+
+    existing.sessionCount++
+
+    if (r.maxLoad !== null && (existing.maxLoad === null || r.maxLoad > existing.maxLoad)) {
+      existing.maxLoad = r.maxLoad
+      existing.maxLoadDate = r.calendarDate
+    }
+    if (r.maxReps !== null && (existing.maxReps === null || r.maxReps > existing.maxReps)) {
+      existing.maxReps = r.maxReps
+      existing.maxRepsDate = r.calendarDate
+    }
+  }
+
+  return [...byExercise.values()].sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
 }
 
 // ── Per-plan-day completion counter ──────────────────────────────────────────
