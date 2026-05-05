@@ -404,12 +404,6 @@ export function TodayPage() {
     setLoggingUpcoming(null)
   }
 
-  function handleUpcomingClear(rd: ResolvedDay) {
-    removeEntry(plan!.id, rd.calendarDate)
-    removeOutcome(makeWorkoutInstanceId(plan!.id, rd.calendarDate))
-    setLoggingUpcoming(null)
-  }
-
   return (
     <div className="px-4 pt-safe space-y-4">
       {/* Header */}
@@ -475,7 +469,7 @@ export function TodayPage() {
       </div>
 
       {/* Unlogged past days nudge — shown when the rotation may be stalled */}
-      {unloggedCount > 0 && (
+      {!planExpired && unloggedCount > 0 && (
         <button
           onClick={() => navigate('/calendar')}
           className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-700/50 border border-slate-600/50 text-left hover:bg-slate-700 transition-colors"
@@ -849,70 +843,34 @@ export function TodayPage() {
               ))}
             </div>
 
-            {loggingUpcoming.rd.historyEntry ? (
-              /* Already logged — show status + edit/clear */
-              <div className="space-y-3">
-                <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl ${
-                  loggingUpcoming.rd.historyEntry.action === 'complete' ? 'bg-emerald-500/10 border border-emerald-500/20' :
-                  loggingUpcoming.rd.historyEntry.action === 'skip' ? 'bg-slate-700 border border-slate-600' :
-                  'bg-amber-500/10 border border-amber-500/20'
-                }`}>
-                  {loggingUpcoming.rd.historyEntry.action === 'complete' && <CheckCircle2 size={16} className="text-emerald-400" />}
-                  {loggingUpcoming.rd.historyEntry.action === 'skip' && <SkipForward size={16} className="text-slate-400" />}
-                  {loggingUpcoming.rd.historyEntry.action === 'day_off' && <Coffee size={16} className="text-amber-400" />}
-                  <span className={`text-sm font-medium capitalize ${
-                    loggingUpcoming.rd.historyEntry.action === 'complete' ? 'text-emerald-400' :
-                    loggingUpcoming.rd.historyEntry.action === 'skip' ? 'text-slate-300' : 'text-amber-400'
-                  }`}>
-                    {loggingUpcoming.rd.historyEntry.action.replace(/_/g, ' ')}
-                  </span>
+            <div className="space-y-2">
+              {upcomingLogError && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+                  <Info size={13} className="text-red-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-red-300">{upcomingLogError}</p>
                 </div>
-                {loggingUpcoming.rd.historyEntry.action === 'complete' && (
-                  <button
-                    onClick={() => setShowUpcomingOutcome(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 text-sky-400 text-sm font-medium transition-colors"
-                  >
-                    <Pencil size={14} /> Edit workout details
-                  </button>
-                )}
+              )}
+              <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleUpcomingClear(loggingUpcoming.rd)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 text-sm font-medium transition-colors"
+                  onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'complete')}
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors active:scale-95"
                 >
-                  <X size={14} /> Clear entry
+                  <CheckCircle2 size={16} /> Complete
+                </button>
+                <button
+                  onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'skip')}
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-sm font-medium transition-colors active:scale-95"
+                >
+                  <SkipForward size={16} /> Skip
                 </button>
               </div>
-            ) : (
-              /* Not yet logged — show action buttons */
-              <div className="space-y-2">
-                {upcomingLogError && (
-                  <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
-                    <Info size={13} className="text-red-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-red-300">{upcomingLogError}</p>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'complete')}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors active:scale-95"
-                  >
-                    <CheckCircle2 size={16} /> Complete
-                  </button>
-                  <button
-                    onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'skip')}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-sm font-medium transition-colors active:scale-95"
-                  >
-                    <SkipForward size={16} /> Skip
-                  </button>
-                </div>
-                <button
-                  onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'day_off')}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium transition-colors active:scale-95"
-                >
-                  <Coffee size={16} /> Day Off
-                </button>
-              </div>
-            )}
+              <button
+                onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'day_off')}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium transition-colors active:scale-95"
+              >
+                <Coffee size={16} /> Day Off
+              </button>
+            </div>
           </div>
         </Modal>
       )}
