@@ -73,6 +73,9 @@ interface OutcomeState {
 
   /** Move an outcome record to a new instanceId key (for date changes). */
   moveOutcome: (oldInstanceId: string, newInstanceId: string) => void
+
+  /** Remove progression states for the given group IDs (called on plan delete). */
+  removeProgressionStates: (groupIds: string[]) => void
 }
 
 export const useOutcomeStore = create<OutcomeState>()(
@@ -215,6 +218,18 @@ export const useOutcomeStore = create<OutcomeState>()(
           }
         })
         useExerciseHistoryStore.getState().moveByWorkoutInstance(oldInstanceId, newInstanceId)
+      },
+
+      removeProgressionStates(groupIds) {
+        if (groupIds.length === 0) return
+        set(s => {
+          const ids = new Set(groupIds)
+          return {
+            progressionStates: Object.fromEntries(
+              Object.entries(s.progressionStates).filter(([k]) => !ids.has(k)),
+            ),
+          }
+        })
       },
     }),
     { name: 'wpt_outcomes' },

@@ -36,6 +36,7 @@ export function PlansPage() {
   const importPlans = usePlanStore(s => s.importPlans)
   const clearHistory = useHistoryStore(s => s.clearPlanHistory)
   const clearOutcomes = useOutcomeStore(s => s.clearPlanOutcomes)
+  const removeProgressionStates = useOutcomeStore(s => s.removeProgressionStates)
   const clearVars = useProgramStore(s => s.clearPlanVars)
   const clearExerciseHistory = useExerciseHistoryStore(s => s.clearByPlanId)
   const entries = useHistoryStore(s => s.entries)
@@ -322,8 +323,15 @@ export function PlansPage() {
               </button>
               <button
                 onClick={() => {
+                  const planToDelete = plans[confirmDelete]
+                  const progressionGroupIds = planToDelete
+                    ? planToDelete.days
+                        .flatMap(d => d.slots)
+                        .flatMap(s => s.runConfig?.progressionGroupId ? [s.runConfig.progressionGroupId] : [])
+                    : []
                   clearHistory(confirmDelete)
                   clearOutcomes(confirmDelete)
+                  removeProgressionStates(progressionGroupIds)
                   clearVars(confirmDelete)
                   clearExerciseHistory(confirmDelete)
                   deletePlan(confirmDelete)
