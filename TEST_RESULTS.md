@@ -1,5 +1,26 @@
 # Test Results
 
+## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
+
+**Result: 551 passing, 0 failing** (+3 tests from 548 baseline)
+
+### Tests added this pass
+
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `sessionSummary.test.ts` | +4 | Empty `exercises` array → null; all-null sets → null; weights with no actual data falls through to run summary; explicit null return confirmation |
+
+### Areas still untested
+
+- `WeeklyActivityStrip` component — UI-only component rendering dots; no unit test added (would require React Testing Library setup not present in the project). Behaviour is visible and easily verified manually.
+- `TodayPage` as a whole — full render tests not present in this project; covered by manual testing.
+
+### TypeScript
+
+`npx tsc --noEmit` exits clean (0 errors).
+
+---
+
 ## 2026-05-05 (twenty-second pass) — branch `claude/dreamy-mccarthy-phNna`
 
 **Result: 548 passing, 0 failing** (+11 tests from 537 baseline)

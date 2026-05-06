@@ -1,3 +1,73 @@
+# Feature Review — 7-Day Activity Strip on TodayPage
+
+Date: 2026-05-06
+Branch: `claude/dreamy-mccarthy-9Dgx6`
+Classification: **Keep**
+
+## What was actually built
+
+A `WeeklyActivityStrip` component local to `TodayPage.tsx` that renders a row
+of 7 coloured dots (plus single-letter day labels) between the stats bar and
+the unlogged-days nudge. The last 7 days ending today are shown left-to-right.
+Dot colours: emerald (complete), amber (day_off), slate ring (skip), sky (extra),
+subtle ring (empty). Today's dot has a sky ring offset.
+
+## What assumptions were encoded
+
+- `planEntries` for this plan includes all 7 days of interest (it does — it
+  filters all history entries for the active plan, not just recent ones).
+- `planExtras` similarly includes all extras regardless of age.
+- A date string of the form `YYYY-MM-DD + 'T00:00'` parses correctly as a local
+  midnight timestamp for day-letter computation — this is a common app-wide pattern
+  (same as CalendarPage and other places).
+- 7 days is the right lookahead to match the "This week" stat (also 7-day rolling).
+
+## What worked well
+
+- Zero new store subscriptions — the data was already in scope.
+- The component is fully isolated: a single self-contained function that can be
+  moved, tweaked, or deleted without touching any shared infrastructure.
+- The `useMemo` keying prevents unnecessary re-computation on unrelated re-renders.
+- TypeScript is clean — the `ActivityFill` union type makes the dot color logic
+  explicit and exhaustive.
+
+## What feels risky or incomplete
+
+- **No click interaction** — tapping a dot does nothing. Users may expect to
+  navigate to that day's Calendar detail. This is intentional scope limitation
+  but could feel unresponsive.
+- **No unit tests** — the component is view-only and uses no shared logic, but
+  a snapshot or integration test would make future refactors safer. Adding
+  React Testing Library is a one-time infrastructure cost not attempted here.
+- **Day letters may repeat** — "T" appears for both Tuesday and Thursday,
+  "S" for Saturday and Sunday. For 7 consecutive days this is usually readable
+  in context, but could be ambiguous for users with irregular schedules.
+
+## What I should evaluate tomorrow
+
+1. Does the strip feel useful on actual device? Check with a plan that has a
+   mix of complete/skip/day_off/extras to confirm the colour contrast is clear.
+2. Is the vertical rhythm between stats bar and strip appropriate, or does it
+   feel cramped?
+3. Does the "extra-only" sky dot read as "bonus activity" or as "something else"?
+
+## Recommended next steps
+
+1. **Keep as-is** — the feature is low-risk and provides genuine value.
+2. Optional: add tap interaction to open Calendar on the selected date.
+3. Optional: replace single-letter labels with day-of-month numbers (`21`, `22`...)
+   for dates that are not today — more information-dense.
+4. Optional: consider showing a small "pending" indicator for today's dot
+   specifically (currently today with no entry shows the same as any empty day,
+   just with the sky ring).
+
+## Keep / revise / prototype only / reject
+
+**Keep** — the feature is contained, useful, and risk-free to ship. The open
+UX questions are aesthetic tweaks, not blockers.
+
+---
+
 # Feature Review — Session Count Indicator on Today's Workout Card
 
 Date: 2026-05-04

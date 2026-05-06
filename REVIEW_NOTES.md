@@ -1,5 +1,101 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
+
+### Executive summary
+
+1. **What changed:** 2 commits — 4 new edge-case tests for `buildLastSessionSummary`
+   and a `WeeklyActivityStrip` feature on TodayPage.
+2. **Highest confidence:** The tests are purely additive. The `WeeklyActivityStrip`
+   is isolated (local component, no new store subscriptions) and can be reverted
+   with a single line deletion.
+3. **What is risky:** Nothing in this pass touches state management, rotation logic,
+   or persistence. The feature is visually additive only.
+4. **Review first:** Open TodayPage and verify the 7-dot strip looks correct across
+   plans with mixed history (complete, skip, day_off, extras, empty days).
+
+---
+
+### Biggest issues found
+
+1. **`buildLastSessionSummary` edge cases untested** — the empty-exercises and
+   all-null-sets paths fell through correctly in the implementation but had no
+   test anchors. Fixed with 4 new tests.
+2. **TodayPage stats bar is aggregate-only** — no day-by-day visualization requires
+   navigating to Calendar. Added `WeeklyActivityStrip` to bridge this gap.
+3. **Streak resets to 0 each morning** — the current "strict" streak definition
+   means a 30-day streak appears to vanish before the user logs today. Documented
+   as a recommendation but not changed (product decision).
+
+---
+
+### Improvements completed
+
+| # | Type | Description |
+|---|------|-------------|
+| 1 | Tests | 4 edge-case tests for `buildLastSessionSummary` |
+| 2 | Feature | `WeeklyActivityStrip` on TodayPage |
+
+---
+
+### Medium-complexity feature explored
+
+**WeeklyActivityStrip** — see FEATURE_PROPOSAL.md and FEATURE_REVIEW.md.
+
+Classification: **Keep**
+
+---
+
+### Definitely keep
+
+- The 4 new `buildLastSessionSummary` tests — pure regression anchors, zero risk.
+
+### Probably keep but tweak
+
+- `WeeklyActivityStrip` — the feature itself is sound. You may want to tweak:
+  - Dot size (`w-2.5 h-2.5` currently; `w-3 h-3` for better tap targets)
+  - Whether the "extra-only" dot (sky) is visually distinct enough from "complete" (emerald)
+  - Whether to show the strip on expired plans (currently yes)
+
+### Do not keep
+
+- Nothing in this pass needs reverting.
+
+### Recommendations only (not implemented)
+
+1. **Streak grace period / pending state** — show "🔥 30" (in amber) rather than
+   "🔥 0" when today is pending but yesterday had a complete entry. This is a
+   product decision; the strict behaviour is defensible but jarring.
+2. **Plan builder `duration.value > 0` validation** — carry-over from prior passes.
+3. **Narrow Zustand selectors in CalendarPage** — performance, not urgent.
+4. **Expression evaluator UI error surface** — malformed YAML progression rules
+   fail silently; showing a toast or badge would aid debugging.
+
+---
+
+### Open questions for me
+
+1. Do you want the activity strip to show all 7 days or just past days (hiding
+   today and future)? Current behaviour: shows today with a ring indicator.
+2. Should the streak show 0 or the prior streak count when today is pending?
+3. Is the "extra-only" sky dot (ad-hoc workouts with no rotation entry) useful,
+   or does it add visual noise?
+
+---
+
+### Known issues or incomplete work
+
+- None. All planned work is complete and tests pass.
+
+---
+
+### Dependencies added
+
+- None. `addDays` and `parseISO` from `date-fns` were added to the import but
+  `date-fns` was already a listed dependency.
+
+---
+
 ## 2026-05-04 (twenty-first pass) — branch `claude/dreamy-mccarthy-sA0Ai`
 
 ### Executive summary

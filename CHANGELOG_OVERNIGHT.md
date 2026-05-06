@@ -1,5 +1,85 @@
 # Overnight Changelog
 
+## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
+
+Baseline on entry: **548 passing, 0 failing**.
+Exit state: **551 passing, 0 failing** (+3 tests).
+
+---
+
+### 1. Tests: edge case coverage for `buildLastSessionSummary`
+
+**File:** `src/lib/__tests__/sessionSummary.test.ts`
+
+Added 4 tests anchoring the behaviour of `buildLastSessionSummary` when
+`weightsActual` contains no usable data. These paths are handled correctly by
+the existing implementation (the `Array.find` on exercises returns `undefined`
+and the function falls through to the run/swim branches or returns `null`), but
+were previously unguarded regression surfaces.
+
+| Test | Scenario covered |
+|------|-----------------|
+| empty exercises array | `weightsActual: { exercises: [] }` → `null` |
+| all-null sets | exercises present but all `actualReps`/`actualLoad` null → `null` |
+| fallthrough to run | weights with no actual data, run data present → run summary |
+| explicit null return | confirmation that null is returned, not a crash |
+
+**Why it matters:** `ActiveWorkoutTracker` can produce an outcome with
+`weightsActual.exercises` populated but with all sets having `null` actual
+values (if the user starts but cancels without logging anything). Without these
+tests, a future refactor of the `find` call could silently break the fallthrough.
+
+**Risk / tradeoff:** Tests only — zero risk to production behaviour.
+
+**Rollback:** Delete the 4 new `it(...)` blocks.
+
+---
+
+### 2. Feature: 7-day activity strip on TodayPage
+
+**File:** `src/pages/TodayPage.tsx`
+
+Added a `WeeklyActivityStrip` component that renders below the stats bar on
+TodayPage. It shows the last 7 calendar days (oldest left, today right) as
+coloured dots with single-letter day labels.
+
+**Dot colours:**
+| Status | Colour |
+|--------|--------|
+| `complete` (rotation entry) | Emerald filled |
+| `day_off` | Amber filled (70% opacity) |
+| `skip` | Slate outline ring |
+| `extra` (ad-hoc workout, no rotation entry) | Sky filled (60% opacity) |
+| `empty` (no entry) | Slate outline ring (50% opacity) |
+
+Today's dot has an additional sky ring to distinguish it from past days.
+
+**Why it matters:** The stats bar already shows aggregate counts (streak,
+7-day total, overall total), but gives no information about *which* days
+were active. The strip makes patterns visible at a glance — "I consistently
+miss Fridays" — without requiring navigation to the Calendar page. It closes
+the gap between the daily view and the calendar without duplicating that page.
+
+**Implementation notes:**
+- No new store subscriptions: uses `planEntries` and `planExtras` which are
+  already computed in TodayPage scope.
+- No new utility functions: date arithmetic via `date-fns` `addDays`/`parseISO`
+  (library already imported).
+- `WeeklyActivityStrip` is a local function component in `TodayPage.tsx`
+  rather than a separate file, since it has no other consumers.
+- The component uses an internal `useMemo` keyed on `[planEntries, planExtras, today]`
+  so it only recomputes when the underlying data changes.
+
+**Risk / tradeoff:** Additive only — no existing UI changed. The strip
+appears even on expired plans (the data is still meaningful for review).
+If the strip is visually unwanted, deleting the `<WeeklyActivityStrip …/>`
+render line and the component function restores the previous state completely.
+
+**Rollback:** Remove the 51-line `WeeklyActivityStrip` function and its
+single render call at `src/pages/TodayPage.tsx:528`.
+
+---
+
 ## 2026-05-05 (twenty-second pass) — branch `claude/dreamy-mccarthy-phNna`
 
 Baseline on entry: **537 passing, 0 failing**.
