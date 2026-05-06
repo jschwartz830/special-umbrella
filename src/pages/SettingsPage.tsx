@@ -2,11 +2,68 @@ import { useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { Modal } from '../components/shared/Modal'
 
+const REFRESH_TIMEOUT_MS = 3000
+
+function waitForServiceWorkerState(
+  worker: ServiceWorker,
+  targetState: ServiceWorkerState,
+  timeoutMs = REFRESH_TIMEOUT_MS,
+) {
+  if (worker.state === targetState) return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    const timeout = window.setTimeout(cleanup, timeoutMs)
+
+    function cleanup() {
+      window.clearTimeout(timeout)
+      worker.removeEventListener('statechange', handleStateChange)
+      resolve()
+    }
+
+    function handleStateChange() {
+      if (worker.state === targetState) cleanup()
+    }
+
+    worker.addEventListener('statechange', handleStateChange)
+  })
+}
+
+function waitForControllerChange(timeoutMs = REFRESH_TIMEOUT_MS) {
+  if (!navigator.serviceWorker.controller) return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    const timeout = window.setTimeout(cleanup, timeoutMs)
+
+    function cleanup() {
+      window.clearTimeout(timeout)
+      navigator.serviceWorker.removeEventListener('controllerchange', cleanup)
+      resolve()
+    }
+
+    navigator.serviceWorker.addEventListener('controllerchange', cleanup)
+  })
+}
+
+async function activateUpdatedWorker(registration: ServiceWorkerRegistration) {
+  await registration.update()
+
+  if (registration.installing) {
+    await waitForServiceWorkerState(registration.installing, 'installed')
+  }
+
+  const worker = registration.waiting
+  if (!worker) return
+
+  worker.postMessage({ type: 'SKIP_WAITING' })
+  await waitForControllerChange()
+}
+
 async function forceRefreshApp() {
   if ('serviceWorker' in navigator) {
     const registrations = await navigator.serviceWorker.getRegistrations()
-    await Promise.all(registrations.map((registration) => registration.update()))
+    await Promise.all(registrations.map((registration) => activateUpdatedWorker(registration)))
     await Promise.all(registrations.map((registration) => registration.unregister()))
+    await waitForControllerChange()
   }
 
   if ('caches' in window) {
@@ -16,7 +73,7 @@ async function forceRefreshApp() {
 
   const url = new URL(window.location.href)
   url.searchParams.set('refresh', Date.now().toString())
-  window.location.replace(url.toString())
+  window.location.assign(url.toString())
 }
 
 export function SettingsPage() {
