@@ -331,4 +331,63 @@ describe('buildLastSessionSummary', () => {
     // Weights branch is checked first
     expect(buildLastSessionSummary(outcome)).toBe('Last: 1×5 @ 200 lb Squat')
   })
+
+  it('returns null when weightsActual has an empty exercises array', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T12:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      weightsActual: { exercises: [] },
+    }
+    expect(buildLastSessionSummary(outcome)).toBeNull()
+  })
+
+  it('returns null when exercises are present but all sets have null reps and null load', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T12:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      weightsActual: {
+        exercises: [{
+          exercise: 'Squat',
+          sets: [
+            { targetReps: 5, actualReps: null, actualLoad: null, completed: false },
+            { targetReps: 5, actualReps: null, actualLoad: null, completed: false },
+          ],
+        }],
+      },
+    }
+    expect(buildLastSessionSummary(outcome)).toBeNull()
+  })
+
+  it('falls through to run data when weightsActual has exercises with no actual data', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T12:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: { actualDistanceMiles: 4, actualDurationMin: 35 },
+      swimActual: null,
+      weightsActual: {
+        exercises: [{
+          exercise: 'Squat',
+          sets: [{ targetReps: 5, actualReps: null, actualLoad: null, completed: false }],
+        }],
+      },
+    }
+    // weights branch finds no exercise with any actual data, falls through to run
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 4 mi · 35 min')
+  })
 })
