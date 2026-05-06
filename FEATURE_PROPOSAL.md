@@ -1,3 +1,86 @@
+# Feature Proposal — 7-Day Activity Strip on TodayPage
+
+Date: 2026-05-06
+Branch: `claude/dreamy-mccarthy-9Dgx6`
+Status: **Implemented this run**
+
+## Feature selected
+
+Add a row of 7 coloured dots to TodayPage, one per day for the last 7 calendar
+days ending today. Each dot indicates that day's activity status at a glance.
+
+## Why it was selected
+
+The TodayPage stats bar shows aggregate totals (streak, 7-day count, lifetime
+count) but no structural breakdown of *which* days were active. To see that,
+users currently need to navigate to the Calendar page. The activity strip closes
+this gap with no additional user action.
+
+This was chosen over other candidates because:
+- All required data (`planEntries`, `planExtras`, `today`) is already computed
+  in TodayPage — zero new store subscriptions needed.
+- The implementation is isolated to a single local component function.
+- It directly complements the existing "This week: N done" stat by showing
+  the same window day-by-day.
+
+## Expected user value
+
+- Quickly visible: "I've done 5 of the last 7 days — I missed Wednesday and Friday"
+- Pattern recognition without Calendar navigation
+- Today's dot provides visual confirmation of pending/complete state
+- Extras (ad-hoc workouts) are shown in sky blue, distinguishing bonus activity
+
+## Implementation scope for this run
+
+- `WeeklyActivityStrip` component added to `src/pages/TodayPage.tsx` (~51 lines)
+- Placed between the stats bar and the unlogged-days nudge
+- Rendered unconditionally when a plan is active (same guard as the rest of the page)
+- Date arithmetic via `date-fns` (`addDays`, `parseISO`) — already a dependency
+- 7 days, oldest left, today right; today's dot has an additional ring
+
+## Assumptions being made
+
+- 7 days is the right window (matches the "This week" rolling window in the stats bar).
+- Showing today's dot (even when pending) is useful — gives context for the current state.
+- 5 status states are sufficient: complete, day_off, skip, extra-only, empty.
+- Day labels as single letters (M, T, W, etc.) are readable at `text-[9px]`.
+
+## Open product / UX decisions
+
+1. Should the strip be hidden on expired plans? Currently shown (data still meaningful).
+2. Should the "extra-only" dot (sky) be a different colour or pattern from "complete"?
+3. Should the strip show 7 days or the current calendar week (Mon–Sun)?
+4. Dot size: `w-2.5 h-2.5` (current) vs. slightly larger for easier reading.
+
+## Architecture or schema impact
+
+None. No new stores, no schema changes, no new utilities exported.
+
+## Risks
+
+- `addDays(parseISO(today), -i)` uses UTC date arithmetic. If the user's local
+  timezone is significantly behind UTC, `today` (YYYY-MM-DD) might be "off by
+  one" relative to what they see on their device. This is an existing risk shared
+  by all date logic in the app and not introduced by this change.
+- Visual crowding on very small screens — dots are `w-2.5 h-2.5` which is 10px,
+  with 7 items spread across the full width. Should be fine at 320px+ viewports.
+
+## Rollback strategy
+
+Remove the `<WeeklyActivityStrip … />` render call (1 line) and the
+`WeeklyActivityStrip` function definition (~51 lines) from `TodayPage.tsx`.
+Remove `addDays, parseISO` from the `date-fns` import if no longer needed.
+No data migration or store changes required.
+
+## What is intentionally not being built yet
+
+- Click interaction (tapping a dot to open that day's detail in Calendar)
+- Tooltip or popover showing the date/action on hover
+- Custom date range (currently hardcoded to last 7 days)
+- Week-view alignment (Mon–Sun calendar week vs. rolling 7-day window)
+
+---
+
 # Feature Proposal — Session Count Indicator on Today's Workout Card
 
 Date: 2026-05-04

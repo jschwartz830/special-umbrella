@@ -416,3 +416,55 @@ the implementation bug, then commit the feature with clean tests and types.
 - Narrow Zustand selectors in CalendarPage (performance, not urgent)
 - Document progression system migration path (legacy RunProgressionState vs new ProgressionRecommendation)
 - Expression evaluator should surface errors to UI for malformed progression rules
+
+---
+
+## Pass 23 — 2026-05-06 (branch `claude/dreamy-mccarthy-9Dgx6`)
+
+### Observations on entry
+
+- Baseline: **548 passing, 0 failing** (after `npm install` on fresh env).
+- `buildLastSessionSummary` had no tests for the edge case where
+  `weightsActual.exercises` is an empty array or where all sets have `null`
+  reps AND `null` load. Both paths are handled correctly by the implementation
+  (the `Array.find` returns `undefined` and the code falls through), but
+  without tests these are unguarded regression surfaces.
+- TodayPage shows aggregate stats (streak, 7-day count, total) but no
+  day-by-day activity visualization. Users must navigate to Calendar to see
+  which specific days they completed. A 7-day activity strip would provide
+  immediate at-a-glance context with no new data dependencies.
+- The streak counter resets to 0 each morning until the user logs today's
+  workout. Technically correct per spec ("consecutive days ending at today
+  inclusive") but creates jarring UX where a 30-day streak appears to vanish
+  every morning. Documented as a recommendation; not changed (product decision).
+
+### Decisions
+
+- **Add edge case tests for `buildLastSessionSummary`** — 4 tests: empty
+  exercises array, all-null sets, fallthrough to run data when weights has no
+  actual data, and explicit null return confirmation.
+- **Implement WeeklyActivityStrip feature** — 7-dot visualization of the last
+  7 days on TodayPage. Each dot colored by status: complete = emerald, day_off
+  = amber, skip = slate ring, extra-only = sky, empty = subtle ring. Today's
+  dot has a ring highlight. No new store subscriptions, no new utilities —
+  derived purely from `planEntries` and `planExtras` already in scope.
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| 1 | Edge case tests for buildLastSessionSummary (4 tests) | None | ✅ Done |
+| 2 | WeeklyActivityStrip feature on TodayPage | Low | ✅ Done |
+
+### Exit state
+
+**551 passing, 0 failing** (+3 net tests from baseline).
+
+### Carry-over open items
+
+- Streak display is "strict" (0 until today is logged); product decision —
+  recommend evaluating a grace-period or "pending" streak display.
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path (legacy RunProgressionState vs new ProgressionRecommendation)
+- Expression evaluator should surface errors to UI for malformed progression rules
