@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
+import { format, addDays, parseISO } from 'date-fns'
 import {
   SkipForward,
   Coffee,
@@ -36,11 +36,68 @@ import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions } from '../lib/historyStats'
-import type { ResolvedDay, ExtraWorkoutEntry } from '../types'
+import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
+
+type ActivityFill = 'complete' | 'day_off' | 'skip' | 'extra' | 'empty'
+
+function WeeklyActivityStrip({
+  planEntries,
+  planExtras,
+  today,
+}: {
+  planEntries: HistoryEntry[]
+  planExtras: ExtraWorkoutEntry[]
+  today: string
+}) {
+  const days = useMemo(() => {
+    const result: { date: string; dayLetter: string; isToday: boolean; fill: ActivityFill }[] = []
+    const todayParsed = parseISO(today)
+    for (let i = 6; i >= 0; i--) {
+      const date = format(addDays(todayParsed, -i), 'yyyy-MM-dd')
+      const entry = planEntries.find(e => e.calendarDate === date)
+      const hasExtra = planExtras.some(e => e.calendarDate === date)
+      const dayLetter = new Date(date + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)
+
+      let fill: ActivityFill
+      if (entry?.action === 'complete') fill = 'complete'
+      else if (entry?.action === 'day_off') fill = 'day_off'
+      else if (entry?.action === 'skip') fill = 'skip'
+      else if (hasExtra) fill = 'extra'
+      else fill = 'empty'
+
+      result.push({ date, dayLetter, isToday: date === today, fill })
+    }
+    return result
+  }, [planEntries, planExtras, today])
+
+  return (
+    <div className="flex items-end justify-between px-1 py-0.5">
+      {days.map(({ date, dayLetter, isToday, fill }) => {
+        const dotClass =
+          fill === 'complete' ? 'bg-emerald-500'
+          : fill === 'day_off' ? 'bg-amber-400/70'
+          : fill === 'skip' ? 'border border-slate-600 bg-transparent'
+          : fill === 'extra' ? 'bg-sky-500/60'
+          : 'border border-slate-700/50 bg-transparent'
+
+        return (
+          <div key={date} className="flex flex-col items-center gap-1">
+            <span
+              className={`w-2.5 h-2.5 rounded-full transition-colors ${dotClass} ${isToday ? 'ring-2 ring-offset-1 ring-offset-slate-900 ring-sky-400/50' : ''}`}
+            />
+            <span className={`text-[9px] font-medium leading-none ${isToday ? 'text-sky-400' : 'text-slate-600'}`}>
+              {dayLetter}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 /** Find the most recent outcome with weights data for this plan (excluding today). */
 function findPreviousWeightsOutcome(
@@ -467,6 +524,9 @@ export function TodayPage() {
           </div>
         </div>
       </div>
+
+      {/* 7-day activity strip */}
+      <WeeklyActivityStrip planEntries={planEntries} planExtras={planExtras} today={today} />
 
       {/* Unlogged past days nudge — shown when the rotation may be stalled */}
       {!planExpired && unloggedCount > 0 && (
