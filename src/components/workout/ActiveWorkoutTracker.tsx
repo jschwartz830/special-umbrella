@@ -12,6 +12,7 @@ interface SetTrackState {
   targetReps: number | string | null
   targetLoad: string | null
   restSeconds: number | null
+  actualRestSeconds: number | null
   resolvedLoadLbs: number | null
 }
 
@@ -84,6 +85,7 @@ function parseNumericLoad(load?: string | null): number | null {
 interface TimerColProps {
   label: string
   value: string
+  targetValue?: string
   running: boolean
   disabled?: boolean
   colorClass: string
@@ -94,12 +96,15 @@ interface TimerColProps {
 }
 
 function TimerCol({
-  label, value, running, disabled, colorClass, expanded,
+  label, value, targetValue, running, disabled, colorClass, expanded,
   onToggle, onReset, onAdjust,
 }: TimerColProps) {
   return (
     <div className="flex flex-col items-center gap-1.5 px-2">
       <p className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">{label}</p>
+      {targetValue && (
+        <p className="text-[9px] text-slate-500 uppercase tracking-wider font-medium leading-none">Target {targetValue}</p>
+      )}
       <p className={`text-lg font-mono font-bold leading-none ${colorClass}`}>{value}</p>
       <div className="flex gap-1">
         <button
@@ -160,12 +165,18 @@ export function ActiveWorkoutTracker({
   const workoutRunRef = useRef(true)
   const activeSetRef = useRef<{ exIdx: number; setIdx: number } | null>(null)
   const restRunRef = useRef(false)
-  const restRemRef = useRef<number | null>(null)
+  const restElapsedRef = useRef<number | null>(null)
+  const restTargetRef = useRef<number | null>(null)
+  const restWarningAlertedRef = useRef(false)
+  const restAlertedRef = useRef(false)
+  const restOwnerRef = useRef<{ exIdx: number; setIdx: number } | null>(null)
+  const audioContextRef = useRef<AudioContext | null>(null)
 
   const [workoutElapsed, setWorkoutElapsed] = useState(0)
   const [workoutRunning, setWorkoutRunning] = useState(true)
   const [activeSetTimer, setActiveSetTimer] = useState<{ exIdx: number; setIdx: number } | null>(null)
-  const [restRemaining, setRestRemaining] = useState<number | null>(null)
+  const [restElapsed, setRestElapsed] = useState<number | null>(null)
+  const [restTarget, setRestTarget] = useState<number | null>(null)
   const [restRunning, setRestRunning] = useState(false)
   const [timersExpanded, setTimersExpanded] = useState(false)
 
@@ -196,6 +207,7 @@ export function ActiveWorkoutTracker({
           targetReps: reps ?? null,
           targetLoad: load ?? null,
           restSeconds: parseRestSecs(rest),
+          actualRestSeconds: null,
           resolvedLoadLbs: validLoad,
         }
       }
@@ -247,6 +259,7 @@ export function ActiveWorkoutTracker({
               actualReps: fromOutcome.sets[i]?.actualReps ?? set.actualReps,
               actualLoad: fromOutcome.sets[i]?.actualLoad ?? set.actualLoad,
               completed: fromOutcome.sets[i]?.completed ?? set.completed,
+              actualRestSeconds: fromOutcome.sets[i]?.actualRestSeconds ?? set.actualRestSeconds,
             })),
           }
         }))
@@ -264,7 +277,12 @@ export function ActiveWorkoutTracker({
         workoutElapsed?: number
         workoutRunning?: boolean
         restRemaining?: number | null
+        restElapsed?: number | null
+        restTarget?: number | null
         restRunning?: boolean
+        restWarningAlerted?: boolean
+        restAlerted?: boolean
+        restOwner?: { exIdx: number; setIdx: number } | null
         activeSetTimer?: { exIdx: number; setIdx: number } | null
         exercises?: ExerciseTrackState[]
       }
@@ -279,10 +297,25 @@ export function ActiveWorkoutTracker({
         setRestRunning(draft.restRunning)
         restRunRef.current = draft.restRunning
       }
-      if (draft.restRemaining != null) {
-        setRestRemaining(draft.restRemaining)
-        restRemRef.current = draft.restRemaining
+      const restoredRestTarget = draft.restTarget ?? (
+        draft.restRemaining != null ? draft.restRemaining : null
+      )
+      const restoredRestElapsed = draft.restElapsed ?? (
+        draft.restRemaining != null && restoredRestTarget != null
+          ? Math.max(0, restoredRestTarget - draft.restRemaining)
+          : null
+      )
+      if (restoredRestElapsed != null) {
+        setRestElapsed(restoredRestElapsed)
+        restElapsedRef.current = restoredRestElapsed
       }
+      if (restoredRestTarget != null) {
+        setRestTarget(restoredRestTarget)
+        restTargetRef.current = restoredRestTarget
+      }
+      if (draft.restWarningAlerted != null) restWarningAlertedRef.current = draft.restWarningAlerted
+      if (draft.restAlerted != null) restAlertedRef.current = draft.restAlerted
+      if (draft.restOwner) restOwnerRef.current = draft.restOwner
       if (draft.activeSetTimer) {
         setActiveSetTimer(draft.activeSetTimer)
         activeSetRef.current = draft.activeSetTimer
@@ -300,13 +333,117 @@ export function ActiveWorkoutTracker({
       pausePeriods: pausePeriodsRef.current,
       workoutElapsed,
       workoutRunning,
-      restRemaining,
+      restElapsed,
+      restTarget,
       restRunning,
+      restWarningAlerted: restWarningAlertedRef.current,
+      restAlerted: restAlertedRef.current,
+      restOwner: restOwnerRef.current,
       activeSetTimer,
       exercises,
     }
     window.localStorage.setItem(draftStorageKey, JSON.stringify(draft))
-  }, [draftStorageKey, workoutElapsed, workoutRunning, restRemaining, restRunning, activeSetTimer, exercises])
+  }, [draftStorageKey, workoutElapsed, workoutRunning, restElapsed, restTarget, restRunning, activeSetTimer, exercises])
+
+  function getAudioContext(): AudioContext | null {
+    const AudioContextCtor = window.AudioContext
+      ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextCtor) return null
+    if (!audioContextRef.current) audioContextRef.current = new AudioContextCtor()
+    if (audioContextRef.current.state === 'suspended') void audioContextRef.current.resume()
+    return audioContextRef.current
+  }
+
+  function scheduleTone(
+    ctx: AudioContext,
+    frequency: number,
+    startAt: number,
+    duration: number,
+    peakGain: number,
+    type: OscillatorType = 'sine',
+  ) {
+    const oscillator = ctx.createOscillator()
+    const gain = ctx.createGain()
+    oscillator.type = type
+    oscillator.frequency.setValueAtTime(frequency, startAt)
+    gain.gain.setValueAtTime(0.0001, startAt)
+    gain.gain.exponentialRampToValueAtTime(peakGain, startAt + 0.01)
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration)
+    oscillator.connect(gain).connect(ctx.destination)
+    oscillator.start(startAt)
+    oscillator.stop(startAt + duration + 0.03)
+  }
+
+  function playRestWarningAlert() {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime + 0.02
+
+    scheduleTone(ctx, 740, now, 0.08, 0.12, 'triangle')
+    scheduleTone(ctx, 880, now + 0.12, 0.08, 0.12, 'triangle')
+  }
+
+  function playRestTargetAlert() {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime + 0.02
+
+    scheduleTone(ctx, 920, now, 0.2, 0.22, 'square')
+    scheduleTone(ctx, 1380, now, 0.05, 0.08, 'triangle')
+
+    const chimeStart = now + 0.24
+    scheduleTone(ctx, 1046.5, chimeStart, 0.28, 0.16)
+    scheduleTone(ctx, 1568, chimeStart + 0.16, 0.38, 0.14)
+  }
+
+  function markRestWarningAlerted() {
+    if (restWarningAlertedRef.current) return
+    restWarningAlertedRef.current = true
+    playRestWarningAlert()
+  }
+
+  function markRestAlerted() {
+    if (restAlertedRef.current) return
+    restAlertedRef.current = true
+    playRestTargetAlert()
+  }
+
+  function maybeAlertForRest(elapsedSeconds: number) {
+    const targetSeconds = restTargetRef.current
+    if (targetSeconds == null) return
+
+    if (targetSeconds > 10 && elapsedSeconds >= targetSeconds - 10) {
+      markRestWarningAlerted()
+    }
+    if (elapsedSeconds >= targetSeconds) markRestAlerted()
+  }
+
+  function recordRestElapsed() {
+    const owner = restOwnerRef.current
+    const elapsed = restElapsedRef.current
+    if (!owner || elapsed == null) return
+    setExercises(prev => prev.map((ex, ei) => (
+      ei !== owner.exIdx ? ex : {
+        ...ex,
+        sets: ex.sets.map((set, si) => (
+          si !== owner.setIdx ? set : { ...set, actualRestSeconds: elapsed }
+        )),
+      }
+    )))
+  }
+
+  function stopRest(recordElapsed = true) {
+    if (recordElapsed) recordRestElapsed()
+    restRunRef.current = false
+    setRestRunning(false)
+    restElapsedRef.current = null
+    restTargetRef.current = null
+    restWarningAlertedRef.current = false
+    restAlertedRef.current = false
+    restOwnerRef.current = null
+    setRestElapsed(null)
+    setRestTarget(null)
+  }
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -324,25 +461,29 @@ export function ActiveWorkoutTracker({
         )))
       }
 
-      if (restRunRef.current) {
-        const cur = restRemRef.current
-        if (cur == null || cur <= 1) {
-          restRunRef.current = false
-          restRemRef.current = null
-          setRestRemaining(null)
-          setRestRunning(false)
-        } else {
-          restRemRef.current = cur - 1
-          setRestRemaining(cur - 1)
+      if (workoutRunRef.current && restRunRef.current) {
+        const cur = restElapsedRef.current
+        if (cur != null) {
+          const next = cur + 1
+          restElapsedRef.current = next
+          setRestElapsed(next)
+          maybeAlertForRest(next)
         }
       }
     }, 1000)
     return () => clearInterval(id)
   }, [])
 
-  function startRest(seconds: number) {
-    restRemRef.current = seconds
-    setRestRemaining(seconds)
+  function startRest(seconds: number, owner: { exIdx: number; setIdx: number }) {
+    stopRest()
+    void getAudioContext()
+    restElapsedRef.current = 0
+    restTargetRef.current = seconds
+    restWarningAlertedRef.current = seconds <= 10
+    restAlertedRef.current = seconds <= 0
+    restOwnerRef.current = owner
+    setRestElapsed(0)
+    setRestTarget(seconds)
     restRunRef.current = true
     setRestRunning(true)
     activeSetRef.current = null
@@ -369,7 +510,7 @@ export function ActiveWorkoutTracker({
     workoutRunRef.current = true
     setWorkoutRunning(true)
 
-    if (restRemRef.current != null) {
+    if (restElapsedRef.current != null) {
       restRunRef.current = true
       setRestRunning(true)
       return
@@ -384,22 +525,21 @@ export function ActiveWorkoutTracker({
 
   function toggleRest(e: React.MouseEvent) {
     e.stopPropagation()
-    if (restRemRef.current == null) return
+    if (restElapsedRef.current == null) return
     if (restRunning) {
       restRunRef.current = false
       setRestRunning(false)
+      recordRestElapsed()
       return
     }
+    void getAudioContext()
     restRunRef.current = true
     setRestRunning(true)
   }
 
   function resetRest(e: React.MouseEvent) {
     e.stopPropagation()
-    restRemRef.current = null
-    setRestRemaining(null)
-    restRunRef.current = false
-    setRestRunning(false)
+    stopRest()
   }
 
   function adjust(timer: 'workout' | 'rest', delta: number, e: React.MouseEvent) {
@@ -409,17 +549,14 @@ export function ActiveWorkoutTracker({
       return
     }
 
-    const cur = restRemRef.current ?? 0
+    if (restElapsedRef.current == null) return
+
+    const cur = restElapsedRef.current
     const next = Math.max(0, cur + delta)
-    restRemRef.current = next
-    setRestRemaining(next || null)
-    if (next > 0 && !restRunning && workoutRunning) {
-      restRunRef.current = true
-      setRestRunning(true)
-      pausedSetRef.current = activeSetRef.current
-      activeSetRef.current = null
-      setActiveSetTimer(null)
-    }
+    restElapsedRef.current = next
+    setRestElapsed(next)
+    maybeAlertForRest(next)
+    recordRestElapsed()
   }
 
   function handleSetTimerToggle(exIdx: number, setIdx: number) {
@@ -427,11 +564,8 @@ export function ActiveWorkoutTracker({
     const set = exercises[exIdx]?.sets[setIdx]
     if (!set || set.completed) return
 
-    if (restRunRef.current || restRemRef.current != null || restRunning) {
-      restRunRef.current = false
-      restRemRef.current = null
-      setRestRunning(false)
-      setRestRemaining(null)
+    if (restRunRef.current || restElapsedRef.current != null || restRunning) {
+      stopRest()
     }
 
     const current = activeSetRef.current
@@ -457,6 +591,7 @@ export function ActiveWorkoutTracker({
             ...s,
             completed: completing,
             setElapsedSeconds: completing ? s.setElapsedSeconds : 0,
+            actualRestSeconds: completing ? s.actualRestSeconds : null,
             actualReps: completing
               ? resolveActualReps(s.actualReps, s.targetReps)
               : s.actualReps,
@@ -470,8 +605,12 @@ export function ActiveWorkoutTracker({
       setActiveSetTimer(null)
     }
 
+    if (!completing && restOwnerRef.current?.exIdx === exIdx && restOwnerRef.current?.setIdx === setIdx) {
+      stopRest(false)
+    }
+
     if (completing) {
-      startRest(setToToggle.restSeconds ?? 90)
+      startRest(setToToggle.restSeconds ?? 90, { exIdx, setIdx })
     }
   }
 
@@ -510,7 +649,21 @@ export function ActiveWorkoutTracker({
     const last = periods[periods.length - 1]
     if (last && !last.end) last.end = endTime
 
-    const result: LoggedExerciseActual[] = exercises.map(ex => ({
+    const activeRestOwner = restOwnerRef.current
+    const activeRestElapsed = restElapsedRef.current
+    const finalExercises = exercises.map((ex, exIdx) => ({
+      ...ex,
+      sets: ex.sets.map((s, setIdx) => ({
+        ...s,
+        actualRestSeconds: activeRestOwner?.exIdx === exIdx
+          && activeRestOwner.setIdx === setIdx
+          && activeRestElapsed != null
+          ? activeRestElapsed
+          : s.actualRestSeconds,
+      })),
+    }))
+
+    const result: LoggedExerciseActual[] = finalExercises.map(ex => ({
       exercise: ex.exercise,
       progressionMode: 'single',
       sets: ex.sets.map(s => ({
@@ -520,6 +673,7 @@ export function ActiveWorkoutTracker({
         actualLoad: s.actualLoad,
         completed: s.completed,
         restSeconds: s.restSeconds,
+        actualRestSeconds: s.actualRestSeconds,
       })),
     }))
 
@@ -609,10 +763,13 @@ export function ActiveWorkoutTracker({
           />
           <TimerCol
             label="Rest"
-            value={restRemaining != null ? fmt(restRemaining) : '—'}
+            value={restElapsed != null ? fmt(restElapsed) : '—'}
+            targetValue={restTarget != null ? fmt(restTarget) : undefined}
             running={restRunning}
-            disabled={restRemaining == null}
-            colorClass={restRemaining != null ? 'text-emerald-300' : 'text-slate-600'}
+            disabled={restElapsed == null}
+            colorClass={restElapsed != null
+              ? (restTarget != null && restElapsed >= restTarget ? 'text-red-400' : 'text-emerald-300')
+              : 'text-slate-600'}
             expanded={timersExpanded}
             onToggle={toggleRest}
             onReset={resetRest}

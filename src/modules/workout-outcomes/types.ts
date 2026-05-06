@@ -27,6 +27,7 @@ export interface LoggedSetActual {
   actualLoad?: number | null
   completed?: boolean
   restSeconds?: number | null
+  actualRestSeconds?: number | null
   notes?: string | null
 }
 
