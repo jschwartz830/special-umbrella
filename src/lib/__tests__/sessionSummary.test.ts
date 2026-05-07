@@ -214,6 +214,53 @@ describe('buildLastSessionSummary', () => {
     expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min')
   })
 
+  it('rounds run distance to 1 decimal place', () => {
+    const outcome = runOutcome('2026-05-01', 3.14159, 30)
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 30 min')
+  })
+
+  it('includes pace when averagePaceSecondsPerMile is present', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: 3,
+      durationActualMin: 28,
+      notes: null,
+      runActual: { actualDistanceMiles: 3.1, actualDurationMin: 28, averagePaceSecondsPerMile: 542 },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min · 9:02 /mi')
+  })
+
+  it('omits pace when averagePaceSecondsPerMile is null', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: 3,
+      durationActualMin: 28,
+      notes: null,
+      runActual: { actualDistanceMiles: 3.1, actualDurationMin: 28, averagePaceSecondsPerMile: null },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min')
+  })
+
+  it('shows pace alone when only pace is available', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: 3,
+      durationActualMin: null,
+      notes: null,
+      runActual: { actualDistanceMiles: null, actualDurationMin: null, averagePaceSecondsPerMile: 480 },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 8:00 /mi')
+  })
+
   it('formats run with distance only', () => {
     const outcome: WorkoutOutcome = {
       workoutInstanceId: 'p1_2026-05-01',
