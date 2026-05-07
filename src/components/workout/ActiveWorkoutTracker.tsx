@@ -682,7 +682,7 @@ export function ActiveWorkoutTracker({
   return (
     <>
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-slate-800">
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 border-b border-slate-800" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
         <button
           onClick={onMinimize}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
