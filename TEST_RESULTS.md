@@ -1,5 +1,43 @@
 # Test Results
 
+## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
+
+**Result: 609 passing, 0 failing** (+58 tests from 551 baseline)
+
+### Tests added this pass
+
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `src/modules/workout-outcomes/__tests__/progression.test.ts` | 30 | `buildProgressionRecommendation`: weights (single/double/volume), run, swim; null paths; partial completion; regression anchor for allCompleted bug |
+| `src/modules/workout-outcomes/__tests__/types.test.ts` | 24 | `completionStateToAction` (6 states), `derivePaceSecondsPerMile`, `deriveSwimPaceSecondsPer100m`, `formatPace` (incl. 9:60 guard, padding, rounding), `formatSwimPace` |
+| `src/lib/__tests__/sessionSummary.test.ts` | 5 | Run distance rounding (3.14159 → "3.1 mi"), pace present ("9:02 /mi"), pace null (omitted), pace-only display, no regression on existing cases |
+| **Total new** | **58** | |
+
+### Tests reviewed (no changes)
+
+All 551 existing tests reviewed implicitly by full suite run — zero regressions.
+
+### Notable test highlights
+
+- **"hold when not all sets completed" (progression.test.ts)** — regression anchor for
+  the `allCompleted` bug. This test would have caught the bug if written before the fix.
+- **"prevents 9:60 display" (types.test.ts)** — verifies the totalSecs rounding guard
+  in `formatPace` that prevents an invalid minute:seconds display.
+- **"rounds run distance to 1 decimal place" (sessionSummary.test.ts)** — catches float
+  display regression if rounding is ever removed.
+
+### Important areas still untested
+
+| Area | Notes |
+|------|-------|
+| `ActiveWorkoutTracker.tsx` | Large component (33.5KB) with real-time timer, exercise tracking, rest timer. No tests. Would require significant test harness work. |
+| `OutcomeModal.tsx` | Large component (21.8KB) with complex form state. No tests. |
+| `CalendarPage.tsx` retroactive edit flows | Complex multi-step edit flows that involve coordinated store mutations. Tested implicitly by engine/store unit tests but no integration coverage. |
+| `csv.ts` full round-trip for outcomes | CSV import/export round-trip tested, but outcome-specific fields (weights, run, swim) within the CSV are not separately verified. |
+| `expressionEval.ts` error paths | DSL evaluation errors (malformed expressions) return `0` silently. No test for the error-handling behavior. |
+
+---
+
 ## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
 
 **Result: 551 passing, 0 failing** (+3 tests from 548 baseline)

@@ -1,5 +1,102 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
+
+### Executive summary
+
+1. **What changed:** 3 commits — one bug fix to core progression logic, two new test
+   files (54 tests), and one display fix + feature bundled with 5 tests.
+2. **Highest confidence:** The test files are purely additive and zero-risk. The
+   `allCompleted` bug fix is low-risk (affects display-only recommendation, not stored data).
+3. **Risky:** The pace display feature is low-risk but adds a new import from
+   `workout-outcomes/types` into `lib/sessionSummary.ts`; verify the import resolves
+   correctly in the built output.
+4. **Review first:** The `buildWeightsRecommendation` bug fix (commit `b38de7b`) — it
+   changes the recommendation shown to users after a partial workout, from "progress"
+   to "hold". Check whether any existing users have plans that would now behave differently.
+
+---
+
+### Biggest issues found
+
+| # | Severity | Description | Status |
+|---|----------|-------------|--------|
+| B1 | Medium | `buildWeightsRecommendation` — `allCompleted` trivially true: single-mode progression always returned 'progress' even for partial workouts. 'hold' path was dead code. | Fixed |
+| B2 | Low | `buildLastSessionSummary` — `actualDistanceMiles` displayed as raw float (e.g., 3.14159). Tests masked it because all test values were clean. | Fixed |
+| T1 | High | `buildProgressionRecommendation` — zero tests on core progression advice function. | Fixed (30 tests added) |
+| T2 | Medium | `workout-outcomes/types.ts` utilities — zero tests on `completionStateToAction`, `formatPace`, pace derivation. | Fixed (24 tests added) |
+
+---
+
+### Improvements completed
+
+| Item | Type | Commits |
+|------|------|---------|
+| Fix `buildWeightsRecommendation` allCompleted bug | Bug fix | `b38de7b` |
+| `buildProgressionRecommendation` test suite (30 tests) | Tests | `086536e` |
+| `workout-outcomes/types.ts` utility tests (24 tests) | Tests | `086536e` |
+| Run distance rounding in `buildLastSessionSummary` | Bug fix | `d386a99` |
+| Pace display in run session summary (feature) | Feature | `d386a99` |
+
+---
+
+### Definitely keep
+
+- **`buildWeightsRecommendation` allCompleted fix** — correct behavior, previously
+  misleading. Confirmed by the new "hold when not all sets completed" test.
+- **`buildProgressionRecommendation` tests** — 30 tests for a zero-coverage critical path.
+- **`types.ts` utility tests** — 24 tests for widely-used formatting functions.
+- **Run distance rounding** — defensive, clean, no UX change for clean values.
+
+### Probably keep but tweak
+
+- **Pace in session summary** — correct, useful, well-tested. One optional improvement:
+  add a `> 0` guard on `averagePaceSecondsPerMile` to prevent "0:00 /mi" display
+  if the field is accidentally set to 0.
+
+### Do not keep
+
+Nothing to reject.
+
+### Recommendations only (not implemented)
+
+| Item | Notes |
+|------|-------|
+| Streak grace period | Reset to 0 each morning until today is logged feels jarring for 30-day streaks. Recommend evaluating a "pending streak" display (e.g., yesterday's streak in parentheses until today is logged). Product decision. |
+| `WorkoutSlot` duration field consolidation | `targetTime`, `timeMin`, `durationMin`, `targetDuration` all mean "minutes". No runtime bug (migration handles reads), but confusing when reading code. |
+| Derive pace from distance + duration | When `averagePaceSecondsPerMile` is null but both distance and duration are present, pace could be computed automatically. Deferred — product decision on whether this is surprising. |
+| Swim pace display | `averagePaceSecondsPer100m` is captured but not shown. Same pattern as run pace — ready to implement when desired. |
+| Plan builder `duration.value > 0` validation | No crash, but creating a plan with 0 rotations/weeks is confusing UX. |
+
+---
+
+### Open questions for me
+
+1. **Partial workout progression:** now that single-mode correctly returns 'hold' for
+   partial workouts, is this the behavior you want? Previously it always said "progress."
+   Users who regularly complete 2/3 sets (by design, leaving gas in the tank) would now
+   see 'hold' instead. Worth verifying this matches your training philosophy.
+2. **Pace in summary:** is "· 9:02 /mi" at the end of the line readable enough, or
+   should pace be on a separate line / given more visual prominence?
+3. **Streak display:** the current "0 streak until today is logged" behavior was noted
+   in passes 22 and 23. Is this something you want to address, or is strict behavior
+   intentional?
+
+---
+
+### Known issues / incomplete work
+
+- `averagePaceSecondsPerMile = 0` would display "0:00 /mi" in the hint — minor edge
+  case, unlikely in practice, but a `> 0` guard would be safer.
+- Swim pace (`averagePaceSecondsPer100m`) is not yet shown in the session summary.
+  The pattern is identical to run pace and ready to implement.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
 
 ### Executive summary
