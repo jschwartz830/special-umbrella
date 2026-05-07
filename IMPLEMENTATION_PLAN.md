@@ -468,3 +468,90 @@ the implementation bug, then commit the feature with clean tests and types.
 - Narrow Zustand selectors in CalendarPage (performance, not urgent)
 - Document progression system migration path (legacy RunProgressionState vs new ProgressionRecommendation)
 - Expression evaluator should surface errors to UI for malformed progression rules
+
+---
+
+## Pass 24 — 2026-05-07 (branch `claude/dreamy-mccarthy-Q6elc`)
+
+### Observations on entry
+
+- Baseline: **551 passing, 0 failing** (after `npm install` on fresh env).
+- `src/modules/workout-outcomes/progression.ts` — `buildProgressionRecommendation`
+  has **zero tests** despite being core business logic surfaced to users after every
+  logged workout. This was the highest-priority test gap.
+- **`buildWeightsRecommendation` allCompleted logic bug**: for `mode === 'single'`,
+  the function filters sets to `completedSets = sets.filter(s => s.completed)` then
+  checks `allCompleted = completedSets.every(s => s.completed)`. Since `completedSets`
+  only contains already-completed sets, `every(s => s.completed)` is trivially `true`.
+  This means single-mode always returns 'progress' when there are any completed sets,
+  even if the user failed half their sets. The 'hold' recommendation path was dead code.
+- `src/modules/workout-outcomes/types.ts` utilities (`completionStateToAction`,
+  `derivePaceSecondsPerMile`, `formatPace`, `formatSwimPace`) have no tests.
+- `buildLastSessionSummary` renders `actualDistanceMiles` as raw float (e.g. `3.14159`
+  would display "3.14159 mi"). No existing test caught this because all test values
+  (`3.1`, `5`, `4`) happen to be clean representations. Defensive rounding adds
+  correctness for any precision float that could arrive from GPS imports or
+  copy-paste from external sources.
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No architectural
+drift since pass 23. All previous PRs (#27–#78) merged.
+
+### Key issues found this pass
+
+1. **`buildWeightsRecommendation` — `allCompleted` trivially true** (LOGIC BUG).
+   See observations above. Fix: compute `allCompleted` from the full unfiltered set
+   list rather than the already-filtered `completedSets`. Impact: single-mode plans
+   now correctly return 'hold' (with "repeat current load" note) when a user only
+   partially completes their sets, and 'progress' only when all sets are finished.
+
+2. **`buildProgressionRecommendation` has zero tests** (TEST GAP). Core business
+   logic — determines the "what to do next" hint shown after every logged workout.
+   Added a comprehensive test suite covering all slot types, all action outcomes,
+   and edge cases.
+
+3. **`workout-outcomes/types.ts` utilities untested** (TEST GAP). `completionStateToAction`,
+   `derivePaceSecondsPerMile`, `formatPace`, `formatSwimPace`, and `deriveSwimPaceSecondsPer100m`
+   have no tests. These feed pace display and history labeling throughout the app.
+
+4. **`buildLastSessionSummary` raw float display** (DISPLAY BUG). Round
+   `actualDistanceMiles` to 1 decimal before string interpolation.
+
+### Feature selected: pace display in run session summary
+
+When `averagePaceSecondsPerMile` is present in `RunWorkoutActual`, append
+the formatted pace to the "Last session" hint on TodayPage (e.g.,
+"Last: 3.1 mi · 28 min · 9:02 /mi"). This field is already captured in
+`OutcomeModal` and stored in `RunWorkoutActual`; it was silently discarded
+in the display layer. Uses the existing `formatPace` utility.
+
+See FEATURE_PROPOSAL.md for full rationale.
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| 1 | Fix `buildWeightsRecommendation` allCompleted bug | Low | ✅ Done |
+| 2 | Add `buildProgressionRecommendation` test suite | None | ✅ Done |
+| 3 | Add `workout-outcomes/types.ts` utility tests | None | ✅ Done |
+| 4 | Fix `buildLastSessionSummary` run distance rounding | Very low | ✅ Done |
+| 5 | Pace display in run session summary (feature) | Low | ✅ Done |
+
+### Rationale for sequencing
+
+Bug fix first (1), then tests that confirm the fix and add baseline coverage (2–3),
+then the display fix that affects the same file as the feature (4), then the feature
+itself (5) on a clean test-covered foundation.
+
+### Carry-over open items
+
+- Streak display is "strict" (0 until today is logged); product decision —
+  recommend evaluating a grace-period or "pending" streak display.
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path (legacy RunProgressionState vs new ProgressionRecommendation)
+- Expression evaluator should surface errors to UI for malformed progression rules
+- `derivePaceSecondsPerMile` is not called by `buildLastSessionSummary` — if
+  `averagePaceSecondsPerMile` is absent but distance + duration are both present,
+  pace could be derived automatically. Deferred as a product decision.
