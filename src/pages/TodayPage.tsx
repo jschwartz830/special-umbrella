@@ -501,6 +501,9 @@ export function TodayPage() {
               {stats.currentStreak}
               <span className="text-xs font-normal text-slate-400 ml-1">day{stats.currentStreak !== 1 ? 's' : ''}</span>
             </p>
+            {stats.longestStreak > stats.currentStreak && (
+              <p className="text-[10px] text-slate-500 leading-none mt-0.5">best {stats.longestStreak}</p>
+            )}
           </div>
         </div>
         <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/60">

@@ -396,6 +396,11 @@ export function HistoryPage() {
               <StatTile label="30-day" value={stats.last30Completed} />
               <StatTile label="Total" value={stats.totalCompleted} />
             </div>
+            {stats.longestStreak > 0 && (
+              <p className="text-xs text-slate-500 text-center">
+                Best streak: <span className="text-slate-300 font-medium">{stats.longestStreak}</span> day{stats.longestStreak !== 1 ? 's' : ''}
+              </p>
+            )}
             {typeMixLabel && (
               <p className="text-xs text-slate-500 text-center">{typeMixLabel}</p>
             )}

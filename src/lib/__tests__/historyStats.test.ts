@@ -41,6 +41,7 @@ describe('computeHistoryStats', () => {
       last7Completed: 0,
       last30Completed: 0,
       currentStreak: 0,
+      longestStreak: 0,
     })
   })
 
@@ -186,6 +187,76 @@ describe('computeHistoryStats', () => {
     ]
     const s = computeHistoryStats([], extras, '2026-04-17')
     expect(s.currentStreak).toBe(1)
+  })
+
+  // ── longestStreak ─────────────────────────────────────────────────────────
+
+  it('longestStreak is 0 for empty inputs', () => {
+    const s = computeHistoryStats([], [], '2026-04-17')
+    expect(s.longestStreak).toBe(0)
+  })
+
+  it('longestStreak equals currentStreak when streak is ongoing', () => {
+    const entries = [
+      entry('2026-04-15', 'complete'),
+      entry('2026-04-16', 'complete'),
+      entry('2026-04-17', 'complete'),
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.currentStreak).toBe(3)
+    expect(s.longestStreak).toBe(3)
+  })
+
+  it('longestStreak exceeds currentStreak when a past streak was longer', () => {
+    // Past streak of 4 days, then a gap, then current streak of 2 days
+    const entries = [
+      entry('2026-04-01', 'complete'),
+      entry('2026-04-02', 'complete'),
+      entry('2026-04-03', 'complete'),
+      entry('2026-04-04', 'complete'),
+      // gap: 2026-04-05 missing
+      entry('2026-04-16', 'complete'),
+      entry('2026-04-17', 'complete'),
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.currentStreak).toBe(2)
+    expect(s.longestStreak).toBe(4)
+  })
+
+  it('longestStreak counts day_off entries (same as currentStreak)', () => {
+    const entries = [
+      entry('2026-04-14', 'complete'),
+      entry('2026-04-15', 'day_off'),
+      entry('2026-04-16', 'complete'),
+      entry('2026-04-17', 'complete'),
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.longestStreak).toBe(4)
+  })
+
+  it('longestStreak is 1 when all entries are isolated single days', () => {
+    const entries = [
+      entry('2026-04-01', 'complete'),
+      entry('2026-04-03', 'complete'),
+      entry('2026-04-05', 'complete'),
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.longestStreak).toBe(1)
+  })
+
+  it('longestStreak includes extras for gap-filling (same as currentStreak)', () => {
+    const entries = [
+      entry('2026-04-14', 'complete'),
+      entry('2026-04-15', 'skip'), // skip alone does not count
+      entry('2026-04-17', 'complete'),
+    ]
+    const extras = [
+      extra('2026-04-15'), // extra on skip day → fills gap
+      extra('2026-04-16'), // extra fills another gap
+    ]
+    const s = computeHistoryStats(entries, extras, '2026-04-17')
+    // 4/14 + 4/15 (skip + extra) + 4/16 (extra) + 4/17 = 4 consecutive
+    expect(s.longestStreak).toBe(4)
   })
 })
 

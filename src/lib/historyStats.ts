@@ -7,6 +7,8 @@ export interface HistoryStats {
   last7Completed: number
   last30Completed: number
   currentStreak: number
+  /** All-time longest consecutive streak of active days (same criteria as currentStreak). */
+  longestStreak: number
 }
 
 /**
@@ -59,7 +61,34 @@ export function computeHistoryStats(
     cursor = shiftDay(cursor, -1)
   }
 
-  return { totalLogged, totalCompleted, last7Completed, last30Completed, currentStreak }
+  // Longest streak: scan all streakable dates in ascending order, counting
+  // consecutive calendar days. O(n log n) for sorting, O(n) for the scan.
+  const longestStreak = computeLongestStreak(streakable)
+
+  return { totalLogged, totalCompleted, last7Completed, last30Completed, currentStreak, longestStreak }
+}
+
+// ── Longest-streak helper ─────────────────────────────────────────────────────
+
+/**
+ * Given a set of YYYY-MM-DD date strings, find the longest consecutive run.
+ * Dates are sorted ascending; two adjacent dates are "consecutive" when the
+ * second equals the first + 1 calendar day.
+ */
+function computeLongestStreak(dateSet: Set<string>): number {
+  if (dateSet.size === 0) return 0
+  const sorted = [...dateSet].sort()
+  let max = 1
+  let run = 1
+  for (let i = 1; i < sorted.length; i++) {
+    if (shiftDay(sorted[i - 1], 1) === sorted[i]) {
+      run++
+      if (run > max) max = run
+    } else {
+      run = 1
+    }
+  }
+  return max
 }
 
 // ── Plan progress ─────────────────────────────────────────────────────────────
