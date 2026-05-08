@@ -115,6 +115,7 @@ export const usePlanStore = create<PlanState>()(
 
       setActivePlan(id, opts = {}) {
         set(s => {
+          if (!s.plans[id]) return s
           const updated = { ...s.plans }
           for (const pid of Object.keys(updated)) {
             if (updated[pid].status === 'active') {
