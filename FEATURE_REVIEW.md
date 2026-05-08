@@ -1,3 +1,59 @@
+# Feature Review — All-Time Longest Streak (`longestStreak`)
+
+Date: 2026-05-08
+Branch: `claude/dreamy-mccarthy-gvR18`
+Classification: **Keep**
+
+## What was actually built
+
+- `longestStreak` field added to `HistoryStats` interface
+- `computeLongestStreak(Set<string>)` private helper in `historyStats.ts`:
+  sorts the streakable dates and scans for the longest consecutive run
+- `computeHistoryStats` calls the helper after computing `currentStreak`
+- HistoryPage: "Best streak: N days" paragraph below the 4-tile grid
+  (conditional on `longestStreak > 0`)
+- TodayPage: "best N" micro-label inside the streak tile
+  (conditional on `longestStreak > stats.currentStreak`)
+- 6 new unit tests + 1 updated test
+
+## Assumptions encoded
+
+1. Streakable criteria matches `currentStreak` exactly: complete + day_off
+   rotation entries, plus any extra entries.
+2. TodayPage label hidden when current streak equals the all-time best.
+3. HistoryPage label always shown when any streak history exists.
+4. All-plan scope (not filtered to active plan) — consistent with how
+   `computeHistoryStats` already receives pre-filtered entries from its callers.
+
+## What worked well
+
+- The `streakable` Set reuse made the implementation trivial and guaranteed
+  consistency between the two metrics
+- Unit tests exercise the full range of edge cases cleanly
+- The conditional display on TodayPage avoids noise when the user is at peak
+
+## What feels risky or incomplete
+
+- The `HistoryStats` interface is now slightly wider; any test or code that
+  constructs a full literal will need the new field. Only one test was affected.
+- "Best streak" appears in two places with slightly different display logic
+  (HistoryPage always shows it; TodayPage hides it when at peak). This
+  inconsistency could be confusing.
+
+## What to evaluate
+
+1. Does the "Best streak" line in HistoryPage feel right in context?
+2. Should the TodayPage micro-label also show when at peak ("you're at your best!")?
+3. Is the all-plan scope correct, or should this be the active plan only?
+
+## Recommended next steps
+
+- Decide on the at-peak display question for TodayPage
+- Consider a "new personal best" celebration trigger when `currentStreak`
+  first exceeds `longestStreak`
+
+---
+
 # Feature Review — 7-Day Activity Strip on TodayPage
 
 Date: 2026-05-06

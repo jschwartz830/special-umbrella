@@ -1,5 +1,82 @@
 # Overnight Changelog
 
+## 2026-05-08 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-gvR18`
+
+Baseline on entry: **551 passing, 0 failing**.
+Exit state: **558 passing, 0 failing** (+7 tests).
+
+---
+
+### 1. Fix: `isPlanExpired` — weeks plan with `duration.value = 0`
+
+**Why it matters**: A weeks plan with `value = 0` computed `endDate = startDate`,
+making `today >= endDate` true from day one. This caused a spurious
+"Plan complete!" banner immediately on activation for any plan imported with a
+zero duration.
+
+**Files changed**: `src/engine/rotationEngine.ts`,
+`src/engine/__tests__/rotationEngine.test.ts`
+
+**Change**: Added `if (value <= 0) return false` before the `endDate` computation
+for weeks plans, matching the existing guard on the rotations path.
+
+**Risks/tradeoffs**: None — mirrors an existing guard; no behaviour changes for
+valid plans.
+
+**Rollback**: Revert commit `4ae52b5`.
+
+---
+
+### 2. Fix: `setActivePlan` — guard against non-existent plan id
+
+**Why it matters**: Calling `setActivePlan` with an id not in the `plans` map
+spread `undefined` into a new record, silently creating a partial plan with no
+`id`, `name`, `days`, or `duration`. Any code subsequently reading those fields
+would crash or behave incorrectly.
+
+**Files changed**: `src/store/planStore.ts`
+
+**Change**: Added `if (!s.plans[id]) return s` at the top of the setter, making
+the call a no-op when the plan doesn't exist.
+
+**Risks/tradeoffs**: None — no UI currently calls this with an invalid id, so
+no behaviour changes in normal use.
+
+**Rollback**: Revert commit `615f395`.
+
+---
+
+### 3. Feat: `longestStreak` in `computeHistoryStats` with UI display
+
+**Why it matters**: Users had no way to see their all-time personal best streak
+— only the current streak was tracked. The `streakable` Set was already being
+built for `currentStreak`; extending it to compute `longestStreak` is a
+natural, low-risk addition.
+
+**Files changed**:
+- `src/lib/historyStats.ts` — new `longestStreak` field in `HistoryStats`;
+  new private `computeLongestStreak` helper; implementation in
+  `computeHistoryStats`
+- `src/lib/__tests__/historyStats.test.ts` — 6 new tests (+ 1 updated)
+- `src/pages/HistoryPage.tsx` — "Best streak: N days" line below the stats grid
+- `src/pages/TodayPage.tsx` — "best N" micro-label in streak tile when
+  longestStreak > currentStreak
+
+**Algorithm**: Sort the streakable date Set ascending; scan for the longest
+run of consecutive dates. O(n log n) total; n is the number of days with
+activity, which is bounded by the plan age.
+
+**Risks/tradeoffs**:
+- The `HistoryStats` interface gained a new field; any external code building a
+  mock `HistoryStats` object will need to add `longestStreak: 0`. Only one test
+  used `toEqual` with the full shape; updated.
+- The TodayPage tile only shows the "best N" label when `longestStreak >
+  currentStreak`, avoiding noise when the user is currently at their peak.
+
+**Rollback**: Revert commit `52bfee8`.
+
+---
+
 ## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
 
 Baseline on entry: **548 passing, 0 failing**.

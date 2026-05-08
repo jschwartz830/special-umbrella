@@ -1,5 +1,88 @@
 # Implementation Plan
 
+## Pass 24 — 2026-05-08 (branch `claude/dreamy-mccarthy-gvR18`)
+
+### Observations on entry
+
+Baseline: **551 passing, 0 failing**.
+
+Architecture is stable. Three prior overnight passes (22, 23) merged cleanly.
+Active-workout tracker, WeeklyActivityStrip, PB-detection fix, progressionStates
+cleanup, and computePersonalRecords extraction are all in main.
+
+### Architecture summary
+
+- React 18 + TypeScript + Vite + Tailwind
+- State: Zustand with localStorage persistence via `persist` middleware
+- Three data stores: `planStore`, `historyStore`, `outcomeStore`, plus
+  `exerciseHistoryStore` (denormalized index) and `programStore` (YAML-import vars)
+- Pure rotation engine (`rotationEngine.ts`) fully decoupled from React
+- `computeHistoryStats`, `computePlanProgress`, `computeRotationCycleProgress`
+  are pure helpers with comprehensive test coverage
+- 16 test files, 551+ tests on entry
+
+### What appears strong and well-designed
+
+- Clean separation between pure engine logic and React UI — engine tests run
+  without any mocking of React dependencies
+- `HistoryStats`, `PlanProgress`, `RotationCycleProgress` composable shapes
+  with shared use across TodayPage, HistoryPage, and tests
+- The `computeCurrentDayIndex` override/entry processing pipeline is correct
+  and well-tested, including the retroactive-jump guard regression test
+- `streakable` Set reuse for both `currentStreak` and new `longestStreak`
+  keeps the two values consistent
+
+### Key issues found this pass
+
+1. **`isPlanExpired` — weeks plan with `duration.value = 0` immediately expires**
+   (BUG). The rotations path has a `value <= 0` guard; the weeks path did not.
+   If a plan was imported via CSV/YAML with value=0, `endDate = startDate`, and
+   `today >= startDate` is true from day one → spurious "Plan complete!" banner.
+
+2. **`setActivePlan` — no guard for non-existent plan id** (STORE CORRUPTION BUG).
+   If called with an id not in `plans`, the JavaScript object spread
+   `{ ...undefined, status: 'active', ... }` silently creates a partial plan
+   with no `id`, `name`, `days`, or `duration` — a corrupted record that would
+   crash any code trying to read those fields. Added early return guard.
+
+3. **`longestStreak` not tracked in `computeHistoryStats`** (FEATURE GAP).
+   The function already computed `currentStreak` using a `streakable` Set.
+   Extending it to track the all-time peak was the natural next step, directly
+   reusing the same logic and data.
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| 1 | Fix `isPlanExpired` weeks value=0 guard | None | ✅ Done |
+| 2 | Fix `setActivePlan` missing plan guard | None | ✅ Done |
+| 3 | Add `longestStreak` to stats + tests + UI | Low | ✅ Done |
+
+### Rationale for sequencing
+
+Bugs first (1, 2) in order of potential impact — store corruption is worse
+than a spurious banner, but both are one-liners. Feature (3) selected because
+it reuses existing infrastructure with no new dependencies, and has high
+clarity of value to the user.
+
+### Carry-over open items
+
+- Plan builder UI should validate `duration.value > 0` (the onChange handler
+  already coerces 0→1 at input time, but the carry-over note is resolved in
+  practice; closing it)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path (legacy RunProgressionState vs
+  new ProgressionRecommendation)
+- Expression evaluator should surface errors to UI for malformed progression rules
+- `PlanCard` component defined inside `PlansPage` function body (no memoization)
+- `TodayPage.today` computed once at render — stale if app left open overnight
+
+### Exit state
+
+**558 passing, 0 failing** (+7 tests from baseline).
+
+---
+
 ## Pass 22 — 2026-05-05 (branch `claude/dreamy-mccarthy-phNna`)
 
 ### Observations on entry

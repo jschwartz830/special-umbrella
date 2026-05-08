@@ -1,5 +1,26 @@
 # Test Results
 
+## 2026-05-08 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-gvR18`
+
+**Result: 558 passing, 0 failing** (+7 tests from 551 baseline)
+
+### Tests added this pass
+
+| File | New / updated | What they cover |
+|------|---------------|-----------------|
+| `rotationEngine.test.ts` | +1 | `isPlanExpired` weeks plan with `duration.value = 0` never expires |
+| `historyStats.test.ts` | +6 (+1 updated) | `longestStreak`: empty inputs → 0; ongoing streak equals longest; past streak longer than current; day_off inclusion; isolated single days; extras gap-filling. Updated `toEqual` for the new `longestStreak` field in the "returns zeros" case. |
+
+### Areas still untested
+
+- `TodayPage` "best N" label rendering — UI-only conditional; verifiable manually
+- `HistoryPage` "Best streak" line rendering — UI-only; verifiable manually
+- `setActivePlan` non-existent id guard — defensive guard with no observable
+  side effect (no state change), so no assertion is possible at the unit level
+- `WeeklyActivityStrip` — requires React Testing Library (not set up in project)
+
+---
+
 ## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
 
 **Result: 551 passing, 0 failing** (+3 tests from 548 baseline)

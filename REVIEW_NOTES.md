@@ -1,5 +1,114 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-08 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-gvR18`
+
+### Executive summary
+
+1. **What changed:** 3 commits — 2 defensive bug fixes + 1 medium-complexity
+   feature (`longestStreak`). +7 tests (551 → 558 passing).
+2. **Highest confidence:** Both bug fixes are single-line guards with zero
+   behaviour change for valid data. The `longestStreak` computation reuses
+   the `streakable` Set already built for `currentStreak`, so the two values
+   are guaranteed consistent.
+3. **What is risky:** `longestStreak` required updating the `HistoryStats`
+   interface (new required field). Any other code constructing a full
+   `HistoryStats` object by value needs `longestStreak: 0` added. Only one
+   test was affected; the UI consumes the field safely.
+4. **Review first:** Open HistoryPage with some completed workouts and verify
+   "Best streak: N days" appears correctly below the stats grid. Then open
+   TodayPage and confirm the streak tile shows "best N" only when the current
+   streak is below the all-time best.
+
+---
+
+### Biggest issues found
+
+1. **`isPlanExpired` weeks+zero-value bug** — immediate expiry on activation for
+   plans with `duration.value = 0`. Low probability in normal use but a
+   straightforward import/paste path that could trigger it.
+
+2. **`setActivePlan` store corruption** — calling with a non-existent id would
+   silently write a corrupt partial plan. No current UI exposes this path, but
+   it's a ticking hazard for future code that might call the action directly.
+
+3. **`longestStreak` gap** — `currentStreak` only shows the active run; users
+   had no visibility into their historical best.
+
+---
+
+### Improvements completed
+
+| # | Item | Commit |
+|---|------|--------|
+| 1 | Fix `isPlanExpired` weeks value=0 guard | `4ae52b5` |
+| 2 | Fix `setActivePlan` missing plan guard | `615f395` |
+| 3 | Add `longestStreak` to `computeHistoryStats` + tests + UI | `52bfee8` |
+
+---
+
+### Medium-complexity feature explored: `longestStreak`
+
+**Classification: Keep**
+
+The feature is fully implemented, tested, and integrated into both the
+HistoryPage (always-visible "Best streak" line) and TodayPage (conditional
+"best N" micro-label). The algorithm is correct and consistent with
+`currentStreak`'s definition. No new dependencies introduced.
+
+---
+
+### Definitely keep
+
+- Fix 1 (isPlanExpired) — correctness fix, no risk
+- Fix 2 (setActivePlan) — defensive guard, no risk
+- Fix 3 (longestStreak) — clean feature addition
+
+### Probably keep but tweak
+
+- TodayPage "best N" label — consider whether to always show it (including when
+  `longestStreak === currentStreak`) as an affirmation. Currently hidden to
+  avoid noise.
+
+### Do not keep
+
+- Nothing removed this pass.
+
+### Recommendations only (not implemented)
+
+- **`TodayPage.today` staleness**: `today` is computed once at render time.
+  If the app is left open past midnight, `today` stays at the previous date.
+  Fix with a `useMemo` that refreshes on a 1-minute interval or a
+  `useEffect` that triggers a re-render at midnight.
+- **Narrow Zustand selectors in `CalendarPage`**: The page subscribes to
+  `entries` and `overrides` as full arrays. On large histories, every
+  history mutation re-renders the entire calendar. Scope the subscriptions
+  to per-plan slices.
+- **Expression evaluator errors**: Malformed YAML progression rules fail
+  silently. Surface the error in the OutcomeModal or PlanBuilderPage.
+- **`PlanCard` memoization**: Defined inside `PlansPage` function body;
+  re-created on every render. Extract to a module-level component.
+
+---
+
+### Open questions
+
+1. Should "Best streak" also appear on TodayPage in the stats bar (replacing
+   one of the existing tiles) rather than as a sub-label inside the streak tile?
+2. Should `longestStreak` exclude `day_off` entries to count only "workout" days?
+   Currently it mirrors `currentStreak` which includes `day_off`.
+
+---
+
+### Known issues / incomplete work
+
+- None introduced this pass.
+
+### Dependencies added
+
+- None.
+
+---
+
 ## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
 
 ### Executive summary
