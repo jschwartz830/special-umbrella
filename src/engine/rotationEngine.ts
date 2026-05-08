@@ -237,6 +237,7 @@ export function isPlanExpired(
 ): boolean {
   const { type, value } = plan.duration
   if (type === 'weeks') {
+    if (value <= 0) return false
     const endDate = format(addDays(parseISO(plan.startDate), value * 7), 'yyyy-MM-dd')
     return today >= endDate
   }

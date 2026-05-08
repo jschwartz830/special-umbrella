@@ -391,6 +391,17 @@ describe('isPlanExpired', () => {
       })
       expect(isPlanExpired(plan, [], '2026-02-01')).toBe(true)
     })
+
+    it('is never expired when duration value is 0 (guard matches rotations behaviour)', () => {
+      // A weeks plan with value=0 would compute endDate=startDate, making today>=endDate
+      // immediately true. The guard returns false to prevent a spurious expiry banner.
+      const plan = makePlan(4, {
+        duration: { type: 'weeks', value: 0 },
+        startDate: '2026-01-01',
+      })
+      expect(isPlanExpired(plan, [], '2026-01-01')).toBe(false)
+      expect(isPlanExpired(plan, [], '2099-12-31')).toBe(false)
+    })
   })
 
   describe('rotations-based duration', () => {
