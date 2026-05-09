@@ -1,5 +1,29 @@
 # Test Results
 
+## 2026-05-09 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-JbYiG`
+
+**Result: 552 passing, 0 failing** (+1 net test from 551 baseline; +2 new tests added for the bug fix)
+
+### Tests added this pass
+
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `src/engine/__tests__/rotationEngine.test.ts` | 2 | `isPlanExpired` — weeks plan with `value === 0` returns `false` on any date |
+
+### Tests reviewed (no changes needed)
+
+- `src/lib/__tests__/historyStats.test.ts` — `isPlanExpired` rotations `value=0` test from pass 21 confirmed still passing; weeks guard wasn't there (now added)
+- All 16 test files: 552 tests, 0 failures, 0 skips
+
+### Important areas still untested
+
+- `PlanProgressBar` component (visual; not testable without browser rendering)
+- CalendarPage `handleOutcomeConfirm` date-change + action-sync path (integration; covered by design review; no regression test added)
+- `WeeklyActivityStrip` component (also visual; not testable without browser rendering)
+- End-to-end flows (no e2e test infrastructure)
+
+---
+
 ## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
 
 **Result: 551 passing, 0 failing** (+3 tests from 548 baseline)

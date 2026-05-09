@@ -468,3 +468,57 @@ the implementation bug, then commit the feature with clean tests and types.
 - Narrow Zustand selectors in CalendarPage (performance, not urgent)
 - Document progression system migration path (legacy RunProgressionState vs new ProgressionRecommendation)
 - Expression evaluator should surface errors to UI for malformed progression rules
+
+---
+
+## Pass 24 — 2026-05-09 (branch `claude/dreamy-mccarthy-JbYiG`)
+
+### Observations on entry
+
+- Baseline: **551 passing, 0 failing** (after `npm install` on fresh env).
+- `isPlanExpired` — Pass 21 added a `value <= 0` guard for `rotations` plans, but
+  the `weeks` branch has no equivalent guard. A weeks plan with `value === 0` computes
+  `endDate = startDate + 0 days = startDate`, so `today >= startDate` is always true —
+  the "Plan complete!" banner appears immediately on activation.
+- `CalendarPage.handleOutcomeConfirm` — the second `entries.find` call (action-sync
+  check after `logOutcomeWithProgression`) reads from the React render closure, which
+  is stale if `updateEntryDate` already ran in the same invocation. Identical to the
+  HistoryPage bug fixed in Pass 18. CalendarPage was never patched. When a user edits
+  an outcome date on the Calendar page, the history entry action label can silently
+  fail to sync to the new completion state.
+- TodayPage stats bar labels: "Streak" / "This week" / "Total". The 7-day window is
+  a rolling 7-day count, not a calendar week (Mon–Sun). "This week" is misleading;
+  "7 days" is more accurate.
+- No obvious regressions from Pass 23.
+
+### Decisions
+
+- **Fix `isPlanExpired` weeks guard** — one-line addition, fixes immediate false-expiry.
+- **Fix CalendarPage stale `entries` closure** — defensive, mirrors HistoryPage pattern.
+- **Relabel "This week" → "7 days" in TodayPage** — trivial UX clarity fix.
+- **Add test for weeks plan with `value === 0`** — anchors the bug fix.
+- **Feature: visual plan progress bar on TodayPage** — slim progress bar below the
+  "Day X of N in rotation" subtitle. Uses `cycleProgress` (rotations plans) and
+  `weekProgress` (weeks plans) data already computed in TodayPage. Additive, isolated,
+  no new dependencies, no store changes.
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|---|---|---|---|
+| 1 | Fix `isPlanExpired` weeks guard + test | Very low | ✅ Done |
+| 2 | Fix CalendarPage stale closure | Very low | ✅ Done |
+| 3 | Relabel "This week" → "7 days" | None | ✅ Done |
+| 4 | Feature: plan progress bar on TodayPage | Low | ✅ Done |
+
+### Exit state
+
+**553 passing, 0 failing** (+2 new tests).
+
+### Carry-over open items
+
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path
+- Expression evaluator should surface errors to UI for malformed progression rules
+- Streak display is "strict" (0 until today is logged) — pending product decision

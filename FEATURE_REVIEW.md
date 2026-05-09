@@ -1,3 +1,54 @@
+# Feature Review — Visual Plan Progress Bar on TodayPage
+
+Date: 2026-05-09
+Branch: `claude/dreamy-mccarthy-JbYiG`
+Classification: **Keep**
+
+## What was actually built
+
+A `PlanProgressBar` component function (~30 lines) added to `TodayPage.tsx`, rendered immediately below the "Day X of N in rotation" subtitle in the page header.
+
+- For **rotations** plans: fills `doneInCycle / rotationLength * 100%`. Visible only when `doneInCycle > 0` (avoids an empty bar at plan start).
+- For **weeks** plans: fills `completed / total * 100%`. Visible only while `completed < total`.
+- Hidden when `planExpired` is true (expiry banner already handles that state).
+- Styled as a `h-0.5` rounded pill, slate-700 track, emerald-500/70 fill.
+
+## What assumptions were encoded
+
+- `doneInCycle > 0` as the show condition for rotations plans — matches the existing text condition and avoids rendering an empty bar on day 1.
+- Progress uses already-computed `cycleProgress` / `weekProgress` values; no new data derived.
+- `PlanProgress | null` and `RotationCycleProgress | null` prop types use the already-exported interfaces from historyStats.ts.
+
+## What worked well
+
+- Zero new data needed: `cycleProgress` and `weekProgress` were already computed in TodayPage for the subtitle text. This made the feature trivially simple to implement.
+- The `null` return paths keep the component self-contained — the caller doesn't need to conditionally render it.
+- Using exported types (`RotationCycleProgress`, `PlanProgress`) instead of inline `ReturnType<typeof import(...)>` keeps the props readable.
+
+## What feels risky or incomplete
+
+- No visual test coverage (can't browser-test in this environment). The component is simple enough that visual regression risk is low.
+- The `h-0.5` bar is very subtle at 2px tall. On high-DPI screens it looks clean; on non-retina screens it may be barely visible. Consider `h-1` if users report it's hard to see.
+- A `transition-[width]` CSS transition is included, but since the page renders fresh on navigation, the transition won't animate on load. It only animates if the parent re-renders while the page is open (e.g., after logging a workout via the action buttons).
+
+## What I should evaluate tomorrow
+
+1. On a real device: is the bar visible at `h-0.5`? Does it look proportional to the header?
+2. Does the bar appear in the right place (between the subtitle and the stats bar) with the correct `-mt-1` spacing?
+3. For a weeks plan in Week 1 of 12: does the bar correctly show ~8% fill without being invisible?
+
+## Recommended next steps
+
+- Evaluate on device as above.
+- If the bar is too subtle, increase to `h-1` and remove `overflow-hidden` from the track.
+- Future: consider adding the same bar to PlansPage plan cards for at-a-glance overview.
+
+## Keep / revise / prototype only / reject recommendation
+
+**Keep** — the implementation is minimal, reversible, and provides clear visual value by surfacing progress data that was previously only available as text.
+
+---
+
 # Feature Review — 7-Day Activity Strip on TodayPage
 
 Date: 2026-05-06

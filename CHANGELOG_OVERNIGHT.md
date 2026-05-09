@@ -1,5 +1,74 @@
 # Overnight Changelog
 
+## 2026-05-09 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-JbYiG`
+
+Baseline on entry: **551 passing, 0 failing**.
+Exit state: **552 passing, 0 failing** (+1 net test; +2 new, engine guard test added).
+
+---
+
+### 1. Bug fix: `isPlanExpired` — guard for `weeks` plan with `duration.value ≤ 0`
+
+**Summary:** A `weeks`-duration plan with `value === 0` computed `endDate = startDate + 0 days`, making `today >= startDate` always true. The "Plan complete!" banner would appear immediately after activating such a plan.
+
+**Why it matters:** Pass 21 added this guard for `rotations` plans but the `weeks` branch was missed. A user who accidentally set a 0-week plan (or whose data is corrupted) would see a confusing banner on first load.
+
+**Files changed:**
+- `src/engine/rotationEngine.ts` — added `if (value <= 0) return false` before the `endDate` calculation in the `weeks` branch
+- `src/engine/__tests__/rotationEngine.test.ts` — added 2 tests anchoring the new guard
+
+**Risks/tradeoffs:** None. The guard only affects plans with `value <= 0`, which are invalid configurations. Valid plans are unaffected.
+
+**Rollback:** Revert the two-line diff in `rotationEngine.ts` and the test block.
+
+---
+
+### 2. UX fix: Rename "This week" stat label to "7 days" on TodayPage
+
+**Summary:** The stats bar label "This week" was misleading — the stat counts workouts in a rolling 7-day window ending today, not a calendar Mon–Sun week. Renamed to "7 days" to match what the code actually computes.
+
+**Why it matters:** A user who logs workouts Mon–Sun and sees "This week: 5 done" on a Thursday might expect it to reset on Monday. It doesn't. The new label removes ambiguity.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — 1-character label change
+
+**Risks/tradeoffs:** None.
+
+**Rollback:** Revert the 1-line change.
+
+---
+
+### 3. Bug fix: CalendarPage `handleOutcomeConfirm` — stale `entries` closure
+
+**Summary:** When a user edits an outcome date on the Calendar page (e.g., marks a workout as completed on a different date than the one it was logged on), the action-sync check after `logOutcomeWithProgression` read from the stale React render closure. After `updateEntryDate` moves the entry from `originalDate` to `completedDate`, `entries.find(calendarDate === completedDate)` returns `undefined` from the closure, and the history entry action label silently fails to update.
+
+**Why it matters:** The outcome saves correctly, but the label shown in the history list ("Completed" / "Skipped" / "Partial") would remain at its old value until the next full re-render that propagates the new store state.
+
+**Files changed:**
+- `src/pages/CalendarPage.tsx` — replaced `entries.find(...)` with `useHistoryStore.getState().entries.find(...)` in the action-sync block; added `!isExtra` guard (extra entries have no rotation history entry to sync)
+
+**Risks/tradeoffs:** Reading directly from store state is a known safe pattern for post-mutation lookups (same as HistoryPage since pass 18). No new dependencies.
+
+**Rollback:** Revert the 7-line diff in `CalendarPage.tsx`.
+
+---
+
+### 4. Feature: Visual plan progress bar on TodayPage
+
+**Summary:** Added a slim (`h-0.5`) emerald progress bar below the "Day X of N in rotation" subtitle on TodayPage. For `rotations` plans the bar shows cycle completion (`doneInCycle / rotationLength`). For `weeks` plans it shows overall plan progress (`completed / total weeks`). Hidden when the plan is expired.
+
+**Why it matters:** The subtitle text already showed progress numerically ("3/6 done", "Week 3 of 12") but required the user to parse a fraction. The bar conveys the same information at a glance.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — added `PlanProgressBar` component function (~30 lines) and one render call in the header section; added `import type { RotationCycleProgress, PlanProgress }` from historyStats
+- `FEATURE_PROPOSAL.md` — documented the feature
+
+**Risks/tradeoffs:** Purely additive. If the bar renders at `0%`, it's invisible (not a broken UI). The text subtitle below it always shows the same information as a fallback. No new store subscriptions.
+
+**Rollback:** Remove the `<PlanProgressBar>` render call (1 line) and the component function definition (~30 lines) from TodayPage.tsx.
+
+---
+
 ## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
 
 Baseline on entry: **548 passing, 0 failing**.

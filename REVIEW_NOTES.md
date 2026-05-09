@@ -1,5 +1,91 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-09 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-JbYiG`
+
+### Executive summary
+
+1. **What changed:** 4 commits — two bug fixes, one UX label fix, and one feature (visual progress bar).
+2. **Highest confidence:** The `isPlanExpired` weeks guard and the "7 days" label rename are both trivial, zero-risk changes. The CalendarPage stale-closure fix mirrors an identical pattern already in use in HistoryPage.
+3. **What is risky:** The progress bar is purely visual — risk is limited to whether the `h-0.5` height is visible on all devices. If too subtle, increase to `h-1`.
+4. **Review first:** The CalendarPage stale-closure fix (the most behaviorally significant change). Then the `isPlanExpired` guard (test coverage added). Then the feature.
+
+---
+
+### Biggest issues found
+
+**B1 — `isPlanExpired` weeks guard missing (confirmed bug)**
+Pass 21 added `if (value <= 0) return false` for `rotations` plans but missed the `weeks` branch. A `weeks` plan with `value=0` always returned `true` (endDate = startDate, today >= startDate is always true), triggering an immediate "Plan complete!" banner on plan activation.
+
+**B2 — CalendarPage `handleOutcomeConfirm` stale `entries` closure (confirmed bug)**
+The action-sync check after `logOutcomeWithProgression` used the React render closure `entries`. After `updateEntryDate` moves an entry from `originalDate` to `completedDate`, the stale closure's `entries.find(calendarDate === completedDate)` returns `undefined`, silently failing to sync the history entry action label to the new completion state.
+
+**U1 — "This week" label inaccurate (UX clarity)**
+The stat counts a rolling 7-day window, not a calendar week. Label changed to "7 days".
+
+---
+
+### Improvements completed
+
+| # | Item | Files | Confidence |
+|---|---|---|---|
+| B1 | `isPlanExpired` weeks guard | `rotationEngine.ts`, test | High |
+| B2 | CalendarPage stale closure | `CalendarPage.tsx` | High |
+| U1 | "7 days" label | `TodayPage.tsx` | High |
+| F1 | Plan progress bar | `TodayPage.tsx`, `FEATURE_PROPOSAL.md` | High |
+
+---
+
+### Feature added
+
+**Visual plan progress bar (F1)** — A slim emerald bar below the subtitle text showing cycle completion (rotations plans) or week progress (weeks plans). Uses data already computed in TodayPage. No new store subscriptions, no new utilities, no schema changes.
+
+---
+
+### Definitely keep
+
+- `isPlanExpired` weeks guard (B1) — bug fix, tested, zero risk
+- "7 days" label (U1) — trivial accuracy fix
+- CalendarPage stale closure fix (B2) — mirrors established pattern
+
+### Probably keep but tweak
+
+- Progress bar (F1) — keep, but evaluate bar height on device (may want `h-1` instead of `h-0.5`)
+
+### Do not keep
+
+_Nothing this pass._
+
+### Recommendations only (not implemented)
+
+- **Plan builder: validate `duration.value > 0`** — no crash, but shows confusing banner immediately. A quick UI guard on the form would prevent this class of bad config.
+- **Streak grace period** — the streak shows 0 each morning until today is logged. Product decision: consider "pending" display ("🔥 5 days + today") vs strict 0.
+- **CalendarPage selectors** — the page subscribes to `entries`, `overrides`, `extraEntries` as full arrays. Could narrow to plan-filtered selectors for better re-render perf with many plans.
+- **Expression evaluator error surface** — malformed YAML progression rules silently evaluate to 0. A UI warning for rule parse errors would aid plan authoring.
+
+---
+
+### Open questions for you
+
+1. Should the progress bar be `h-0.5` (2px) or `h-1` (4px)? Hard to evaluate without a real device.
+2. Should the progress bar also appear on PlansPage plan cards (to show progress at a glance without opening the plan)?
+3. Should `isPlanExpired` also guard for `plan.days.length === 0` in the weeks branch? Currently, a weeks plan with no days would compute a valid expiry date and return true/false normally. The schedule wouldn't work anyway (no workout to show), but it's a defensible additional guard.
+4. The "7 days" label — is "7 days" clear enough, or would "Last 7d" or "This 7d" read better in context?
+
+---
+
+### Known issues / incomplete work
+
+- `h-0.5` progress bar height needs device validation.
+- The `transition-[width]` CSS property on the bar fill won't animate on initial navigation (only on in-session re-renders). This is cosmetic.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
 
 ### Executive summary
