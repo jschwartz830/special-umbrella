@@ -171,6 +171,9 @@ export function ActiveWorkoutTracker({
   const restAlertedRef = useRef(false)
   const restOwnerRef = useRef<{ exIdx: number; setIdx: number } | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
+  const scheduledRestNodesRef = useRef<OscillatorNode[]>([])
+  const workoutWallBaseRef = useRef<{ elapsed: number; time: number }>({ elapsed: 0, time: Date.now() })
+  const restWallBaseRef = useRef<{ elapsed: number; time: number } | null>(null)
 
   const [workoutElapsed, setWorkoutElapsed] = useState(0)
   const [workoutRunning, setWorkoutRunning] = useState(true)
@@ -313,14 +316,21 @@ export function ActiveWorkoutTracker({
         setRestTarget(restoredRestTarget)
         restTargetRef.current = restoredRestTarget
       }
-      if (draft.restWarningAlerted != null) restWarningAlertedRef.current = draft.restWarningAlerted
-      if (draft.restAlerted != null) restAlertedRef.current = draft.restAlerted
       if (draft.restOwner) restOwnerRef.current = draft.restOwner
       if (draft.activeSetTimer) {
         setActiveSetTimer(draft.activeSetTimer)
         activeSetRef.current = draft.activeSetTimer
       }
       if (draft.exercises?.length) setExercises(draft.exercises)
+      // Re-schedule rest audio if rest was still running when draft was saved
+      if (restRunRef.current && restoredRestElapsed != null && restoredRestTarget != null) {
+        restWallBaseRef.current = { elapsed: restoredRestElapsed, time: Date.now() }
+        const ctx = getAudioContext()
+        if (ctx) scheduleRestAudio(ctx, restoredRestTarget, restoredRestElapsed)
+      }
+      if (typeof draft.workoutElapsed === 'number') {
+        workoutWallBaseRef.current = { elapsed: draft.workoutElapsed, time: Date.now() }
+      }
     } catch {
       window.localStorage.removeItem(draftStorageKey)
     }
@@ -361,7 +371,7 @@ export function ActiveWorkoutTracker({
     duration: number,
     peakGain: number,
     type: OscillatorType = 'sine',
-  ) {
+  ): OscillatorNode {
     const oscillator = ctx.createOscillator()
     const gain = ctx.createGain()
     oscillator.type = type
@@ -372,50 +382,68 @@ export function ActiveWorkoutTracker({
     oscillator.connect(gain).connect(ctx.destination)
     oscillator.start(startAt)
     oscillator.stop(startAt + duration + 0.03)
+    return oscillator
   }
 
-  function playRestWarningAlert() {
-    const ctx = getAudioContext()
-    if (!ctx) return
-    const now = ctx.currentTime + 0.02
-
-    scheduleTone(ctx, 740, now, 0.08, 0.12, 'triangle')
-    scheduleTone(ctx, 880, now + 0.12, 0.08, 0.12, 'triangle')
+  function cancelScheduledRestAudio() {
+    for (const node of scheduledRestNodesRef.current) {
+      try { node.stop(0) } catch { /* already stopped */ }
+    }
+    scheduledRestNodesRef.current = []
   }
 
-  function playRestTargetAlert() {
-    const ctx = getAudioContext()
-    if (!ctx) return
-    const now = ctx.currentTime + 0.02
+  // Pre-schedule rest audio via AudioContext hardware clock so it fires even when backgrounded.
+  // Sets the warning/alerted ref flags immediately to prevent interval double-play.
+  function scheduleRestAudio(ctx: AudioContext, targetSeconds: number, fromElapsed: number) {
+    cancelScheduledRestAudio()
+    const nodes: OscillatorNode[] = []
+    const base = ctx.currentTime + 0.05
+    const remainingToWoodBlock = (targetSeconds - 15) - fromElapsed
+    const remainingToEnd = targetSeconds - fromElapsed
 
-    scheduleTone(ctx, 920, now, 0.2, 0.22, 'square')
-    scheduleTone(ctx, 1380, now, 0.05, 0.08, 'triangle')
+    if (targetSeconds > 15 && remainingToWoodBlock > 0) {
+      // wood block: short percussive double-tap
+      nodes.push(scheduleTone(ctx, 880, base + remainingToWoodBlock, 0.045, 0.28, 'triangle'))
+      nodes.push(scheduleTone(ctx, 440, base + remainingToWoodBlock + 0.025, 0.04, 0.14, 'triangle'))
+    }
+    if (remainingToEnd > 0) {
+      nodes.push(scheduleTone(ctx, 920, base + remainingToEnd, 0.2, 0.22, 'square'))
+      nodes.push(scheduleTone(ctx, 1380, base + remainingToEnd, 0.05, 0.08, 'triangle'))
+      nodes.push(scheduleTone(ctx, 1046.5, base + remainingToEnd + 0.24, 0.28, 0.16))
+      nodes.push(scheduleTone(ctx, 1568, base + remainingToEnd + 0.40, 0.38, 0.14))
+    }
+    scheduledRestNodesRef.current = nodes
 
-    const chimeStart = now + 0.24
-    scheduleTone(ctx, 1046.5, chimeStart, 0.28, 0.16)
-    scheduleTone(ctx, 1568, chimeStart + 0.16, 0.38, 0.14)
+    // Mark flags so interval never double-plays
+    restWarningAlertedRef.current = targetSeconds <= 15 || remainingToWoodBlock <= 0
+    restAlertedRef.current = remainingToEnd <= 0
   }
 
-  function markRestWarningAlerted() {
-    if (restWarningAlertedRef.current) return
-    restWarningAlertedRef.current = true
-    playRestWarningAlert()
-  }
-
-  function markRestAlerted() {
-    if (restAlertedRef.current) return
-    restAlertedRef.current = true
-    playRestTargetAlert()
-  }
-
+  // Fallback (fires only when AudioContext unavailable or pre-scheduling wasn't done)
   function maybeAlertForRest(elapsedSeconds: number) {
     const targetSeconds = restTargetRef.current
     if (targetSeconds == null) return
-
-    if (targetSeconds > 10 && elapsedSeconds >= targetSeconds - 10) {
-      markRestWarningAlerted()
+    if (targetSeconds > 15 && elapsedSeconds >= targetSeconds - 15 && !restWarningAlertedRef.current) {
+      restWarningAlertedRef.current = true
+      // wood block fallback
+      const ctx = getAudioContext()
+      if (ctx) {
+        const now = ctx.currentTime + 0.02
+        scheduleTone(ctx, 880, now, 0.045, 0.28, 'triangle')
+        scheduleTone(ctx, 440, now + 0.025, 0.04, 0.14, 'triangle')
+      }
     }
-    if (elapsedSeconds >= targetSeconds) markRestAlerted()
+    if (elapsedSeconds >= targetSeconds && !restAlertedRef.current) {
+      restAlertedRef.current = true
+      const ctx = getAudioContext()
+      if (ctx) {
+        const now = ctx.currentTime + 0.02
+        scheduleTone(ctx, 920, now, 0.2, 0.22, 'square')
+        scheduleTone(ctx, 1380, now, 0.05, 0.08, 'triangle')
+        scheduleTone(ctx, 1046.5, now + 0.24, 0.28, 0.16)
+        scheduleTone(ctx, 1568, now + 0.40, 0.38, 0.14)
+      }
+    }
   }
 
   function recordRestElapsed() {
@@ -433,6 +461,7 @@ export function ActiveWorkoutTracker({
   }
 
   function stopRest(recordElapsed = true) {
+    cancelScheduledRestAudio()
     if (recordElapsed) recordRestElapsed()
     restRunRef.current = false
     setRestRunning(false)
@@ -441,13 +470,20 @@ export function ActiveWorkoutTracker({
     restWarningAlertedRef.current = false
     restAlertedRef.current = false
     restOwnerRef.current = null
+    restWallBaseRef.current = null
     setRestElapsed(null)
     setRestTarget(null)
   }
 
   useEffect(() => {
     const id = setInterval(() => {
-      if (workoutRunRef.current) setWorkoutElapsed(s => s + 1)
+      if (workoutRunRef.current) {
+        setWorkoutElapsed(s => {
+          const next = s + 1
+          workoutWallBaseRef.current = { elapsed: next, time: Date.now() }
+          return next
+        })
+      }
 
       const activeSet = activeSetRef.current
       if (workoutRunRef.current && !restRunRef.current && activeSet) {
@@ -466,6 +502,7 @@ export function ActiveWorkoutTracker({
         if (cur != null) {
           const next = cur + 1
           restElapsedRef.current = next
+          restWallBaseRef.current = { elapsed: next, time: Date.now() }
           setRestElapsed(next)
           maybeAlertForRest(next)
         }
@@ -474,13 +511,35 @@ export function ActiveWorkoutTracker({
     return () => clearInterval(id)
   }, [])
 
+  // On resume from background/lock, reconcile timers against system clock rather than
+  // relying on throttled setInterval ticks.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.hidden) return
+      if (workoutRunRef.current) {
+        const { elapsed, time } = workoutWallBaseRef.current
+        const actual = elapsed + Math.floor((Date.now() - time) / 1000)
+        setWorkoutElapsed(actual)
+        workoutWallBaseRef.current = { elapsed: actual, time: Date.now() }
+      }
+      if (restRunRef.current && restWallBaseRef.current) {
+        const { elapsed, time } = restWallBaseRef.current
+        const actual = elapsed + Math.floor((Date.now() - time) / 1000)
+        restElapsedRef.current = actual
+        restWallBaseRef.current = { elapsed: actual, time: Date.now() }
+        setRestElapsed(actual)
+        maybeAlertForRest(actual)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
   function startRest(seconds: number, owner: { exIdx: number; setIdx: number }) {
     stopRest()
-    void getAudioContext()
+    const ctx = getAudioContext()
     restElapsedRef.current = 0
     restTargetRef.current = seconds
-    restWarningAlertedRef.current = seconds <= 10
-    restAlertedRef.current = seconds <= 0
     restOwnerRef.current = owner
     setRestElapsed(0)
     setRestTarget(seconds)
@@ -488,6 +547,8 @@ export function ActiveWorkoutTracker({
     setRestRunning(true)
     activeSetRef.current = null
     setActiveSetTimer(null)
+    restWallBaseRef.current = { elapsed: 0, time: Date.now() }
+    if (ctx) scheduleRestAudio(ctx, seconds, 0)
   }
 
   function toggleWorkout(e?: React.MouseEvent) {
@@ -501,6 +562,7 @@ export function ActiveWorkoutTracker({
       setActiveSetTimer(null)
       restRunRef.current = false
       setRestRunning(false)
+      cancelScheduledRestAudio()
       return
     }
 
@@ -509,10 +571,14 @@ export function ActiveWorkoutTracker({
     if (last && !last.end) last.end = new Date().toISOString()
     workoutRunRef.current = true
     setWorkoutRunning(true)
+    workoutWallBaseRef.current = { elapsed: workoutElapsed, time: Date.now() }
 
     if (restElapsedRef.current != null) {
       restRunRef.current = true
       setRestRunning(true)
+      restWallBaseRef.current = { elapsed: restElapsedRef.current, time: Date.now() }
+      const ctx = getAudioContext()
+      if (ctx && restTargetRef.current != null) scheduleRestAudio(ctx, restTargetRef.current, restElapsedRef.current)
       return
     }
 
@@ -527,14 +593,18 @@ export function ActiveWorkoutTracker({
     e.stopPropagation()
     if (restElapsedRef.current == null) return
     if (restRunning) {
+      cancelScheduledRestAudio()
       restRunRef.current = false
       setRestRunning(false)
+      restWallBaseRef.current = null
       recordRestElapsed()
       return
     }
-    void getAudioContext()
+    const ctx = getAudioContext()
     restRunRef.current = true
     setRestRunning(true)
+    restWallBaseRef.current = { elapsed: restElapsedRef.current, time: Date.now() }
+    if (ctx && restTargetRef.current != null) scheduleRestAudio(ctx, restTargetRef.current, restElapsedRef.current)
   }
 
   function resetRest(e: React.MouseEvent) {
@@ -545,7 +615,11 @@ export function ActiveWorkoutTracker({
   function adjust(timer: 'workout' | 'rest', delta: number, e: React.MouseEvent) {
     e.stopPropagation()
     if (timer === 'workout') {
-      setWorkoutElapsed(s => Math.max(0, s + delta))
+      setWorkoutElapsed(s => {
+        const next = Math.max(0, s + delta)
+        workoutWallBaseRef.current = { elapsed: next, time: Date.now() }
+        return next
+      })
       return
     }
 
@@ -557,6 +631,11 @@ export function ActiveWorkoutTracker({
     setRestElapsed(next)
     maybeAlertForRest(next)
     recordRestElapsed()
+    if (restRunRef.current && restTargetRef.current != null) {
+      restWallBaseRef.current = { elapsed: next, time: Date.now() }
+      const ctx = getAudioContext()
+      if (ctx) scheduleRestAudio(ctx, restTargetRef.current, next)
+    }
   }
 
   function handleSetTimerToggle(exIdx: number, setIdx: number) {
@@ -744,13 +823,15 @@ export function ActiveWorkoutTracker({
         className="flex-shrink-0 mx-4 mt-3 border border-slate-700 rounded-xl bg-slate-800/60 cursor-pointer select-none"
         onClick={() => setTimersExpanded(v => !v)}
       >
-        <div className="px-3 pt-2.5">
-          <div className="flex items-center justify-between rounded-lg border border-slate-700/70 bg-slate-900/40 px-2.5 py-1.5">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Active Set</p>
-            <p className="text-sm font-mono font-bold text-amber-200">{activeSetValue}</p>
+        <div className="grid grid-cols-3 divide-x divide-slate-700/60 py-2.5">
+          {/* Active Set — display-only counter, equal width with Workout and Rest */}
+          <div className="flex flex-col items-center gap-1.5 px-2">
+            <p className="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Active Set</p>
+            <p className="text-lg font-mono font-bold leading-none text-amber-200">{activeSetValue}</p>
+            {/* spacer matches the h-6 button row in TimerCol so all three columns are equal height */}
+            <div className="h-6" />
+            {timersExpanded && <div className="h-[22px]" />}
           </div>
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-slate-700/60 py-2.5">
           <TimerCol
             label="Workout"
             value={fmt(workoutElapsed)}
