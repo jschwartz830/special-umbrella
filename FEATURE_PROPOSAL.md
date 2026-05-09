@@ -1,3 +1,86 @@
+# Feature Proposal — Visual Plan Progress Bar on TodayPage
+
+Date: 2026-05-09
+Branch: `claude/dreamy-mccarthy-JbYiG`
+Status: **Implemented this run**
+
+## Feature selected
+
+Add a slim horizontal progress bar below the "Day X of N in rotation" subtitle
+on TodayPage. For **rotations** plans the bar fills based on the current cycle's
+completion (doneInCycle / rotationLength). For **weeks** plans it fills based on
+weeks elapsed (completed / total).
+
+## Why it was selected
+
+The subtitle already shows "3/6 done" or "Week 3 of 12" as text, but text alone
+requires the user to parse a fraction and mentally compute a percentage. A visual
+bar conveys progress immediately at a glance — the same data, zero new cognition.
+
+All required data (`cycleProgress`, `weekProgress`) is already computed in
+TodayPage for the subtitle text. This feature reuses those values with no new
+store subscriptions, no new utilities, and no schema changes.
+
+## Expected user value
+
+- Glanceable progress: users see at a glance how far through the current cycle
+  or week-plan they are without reading numbers.
+- Motivation: a partially filled bar creates a natural "gap" to close.
+- Parity: both plan duration types (rotations and weeks) get the same treatment.
+
+## Implementation scope for this run
+
+- Single `<PlanProgressBar>` component function added at the top of TodayPage.tsx
+  (~15 lines).
+- Rendered only when a progress value is meaningful (cycleProgress with at least
+  one entry done, or weekProgress while not expired).
+- Styled as a slim `h-0.5` bar: slate-700 track, emerald-500 fill.
+- No animation — static width set via `style={{ width: '...%' }}`.
+- No new imports; `cycleProgress` and `weekProgress` are already in scope.
+
+## Assumptions being made
+
+- Bar width 0–100% from `(doneInCycle / rotationLength) * 100` or
+  `(completed / total) * 100`.
+- For rotations plans: shows bar only when doneInCycle > 0 (matches existing
+  text guard — avoids an empty bar at plan start).
+- For weeks plans: shows bar only while plan is not expired (matches existing
+  text guard).
+- Hidden when plan is expired (expiry banner already handles that state).
+
+## Open product / UX decisions
+
+1. Should the bar be animated (CSS transition) for a more polished feel?
+   Left static — simpler and avoids distracting motion on navigation.
+2. Should the bar use `rounded-full` or `rounded-l-full` (partial fill)?
+   Using `rounded-full` on both track and fill for consistent pill appearance.
+3. Should the full 100% state show a different colour (gold/amber)? Deferred —
+   the expiry banner already handles the "plan complete" state.
+
+## Architecture or schema impact
+
+None. Purely additive UI. No store changes, no new props on existing components,
+no new utilities.
+
+## Risks
+
+Very low. If the bar renders incorrectly (e.g., overflows or disappears), the
+text subtitle below it still shows the same information — no information is lost.
+
+## Rollback strategy
+
+Remove the `<PlanProgressBar>` JSX call (1 line) and the `PlanProgressBar`
+function definition (~15 lines) from TodayPage.tsx. No data migration required.
+
+## What is intentionally not being built yet
+
+- Animated fill transition
+- Per-day tick marks on the bar
+- Hover tooltip showing exact count
+- Same bar on the PlansPage card (scope expansion, deferred)
+
+---
+
 # Feature Proposal — 7-Day Activity Strip on TodayPage
 
 Date: 2026-05-06

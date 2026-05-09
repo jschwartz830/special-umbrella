@@ -36,6 +36,7 @@ import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions } from '../lib/historyStats'
+import type { RotationCycleProgress, PlanProgress } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
@@ -95,6 +96,37 @@ function WeeklyActivityStrip({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** Slim horizontal bar showing plan progress: cycle % for rotations, week % for weeks. */
+function PlanProgressBar({
+  cycleProgress,
+  weekProgress,
+  planExpired,
+}: {
+  cycleProgress: RotationCycleProgress | null
+  weekProgress: PlanProgress | null
+  planExpired: boolean
+}) {
+  if (planExpired) return null
+
+  let pct = 0
+  if (cycleProgress && cycleProgress.doneInCycle > 0) {
+    pct = Math.round((cycleProgress.doneInCycle / cycleProgress.rotationLength) * 100)
+  } else if (weekProgress && weekProgress.completed < weekProgress.total) {
+    pct = Math.round((weekProgress.completed / weekProgress.total) * 100)
+  } else {
+    return null
+  }
+
+  return (
+    <div className="w-full h-0.5 rounded-full bg-slate-700/60 overflow-hidden -mt-1">
+      <div
+        className="h-full rounded-full bg-emerald-500/70 transition-[width]"
+        style={{ width: `${pct}%` }}
+      />
     </div>
   )
 }
@@ -489,6 +521,11 @@ export function TodayPage() {
             </span>
           )}
         </p>
+        <PlanProgressBar
+          cycleProgress={cycleProgress}
+          weekProgress={weekProgress}
+          planExpired={planExpired}
+        />
       </div>
 
       {/* Stats bar — streak + this-week count */}
