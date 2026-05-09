@@ -78,7 +78,8 @@ function buildWeightsRecommendation(
 ): ProgressionRecommendation | null {
   if (exercises.length === 0) return null
 
-  const completedSets = exercises.flatMap(ex => ex.sets).filter(s => s.completed)
+  const allSets = exercises.flatMap(ex => ex.sets)
+  const completedSets = allSets.filter(s => s.completed)
   if (completedSets.length === 0) return null
 
   const mode = exercises[0].progressionMode ?? 'single'
@@ -113,7 +114,9 @@ function buildWeightsRecommendation(
     }
   }
 
-  const allCompleted = completedSets.every(s => s.completed)
+  // allCompleted uses allSets so that partially-done workouts (some sets not
+  // completed) correctly receive the 'hold' recommendation rather than 'progress'.
+  const allCompleted = allSets.every(s => s.completed === true)
   return {
     discipline: 'weights',
     mode: 'single',

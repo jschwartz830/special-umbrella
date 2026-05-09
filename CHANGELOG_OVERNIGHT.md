@@ -1,5 +1,104 @@
 # Overnight Changelog
 
+## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
+
+Baseline on entry: **551 passing, 0 failing**.
+Exit state: **609 passing, 0 failing** (+58 tests).
+
+---
+
+### 1. Bug fix: `buildWeightsRecommendation` — `allCompleted` was trivially true
+
+**Summary:** For single-mode weight progression, the function always returned 'progress'
+whenever any set was completed, even when the user only finished part of their sets.
+The 'hold' path and its "repeat current load" coaching note were dead code.
+
+**Root cause:** `allCompleted` was evaluated against `completedSets` — a local variable
+already filtered to `s.completed === true` — making `.every(s => s.completed)` trivially
+true. The fix computes `allCompleted` from `allSets` (all logged sets, filtered or not),
+so any set with `completed: false` or `completed: undefined` correctly produces 'hold'.
+
+**Why it matters:** Users who only complete 2 out of 3 planned sets were told to
+"add 2.5-5 lb next session" rather than "repeat current load". The coaching note
+was actively misleading for partial-completion sessions.
+
+**Files changed:** `src/modules/workout-outcomes/progression.ts`
+
+**Risks / tradeoffs:** Regression risk is low. Only affects the display recommendation,
+not the logged history or rotation state. Single-mode plans that previously always saw
+'progress' will now see 'hold' when sets are partially completed. This is correct behavior.
+
+**Rollback:** `git revert b38de7b` — reverts the two-line change in `progression.ts`.
+
+---
+
+### 2. Tests: `buildProgressionRecommendation` — 30 new tests
+
+**Summary:** Core business logic with zero prior coverage. Added a comprehensive test
+suite covering all slot types (weights single/double/volume, run, swim), all action
+outcomes (progress/hold/regress), null paths, and partial-completion scenarios.
+The "hold when not all sets completed" test is a regression anchor for the bug above.
+
+**Why it matters:** `buildProgressionRecommendation` determines the coaching hint shown
+to users after every logged workout. Undetected regressions here would silently produce
+wrong advice.
+
+**Files changed:** `src/modules/workout-outcomes/__tests__/progression.test.ts` (new)
+
+**Risks / tradeoffs:** None. Pure-function tests with no side effects.
+
+**Rollback:** Delete the test file.
+
+---
+
+### 3. Tests: `workout-outcomes/types.ts` utilities — 24 new tests
+
+**Summary:** Added tests for `completionStateToAction`, `derivePaceSecondsPerMile`,
+`deriveSwimPaceSecondsPer100m`, `formatPace`, and `formatSwimPace`. Includes coverage
+of edge cases like single-digit seconds padding, fractional-second rounding, and the
+"9:60 /mi" prevention guard.
+
+**Why it matters:** These utilities feed pace display and history labeling throughout
+the app. `formatPace` is now used in the session summary (change 4) — having tests
+before adding the consumer reduces regression risk.
+
+**Files changed:** `src/modules/workout-outcomes/__tests__/types.test.ts` (new)
+
+**Risks / tradeoffs:** None. Pure-function tests.
+
+**Rollback:** Delete the test file.
+
+---
+
+### 4. Bug fix + Feature: run distance rounding + pace in session summary
+
+**Bug fix:** `buildLastSessionSummary` rendered `actualDistanceMiles` via direct
+template interpolation, so a value like `3.14159` would display as "3.14159 mi".
+Rounded to 1 decimal via `Math.round(miles * 10) / 10` — avoids `toFixed` trailing
+zeros (`5.0` → "5 mi", not "5.0 mi").
+
+**Feature:** When `RunWorkoutActual.averagePaceSecondsPerMile` is non-null, the pace
+is appended to the run summary using the existing `formatPace` utility. The hint
+becomes "Last: 3.1 mi · 28 min · 9:02 /mi" instead of "Last: 3.1 mi · 28 min".
+Pace is only shown when explicitly stored — deriving it from distance + duration is
+deferred as a product decision.
+
+**Why it matters:** Pace is the primary performance metric for runners. The field was
+already captured and persisted; this change surfaces it in the one place runners look
+before starting today's run.
+
+**Files changed:**
+- `src/lib/sessionSummary.ts` (import + 4 lines)
+- `src/lib/__tests__/sessionSummary.test.ts` (5 new tests)
+- `FEATURE_PROPOSAL.md` (new pass 24 entry prepended)
+
+**Risks / tradeoffs:** If `averagePaceSecondsPerMile` is 0 (accidental input),
+displays "0:00 /mi". Harmless but odd; a `> 0` guard is a possible follow-up.
+
+**Rollback:** `git revert d386a99` — reverts `sessionSummary.ts` and test changes.
+
+---
+
 ## 2026-05-06 (twenty-third pass) — branch `claude/dreamy-mccarthy-9Dgx6`
 
 Baseline on entry: **548 passing, 0 failing**.

@@ -1,4 +1,5 @@
 import type { HistoryEntry } from '../types'
+import { formatPace } from '../modules/workout-outcomes/types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 
 /**
@@ -71,12 +72,16 @@ export function buildLastSessionSummary(
       return `Last: ${sets}×${reps}${load ? ' ' + load : ''} ${ex.exercise}${isPB ? ' · PB' : ''}`
     }
   }
-  // Run: distance and/or duration
+  // Run: distance, duration, and pace when available
   const run = outcome.runActual
   if (run) {
     const parts: string[] = []
-    if (run.actualDistanceMiles != null) parts.push(`${run.actualDistanceMiles} mi`)
+    if (run.actualDistanceMiles != null) {
+      const dist = Math.round(run.actualDistanceMiles * 10) / 10
+      parts.push(`${dist} mi`)
+    }
     if (run.actualDurationMin != null) parts.push(`${run.actualDurationMin} min`)
+    if (run.averagePaceSecondsPerMile != null) parts.push(formatPace(run.averagePaceSecondsPerMile))
     if (parts.length) return `Last: ${parts.join(' · ')}`
   }
   // Swim: distance and/or duration

@@ -1,3 +1,78 @@
+# Feature Proposal — Pace Display in Run Session Summary
+
+Date: 2026-05-07
+Branch: `claude/dreamy-mccarthy-Q6elc`
+Status: **Implemented this run**
+
+## Feature selected
+
+**Include pace in the "Last session" run hint on TodayPage.**
+
+When the previous run outcome includes `averagePaceSecondsPerMile`, append a
+formatted pace string (e.g., "9:02 /mi") to the existing hint, producing:
+"Last: 3.1 mi · 28 min · 9:02 /mi" instead of "Last: 3.1 mi · 28 min".
+
+## Why it was selected
+
+- `RunWorkoutActual.averagePaceSecondsPerMile` has been captured in `OutcomeModal`
+  and persisted since the type was defined, but was never surfaced in the hint.
+- Pace is the primary performance metric for most runners (more meaningful than
+  distance + duration separately).
+- `formatPace` already exists in `workout-outcomes/types.ts` and is now tested.
+- Zero new data capture, zero store changes, one guarded `if` statement.
+- Bundled with the run distance float-rounding fix (same function, same commit).
+
+## Expected user value
+
+- Runners immediately see "Last: 3.1 mi · 28 min · 9:02 /mi" — all three key
+  metrics at a glance without opening any modal.
+- Supports the "should I try to go faster today?" decision alongside the
+  existing distance/duration context.
+
+## Implementation scope for this run
+
+1. Round `actualDistanceMiles` to 1 decimal in `buildLastSessionSummary` (display bug fix).
+2. Import `formatPace` from `../modules/workout-outcomes/types` in `sessionSummary.ts`.
+3. Append `formatPace(run.averagePaceSecondsPerMile)` to the run summary parts array
+   when the field is non-null.
+4. Update tests: add rounding test and pace display test to `sessionSummary.test.ts`.
+
+## Assumptions being made
+
+- Only appended when `averagePaceSecondsPerMile` is explicitly non-null. Deriving
+  pace from distance + duration is deferred (product decision).
+- String length increase is acceptable; the hint is already a single scrollable line.
+
+## Open product / UX decisions
+
+1. **Auto-derived pace**: if both distance and duration are logged but pace is absent,
+   should pace be computed and shown? Deferred — could surprise users if approximate.
+2. **Swim pace**: identical pattern exists for `averagePaceSecondsPer100m`. Deferred
+   because `/100m` notation is less universally familiar.
+
+## Architecture / schema impact
+
+None. No new fields, no new stores, no schema changes.
+
+## Risks
+
+- Low. If `averagePaceSecondsPerMile` is 0 (user accident), displays "0:00 /mi" — odd
+  but harmless. A `> 0` guard is a possible future improvement.
+
+## Rollback strategy
+
+Revert the `sessionSummary.ts` change (2 lines added, 1 modified) and the two new
+tests. No data migration required.
+
+## What is intentionally not being built yet
+
+- Auto-derive pace from distance + duration when field is absent
+- Swim pace display
+- Pace trend comparison (faster/slower than average)
+- Target pace vs. actual pace delta
+
+---
+
 # Feature Proposal — 7-Day Activity Strip on TodayPage
 
 Date: 2026-05-06

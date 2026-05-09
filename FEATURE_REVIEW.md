@@ -1,3 +1,69 @@
+# Feature Review — Pace Display in Run Session Summary
+
+Date: 2026-05-07
+Branch: `claude/dreamy-mccarthy-Q6elc`
+Classification: **Keep**
+
+## What was actually built
+
+Modified `buildLastSessionSummary` in `src/lib/sessionSummary.ts` to:
+1. Round `actualDistanceMiles` to 1 decimal before display (display bug fix).
+2. Append a formatted pace string ("· 9:02 /mi") when `RunWorkoutActual.averagePaceSecondsPerMile`
+   is non-null, using the existing `formatPace` utility.
+
+5 new tests in `sessionSummary.test.ts` cover: rounding, pace present, pace null,
+pace-only display.
+
+## Assumptions encoded
+
+- Pace is only shown when `averagePaceSecondsPerMile` is explicitly stored (non-null).
+  Deriving from distance + duration was explicitly excluded.
+- The `·`-delimited format extension is consistent with the existing style ("3.1 mi · 28 min").
+- `formatPace` from `workout-outcomes/types.ts` is the canonical pace formatter.
+
+## What worked well
+
+- One import, 3 lines of logic, 5 tests. The feature delivered its intended value
+  with minimal surface area.
+- Bundling the float-rounding bug fix was natural since both changes affect the
+  same run display path.
+- Existing `formatPace` utility handled all formatting edge cases (padding, rounding,
+  9:60 prevention) — no new formatting code needed.
+
+## What feels risky or incomplete
+
+- `averagePaceSecondsPerMile = 0` displays "0:00 /mi". This is technically correct
+  (0 is a valid stored value if the user accidentally leaves the field at default)
+  but looks wrong in the UI. A `> 0` guard would prevent it.
+- Swim pace (`averagePaceSecondsPer100m`) follows the exact same pattern but was
+  not added this pass. The omission is intentional (one feature at a time) but
+  creates asymmetry.
+- Cannot verify the live UI rendering without running the dev server.
+
+## What I should evaluate tomorrow
+
+- Open TodayPage with a run plan that has a previously logged run outcome with pace.
+  Verify "9:02 /mi" appears correctly after the distance + duration.
+- Check the hint wraps cleanly on a narrow screen (320px) when all three components
+  are present.
+- Verify that `averagePaceSecondsPerMile` is populated correctly by `OutcomeModal`
+  when pace is manually entered.
+
+## Recommended next steps
+
+1. Add a `> 0` guard on pace display (optional, low priority).
+2. Extend the same pattern to swim: `averagePaceSecondsPer100m` → `formatSwimPace`.
+3. Consider auto-deriving pace from distance + duration when pace is absent:
+   `derivePaceSecondsPerMile(actualDistanceMiles, actualDurationMin)` — but mark
+   it as "computed" (e.g., italic or different color) vs. explicitly recorded.
+
+## Keep / revise / prototype only / reject
+
+**Keep.** Low risk, clearly correct, well tested, useful to runners.
+The only open question is the `> 0` guard, which is a minor defensive addition.
+
+---
+
 # Feature Review — 7-Day Activity Strip on TodayPage
 
 Date: 2026-05-06
