@@ -167,6 +167,7 @@ export function ActiveWorkoutTracker({
   const restRunRef = useRef(false)
   const restElapsedRef = useRef<number | null>(null)
   const restTargetRef = useRef<number | null>(null)
+  const restWarningAlertedRef = useRef(false)
   const restAlertedRef = useRef(false)
   const restOwnerRef = useRef<{ exIdx: number; setIdx: number } | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -279,6 +280,7 @@ export function ActiveWorkoutTracker({
         restElapsed?: number | null
         restTarget?: number | null
         restRunning?: boolean
+        restWarningAlerted?: boolean
         restAlerted?: boolean
         restOwner?: { exIdx: number; setIdx: number } | null
         activeSetTimer?: { exIdx: number; setIdx: number } | null
@@ -311,6 +313,7 @@ export function ActiveWorkoutTracker({
         setRestTarget(restoredRestTarget)
         restTargetRef.current = restoredRestTarget
       }
+      if (draft.restWarningAlerted != null) restWarningAlertedRef.current = draft.restWarningAlerted
       if (draft.restAlerted != null) restAlertedRef.current = draft.restAlerted
       if (draft.restOwner) restOwnerRef.current = draft.restOwner
       if (draft.activeSetTimer) {
@@ -333,6 +336,7 @@ export function ActiveWorkoutTracker({
       restElapsed,
       restTarget,
       restRunning,
+      restWarningAlerted: restWarningAlertedRef.current,
       restAlerted: restAlertedRef.current,
       restOwner: restOwnerRef.current,
       activeSetTimer,
@@ -370,6 +374,15 @@ export function ActiveWorkoutTracker({
     oscillator.stop(startAt + duration + 0.03)
   }
 
+  function playRestWarningAlert() {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime + 0.02
+
+    scheduleTone(ctx, 740, now, 0.08, 0.12, 'triangle')
+    scheduleTone(ctx, 880, now + 0.12, 0.08, 0.12, 'triangle')
+  }
+
   function playRestTargetAlert() {
     const ctx = getAudioContext()
     if (!ctx) return
@@ -383,6 +396,12 @@ export function ActiveWorkoutTracker({
     scheduleTone(ctx, 1568, chimeStart + 0.16, 0.38, 0.14)
   }
 
+  function markRestWarningAlerted() {
+    if (restWarningAlertedRef.current) return
+    restWarningAlertedRef.current = true
+    playRestWarningAlert()
+  }
+
   function markRestAlerted() {
     if (restAlertedRef.current) return
     restAlertedRef.current = true
@@ -391,7 +410,12 @@ export function ActiveWorkoutTracker({
 
   function maybeAlertForRest(elapsedSeconds: number) {
     const targetSeconds = restTargetRef.current
-    if (targetSeconds != null && elapsedSeconds >= targetSeconds) markRestAlerted()
+    if (targetSeconds == null) return
+
+    if (targetSeconds > 10 && elapsedSeconds >= targetSeconds - 10) {
+      markRestWarningAlerted()
+    }
+    if (elapsedSeconds >= targetSeconds) markRestAlerted()
   }
 
   function recordRestElapsed() {
@@ -414,6 +438,7 @@ export function ActiveWorkoutTracker({
     setRestRunning(false)
     restElapsedRef.current = null
     restTargetRef.current = null
+    restWarningAlertedRef.current = false
     restAlertedRef.current = false
     restOwnerRef.current = null
     setRestElapsed(null)
@@ -454,6 +479,7 @@ export function ActiveWorkoutTracker({
     void getAudioContext()
     restElapsedRef.current = 0
     restTargetRef.current = seconds
+    restWarningAlertedRef.current = seconds <= 10
     restAlertedRef.current = seconds <= 0
     restOwnerRef.current = owner
     setRestElapsed(0)
