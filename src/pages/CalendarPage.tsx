@@ -222,14 +222,16 @@ export function CalendarPage() {
     const slot = planDay.slots[0] ?? { id: '', type: 'rest' as WorkoutType, name: '' }
     logOutcomeWithProgression(finalOutcome, slot)
 
-    // Ensure the history entry action is synced to the completion state
-    const entry = entries.find(
+    // Ensure the history entry action is synced to the completion state.
+    // Read fresh store state — the `entries` closure is stale if updateEntryDate
+    // ran above (same pattern as HistoryPage.handleOutcomeConfirm).
+    const freshEntry = useHistoryStore.getState().entries.find(
       e => e.planId === outcomeTarget.planId && e.calendarDate === completedDate,
     )
-    if (entry) {
+    if (freshEntry && !isExtra) {
       const action = completionStateToAction(outcome.completionState)
-      if (entry.action !== action) {
-        updateEntryAction(entry.planId, entry.calendarDate, action, entry.planDayIndex)
+      if (freshEntry.action !== action) {
+        updateEntryAction(freshEntry.planId, freshEntry.calendarDate, action, freshEntry.planDayIndex)
       }
     }
     setOutcomeTarget(null)
