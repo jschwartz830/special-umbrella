@@ -506,7 +506,7 @@ export function TodayPage() {
         <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/60">
           <span className="text-base leading-none">📅</span>
           <div>
-            <p className="text-xs text-slate-500 leading-none mb-0.5">This week</p>
+            <p className="text-xs text-slate-500 leading-none mb-0.5">7 days</p>
             <p className="text-sm font-bold text-white leading-none">
               {stats.last7Completed}
               <span className="text-xs font-normal text-slate-400 ml-1">done</span>
