@@ -209,14 +209,16 @@ describe('buildLastSessionSummary', () => {
     expect(buildLastSessionSummary(outcome, maxLoadByExercise)).toBe('Last: 3×8 @ 95 lb OHP')
   })
 
-  it('formats run with distance and duration', () => {
+  it('formats run with distance, duration, and auto-derived pace', () => {
+    // 3.1 mi in 28 min ≈ 9:02 /mi — pace is derived when not stored
     const outcome = runOutcome('2026-05-01', 3.1, 28)
-    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min')
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min · 9:02 /mi')
   })
 
-  it('rounds run distance to 1 decimal place', () => {
+  it('rounds run distance to 1 decimal place (pace also derived)', () => {
+    // 3.14159 mi → displayed as 3.1; pace = (30*60)/3.14159 ≈ 573 s/mi ≈ 9:33 /mi
     const outcome = runOutcome('2026-05-01', 3.14159, 30)
-    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 30 min')
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 30 min · 9:33 /mi')
   })
 
   it('includes pace when averagePaceSecondsPerMile is present', () => {
@@ -233,7 +235,8 @@ describe('buildLastSessionSummary', () => {
     expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min · 9:02 /mi')
   })
 
-  it('omits pace when averagePaceSecondsPerMile is null', () => {
+  it('derives pace when averagePaceSecondsPerMile is null and distance+duration are available', () => {
+    // 3.1 mi in 28 min ≈ 9:02 /mi — auto-derived because stored pace is null
     const outcome: WorkoutOutcome = {
       workoutInstanceId: 'p1_2026-05-01',
       completionState: 'completed',
@@ -244,7 +247,7 @@ describe('buildLastSessionSummary', () => {
       runActual: { actualDistanceMiles: 3.1, actualDurationMin: 28, averagePaceSecondsPerMile: null },
       swimActual: null,
     }
-    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min')
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min · 9:02 /mi')
   })
 
   it('shows pace alone when only pace is available', () => {
@@ -313,7 +316,8 @@ describe('buildLastSessionSummary', () => {
     expect(buildLastSessionSummary(outcome)).toBe('Last: 813 m · 22 min')
   })
 
-  it('does not display pace when averagePaceSecondsPerMile is 0', () => {
+  it('ignores stored pace of 0 and falls back to derived pace', () => {
+    // stored pace=0 is bogus; derived from 3 mi / 30 min = 10:00 /mi
     const outcome: WorkoutOutcome = {
       workoutInstanceId: 'p1_2026-05-01',
       completionState: 'completed',
@@ -324,7 +328,82 @@ describe('buildLastSessionSummary', () => {
       runActual: { actualDistanceMiles: 3, actualDurationMin: 30, averagePaceSecondsPerMile: 0 },
       swimActual: null,
     }
-    expect(buildLastSessionSummary(outcome)).toBe('Last: 3 mi · 30 min')
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3 mi · 30 min · 10:00 /mi')
+  })
+
+  it('shows no pace when stored pace is 0 and no distance/duration to derive from', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: { actualDistanceMiles: null, actualDurationMin: null, averagePaceSecondsPerMile: 0 },
+      swimActual: null,
+    }
+    // No data to display — runs with no outcome data return null
+    expect(buildLastSessionSummary(outcome)).toBeNull()
+  })
+
+  it('derives pace from distance + duration when averagePaceSecondsPerMile is absent', () => {
+    // 5 mi in 40 min = 8:00 /mi (480 s/mi)
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: 3,
+      durationActualMin: 40,
+      notes: null,
+      runActual: { actualDistanceMiles: 5, actualDurationMin: 40 },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 5 mi · 40 min · 8:00 /mi')
+  })
+
+  it('derives pace from distance + duration when stored pace is null', () => {
+    // 3.1 mi in 28 min ≈ 9:02 /mi (542 s/mi)
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: 3,
+      durationActualMin: 28,
+      notes: null,
+      runActual: { actualDistanceMiles: 3.1, actualDurationMin: 28, averagePaceSecondsPerMile: null },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min · 9:02 /mi')
+  })
+
+  it('prefers stored pace over derived pace when both are available', () => {
+    // stored pace: 480 s/mi (8:00); derived would differ from stored if distance/duration gave something else
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: 3,
+      durationActualMin: 50,
+      notes: null,
+      // stored 8:00/mi but distance+duration would give 10:00/mi — stored wins
+      runActual: { actualDistanceMiles: 5, actualDurationMin: 50, averagePaceSecondsPerMile: 480 },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 5 mi · 50 min · 8:00 /mi')
+  })
+
+  it('does not derive pace when only distance is available (no duration)', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: { actualDistanceMiles: 5, actualDurationMin: null },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 5 mi')
   })
 
   it('uses heaviest set for display when sets have mixed loads', () => {
@@ -437,6 +516,7 @@ describe('buildLastSessionSummary', () => {
   })
 
   it('falls through to run data when weightsActual has exercises with no actual data', () => {
+    // 4 mi in 35 min = 8:45 /mi — pace is also derived since not stored
     const outcome: WorkoutOutcome = {
       workoutInstanceId: 'p1_2026-05-01',
       completionState: 'completed',
@@ -454,6 +534,6 @@ describe('buildLastSessionSummary', () => {
       },
     }
     // weights branch finds no exercise with any actual data, falls through to run
-    expect(buildLastSessionSummary(outcome)).toBe('Last: 4 mi · 35 min')
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 4 mi · 35 min · 8:45 /mi')
   })
 })
