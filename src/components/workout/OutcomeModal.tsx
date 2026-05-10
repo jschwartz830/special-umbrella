@@ -11,6 +11,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { Modal } from '../shared/Modal'
+import { NumericInputField } from '../shared/NumericInputField'
 import type { PlanDay, WorkoutSlot } from '../../types'
 import type {
   WorkoutCompletionState,
@@ -350,26 +351,18 @@ export function OutcomeModal({
                   <div key={setIndex} className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 items-center text-xs">
                     <span className="col-span-1 text-center text-slate-400">{setIndex + 1}</span>
                     <span className="col-span-3 text-center text-slate-500 text-[10px]">{prevText}</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={set.actualReps ?? ''}
-                      onChange={e => updateSet(exIndex, setIndex, {
-                        actualReps: e.target.value ? Number(e.target.value) : null,
-                      })}
+                    <NumericInputField
+                      value={set.actualReps ?? null}
+                      onChange={v => updateSet(exIndex, setIndex, { actualReps: v })}
                       placeholder={String(set.targetReps ?? 'reps')}
-                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-slate-100 text-center"
+                      integerOnly
+                      className="col-span-3"
                     />
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      value={set.actualLoad ?? ''}
-                      onChange={e => updateSet(exIndex, setIndex, {
-                        actualLoad: e.target.value ? Number(e.target.value) : null,
-                      })}
+                    <NumericInputField
+                      value={set.actualLoad ?? null}
+                      onChange={v => updateSet(exIndex, setIndex, { actualLoad: v })}
                       placeholder={parseNumericLoad(set.targetLoad ?? undefined)?.toString() ?? 'lbs'}
-                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-slate-100 text-center"
+                      className="col-span-3"
                     />
                     <button
                       onClick={() => updateSet(exIndex, setIndex, { completed: !set.completed })}
