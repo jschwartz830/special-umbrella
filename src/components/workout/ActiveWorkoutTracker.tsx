@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
@@ -324,9 +324,50 @@ export function ActiveWorkoutTracker({
   const [restTarget, setRestTarget] = useState<number | null>(null)
   const [restRunning, setRestRunning] = useState(false)
   const [timersExpanded, setTimersExpanded] = useState(false)
+  const [focusedField, setFocusedField] = useState<{ exIdx: number; setIdx: number; type: 'reps' | 'weight' } | null>(null)
+  const [keyboardBottom, setKeyboardBottom] = useState(0)
+  const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const hasVars = Object.keys(programVars).length > 0
   const evalCtx: EvalContext = { vars: programVars }
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      const bottom = window.innerHeight - (vv.height + vv.offsetTop)
+      setKeyboardBottom(Math.max(0, bottom))
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+
+  const handleFieldFocus = useCallback((exIdx: number, setIdx: number, type: 'reps' | 'weight') => {
+    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current)
+    setFocusedField({ exIdx, setIdx, type })
+  }, [])
+
+  const handleFieldBlur = useCallback(() => {
+    blurTimeoutRef.current = setTimeout(() => setFocusedField(null), 200)
+  }, [])
+
+  function adjustFocusedField(delta: number) {
+    if (!focusedField) return
+    const { exIdx, setIdx, type } = focusedField
+    const s = exercises[exIdx]?.sets[setIdx]
+    if (!s) return
+    if (type === 'weight') {
+      const next = Math.max(0, (s.actualLoad ?? 0) + delta)
+      updateSet(exIdx, setIdx, { actualLoad: next })
+    } else {
+      const next = Math.max(0, (s.actualReps ?? 0) + delta)
+      updateSet(exIdx, setIdx, { actualReps: next })
+    }
+  }
 
   const [exercises, setExercises] = useState<ExerciseTrackState[]>(() => {
     const allExercises = [
@@ -1118,6 +1159,8 @@ export function ActiveWorkoutTracker({
                       onChange={e => updateSet(exIdx, setIdx, {
                         actualReps: e.target.value ? Number(e.target.value) : null,
                       })}
+                      onFocus={() => handleFieldFocus(exIdx, setIdx, 'reps')}
+                      onBlur={handleFieldBlur}
                       placeholder={String(s.targetReps ?? 'reps')}
                       className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
                     />
@@ -1129,6 +1172,8 @@ export function ActiveWorkoutTracker({
                       onChange={e => updateSet(exIdx, setIdx, {
                         actualLoad: e.target.value ? Number(e.target.value) : null,
                       })}
+                      onFocus={() => handleFieldFocus(exIdx, setIdx, 'weight')}
+                      onBlur={handleFieldBlur}
                       placeholder={
                         s.resolvedLoadLbs != null && s.resolvedLoadLbs > 0
                           ? String(s.resolvedLoadLbs)
@@ -1191,6 +1236,49 @@ export function ActiveWorkoutTracker({
         </button>
       </div>
     </div>
+
+    {focusedField && (
+      <div
+        className="fixed left-0 right-0 z-[55] flex gap-3 px-4 py-2 bg-slate-800/95 border-t border-slate-700 backdrop-blur-sm"
+        style={{ bottom: keyboardBottom }}
+      >
+        {focusedField.type === 'weight' ? (
+          <>
+            <button
+              onPointerDown={e => e.preventDefault()}
+              onClick={() => adjustFocusedField(-5)}
+              className="flex-1 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-slate-200 text-sm font-semibold active:bg-slate-500 transition-colors"
+            >
+              −5 lbs
+            </button>
+            <button
+              onPointerDown={e => e.preventDefault()}
+              onClick={() => adjustFocusedField(5)}
+              className="flex-1 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-slate-200 text-sm font-semibold active:bg-slate-500 transition-colors"
+            >
+              +5 lbs
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onPointerDown={e => e.preventDefault()}
+              onClick={() => adjustFocusedField(-1)}
+              className="flex-1 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-slate-200 text-xl font-semibold active:bg-slate-500 transition-colors"
+            >
+              −
+            </button>
+            <button
+              onPointerDown={e => e.preventDefault()}
+              onClick={() => adjustFocusedField(1)}
+              className="flex-1 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-slate-200 text-xl font-semibold active:bg-slate-500 transition-colors"
+            >
+              +
+            </button>
+          </>
+        )}
+      </div>
+    )}
 
     {showCancelConfirm && (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-6">
