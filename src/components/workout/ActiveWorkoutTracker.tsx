@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
+import type { ExerciseSpec, WarmupRampSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import { resolveLoad, type EvalContext } from '../../lib/expressionEval'
 import { EXERCISE_LIBRARY } from '../../lib/exerciseLibrary'
@@ -15,6 +16,7 @@ interface SetTrackState {
   restSeconds: number | null
   actualRestSeconds: number | null
   resolvedLoadLbs: number | null
+  isWarmup?: boolean
 }
 
 interface ExerciseTrackState {
@@ -22,6 +24,30 @@ interface ExerciseTrackState {
   isWarmup: boolean
   sets: SetTrackState[]
   previousSets?: LoggedSetActual[]
+}
+
+
+function parseWarmupPercentages(warmup: ExerciseSpec['warmup']): number[] {
+  if (!warmup) return []
+  if (typeof warmup === 'string') {
+    return warmup
+      .split(/[\/;,]+/)
+      .map(part => part.trim().match(/(\d+(?:\.\d+)?)\s*%?/)?.[1])
+      .filter((part): part is string => Boolean(part))
+      .map(Number)
+      .filter(n => Number.isFinite(n) && n > 0)
+  }
+  return warmup.percentages.filter(n => Number.isFinite(n) && n > 0)
+}
+
+function warmupRampObject(warmup: ExerciseSpec['warmup']): WarmupRampSpec | null {
+  return warmup && typeof warmup === 'object' ? warmup : null
+}
+
+function warmupRepsForIndex(warmup: ExerciseSpec['warmup'], index: number): number | string {
+  const explicit = warmupRampObject(warmup)?.reps?.[index]
+  if (explicit != null) return explicit
+  return [8, 5, 3, 2, 1][index] ?? 1
 }
 
 function resolveActualReps(actualReps: number | null, targetReps: number | string | null): number | null {
@@ -398,28 +424,38 @@ export function ActiveWorkoutTracker({
         }
       }
 
+      const warmupSets: SetTrackState[] = !ex.__isWarmup && ex.load
+        ? parseWarmupPercentages(ex.warmup).map((pct, i) => buildSet(
+            `${pct / 100} * (${ex.load})`,
+            warmupRepsForIndex(ex.warmup, i),
+            warmupRampObject(ex.warmup)?.rest ?? ex.rest,
+          )).map(set => ({ ...set, isWarmup: true }))
+        : []
+
       let sets: SetTrackState[]
       if (Array.isArray(ex.sets) && ex.sets.length > 0) {
-        sets = ex.sets.map((s, i) => {
+        const workSets = ex.sets.map((s, i) => {
           const base = buildSet(s.load ?? ex.load, s.reps ?? ex.reps, s.rest ?? ex.rest)
-          const prev = prevEx?.[i]
+          const prev = prevEx?.[i + warmupSets.length]
           return {
             ...base,
             actualReps: prev?.actualReps ?? base.actualReps,
             actualLoad: prev?.actualLoad ?? base.actualLoad,
           }
         })
+        sets = [...warmupSets, ...workSets]
       } else {
         const n = typeof ex.sets === 'number' ? ex.sets : 3
-        sets = Array.from({ length: n }, (_, i) => {
+        const workSets = Array.from({ length: n }, (_, i) => {
           const base = buildSet(ex.load, ex.reps, ex.rest)
-          const prev = prevEx?.[i]
+          const prev = prevEx?.[i + warmupSets.length]
           return {
             ...base,
             actualReps: prev?.actualReps ?? base.actualReps,
             actualLoad: prev?.actualLoad ?? base.actualLoad,
           }
         })
+        sets = [...warmupSets, ...workSets]
       }
 
       return {
@@ -1143,7 +1179,7 @@ export function ActiveWorkoutTracker({
                     className={`grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 items-center transition-opacity ${s.completed ? 'opacity-60' : ''}`}
                   >
                     <span className="col-span-1 text-center text-slate-400 text-xs font-medium">
-                      {ex.isWarmup ? (
+                      {ex.isWarmup || s.isWarmup ? (
                         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/20 text-orange-300 font-bold">W</span>
                       ) : (
                         setIdx + 1

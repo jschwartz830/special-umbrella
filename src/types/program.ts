@@ -43,6 +43,15 @@ export interface SetSpec {
  * When `sets` is a number, `reps` and `load` act as defaults for all sets.
  * When `sets` is an array of SetSpec, each set is fully specified.
  */
+export interface WarmupRampSpec {
+  /** Percentages of the exercise load/1RM to use for generated warmup sets. */
+  percentages: number[]
+  /** Optional per-warmup-set reps; falls back to 8/5/3-style ramping. */
+  reps?: Array<number | string>
+  rest?: string
+  notes?: string
+}
+
 export interface ExerciseSpec {
   exercise: string
   sets?: number | SetSpec[]
@@ -52,6 +61,7 @@ export interface ExerciseSpec {
   rest?: string
   tempo?: string
   notes?: string
+  warmup?: string | WarmupRampSpec
   type?: string[]
   target?: string[]
   synergist?: string[]
@@ -159,6 +169,13 @@ export interface YamlSetSpec {
   notes?: string
 }
 
+export interface YamlWarmupRampSpec {
+  percentages: number[]
+  reps?: Array<number | string>
+  rest?: string
+  notes?: string
+}
+
 export interface YamlExerciseSpec {
   exercise: string
   sets?: number | YamlSetSpec[]
@@ -168,6 +185,7 @@ export interface YamlExerciseSpec {
   rest?: string
   tempo?: string
   notes?: string
+  warmup?: string | YamlWarmupRampSpec
   type?: string[]
   target?: string[]
   synergist?: string[]

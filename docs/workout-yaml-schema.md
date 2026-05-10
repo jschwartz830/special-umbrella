@@ -9,7 +9,7 @@ This project uses a standardized YAML schema for importable workout plans.
 
 - Keep plans easy to read/edit by hand.
 - Support all existing slot types and metadata currently used by the app.
-- Keep progression, run segments, and detailed set-level prescriptions available.
+- Keep progression, run segments, programmatic warmup ramps, and detailed set-level prescriptions available.
 
 ## Required top-level fields
 
@@ -40,7 +40,7 @@ Each slot supports:
 - `name`, `subtype`, `location`, `notes`
 - `durationMin`, `difficulty`, `focus`, `intent`
 - `progress`
-- Weights-specific: `warmup`, `exercises`
+- Weights-specific: slot-level `warmup`, `exercises`, and exercise-level `warmup` ramps
 - Run-specific: `segments`
 
 ## Progressive overload rules
@@ -60,3 +60,11 @@ progress:
 - Keep day labels short and descriptive (`"Upper A"`, `"Recovery"`).
 - Use `vars` + expressions in `load`/`distance` for easy global edits.
 - Use `sets: <number>` for simple prescriptions, and `sets: [ ... ]` only when set-by-set detail is needed.
+- Use exercise-level `warmup: "30% / 40% / 50%"` for generated warmup sets, or object form when you need custom reps/rest:
+
+```yaml
+warmup:
+  percentages: [30, 40, 50]
+  reps: [8, 5, 3]
+  rest: 60s
+```
