@@ -29,6 +29,9 @@ function ExerciseRow({ ex }: { ex: ExerciseSpec }) {
           : ''
   const loadStr = ex.load ? ` @ ${ex.load}` : ''
   const restStr = ex.rest ? ` · rest ${ex.rest}` : ''
+  const warmupStr = ex.warmup
+    ? ` · warmup ${typeof ex.warmup === 'string' ? ex.warmup : ex.warmup.percentages.map(p => `${p}%`).join(' / ')}`
+    : ''
   const progStr = ex.progress
     ? ` → if (${ex.progress.if ?? 'always'}) ${ex.progress.then}`
     : ''
@@ -38,6 +41,7 @@ function ExerciseRow({ ex }: { ex: ExerciseSpec }) {
       {setsStr && <span className="text-slate-400"> {setsStr}</span>}
       {loadStr && <span className="text-amber-400">{loadStr}</span>}
       {restStr && <span className="text-slate-500">{restStr}</span>}
+      {warmupStr && <span className="text-orange-300">{warmupStr}</span>}
       {progStr && <span className="text-emerald-400 block pl-1 italic text-[11px]">{progStr}</span>}
     </div>
   )
@@ -349,6 +353,7 @@ exercises:
     reps: 3
     load: bench      # var reference
     rest: 3m
+    warmup: "30% / 40% / 50%"
     progress:
       if: all_reps   # condition
       then: "bench += 5"

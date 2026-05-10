@@ -15,6 +15,7 @@ import type {
   YamlSetSpec,
   YamlRunSegment,
   YamlDrillSpec,
+  YamlWarmupRampSpec,
 } from '../types/program'
 import type {
   WeightsFocusArea,
@@ -72,6 +73,17 @@ function parseSetSpec(raw: YamlSetSpec): SetSpec {
   }
 }
 
+function parseWarmupRamp(raw: string | YamlWarmupRampSpec | undefined): ExerciseSpec['warmup'] {
+  if (typeof raw === 'string') return normStr(raw)
+  if (!raw || typeof raw !== 'object' || !Array.isArray(raw.percentages)) return undefined
+  return {
+    percentages: raw.percentages,
+    reps: Array.isArray(raw.reps) ? raw.reps : undefined,
+    rest: normStr(raw.rest),
+    notes: normStr(raw.notes),
+  }
+}
+
 function parseExerciseSpec(raw: YamlExerciseSpec): ExerciseSpec {
   const sets: number | SetSpec[] | undefined =
     typeof raw.sets === 'number'
@@ -93,6 +105,7 @@ function parseExerciseSpec(raw: YamlExerciseSpec): ExerciseSpec {
     rest: normStr(raw.rest),
     tempo: normStr(raw.tempo),
     notes: normStr(raw.notes),
+    warmup: parseWarmupRamp(raw.warmup),
     type: Array.isArray(raw.type) ? raw.type : undefined,
     target: Array.isArray(raw.target) ? raw.target : undefined,
     synergist: Array.isArray(raw.synergist) ? raw.synergist : undefined,
