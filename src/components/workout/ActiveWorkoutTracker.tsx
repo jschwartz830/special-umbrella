@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
-import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2 } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import { resolveLoad, type EvalContext } from '../../lib/expressionEval'
+import { EXERCISE_LIBRARY } from '../../lib/exerciseLibrary'
 
 interface SetTrackState {
   setElapsedSeconds: number
@@ -136,6 +137,146 @@ function TimerCol({
   )
 }
 
+type ExercisePickerMode = { mode: 'add' } | { mode: 'replace'; exIdx: number }
+
+function ExercisePicker({
+  mode,
+  exerciseNames,
+  onSelect,
+  onClose,
+}: {
+  mode: 'add' | 'replace'
+  exerciseNames: string[]
+  onSelect: (name: string, insertAt: number) => void
+  onClose: () => void
+}) {
+  const [query, setQuery] = useState('')
+  const [customName, setCustomName] = useState('')
+  const [insertAt, setInsertAt] = useState(exerciseNames.length)
+  const [showCustom, setShowCustom] = useState(false)
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return EXERCISE_LIBRARY.slice(0, 25)
+    return EXERCISE_LIBRARY.filter(ex => ex.name.toLowerCase().includes(q)).slice(0, 40)
+  }, [query])
+
+  function handleSelect(name: string) {
+    onSelect(name, insertAt)
+  }
+
+  function handleCustomSubmit() {
+    const name = customName.trim()
+    if (!name) return
+    handleSelect(name)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col bg-slate-900">
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-slate-800">
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+        >
+          <X size={18} />
+        </button>
+        <h2 className="text-sm font-bold text-white flex-1">
+          {mode === 'add' ? 'Add Exercise' : 'Replace Exercise'}
+        </h2>
+      </div>
+
+      {mode === 'add' && exerciseNames.length > 0 && (
+        <div className="flex-shrink-0 px-4 py-3 border-b border-slate-800">
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-2">Insert position</p>
+          <div className="flex flex-wrap gap-1.5">
+            {exerciseNames.map((name, i) => (
+              <button
+                key={i}
+                onClick={() => setInsertAt(i)}
+                className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
+                  insertAt === i
+                    ? 'bg-sky-500/20 border-sky-500/50 text-sky-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Before {name.split(',')[0]}
+              </button>
+            ))}
+            <button
+              onClick={() => setInsertAt(exerciseNames.length)}
+              className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
+                insertAt === exerciseNames.length
+                  ? 'bg-sky-500/20 border-sky-500/50 text-sky-300'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              At end
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex-shrink-0 px-4 py-3 border-b border-slate-800">
+        <input
+          type="text"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search exercises..."
+          autoFocus={!showCustom}
+          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500/50"
+        />
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+        {!showCustom ? (
+          <button
+            onClick={() => setShowCustom(true)}
+            className="w-full text-left px-3 py-2.5 rounded-lg border border-dashed border-slate-600 text-slate-400 text-sm hover:border-sky-500/50 hover:text-sky-300 transition-colors"
+          >
+            + Enter custom exercise name
+          </button>
+        ) : (
+          <div className="flex gap-2 mb-1">
+            <input
+              type="text"
+              value={customName}
+              onChange={e => setCustomName(e.target.value)}
+              placeholder="Custom exercise name"
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') handleCustomSubmit() }}
+              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500/50"
+            />
+            <button
+              onClick={handleCustomSubmit}
+              disabled={!customName.trim()}
+              className="px-3 py-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              Add
+            </button>
+            <button
+              onClick={() => setShowCustom(false)}
+              className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {filtered.map(ex => (
+          <button
+            key={ex.name}
+            onClick={() => handleSelect(ex.name)}
+            className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-800 transition-colors"
+          >
+            <p className="text-sm text-white leading-tight">{ex.name}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{ex.target.join(', ')}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function ActiveWorkoutTracker({
   planId: _planId,
   workoutInstanceId,
@@ -153,6 +294,7 @@ export function ActiveWorkoutTracker({
 }: Props) {
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [exercisePicker, setExercisePicker] = useState<ExercisePickerMode | null>(null)
   const workoutStartRef = useRef(new Date().toISOString())
   const pausePeriodsRef = useRef<{ start: string; end?: string }[]>([])
   const pausedSetRef = useRef<{ exIdx: number; setIdx: number } | null>(null)
@@ -484,6 +626,63 @@ export function ActiveWorkoutTracker({
     )))
   }
 
+  function addSet(exIdx: number) {
+    setExercises(prev => prev.map((ex, ei) => {
+      if (ei !== exIdx) return ex
+      const lastSet = ex.sets[ex.sets.length - 1]
+      const newSet: SetTrackState = {
+        setElapsedSeconds: 0,
+        completed: false,
+        actualReps: lastSet?.actualReps ?? null,
+        actualLoad: lastSet?.actualLoad ?? null,
+        targetReps: lastSet?.targetReps ?? null,
+        targetLoad: lastSet?.targetLoad ?? null,
+        restSeconds: lastSet?.restSeconds ?? null,
+        resolvedLoadLbs: lastSet?.resolvedLoadLbs ?? null,
+      }
+      return { ...ex, sets: [...ex.sets, newSet] }
+    }))
+  }
+
+  function addExercise(name: string, insertAt: number) {
+    const newEx: ExerciseTrackState = {
+      exercise: name,
+      isWarmup: false,
+      sets: Array.from({ length: 3 }, () => ({
+        setElapsedSeconds: 0,
+        completed: false,
+        actualReps: null,
+        actualLoad: null,
+        targetReps: null,
+        targetLoad: null,
+        restSeconds: 90,
+        resolvedLoadLbs: null,
+      })),
+    }
+    setExercises(prev => [
+      ...prev.slice(0, insertAt),
+      newEx,
+      ...prev.slice(insertAt),
+    ])
+    setExercisePicker(null)
+  }
+
+  function replaceExercise(exIdx: number, name: string) {
+    setExercises(prev => prev.map((ex, ei) =>
+      ei !== exIdx ? ex : { ...ex, exercise: name, previousSets: undefined }
+    ))
+    setExercisePicker(null)
+  }
+
+  function handlePickerSelect(name: string, insertAt: number) {
+    if (!exercisePicker) return
+    if (exercisePicker.mode === 'add') {
+      addExercise(name, insertAt)
+    } else {
+      replaceExercise(exercisePicker.exIdx, name)
+    }
+  }
+
   function setTimerDisplay(exIdx: number, setIdx: number): string {
     const s = exercises[exIdx].sets[setIdx]
     return fmt(s.setElapsedSeconds)
@@ -634,8 +833,15 @@ export function ActiveWorkoutTracker({
         ) : (
           exercises.map((ex, exIdx) => (
             <div key={ex.exercise + exIdx} className="bg-slate-800/60 rounded-xl p-3 space-y-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white leading-tight">{ex.exercise}</p>
+              <div className="flex items-center justify-between min-w-0">
+                <p className="text-sm font-semibold text-white leading-tight truncate flex-1">{ex.exercise}</p>
+                <button
+                  onClick={() => setExercisePicker({ mode: 'replace', exIdx })}
+                  className="ml-2 p-1 rounded text-slate-600 hover:text-slate-300 hover:bg-slate-700 transition-colors flex-shrink-0"
+                  title="Replace exercise"
+                >
+                  <ArrowLeftRight size={13} />
+                </button>
               </div>
 
               <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
@@ -715,9 +921,25 @@ export function ActiveWorkoutTracker({
                   </div>
                 )
               })}
+
+              <button
+                onClick={() => addSet(exIdx)}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed border-slate-700 text-slate-600 text-xs hover:text-slate-300 hover:border-slate-500 transition-colors"
+              >
+                <Plus size={11} />
+                Add set
+              </button>
             </div>
           ))
         )}
+
+        <button
+          onClick={() => setExercisePicker({ mode: 'add' })}
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-slate-700 text-slate-500 text-sm hover:text-slate-200 hover:border-slate-500 transition-colors"
+        >
+          <Plus size={14} />
+          Add exercise
+        </button>
       </div>
 
       <div className="flex-shrink-0 px-4 pt-3 pb-6 border-t border-slate-800 bg-slate-900">
@@ -759,6 +981,15 @@ export function ActiveWorkoutTracker({
           </div>
         </div>
       </div>
+    )}
+
+    {exercisePicker && (
+      <ExercisePicker
+        mode={exercisePicker.mode}
+        exerciseNames={exercises.map(ex => ex.exercise)}
+        onSelect={handlePickerSelect}
+        onClose={() => setExercisePicker(null)}
+      />
     )}
     </>
   )
