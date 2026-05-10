@@ -308,6 +308,25 @@ describe('buildLastSessionSummary', () => {
     expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min')
   })
 
+  it('rounds swim distance to the nearest whole meter', () => {
+    const outcome = swimOutcome('2026-05-01', 812.5, 22)
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 813 m · 22 min')
+  })
+
+  it('does not display pace when averagePaceSecondsPerMile is 0', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: 3,
+      durationActualMin: 30,
+      notes: null,
+      runActual: { actualDistanceMiles: 3, actualDurationMin: 30, averagePaceSecondsPerMile: 0 },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3 mi · 30 min')
+  })
+
   it('uses heaviest set for display when sets have mixed loads', () => {
     // Warmup 135 lb, working sets 185 lb — should display the 185 lb set
     const outcome: WorkoutOutcome = {

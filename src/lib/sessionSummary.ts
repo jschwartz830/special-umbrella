@@ -81,14 +81,14 @@ export function buildLastSessionSummary(
       parts.push(`${dist} mi`)
     }
     if (run.actualDurationMin != null) parts.push(`${run.actualDurationMin} min`)
-    if (run.averagePaceSecondsPerMile != null) parts.push(formatPace(run.averagePaceSecondsPerMile))
+    if (run.averagePaceSecondsPerMile != null && run.averagePaceSecondsPerMile > 0) parts.push(formatPace(run.averagePaceSecondsPerMile))
     if (parts.length) return `Last: ${parts.join(' · ')}`
   }
   // Swim: distance and/or duration
   const swim = outcome.swimActual
   if (swim) {
     const parts: string[] = []
-    if (swim.actualDistanceMeters != null) parts.push(`${swim.actualDistanceMeters} m`)
+    if (swim.actualDistanceMeters != null) parts.push(`${Math.round(swim.actualDistanceMeters)} m`)
     if (swim.actualDurationMin != null) parts.push(`${swim.actualDurationMin} min`)
     if (parts.length) return `Last: ${parts.join(' · ')}`
   }
