@@ -857,6 +857,7 @@ export function ActiveWorkoutTracker({
         targetReps: lastSet?.targetReps ?? null,
         targetLoad: lastSet?.targetLoad ?? null,
         restSeconds: lastSet?.restSeconds ?? null,
+        actualRestSeconds: null,
         resolvedLoadLbs: lastSet?.resolvedLoadLbs ?? null,
       }
       return { ...ex, sets: [...ex.sets, newSet] }
@@ -875,6 +876,7 @@ export function ActiveWorkoutTracker({
         targetReps: null,
         targetLoad: null,
         restSeconds: 90,
+        actualRestSeconds: null,
         resolvedLoadLbs: null,
       })),
     }
