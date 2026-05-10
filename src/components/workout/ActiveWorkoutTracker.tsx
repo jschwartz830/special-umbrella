@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { NumericInputField } from '../shared/NumericInputField'
 import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
@@ -1112,22 +1111,30 @@ export function ActiveWorkoutTracker({
                     <span className="col-span-3 text-center text-slate-500 text-[10px]">
                       {previousSetDisplay(ex, setIdx)}
                     </span>
-                    <NumericInputField
-                      value={s.actualReps ?? null}
-                      onChange={v => updateSet(exIdx, setIdx, { actualReps: v })}
+                    <input
+                      type="number"
+                      min="0"
+                      value={s.actualReps ?? ''}
+                      onChange={e => updateSet(exIdx, setIdx, {
+                        actualReps: e.target.value ? Number(e.target.value) : null,
+                      })}
                       placeholder={String(s.targetReps ?? 'reps')}
-                      integerOnly
-                      className="col-span-3"
+                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
                     />
-                    <NumericInputField
-                      value={s.actualLoad ?? null}
-                      onChange={v => updateSet(exIdx, setIdx, { actualLoad: v })}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={s.actualLoad ?? ''}
+                      onChange={e => updateSet(exIdx, setIdx, {
+                        actualLoad: e.target.value ? Number(e.target.value) : null,
+                      })}
                       placeholder={
                         s.resolvedLoadLbs != null && s.resolvedLoadLbs > 0
                           ? String(s.resolvedLoadLbs)
                           : (s.targetLoad ?? 'lbs')
                       }
-                      className="col-span-3"
+                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
                     />
                     <button
                       onClick={() => handleSetTimerToggle(exIdx, setIdx)}
