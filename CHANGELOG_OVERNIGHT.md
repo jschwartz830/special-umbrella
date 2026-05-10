@@ -1,5 +1,96 @@
 # Overnight Changelog
 
+## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
+
+Baseline on entry: **609 passing, 0 failing**.
+Exit state: **616 passing, 0 failing** (+7 tests).
+
+---
+
+### 1. Bug fix: CalendarPage stale `entries` closure in `handleOutcomeConfirm`
+
+**Summary:** When a user edits an outcome in the Calendar day-detail modal and
+simultaneously changes the `completedAt` date AND the completion state (e.g.,
+from `completed` to `partially_completed`), the action stored on the history
+entry was silently not updated. The displayed label in the calendar ("Done",
+"Skipped", etc.) would remain as the original action.
+
+**Root cause:** `handleOutcomeConfirm` calls `updateEntryDate(entry.id, completedDate)`
+to move the history entry to the new date. Zustand updates the store immediately,
+but `entries` is the closure-captured React state array (from the last render cycle).
+The subsequent `entries.find(e => e.calendarDate === completedDate)` reads the
+stale array and returns `undefined` — so `updateEntryAction` is never called.
+
+**Fix:** Replace the stale closure with `useHistoryStore.getState().entries`
+(live store), consistent with TodayPage's `todayEntry` lookup and the pass-18
+fix applied to the identical bug in HistoryPage.
+
+**Why it matters:** Silent data inconsistency — the outcome and the rotation
+engine would both use the correct completion state, but the history list label
+and the calendar dot color would show the wrong action when date and state
+changed in the same edit.
+
+**Files changed:** `src/pages/CalendarPage.tsx`
+
+**Risks / tradeoffs:** Minimal. `useHistoryStore.getState()` is the standard
+pattern for reading Zustand state outside of the React render cycle, used
+consistently across TodayPage and HistoryPage for the same purpose.
+
+**Rollback:** `git revert ebecc5f`
+
+---
+
+### 2. Bug fixes: `buildLastSessionSummary` — pace=0 guard + swim distance rounding
+
+**Summary:** Two small display bugs in the last-session hint shown on TodayPage:
+
+1. **Pace guard**: `averagePaceSecondsPerMile === 0` (accidental input) would
+   render "0:00 /mi". Added a `> 0` guard to treat zero identically to null.
+   With the auto-derive feature below, a zero stored pace additionally falls
+   back to the derived value when distance+duration are both available.
+
+2. **Swim distance rounding**: `actualDistanceMeters` was interpolated as-is
+   (e.g., `812.5 m`). Run distance was fixed in pass 24; this applies the same
+   discipline to swim via `Math.round()`.
+
+**Files changed:** `src/lib/sessionSummary.ts`, `src/lib/__tests__/sessionSummary.test.ts`
+
+**Risks / tradeoffs:** Display-only changes. `Math.round(812.5)` → 813 — any
+user who entered a half-meter would see it rounded up. For swim, this is
+appropriate (pools are measured in whole meters).
+
+**Rollback:** `git revert a0f6ded` (reverts both fixes and their tests).
+
+---
+
+### 3. Feature: auto-derive pace in run session summary
+
+**Summary:** When `averagePaceSecondsPerMile` is not stored (null or 0) but
+both `actualDistanceMiles > 0` and `actualDurationMin > 0` are available, the
+pace is now derived as `(durationMin × 60) / distanceMiles` and appended using
+`formatPace`. The hint becomes "Last: 3.1 mi · 28 min · 9:02 /mi" instead of
+"Last: 3.1 mi · 28 min". Stored pace still takes priority when present and > 0.
+
+**Why it matters:** Most users don't manually enter a GPS pace value in the
+outcome modal — they enter distance and duration. The derivation is exact and
+consistent with `derivePaceSecondsPerMile` already in the type system. This
+closes the carry-over from pass 24, which explicitly deferred the decision.
+
+**Files changed:**
+- `src/lib/sessionSummary.ts` (10 lines — logic + comment)
+- `src/lib/__tests__/sessionSummary.test.ts` (7 new tests, 5 updated)
+
+**Risks / tradeoffs:**
+- If a user entered distance + duration that together imply an implausibly fast
+  or slow pace, that derived pace would be shown. Unlikely in practice, and the
+  user can always override by entering a manual pace in the modal.
+- Five existing tests updated to include the derived pace in their expected
+  strings (all involved run outcomes with both distance and duration present).
+
+**Rollback:** `git revert 35d5856` — reverts `sessionSummary.ts` and all test changes.
+
+---
+
 ## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
 
 Baseline on entry: **551 passing, 0 failing**.
