@@ -437,4 +437,60 @@ describe('buildLastSessionSummary', () => {
     // weights branch finds no exercise with any actual data, falls through to run
     expect(buildLastSessionSummary(outcome)).toBe('Last: 4 mi · 35 min')
   })
+
+  it('omits run pace when averagePaceSecondsPerMile is 0 (guard against bad data)', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: 3,
+      durationActualMin: 28,
+      notes: null,
+      runActual: { actualDistanceMiles: 3.1, actualDurationMin: 28, averagePaceSecondsPerMile: 0 },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 3.1 mi · 28 min')
+  })
+
+  it('includes swim pace when averagePaceSecondsPer100m is present', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T08:00:00Z',
+      perceivedEffort: 2,
+      durationActualMin: 30,
+      notes: null,
+      runActual: null,
+      swimActual: { actualDistanceMeters: 1000, actualDurationMin: 30, averagePaceSecondsPer100m: 120 },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 1000 m · 30 min · 2:00 /100m')
+  })
+
+  it('omits swim pace when averagePaceSecondsPer100m is null', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T08:00:00Z',
+      perceivedEffort: 2,
+      durationActualMin: 20,
+      notes: null,
+      runActual: null,
+      swimActual: { actualDistanceMeters: 800, actualDurationMin: 20, averagePaceSecondsPer100m: null },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min')
+  })
+
+  it('omits swim pace when averagePaceSecondsPer100m is 0 (guard against bad data)', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T08:00:00Z',
+      perceivedEffort: 2,
+      durationActualMin: 20,
+      notes: null,
+      runActual: null,
+      swimActual: { actualDistanceMeters: 800, actualDurationMin: 20, averagePaceSecondsPer100m: 0 },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min')
+  })
 })

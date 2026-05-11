@@ -1,5 +1,5 @@
 import type { HistoryEntry } from '../types'
-import { formatPace } from '../modules/workout-outcomes/types'
+import { formatPace, formatSwimPace } from '../modules/workout-outcomes/types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 
 /**
@@ -81,7 +81,7 @@ export function buildLastSessionSummary(
       parts.push(`${dist} mi`)
     }
     if (run.actualDurationMin != null) parts.push(`${run.actualDurationMin} min`)
-    if (run.averagePaceSecondsPerMile != null) parts.push(formatPace(run.averagePaceSecondsPerMile))
+    if (run.averagePaceSecondsPerMile != null && run.averagePaceSecondsPerMile > 0) parts.push(formatPace(run.averagePaceSecondsPerMile))
     if (parts.length) return `Last: ${parts.join(' · ')}`
   }
   // Swim: distance and/or duration
@@ -90,6 +90,7 @@ export function buildLastSessionSummary(
     const parts: string[] = []
     if (swim.actualDistanceMeters != null) parts.push(`${swim.actualDistanceMeters} m`)
     if (swim.actualDurationMin != null) parts.push(`${swim.actualDurationMin} min`)
+    if (swim.averagePaceSecondsPer100m != null && swim.averagePaceSecondsPer100m > 0) parts.push(formatSwimPace(swim.averagePaceSecondsPer100m))
     if (parts.length) return `Last: ${parts.join(' · ')}`
   }
   return null
