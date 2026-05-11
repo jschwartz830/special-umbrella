@@ -1,5 +1,40 @@
 # Test Results
 
+## 2026-05-11 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-3SEA4`
+
+**Result: 613 passing, 0 failing** (+4 tests from 609 baseline)
+
+### Tests added this pass
+
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `src/lib/__tests__/sessionSummary.test.ts` | 4 | Run pace = 0 guard (no "0:00 /mi"); swim pace present → shown ("2:00 /100m"); swim pace null → omitted; swim pace = 0 → omitted |
+
+### Tests reviewed (no changes)
+
+All 609 existing tests reviewed implicitly by full suite run — zero regressions.
+
+### Notable test highlights
+
+- **"omits run pace when averagePaceSecondsPerMile is 0"** — regression anchor for the
+  zero-pace guard. Without this test, `formatPace(0)` producing "0:00 /mi" in the hint
+  would be invisible until a user reported it.
+- **"includes swim pace when averagePaceSecondsPer100m is present"** — first test
+  exercising the swim pace display path end-to-end, with `formatSwimPace` called
+  through the full `buildLastSessionSummary` function.
+
+### Important areas still untested
+
+| Area | Notes |
+|------|-------|
+| `ActiveWorkoutTracker.tsx` | Large component (real-time timer, exercise tracking). No tests; would require significant harness work. |
+| `OutcomeModal.tsx` | Large component (21.8KB) with complex form state. No tests. |
+| `CalendarPage.tsx` retroactive edit flows | Complex multi-step edit flows. Tested implicitly by engine/store unit tests, no integration coverage. |
+| `csv.ts` outcome fields round-trip | CSV round-trip for weights/run/swim fields not separately verified. |
+| `expressionEval.ts` error paths | Malformed expressions return `0` silently; error-handling behavior untested. |
+
+---
+
 ## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
 
 **Result: 609 passing, 0 failing** (+58 tests from 551 baseline)

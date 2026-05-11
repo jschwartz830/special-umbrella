@@ -1,5 +1,84 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-11 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-3SEA4`
+
+### Executive summary
+
+1. **What changed:** 1 commit — run pace zero-guard (bug fix) + swim pace in session
+   hint (small feature). 4 new tests; no source changes outside `sessionSummary.ts`.
+2. **Highest confidence:** Both changes are additive / defensive. The swim pace addition
+   is a one-liner that mirrors the already-proven run pace pattern from pass 24. The pace
+   guard is a single `&& > 0` addition that cannot regress existing behavior.
+3. **Risky:** Nothing risky. The only side effect is that swim sessions with a stored
+   `averagePaceSecondsPer100m` will now show pace in the "Last:" hint on TodayPage.
+4. **Review first:** Check that swim outcomes created before this pass do not have
+   `averagePaceSecondsPer100m` set to a nonsensical value (e.g., 0) that would now
+   be guarded away. The guard is defensive, so even if they do, no bad data appears.
+
+---
+
+### Biggest issues found
+
+| # | Severity | Description | Status |
+|---|----------|-------------|--------|
+| B1 | Low | `averagePaceSecondsPerMile === 0` passed null-guard, producing "0:00 /mi". Carried over from pass 24 REVIEW_NOTES. | Fixed |
+| G1 | Low | Swim pace (`averagePaceSecondsPer100m`) captured but never displayed in session hint. Same gap as run pace (fixed pass 24). | Fixed |
+
+---
+
+### Improvements completed
+
+| Item | Type | Commit |
+|------|------|--------|
+| Run pace `> 0` guard in session hint | Bug fix | `6568f42` |
+| Swim pace in session hint + 3 tests | Feature | `6568f42` |
+
+---
+
+### Definitely keep
+
+- **Run pace `> 0` guard** — strictly defensive; closes pass 24 carry-over item.
+- **Swim pace display** — clearly adjacent, zero new dependencies, well-tested.
+
+### Probably keep but tweak
+
+Nothing.
+
+### Do not keep
+
+Nothing.
+
+### Recommendations only (not implemented)
+
+| Item | Notes |
+|------|-------|
+| Auto-derive run pace | When `averagePaceSecondsPerMile` is null but distance + duration are both present, derive pace with `derivePaceSecondsPerMile`. Deferred product decision since pass 24. |
+| Auto-derive swim pace | Same pattern for swim. |
+| Streak grace period | Reset to 0 each morning until today is logged. Recommend "pending streak" display. Product decision. |
+| Plan builder `duration.value > 0` validation | No crash, just bad UX. Simple guard in PlanBuilderPage save handler. |
+| Expression evaluator errors to UI | Malformed progression rules silently evaluate to 0; surfacing errors would help YAML plan authors. |
+
+---
+
+### Open questions for me
+
+1. **Swim pace display:** the field name `averagePaceSecondsPer100m` implies pool/meters.
+   Do any of your swim workouts use yards? If so, the unit label "/100m" may be incorrect
+   for those sessions.
+2. **Auto-derive pace:** now that swim pace is displayed, do you want pace to be shown
+   even when it was not manually entered — derived from distance + duration? Currently
+   deferred as a product decision; easy to implement in the same function.
+
+### Known issues or incomplete work
+
+None.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
 
 ### Executive summary

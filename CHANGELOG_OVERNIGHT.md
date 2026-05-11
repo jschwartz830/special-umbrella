@@ -1,5 +1,52 @@
 # Overnight Changelog
 
+## 2026-05-11 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-3SEA4`
+
+Baseline on entry: **609 passing, 0 failing**.
+Exit state: **613 passing, 0 failing** (+4 tests).
+
+---
+
+### 1. Bug fix: run pace `> 0` guard in `buildLastSessionSummary`
+
+**Summary:** Added `&& averagePaceSecondsPerMile > 0` guard alongside the existing
+`!= null` check. Prevents "0:00 /mi" from appearing in the session hint if the field
+is accidentally stored as 0 (e.g., from a future integration that sets a default).
+
+**Why it matters:** `formatPace(0)` produces "0:00 /mi" — a nonsensical value that
+would appear as the pace part of the hint. This closes the "probably keep but tweak"
+item from the pass 24 REVIEW_NOTES.
+
+**Files changed:** `src/lib/sessionSummary.ts`
+
+**Risks / tradeoffs:** None. Adding `> 0` is strictly more defensive; does not affect
+any realistic stored value (valid paces are always positive).
+
+**Rollback:** `git revert 6568f42` — this commit also includes the swim pace feature
+below; revert both together.
+
+---
+
+### 2. Feature: swim pace in session hint
+
+**Summary:** `buildLastSessionSummary` now includes `averagePaceSecondsPer100m` in the
+swim hint when the field is present and > 0, producing e.g.:
+"Last: 800 m · 20 min · 2:00 /100m"
+
+**Why it matters:** `averagePaceSecondsPer100m` is captured in `OutcomeModal` and
+stored in `SwimWorkoutActual`, but was silently discarded in the display layer —
+identical to the run pace situation fixed in pass 24. Swimmers care about pace per
+100m just as runners care about pace per mile.
+
+**Files changed:** `src/lib/sessionSummary.ts`, `src/lib/__tests__/sessionSummary.test.ts`
+
+**Risks / tradeoffs:** Additive only. Existing swim tests (distance+duration, no pace)
+are unchanged. 3 new tests verify the stored-pace, null-pace, and zero-pace paths.
+
+**Rollback:** `git revert 6568f42`
+
+---
+
 ## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
 
 Baseline on entry: **551 passing, 0 failing**.
