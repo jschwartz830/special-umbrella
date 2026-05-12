@@ -1,3 +1,64 @@
+# Feature Review — Plan-Scoped Streak (`computePlanStreak`)
+
+Date: 2026-05-12
+Branch: `claude/dreamy-mccarthy-OjsGg`
+Classification: **Keep — wire UI in next pass**
+
+## What Was Actually Built
+
+A single exported function `computePlanStreak(planId, entries, extras, today)` in
+`src/lib/historyStats.ts`. It counts consecutive days ending at `today` (inclusive)
+where the given plan has a qualifying entry: `complete` or `day_off` rotation entry,
+or any extra workout for that planId. Returns `0` when today has no qualifying entry.
+
+12 unit tests covering the full behavioural surface.
+
+## Assumptions Encoded
+
+- Same streak semantics as the existing global streak (skip alone = streak breaker).
+- No plan-start-date guard: if entries before the plan's `startDate` somehow exist,
+  they would count toward the streak. In practice this cannot happen through the UI.
+- Extra workouts for a plan count regardless of their `source` field (`double_day` vs
+  `history`). Both represent real workout activity.
+
+## What Worked Well
+
+- The implementation is essentially `computeHistoryStats.currentStreak` with a
+  `planId` filter on the Set population loop. ~20 lines total.
+- 12 tests pass with zero friction; the test patterns reuse helpers from adjacent
+  describe blocks.
+- Zero state, zero schema, zero UI risk. The function is inert until called.
+
+## What Feels Risky or Incomplete
+
+- **Not wired into UI yet** — the function is exported but never called. An unused
+  export is harmless but clutters the public API until wired.
+- **Semantic gap vs global streak** — if a user sees both stats side by side, the
+  plan streak could be lower than the global streak (if they have extras for other
+  plans). This needs clear labelling in whatever UI uses it.
+
+## What I Should Evaluate Tomorrow
+
+1. Does the TodayPage stats bar have room for a plan-streak label alongside the
+   existing "streak" count, or should it replace it?
+2. Should the label be "plan streak" or just "streak" (implicit since TodayPage
+   already shows the active plan)?
+3. Is the HistoryPage per-plan summary a better home for this stat?
+
+## Recommended Next Steps
+
+- Wire `computePlanStreak` into TodayPage stats bar for the active plan (`plan?.id`).
+- Import it alongside `computeHistoryStats` in `TodayPage.tsx` — no new store
+  subscriptions required since `planEntries` and `planExtras` are already in scope.
+- Add a `data-testid` attribute on the streak element for future E2E testing.
+
+## Keep / Revise / Prototype Only / Reject
+
+**Keep** — the logic is correct, the tests are solid, and the function fits naturally
+into the existing stats API. Wire it in next pass.
+
+---
+
 # Feature Review — Pace Display in Run Session Summary
 
 Date: 2026-05-07

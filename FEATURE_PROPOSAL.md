@@ -1,3 +1,88 @@
+# Feature Proposal — Plan-Scoped Streak (`computePlanStreak`)
+
+Date: 2026-05-12
+Branch: `claude/dreamy-mccarthy-OjsGg`
+Status: **Implemented this run (logic layer only; UI wiring deferred)**
+
+## Feature Selected
+
+`computePlanStreak(planId, entries, extras, today): number` — a plan-scoped
+consecutive-day streak counter exported from `src/lib/historyStats.ts`.
+
+## Why It Was Selected
+
+The current global streak (`computeHistoryStats.currentStreak`) aggregates
+across all plans and extra workouts. For a user who finishes one plan and
+starts another, the streak count carries over from the previous plan's
+history. This produces noise ("30-day streak" when most of those days belong
+to a different program).
+
+A plan-scoped streak:
+- Gives the user a cleaner signal: "You've been consistent on *this* plan for N days."
+- Naturally integrates with the TodayPage stats bar (current streak, 7-day, total).
+- Requires no store changes, no schema changes, no UI changes to ship a safe version.
+
+## Expected User Value
+
+Users following a specific training program benefit from seeing how long they
+have maintained *that program* without a gap — independent of other workouts
+they may log. This is a common feature in dedicated fitness apps (e.g., Strava
+challenges, Garmin "streak for this activity type") and maps naturally to the
+plan-centric model here.
+
+## Implementation Scope for This Run
+
+- Add `computePlanStreak` to `src/lib/historyStats.ts` — ~20 lines of pure logic.
+- Add 12 tests covering: zero entries, today-only, consecutive days, gap breaks,
+  day_off counts, skip does not count, extras rescue a skip-only day, multi-plan
+  isolation, Set deduplication.
+- Export from `historyStats.ts` (no re-export barrel needed).
+- **Not wiring into UI this run** — the function exists but is not yet called
+  from any component. UI integration is deferred so this pass remains small and
+  reviewable.
+
+## Assumptions Being Made
+
+- Same streak semantics as global streak: `complete` or `day_off` entries count;
+  `skip` alone does not; extras always count.
+- The function does not need to know about the plan's start date (entries before
+  plan start should not exist in practice; not guarded).
+- A "plan streak" should not cross into another plan's history even if the user
+  had back-to-back plans that share a calendar date. Scoping by `planId` is
+  sufficient.
+
+## Open Product / UX Decisions
+
+- **Where to surface it:** TodayPage stats bar (replacing or supplementing global
+  streak), HistoryPage plan header, or plan cards on PlansPage.
+- **Label:** "streak" vs "active streak" vs "plan streak" — all reasonable.
+- **Edge case:** if the active plan changes mid-streak, should the old plan's
+  streak remain visible? Current impl: each planId has its own independent count.
+
+## Architecture / Schema Impact
+
+None. Pure function, no state, no persistence, no store changes.
+
+## Risks
+
+- Unused export until UI is wired. Not a runtime risk; minor style concern.
+- Semantic mismatch with global streak if user sees both at once (one could be
+  higher than the other depending on extra workouts for other plans). Acceptable
+  — they measure different things.
+
+## Rollback Strategy
+
+`git revert` the feature commit. No migration needed. No data modified.
+
+## What Is Intentionally Not Being Built Yet
+
+- UI component/prop changes
+- "Longest streak" all-time record for a plan
+- Streak freeze / grace day mechanics
+- Integration with the plan expiry or progress indicators
+
+---
+
 # Feature Proposal — Pace Display in Run Session Summary
 
 Date: 2026-05-07

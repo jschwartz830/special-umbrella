@@ -1,5 +1,63 @@
 # Overnight Changelog
 
+## 2026-05-12 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-OjsGg`
+
+Baseline on entry: tests could not be run (devDeps not installed on audit machine).
+Source-level audit confirmed all prior fixes stable.
+
+---
+
+### 1. Bug fix: `buildWeightsRecommendation` — double-progression partial completion
+
+**Summary:** In `mode === 'double'`, the progression recommendation incorrectly
+returned `'progress'` when only some sets were completed, as long as the completed
+ones hit their rep targets.
+
+**Why it matters:** A user who bails halfway through a workout (completing 2 of 4
+sets) would be told to add load next session, which is the wrong progression cue.
+The single-progression mode had an identical bug fixed in pass 24; this closes the
+parallel gap in double mode.
+
+**Files changed:**
+- `src/modules/workout-outcomes/progression.ts` — add `allSetsCompleted` guard
+  before evaluating `allHit`; `allHit = allSetsCompleted && completedSets.every(...)`
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` — 2 new regression
+  tests (partial completion → hold; `completed: undefined` sets → hold)
+
+**Risks / tradeoffs:** Behaviour change: partial-completion double-progression
+workouts now correctly recommend 'hold' instead of 'progress'. This is a bug fix
+not a policy change; users who complete all sets are unaffected.
+
+**Rollback:** `git revert` the single commit that contains both file changes.
+
+---
+
+### 2. Feature: `computePlanStreak` — plan-scoped consecutive-day streak
+
+**Summary:** Added a new pure function `computePlanStreak(planId, entries, extras, today)`
+to `src/lib/historyStats.ts`. It counts consecutive days ending at `today` where the
+given plan has a `complete` or `day_off` entry, or any extra workout. Mirrors the
+algorithm in `computeHistoryStats.currentStreak` but scoped to one plan.
+
+**Why it matters:** The global streak aggregates across all plans and extras. A user
+on their second active plan sees a streak that includes history from their previous
+plan. A plan-scoped streak is more actionable ("5 days on this program") and is the
+natural next stat to surface on the TodayPage stats bar or the HistoryPage plan
+summary. This pass adds the function and tests only; UI wiring is left for the next
+pass to keep this change reviewable.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — new export `computePlanStreak`
+- `src/lib/__tests__/historyStats.test.ts` — 12 new tests; import updated
+
+**Risks / tradeoffs:** Additive only. Zero UI changes. Zero store changes. The function
+is exported but not yet called from any component; unused exports are a style lint risk
+(no ESLint `no-unused-exports` rule currently configured). Easy to revert.
+
+**Rollback:** `git revert` the feature commit. No data migration needed.
+
+---
+
 ## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
 
 Baseline on entry: **551 passing, 0 failing**.

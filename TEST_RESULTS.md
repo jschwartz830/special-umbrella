@@ -1,5 +1,45 @@
 # Test Results
 
+## 2026-05-12 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-OjsGg`
+
+**Result: Could not run** — devDependencies not installed on audit machine
+(`vitest` not found; `npx vitest run` attempted installation but failed due to
+missing `vite` peer dependency in the test environment).
+
+All source changes are type-correct (TypeScript strict mode) and follow
+the established test patterns used across the existing 609-test suite.
+Tests were reviewed for correctness by inspection.
+
+### Tests added this pass
+
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `src/modules/workout-outcomes/__tests__/progression.test.ts` | +2 | Double-progression partial completion → 'hold'; sets with `completed: undefined` → 'hold' |
+| `src/lib/__tests__/historyStats.test.ts` | +12 | `computePlanStreak`: zero entries, today-only, consecutive days, gap break, day_off, skip alone, skip rescued by extra, multi-plan isolation, Set dedup, cross-plan independence |
+
+**Total new tests this pass: 14**
+**Expected passing total (unverified): 623** (609 baseline + 14)
+
+### Tests reviewed (no changes)
+
+All existing tests in the following files were inspected and remain correct:
+- `src/engine/__tests__/rotationEngine.test.ts` (28 tests) — unaffected
+- `src/store/__tests__/historyStore.test.ts` — unaffected
+- `src/store/__tests__/planStore.test.ts` — unaffected
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` — 2 new tests added; existing 34 tests unaffected by the fix (they all use all-sets-completed scenarios)
+- `src/lib/__tests__/historyStats.test.ts` — 12 new tests added to new describe block; existing 98 tests unaffected
+
+### Important areas still untested
+
+| Area | Gap | Priority |
+|------|-----|----------|
+| `outcomeStore.logOutcomeWithProgression` | Run progression state update and program var update paths have no unit tests | Medium |
+| `csv.ts historyFromCsv` | No round-trip test for weighted outcomes (sets/reps/load in `weightsActual`) | Medium |
+| `exerciseHistoryStore.upsertFromOutcome` | No direct unit tests for missing planDayIndex, null sets edge cases | Low |
+| `calendarProjection.buildMonthGrid` | Coverage unknown — test file exists but was not visible on audit machine | Unknown |
+
+---
+
 ## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
 
 **Result: 609 passing, 0 failing** (+58 tests from 551 baseline)
