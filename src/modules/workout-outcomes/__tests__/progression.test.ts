@@ -226,6 +226,50 @@ describe('buildProgressionRecommendation — weights: double mode', () => {
     )
     expect(result?.action).toBe('progress')
   })
+
+  it('returns hold when only some sets are completed — even if completed ones hit reps (bug fix)', () => {
+    // Regression guard: before the fix, double mode only checked completedSets
+    // for rep targets. A workout with 2 of 4 sets done (both hitting reps) would
+    // incorrectly return 'progress' instead of 'hold'.
+    const result = buildProgressionRecommendation(
+      makeSlot('weights'),
+      makeOutcome({
+        weightsActual: {
+          exercises: [{
+            exercise: 'Squat',
+            progressionMode: 'double',
+            sets: [
+              { targetReps: 8, actualReps: 8, completed: true },
+              { targetReps: 8, actualReps: 8, completed: true },
+              { targetReps: 8, actualReps: null, completed: false },
+              { targetReps: 8, actualReps: null, completed: false },
+            ],
+          }],
+        },
+      }),
+    )
+    expect(result?.action).toBe('hold')
+    expect(result?.note).toMatch(/complete all target reps/i)
+  })
+
+  it('returns hold when some sets are completed: undefined (not-yet-touched)', () => {
+    const result = buildProgressionRecommendation(
+      makeSlot('weights'),
+      makeOutcome({
+        weightsActual: {
+          exercises: [{
+            exercise: 'RDL',
+            progressionMode: 'double',
+            sets: [
+              { targetReps: 10, actualReps: 10, completed: true },
+              { targetReps: 10 }, // no completed field — not touched
+            ],
+          }],
+        },
+      }),
+    )
+    expect(result?.action).toBe('hold')
+  })
 })
 
 // ── Weights: volume mode ──────────────────────────────────────────────────────
