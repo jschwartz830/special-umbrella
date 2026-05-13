@@ -1,5 +1,71 @@
 # Implementation Plan
 
+## Pass 27 — 2026-05-13 (branch `claude/dreamy-mccarthy-JEVCy`)
+
+### Observations on entry
+
+- Baseline on checkout: **4 failing tests, 631 passing** — pre-existing failures
+  in `sessionSummary.test.ts` introduced when derived-pace support was added in
+  pass 25/26 but the implementation had two bugs.
+- **`buildLastSessionSummary` — pace pushed twice**: the old `parts.push(formatPace(storedPace))` line
+  was left in the function after the new unified storedPace/derivedPace block was
+  added. Every run summary showed pace twice (e.g., "9:02 /mi · 9:02 /mi").
+- **`buildLastSessionSummary` — stale zero-pace guard**: the `derivedPace` condition
+  used `storedPace == null` to decide whether to derive. This is true even when stored
+  pace is `0` (bad data). The implementation plan intent (pass 25) was that `0` should
+  fall back to derived, but a test named "omits run pace when 0" expected no pace at all.
+  The conflicting test was written for pre-derivation behavior and not updated.
+- **`summariseRunOutcome`** (in `explanation.ts`): pace formatted with raw
+  `Math.floor/Math.round` arithmetic instead of `formatPace()`. Could produce "9:60 /mi"
+  for pace values near 60-second boundaries. Also lacked the `> 0` zero guard.
+- **`last7Completed` label mismatch**: TodayPage shows "This week" for a rolling 7-day
+  window; HistoryPage already correctly uses "7-day". Inconsistency flagged in pass 26
+  review notes.
+- **Swim pace derivation gap**: run derivation (pass 25) was explicitly noted as
+  "not extended to swim." The swim branch of `buildLastSessionSummary` showed stored
+  pace when available but never derived when absent, creating asymmetry.
+
+### Decisions
+
+- **Fix all 4 failing tests** — highest priority; a green baseline is non-negotiable.
+  Fix 1: remove the stale old pace push. Fix 2: restore `storedPace == null` for
+  derivedPace condition (derives from 0, matching implementation plan intent). Update
+  the contradictory test.
+- **Fix `summariseRunOutcome`** — import and use `formatPace`; add `> 0` guard. Safe,
+  well-scoped, consistent with buildLastSessionSummary fixes.
+- **Fix "This week" → "7-day"** — one-line label change, reduces user confusion.
+- **Feature: swim pace derivation** — symmetric extension of run derivation.
+  Cleanest available feature candidate: same logic pattern, adjacent to fixed code,
+  well-defined behavior, no new dependencies.
+
+### Architecture summary
+
+React + TypeScript + Zustand + Vite PWA. Core state in four persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`. Rotation logic
+is a pure function in `rotationEngine.ts`. Stats and summaries are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`. Two main pages drive
+the daily flow: `TodayPage.tsx` and `CalendarPage.tsx`.
+
+### Key strengths
+
+- Pure-function engine with excellent test coverage (18 test files, 639 tests as of
+  this pass).
+- Careful stale-closure handling in CalendarPage and TodayPage (fixed in passes 18
+  and 25).
+- Well-structured store actions with consistent deduplication and cleanup.
+- Modular session summary system with per-discipline derivation paths.
+
+### Key risks (carried forward)
+
+- `workoutInstanceId` parsing via `split('_')` in `outcomeStore.ts` and
+  `exerciseHistoryStore.ts` is fragile if plan ID format ever changes (nanoid is
+  alphanumeric only today, so currently safe).
+- No React component tests — CalendarPage/TodayPage logic is only tested at the
+  engine/utility layer. Complex UI flows (retroactive editing, double-day) have no
+  automated regression coverage.
+
+---
+
 ## Pass 25 — 2026-05-10 (branch `claude/dreamy-mccarthy-ApbpW`)
 
 ### Observations on entry

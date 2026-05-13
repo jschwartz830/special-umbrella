@@ -3,6 +3,7 @@
 import type { WorkoutSlot } from '../../types'
 import type { RunProgressionState } from '../run-adaptation/types'
 import type { WorkoutOutcome } from '../workout-outcomes/types'
+import { formatPace } from '../workout-outcomes/types'
 import type { WorkoutDifficulty } from '../workout-metadata/types'
 import { resolveWorkoutDisplayTarget } from '../run-adaptation/selectors'
 
@@ -44,10 +45,8 @@ export function summariseRunOutcome(outcome: WorkoutOutcome): string | null {
   const parts: string[] = []
   if (ra.actualDistanceMiles != null) parts.push(`${ra.actualDistanceMiles} mi`)
   if (ra.actualDurationMin != null) parts.push(`${ra.actualDurationMin} min`)
-  if (ra.averagePaceSecondsPerMile != null) {
-    const m = Math.floor(ra.averagePaceSecondsPerMile / 60)
-    const s = Math.round(ra.averagePaceSecondsPerMile % 60)
-    parts.push(`${m}:${s.toString().padStart(2, '0')} /mi`)
+  if (ra.averagePaceSecondsPerMile != null && ra.averagePaceSecondsPerMile > 0) {
+    parts.push(formatPace(ra.averagePaceSecondsPerMile))
   }
   return parts.length ? parts.join(' · ') : null
 }

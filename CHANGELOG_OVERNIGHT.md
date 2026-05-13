@@ -1,5 +1,123 @@
 # Overnight Changelog
 
+## 2026-05-13 (twenty-seventh pass) — branch `claude/dreamy-mccarthy-JEVCy`
+
+Baseline on entry: **4 failing, 631 passing** (pre-existing failures in
+`sessionSummary.test.ts`). Exit state: **639 passing, 0 failing** (+8 tests, +4 fixed).
+
+---
+
+### 1. Bug fix: `buildLastSessionSummary` — double pace push
+
+**Summary**: Pace was appended twice in every run session summary (e.g.,
+"Last: 3.1 mi · 28 min · 9:02 /mi · 9:02 /mi"). The old `parts.push(formatPace(...))`
+line at the head of the run block was left in place when the new
+storedPace/derivedPace block was added in pass 25. The stale push is removed;
+the unified block is the sole pace emitter.
+
+**Why it matters**: Three tests were failing on entry due to this bug. Run hints
+were displaying double pace to all users with stored pace data.
+
+**Files changed**: `src/lib/sessionSummary.ts`
+
+**Risks**: None — removing a duplicate push.
+
+**Rollback**: `git revert a124b14`.
+
+---
+
+### 2. Bug fix: `buildLastSessionSummary` — stale zero-pace guard and conflicting test
+
+**Summary**: The `derivedPace` condition used `storedPace == null`, which is true
+when the stored value is `0` (bad data). Implementation plan intent (pass 25) was
+that `stored=0` should fall back to derived pace, matching the "ignore bad default"
+philosophy. The correct condition is `run.averagePaceSecondsPerMile == null` (only
+derive when pace was never provided). One test ("omits run pace when 0") expected
+the old no-derivation behavior and is updated to match the documented intent.
+
+**Why it matters**: Ensures consistent behavior: `0` → derive (same as absent);
+`null` → derive; valid positive → use stored. Eliminates the conflict between two
+tests with opposite expectations.
+
+**Files changed**: `src/lib/sessionSummary.ts`, `src/lib/__tests__/sessionSummary.test.ts`
+
+**Risks**: Users who had stored `averagePaceSecondsPerMile=0` will now see derived
+pace in their session hints instead of no pace. This is correct behavior — they had
+no valid stored pace.
+
+**Rollback**: `git revert a124b14`.
+
+---
+
+### 3. Fix: `summariseRunOutcome` — use `formatPace`, add zero guard
+
+**Summary**: `summariseRunOutcome` in `explanation.ts` formatted pace with raw
+`Math.floor / Math.round` arithmetic instead of the canonical `formatPace()` utility.
+The raw approach can produce "9:60 /mi" for values near 599.5 s/mi where
+`Math.round(x % 60) = 60`. Also, no `> 0` guard meant `averagePaceSecondsPerMile=0`
+would display "0:00 /mi". Fixed both by importing `formatPace` and adding
+`&& ra.averagePaceSecondsPerMile > 0`.
+
+**Why it matters**: Consistency with `buildLastSessionSummary` (which uses `formatPace`
+and guards > 0). Latent "9:60 /mi" display bug removed.
+
+**Files changed**: `src/modules/recommendation/explanation.ts`,
+`src/modules/recommendation/__tests__/explanation.test.ts`
+
+**Risks**: None — defensive fix. Two new tests anchor the corrected behavior.
+
+**Rollback**: `git revert 193ffe6`.
+
+---
+
+### 4. Fix: rename "This week" stat label to "7-day" on TodayPage
+
+**Summary**: The middle stat tile on TodayPage showed "This week" for `last7Completed`,
+which counts the last 7 rolling calendar days — not the current Mon–Sun calendar week.
+On Wednesday, "this week" reads as Mon–Wed (3 days) but the code reports Thu-last-week
+through today (7 days). HistoryPage already correctly uses "7-day" for the same stat.
+Changed TodayPage to match.
+
+**Why it matters**: UX clarity — users familiar with "this week = Mon–Sun" would
+misinterpret the count, especially mid-week when the label is most misleading.
+
+**Files changed**: `src/pages/TodayPage.tsx`
+
+**Risks**: Users who knew "This week" as the label will see it changed. Semantic
+improvement, not a behavioral change.
+
+**Rollback**: `git revert a1ad26d`.
+
+---
+
+### 5. Feature: swim pace derivation in `buildLastSessionSummary`
+
+**Summary**: Extends run pace derivation (pass 25) to swim. When
+`averagePaceSecondsPer100m` is absent (null/undefined) or 0 (bad data), and
+both `actualDistanceMeters` and `actualDurationMin` are present and non-zero,
+pace is derived as `(durationMin × 60) / (distanceMeters / 100)` seconds per 100m
+and formatted via `formatSwimPace()`.
+
+Before: `"Last: 800 m · 20 min"` (no pace even when distance+duration available)
+After:  `"Last: 800 m · 20 min · 2:30 /100m"`
+
+Stored pace > 0 still takes priority. Zero stored pace falls back to derived
+(same semantics as run).
+
+**Why it matters**: Swimmers see pace context in their session hint the same way
+runners do. The feature was deferred in pass 24 ("not extended to swim") — this
+pass completes the symmetry.
+
+**Files changed**: `src/lib/sessionSummary.ts`, `src/lib/__tests__/sessionSummary.test.ts`
+
+**Risks**: Users with existing swim data (no stored pace, but distance+duration
+logged) will now see derived pace in the TodayPage hint. This is additive and
+informative — the same reception as the run feature.
+
+**Rollback**: `git revert 547f181`.
+
+---
+
 ## 2026-05-13 (twenty-sixth pass) — branch `claude/dreamy-mccarthy-G6yaB`
 
 Baseline on entry: **616 passing, 0 failing**.

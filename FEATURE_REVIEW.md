@@ -1,3 +1,53 @@
+# Feature Review — Swim Pace Derivation in Session Summary Hint
+
+Date: 2026-05-13
+Branch: `claude/dreamy-mccarthy-JEVCy`
+Classification: **Keep**
+
+## What was actually built
+
+When `buildLastSessionSummary` formats a swim workout outcome, it now derives
+the pace from distance + duration when `averagePaceSecondsPer100m` is null or
+0. The derived value is formatted with `formatSwimPace` and appended as
+`"· 2:30 /100m"` (same format as a stored pace).
+
+## What assumptions were encoded
+
+1. `stored pace = 0` is always a data entry error, not a meaningful value. The
+   implementation falls through to derivation in this case, consistent with
+   the run block.
+2. Pace is only derivable when **both** `actualDistanceMeters > 0` and
+   `actualDurationMin > 0` are available. A half-complete record (distance
+   only, duration only) produces no pace — correct behaviour.
+3. `formatSwimPace` handles rounding correctly (it calls `formatPace` under
+   the hood, which has a tested rounding guard preventing "x:60" display).
+
+## Correctness assessment
+
+The derivation formula `(durationMin × 60) / (distanceMeters / 100)` is
+mathematically correct and consistent with `deriveSwimPaceSecondsPer100m` in
+`workout-outcomes/types.ts`.
+
+The stored-beats-derived priority is enforced by `storedSwimPace ?? derivedSwimPace`,
+which is only non-null when stored > 0. The test "prefers stored swim pace over
+derived when both are available" verifies this.
+
+## Risk assessment
+
+**Low risk.** The change is additive:
+- Outcomes without pace previously showed no pace → no regression possible for those.
+- Outcomes with a valid stored pace are unaffected (stored always wins).
+- Outcomes with stored pace = 0 now derive; previously they showed nothing. This
+  is strictly an improvement.
+- `formatSwimPace` is already tested with edge cases in `types.test.ts`.
+- 7 tests in `sessionSummary.test.ts` guard all branches of the new logic.
+
+## Open questions
+
+None. The feature is complete and consistent with the run equivalent.
+
+---
+
 # Feature Review — Previous Session Notes in TodayPage Hint
 
 Date: 2026-05-13
