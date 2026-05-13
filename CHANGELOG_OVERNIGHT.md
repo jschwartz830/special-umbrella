@@ -1,5 +1,89 @@
 # Overnight Changelog
 
+## 2026-05-13 (twenty-sixth pass) — branch `claude/dreamy-mccarthy-G6yaB`
+
+Baseline on entry: **616 passing, 0 failing**.
+Exit state: **617 passing, 0 failing** (+1 test).
+
+---
+
+### 1. Bug fix: `isPlanExpired` — missing guard for `weeks` duration with `value = 0`
+
+**Summary**: A plan configured with `{ type: 'weeks', value: 0 }` would
+compute `endDate = startDate`, making `today >= endDate` immediately true.
+The "Plan complete!" banner would appear the moment such a plan was activated,
+before the user had done a single workout.
+
+**Why it matters**: The `value <= 0` guard already existed in the `rotations`
+branch of the same function. The `weeks` branch was missing it, creating a
+silent asymmetry. While users are unlikely to configure a 0-week plan
+intentionally, the plan builder does not prevent it, and a malformed YAML
+import could produce one.
+
+**Files changed**: `src/engine/rotationEngine.ts`
+
+**Change**: Moved `if (value <= 0) return false` above both type branches so
+the guard applies uniformly to weeks and rotations plans.
+
+**Risks / tradeoffs**: Zero — the guard is only reached for `value = 0` or
+negative, which represents invalid configuration. Valid plans (value ≥ 1) are
+unaffected.
+
+**Rollback**: `git revert` the commit. No data migration needed.
+
+---
+
+### 2. Test: cover the weeks+zero guard
+
+**Summary**: Added two assertions to the `isPlanExpired` test suite —
+`isPlanExpired` with a weeks plan + `value = 0` on its start date and far
+in the future both return `false`. Mirrors the existing rotations zero-value test.
+
+**Files changed**: `src/engine/__tests__/rotationEngine.test.ts`
+
+**Risks**: None.
+
+---
+
+### 3. Feature: previous session notes in TodayPage pending-state hint
+
+**Summary**: When the user is pending (today's workout not yet logged) and
+a prior session for the same plan day exists with non-empty notes, those notes
+are now shown as a second italic hint line below the existing "Last: …" summary.
+
+Example before: `Last: 3×8 @ 135 lb Bench Press`
+Example after:
+```
+Last: 3×8 @ 135 lb Bench Press
+"felt strong, ready to add 5 lb"
+```
+
+**Why it matters**: Athletes regularly write session notes ("left shoulder
+tight", "felt great, up the weight next time") that are immediately useful
+context for the next session of the same movement. Without this, those notes
+are buried inside the outcome modal and effectively invisible at the moment
+they're most needed.
+
+**Files changed**: `src/pages/TodayPage.tsx`
+
+**Change**: The `lastSessionSummary` single `<p>` was replaced with a
+wrapping `<div>` that conditionally renders both the summary line and a
+second italic `<p>` for `prevSessionOutcome?.notes`. Both lines truncate at
+screen width via `truncate`. The same visibility condition (pending + no
+double-day) applies to both lines.
+
+**Risks / tradeoffs**:
+- Notes can be long; truncation prevents layout breakage but long notes are
+  cropped without ellipsis on touch overflow. Acceptable — the full note is
+  still accessible via the "Edit outcome" modal.
+- No new state, no new hooks, no new data fetching. `prevSessionOutcome` was
+  already computed one line above.
+- The italic `"..."` framing is a style decision — easy to revise.
+
+**Rollback**: `git revert` the commit. One self-contained change to TodayPage.
+
+---
+
 ## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
 
 Baseline on entry: **609 passing, 0 failing**.

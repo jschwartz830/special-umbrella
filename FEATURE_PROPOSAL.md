@@ -1,3 +1,87 @@
+# Feature Proposal — Previous Session Notes in TodayPage Hint
+
+Date: 2026-05-13
+Branch: `claude/dreamy-mccarthy-G6yaB`
+Status: **Implemented this run**
+
+## Feature selected
+
+Show the previous session's notes as a second hint line below the existing
+"Last: …" workout summary on TodayPage, when the workout is pending and
+the prior session has non-empty notes.
+
+## Why it was selected
+
+The "Last: …" hint (added in pass 18, extended in passes 20/24/25) already
+surfaces the most useful pre-workout data: what weight was used, how far was
+run, pace. But athlete notes capture the qualitative signal that numbers can't:
+"left shoulder tight", "ready to go heavier", "form broke down at set 4".
+
+Currently, those notes are stored in the outcome but invisible at decision
+time. A user who writes "add 5 lb next time" has to remember to open the
+outcome modal to retrieve that note — which most won't do. Surfacing it
+automatically turns notes from a filing system into an active coaching tool.
+
+## Expected user value
+
+- Intermediate-to-advanced users who write session notes will see their own
+  advice at the moment it's actionable.
+- Users who don't write notes see no change.
+- No learning curve — the note just appears below the existing hint.
+
+## Implementation scope for this run
+
+- Narrowest viable slice: render `prevSessionOutcome.notes` as one italic
+  `<p>` below `lastSessionSummary` in TodayPage.
+- Reuse existing `prevSessionOutcome` which is already computed one line above.
+- Same visibility guard as `lastSessionSummary` (pending + no double-day).
+- Truncate with CSS to prevent layout breakage on long notes.
+
+## Assumptions being made
+
+- Notes are written by the user for themselves and are useful across sessions.
+- Truncation at the hint level is acceptable; the full note is accessible via
+  "Edit outcome".
+- Italic `"…"` framing is a reasonable visual treatment; it's easy to revise.
+
+## Open product / UX decisions
+
+1. **Length threshold**: Should notes longer than N chars be suppressed rather
+   than truncated? Could reduce noise for very long self-authored notes.
+2. **When both are shown**: If `lastSessionSummary` is null but notes exist,
+   should the notes still show? Current implementation: yes (the `||` condition
+   handles either/both being truthy).
+3. **Label**: No "Last session:" label precedes the notes — they follow the
+   summary and are visually distinct via italic. Consider adding a subtle label
+   if users find the note's origin ambiguous.
+
+## Architecture or schema impact
+
+None. `prevSessionOutcome?.notes` is `string | null | undefined` on the
+existing `WorkoutOutcome` type. No new fields, no new store subscriptions.
+
+## Risks
+
+- Long notes truncated by CSS (`truncate`) may leave users unsure if the note
+  is complete. Acceptable since the full note is one tap away.
+- If `prevSessionOutcome` changes identity on every render (unlikely given
+  memoization via `findPreviousSessionForPlanDay`), there is no extra re-render
+  cost beyond the existing computation.
+
+## Rollback strategy
+
+Single-commit change to `TodayPage.tsx`. `git revert 643014e`. No data
+migration, no store changes, no downstream effects.
+
+## What is intentionally not being built yet
+
+- Notes displayed for completed state (only shown when pending).
+- Notes from extras or double-day sessions (only rotation history entries).
+- A "notes history" panel or expandable view.
+- Ability to edit the note directly from the hint.
+
+---
+
 # Feature Proposal — Auto-Derive Pace in Run Session Summary
 
 Date: 2026-05-10

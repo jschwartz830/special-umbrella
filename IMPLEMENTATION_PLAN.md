@@ -634,3 +634,78 @@ itself (5) on a clean test-covered foundation.
 - `derivePaceSecondsPerMile` is not called by `buildLastSessionSummary` — if
   `averagePaceSecondsPerMile` is absent but distance + duration are both present,
   pace could be derived automatically. Deferred as a product decision.
+
+---
+
+## Pass 26 — 2026-05-13 (branch `claude/dreamy-mccarthy-G6yaB`)
+
+### Observations on entry
+
+- Baseline: **616 passing, 0 failing** (after `npm install` on fresh env).
+- All 25 prior pass fixes stable — no regressions.
+- **`isPlanExpired` — missing `value <= 0` guard for `weeks` type**: The
+  `value <= 0` guard existed only in the rotations branch. A plan configured
+  with `{ type: 'weeks', value: 0 }` would compute `endDate = startDate`,
+  making `today >= endDate` true on day one and triggering the "Plan complete!"
+  banner immediately. The rotations branch already had the guard; weeks did not.
+- **`last7Completed` / "This week" label mismatch**: Rolling 7-day window,
+  not Mon–Sun calendar week. Low-impact UX inconsistency — documented only.
+- **`workoutInstanceId` parsing via `split('_')`**: Fragile convention that
+  works because plan IDs (base-36, no underscores) and calendar dates
+  (YYYY-MM-DD, hyphens only) never contain underscores. Worth a comment; not
+  blocking.
+- **Previous session notes not surfaced**: `prevSessionOutcome` is already
+  computed on TodayPage and its `notes` field is stored in every outcome, but
+  notes were silently discarded in the hint display. A user who writes "left
+  shoulder tight" or "ready to go heavier" loses that context every session.
+
+### Decisions
+
+- **Fix `isPlanExpired` weeks+zero** — one-line guard hoist, highest
+  confidence, no behavior change for valid configs.
+- **Add test for the above** — parallel to existing rotations zero-value test.
+- **Feature: previous session notes in TodayPage hint** — additive, uses
+  already-computed `prevSessionOutcome`, zero new state or data fetching.
+
+### Architecture summary (unchanged)
+
+Stack, store split, and engine layering match all prior audits. No
+architectural drift since pass 25. All previous PRs (#27–#91) merged.
+
+### What appears strong and well-designed (this pass)
+
+- 617-test suite stable across 26 passes; no regressions.
+- `sessionSummary.ts` has comprehensive test coverage (35 tests across
+  `findPreviousSessionForPlanDay` and `buildLastSessionSummary`).
+- The pure-function rotation engine continues to be the most reliable
+  subsystem; all edge cases exercised by 62 dedicated tests.
+- Double-day flow, CalendarPage retroactive editing, and YAML program
+  progression are all well-tested after prior passes.
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|---|---|---|---|
+| P0 Bug | `isPlanExpired` weeks+zero guard | Very low | ✅ Done |
+| P0 Test | Add weeks+zero test | None | ✅ Done |
+| P1 Feature | Previous session notes in TodayPage hint | Low | ✅ Done |
+| P2 Docs | "This week" label semantics | Recommendation only | — |
+| P3 Refactor | Named helper for instanceId parsing | Recommendation only | — |
+
+### Exit state
+
+**617 passing, 0 failing** (+1 test from baseline).
+
+### Carry-over open items
+
+- Streak display is "strict" (0 until today is logged); product decision —
+  recommend evaluating a grace-period or "pending" streak display.
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX).
+- `last7Completed` uses a rolling 7-day window but the UI says "This week".
+- `workoutInstanceId` parsing via `split('_')` should have a named helper or
+  comment to make the implicit contract explicit.
+- `WorkoutType` union includes deprecated values (`weightlifting`, `long_run`,
+  `recovery_run`, `rest`) — worth eventual cleanup once all migration paths
+  are verified complete.
+- `getTodayResolvedDay` returns `planDay: undefined` for a 0-day plan (type
+  lie); guarded by UI convention but not enforced at the type level.

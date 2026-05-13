@@ -1,3 +1,70 @@
+# Feature Review — Previous Session Notes in TodayPage Hint
+
+Date: 2026-05-13
+Branch: `claude/dreamy-mccarthy-G6yaB`
+Classification: **Keep** (with optional visual tweak)
+
+## What was actually built
+
+A second hint line below the "Last: …" summary on TodayPage, visible when:
+- The workout is pending (not yet logged today)
+- Double-day mode is off
+- `prevSessionOutcome?.notes` is a non-empty string
+
+The notes appear in italic with `"..."` framing and are truncated at screen
+width. Both the summary and notes share a wrapping `<div className="space-y-0.5">`.
+
+## What assumptions were encoded
+
+1. Notes from the previous session are useful context before the next session
+   of the same plan day.
+2. Truncation at hint level is acceptable; the full note is in the outcome modal.
+3. The italic `"..."` visual treatment clearly signals "quoted prior note".
+4. Showing notes even when `lastSessionSummary` is null (e.g., yoga session
+   with no metrics but a written note) is correct behavior.
+
+## What worked well
+
+- Zero new state, zero new data fetching, zero new store subscriptions.
+  `prevSessionOutcome` was already computed immediately above the hint.
+- The wrapping `<div>` approach cleanly handles all four combinations:
+  summary only, notes only, both, neither.
+- The feature degrades gracefully: users who don't write notes see no change.
+
+## What feels risky or incomplete
+
+- **Not browser-tested**: This is a JSX change in a CLI-only environment.
+  The layout in the actual PWA should be visually confirmed, especially on
+  narrow screens where truncation matters most.
+- **Style decision**: The italic `"..."` framing is an aesthetic call. You
+  may prefer a different treatment (e.g., a faint left border, a "📝" prefix,
+  or no special framing).
+- **No length threshold**: A 300-character note will be shown and truncated.
+  Consider suppressing notes longer than ~100 chars or adding a "..." indicator
+  at truncation.
+
+## What I should evaluate tomorrow
+
+1. Open TodayPage with a workout that has prior session notes. Verify the
+   italic note line renders below the "Last:" summary cleanly.
+2. Check narrow-viewport behavior (iPhone SE 375px width).
+3. Decide whether the `"..."` framing or a plain italic line is preferred.
+4. If notes are usually short: keep as-is. If they tend to be long: add a
+   character limit or max-width clamp.
+
+## Recommended next steps
+
+- Visual QA in the actual app.
+- Optionally add a character-length threshold to suppress very long notes.
+- If the style feels off, one-line tweak to the italic `<p>` className.
+
+## Keep / revise / prototype only / reject
+
+**Keep** — the feature is additive, uses existing data, and solves a real
+friction point. The main open question is visual polish, not logic.
+
+---
+
 # Feature Review — Auto-Derive Pace in Run Session Summary
 
 Date: 2026-05-10
