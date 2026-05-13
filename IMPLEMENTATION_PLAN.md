@@ -659,6 +659,19 @@ itself (5) on a clean test-covered foundation.
   strips `tags → undefined` on load, so this is only relevant for plans exported
   before v2 migration runs. Low impact; documented.
 - No test gaps introduced since pass 24 (all new code in passes 23–24 is covered).
+## Pass 25 — 2026-05-11 (branch `claude/dreamy-mccarthy-3SEA4`)
+
+### Observations on entry
+
+- Baseline: **609 passing, 0 failing** (after `npm install` on fresh env).
+- REVIEW_NOTES from pass 24 flagged `averagePaceSecondsPerMile` as "probably keep
+  but tweak": add a `> 0` guard to prevent "0:00 /mi" if the field is accidentally
+  stored as 0. Simple defensive guard, deferred from pass 24.
+- REVIEW_NOTES from pass 24 also flagged swim pace as "ready to implement when
+  desired" — `averagePaceSecondsPer100m` is captured in `SwimWorkoutActual` and
+  `formatSwimPace` exists and is tested (added pass 24), but was never surfaced in
+  the session summary hint. Mirrors the run pace feature added in pass 24.
+- No new bugs or regressions found in the core engine, stores, or test suite.
 
 ### Architecture summary (unchanged)
 
@@ -683,6 +696,36 @@ drift since pass 24. All previous PRs merged.
      post-activation.
    - CSV re-import of rotation entries is not idempotent (fresh IDs generated each
      time; mitigated by per-date deduplication on merge).
+drift since pass 24. All previous PRs (#27–#91) merged into this branch.
+
+### What appears strong and well-designed (unchanged)
+
+- 609-test suite stable across 24 prior passes; no regressions.
+- Pure-function rotation engine with thorough coverage.
+- Clean store isolation: historyStore, outcomeStore, planStore, programStore.
+- `buildLastSessionSummary` and `findPreviousSessionForPlanDay` are well-extracted,
+  fully-tested pure functions in `src/lib/sessionSummary.ts`.
+
+### Key issues found this pass
+
+1. **`averagePaceSecondsPerMile === 0` could produce "0:00 /mi" in the hint** (DISPLAY BUG).
+   The existing null guard `!= null` passes through a value of `0`, which `formatPace`
+   would render as "0:00 /mi". While 0 is not a realistic pace, defensive data handling
+   is correct. Closed the "probably keep but tweak" item from pass 24 REVIEW_NOTES.
+
+2. **Swim pace not shown in session summary** (FEATURE GAP — from pass 24 carry-over).
+   `averagePaceSecondsPer100m` is captured in `OutcomeModal` and stored in
+   `SwimWorkoutActual`, but was never surfaced in `buildLastSessionSummary`. The exact
+   same pattern as run pace (added pass 24) was straightforward to apply. Same `> 0`
+   guard applied for consistency.
+
+### Decisions
+
+- **Fix run pace `> 0` guard** — 1-line change, closes carry-over item.
+- **Add swim pace to session hint** — 1-line change, mirrors run pace pattern, 0 new
+  store dependencies.
+- **Do NOT auto-derive pace** from distance + duration when stored pace is null — kept
+  as deferred product decision per pass 24 notes. Swim pace auto-derive similarly deferred.
 
 ### Prioritized plan
 
@@ -710,3 +753,25 @@ product risk — the caller decides whether and where to surface it.
 - Expression evaluator should surface errors to UI for malformed progression rules.
 - `derivePaceSecondsPerMile` auto-derivation deferred (product decision).
 - Wire `computePlanStreak` into TodayPage or HistoryPage stat display.
+| 1 | Fix run pace `> 0` guard + test | None | ✅ Done |
+| 2 | Add swim pace to session hint + tests | None | ✅ Done |
+
+### Rationale for sequencing
+
+Both changes are in the same function and test file; batched into one commit for
+reviewability. Bug fix first (item 1), feature additive on top (item 2).
+
+### Exit state
+
+**613 passing, 0 failing** (+4 tests from baseline).
+
+### Carry-over open items
+
+- Streak display is "strict" (0 until today is logged); product decision.
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX).
+- Narrow Zustand selectors in CalendarPage (performance, not urgent).
+- Document progression system migration path.
+- Expression evaluator should surface errors to UI for malformed progression rules.
+- Auto-derive run pace from distance + duration when `averagePaceSecondsPerMile` is
+  null — deferred as product decision.
+- Auto-derive swim pace from distance + duration — deferred, same rationale.

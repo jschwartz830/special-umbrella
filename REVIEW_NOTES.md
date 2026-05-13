@@ -1,6 +1,21 @@
 # Review Notes — Overnight Audit
 
 ## 2026-05-12 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-OjsGg`
+## 2026-05-11 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-3SEA4`
+
+### Executive summary
+
+1. **What changed:** 1 commit — run pace zero-guard (bug fix) + swim pace in session
+   hint (small feature). 4 new tests; no source changes outside `sessionSummary.ts`.
+2. **Highest confidence:** Both changes are additive / defensive. The swim pace addition
+   is a one-liner that mirrors the already-proven run pace pattern from pass 24. The pace
+   guard is a single `&& > 0` addition that cannot regress existing behavior.
+3. **Risky:** Nothing risky. The only side effect is that swim sessions with a stored
+   `averagePaceSecondsPer100m` will now show pace in the "Last:" hint on TodayPage.
+4. **Review first:** Check that swim outcomes created before this pass do not have
+   `averagePaceSecondsPer100m` set to a nonsensical value (e.g., 0) that would now
+   be guarded away. The guard is defensive, so even if they do, no bad data appears.
+## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
 
 ### Executive summary
 
@@ -29,6 +44,13 @@
 | 4 | CSV rotation re-import not idempotent (new IDs each time) | Medium | Documented |
 | 5 | No `outcomeStore.logOutcomeWithProgression` unit tests | Medium | Recommended |
 | 6 | No weighted-outcome CSV round-trip test | Medium | Recommended |
+| # | Severity | Description | Status |
+|---|----------|-------------|--------|
+| B1 | Low | `averagePaceSecondsPerMile === 0` passed null-guard, producing "0:00 /mi". Carried over from pass 24 REVIEW_NOTES. | Fixed |
+| G1 | Low | Swim pace (`averagePaceSecondsPer100m`) captured but never displayed in session hint. Same gap as run pace (fixed pass 24). | Fixed |
+| B1 | Medium | CalendarPage `handleOutcomeConfirm` stale `entries` closure: action label not updated when both date and completion state change in same edit. Same class of bug as pass-18 HistoryPage fix. | Fixed |
+| B2 | Low | `buildLastSessionSummary`: `averagePaceSecondsPerMile === 0` displays "0:00 /mi" (carry-over from pass 24). | Fixed (superseded by auto-derive) |
+| B3 | Low | `buildLastSessionSummary`: swim `actualDistanceMeters` displayed as raw float; run was fixed in pass 24 but swim was missed. | Fixed |
 
 ---
 
@@ -44,6 +66,15 @@
 2. **`computePlanStreak` feature** (`historyStats.ts`, `historyStats.test.ts`)
    - New pure function, no UI wiring, 12 tests.
    - Enables a plan-scoped streak stat on TodayPage or HistoryPage.
+| Item | Type | Commit |
+|------|------|--------|
+| Run pace `> 0` guard in session hint | Bug fix | `6568f42` |
+| Swim pace in session hint + 3 tests | Feature | `6568f42` |
+| # | Description | Files |
+|---|-------------|-------|
+| 1 | CalendarPage stale closure fix | `CalendarPage.tsx` |
+| 2 | Pace=0 guard + swim rounding + 2 tests | `sessionSummary.ts`, `sessionSummary.test.ts` |
+| 3 | Auto-derive pace feature + 7 tests (5 updated, 7 new) | `sessionSummary.ts`, `sessionSummary.test.ts` |
 
 ---
 
@@ -65,6 +96,43 @@ completion forecast, UI filter) was deliberately skipped in favour of stability.
 
 - Bug fix commit (double-progression guard). Direct correctness improvement with
   regression tests.
+- **Run pace `> 0` guard** — strictly defensive; closes pass 24 carry-over item.
+- **Swim pace display** — clearly adjacent, zero new dependencies, well-tested.
+
+### Probably keep but tweak
+
+Nothing.
+
+### Do not keep
+
+Nothing.
+
+### Recommendations only (not implemented)
+
+| Item | Notes |
+|------|-------|
+| Auto-derive run pace | When `averagePaceSecondsPerMile` is null but distance + duration are both present, derive pace with `derivePaceSecondsPerMile`. Deferred product decision since pass 24. |
+| Auto-derive swim pace | Same pattern for swim. |
+| Streak grace period | Reset to 0 each morning until today is logged. Recommend "pending streak" display. Product decision. |
+| Plan builder `duration.value > 0` validation | No crash, just bad UX. Simple guard in PlanBuilderPage save handler. |
+| Expression evaluator errors to UI | Malformed progression rules silently evaluate to 0; surfacing errors would help YAML plan authors. |
+
+---
+
+### Open questions for me
+
+1. **Swim pace display:** the field name `averagePaceSecondsPer100m` implies pool/meters.
+   Do any of your swim workouts use yards? If so, the unit label "/100m" may be incorrect
+   for those sessions.
+2. **Auto-derive pace:** now that swim pace is displayed, do you want pace to be shown
+   even when it was not manually entered — derived from distance + duration? Currently
+   deferred as a product decision; easy to implement in the same function.
+
+### Known issues or incomplete work
+
+None.
+- CalendarPage stale closure fix — correctness bug, no risk.
+- Swim rounding fix — cosmetic consistency.
 
 ### Probably keep but tweak
 
@@ -2259,6 +2327,48 @@ items from passes 17–19 are now resolved.
    session after retroactive history edits that shift planDayIndex values? If
    so, the hint shows stale data. The same concern applies to
    `previousSetsByExercise` (pre-existing, not introduced here).
+## 2026-05-03 (twentieth pass) — branch `claude/dreamy-mccarthy-SwIxl`
+
+### Executive summary
+
+1. **What changed**: 29 new unit tests for `exerciseHistoryStore` (no prior
+   coverage), and the Personal Records feature added to the History tab — a
+   collapsible table showing per-exercise best weight, best reps, and session
+   count. A dead-code bug in `PersonalRecordsSection` was found and fixed. 469
+   tests now pass (was 440).
+
+2. **What is highest confidence**: The test suite — all 29 new tests are
+   straightforward unit tests against pure logic with no external dependencies.
+   The `computePersonalRecords` function is a single-pass reduce with clear
+   invariants. The dead-code fix is mechanical (removed unreachable branch).
+
+3. **What is risky**: `PersonalRecordsSection` is a new UI component that hasn't
+   been browser-tested. The component is display-only with no side effects, so
+   the risk is limited to visual rendering (layout, overflow, empty states).
+
+---
+
+### What changed
+
+#### Test: `exerciseHistoryStore` (29 new tests)
+
+`src/store/__tests__/exerciseHistoryStore.test.ts` — new file. Covers all six
+public methods of the store added in PR #66 that had zero prior coverage.
+
+Notable: the `upsertFromOutcome` method parses `planId` and `calendarDate` from
+the `workoutInstanceId` string. Both the standard format (`planId_date`) and the
+extra format (`planId_date_extra_id`) are tested. The idempotency invariant
+(second call replaces, not appends) is verified explicitly.
+
+#### Feat: Personal Records in History tab
+
+`src/pages/HistoryPage.tsx` — new `PersonalRecordsSection` component, new
+`computePersonalRecords` pure function, new `PersonalRecord` interface. The
+section renders only when there are records; it collapses by default.
+
+Dead-code fix: `{hasMore && !expanded && (...)}` was inside `{expanded && (...)}`,
+making the `!expanded` guard always `false`. Removed the dead branch and
+simplified the component to a plain toggle.
 
 ---
 
@@ -2269,6 +2379,14 @@ items from passes 17–19 are now resolved.
 - **Run/swim PB** — no PB detection for run or swim outcomes.
 - **Double-day rotation behavior** — advance override + complete on the same
   day still untested.
+- **`computePersonalRecords` unit tests** not yet written. The function is
+  exported and easily testable; carrying forward as a low-priority gap.
+- **`truncate` overflow on exercise names** in the PR table — long exercise
+  names may overflow the first column on narrow screens. Low priority.
+- **`truncate` on session hint** (carry-over from pass 18). Low priority.
+- **`findPreviousSessionForPlanDay` / `buildLastSessionSummary`** still
+  untested. Low priority.
+- **`planStore.setActivePlan` / `duplicatePlan`** still untested. Medium.
 
 ---
 
