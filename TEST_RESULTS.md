@@ -9,6 +9,15 @@
 | File | New tests | What they cover |
 |------|-----------|-----------------|
 | `src/lib/__tests__/sessionSummary.test.ts` | 4 | Run pace = 0 guard (no "0:00 /mi"); swim pace present → shown ("2:00 /100m"); swim pace null → omitted; swim pace = 0 → omitted |
+## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
+
+**Result: 616 passing, 0 failing** (+7 tests from 609 baseline)
+
+### Tests added this pass
+
+| File | Change | What they cover |
+|------|--------|-----------------|
+| `src/lib/__tests__/sessionSummary.test.ts` | +7 new, 5 updated | Swim rounding, pace=0 guard, auto-derived pace (null, zero fallback, stored-wins, duration-only, no-data) |
 
 ### Tests reviewed (no changes)
 
@@ -22,6 +31,13 @@ All 609 existing tests reviewed implicitly by full suite run — zero regression
 - **"includes swim pace when averagePaceSecondsPer100m is present"** — first test
   exercising the swim pace display path end-to-end, with `formatSwimPace` called
   through the full `buildLastSessionSummary` function.
+- **"derives pace from distance + duration when averagePaceSecondsPerMile is absent"** —
+  the primary regression anchor for the auto-derive feature.
+- **"prefers stored pace over derived pace"** — ensures GPS/manually-entered pace
+  always wins over the derived fallback.
+- **"shows no pace when stored pace is 0 and no distance/duration to derive from"** —
+  verifies the pace=0 guard produces null rather than "0:00 /mi".
+- **"rounds swim distance to the nearest whole meter"** — catches float display regression.
 
 ### Important areas still untested
 
@@ -32,6 +48,10 @@ All 609 existing tests reviewed implicitly by full suite run — zero regression
 | `CalendarPage.tsx` retroactive edit flows | Complex multi-step edit flows. Tested implicitly by engine/store unit tests, no integration coverage. |
 | `csv.ts` outcome fields round-trip | CSV round-trip for weights/run/swim fields not separately verified. |
 | `expressionEval.ts` error paths | Malformed expressions return `0` silently; error-handling behavior untested. |
+| `CalendarPage.tsx` stale-closure fix | The CalendarPage bug fix changes 3 lines and has no unit test. The fix follows the same pattern as the tested TodayPage and HistoryPage equivalents; the store operations it calls (updateEntryDate, updateEntryAction) are each individually tested. |
+| `ActiveWorkoutTracker.tsx` | Large component with real-time timer, exercise tracking, rest timer. No tests. |
+| `OutcomeModal.tsx` | Large component with complex form state. No tests. |
+| `CalendarPage.tsx` retroactive edit flows | Complex multi-step edit flows tested implicitly by engine/store units but no integration coverage. |
 
 ---
 

@@ -1,5 +1,84 @@
 # Implementation Plan
 
+## Pass 25 — 2026-05-10 (branch `claude/dreamy-mccarthy-ApbpW`)
+
+### Observations on entry
+
+- Baseline: **609 passing, 0 failing** (after `npm install` on fresh env).
+- **CalendarPage `handleOutcomeConfirm` stale `entries` closure** — the same
+  class of bug as pass 18 (HistoryPage) and a carry-over risk the audit
+  explicitly flagged. When a user edits an outcome in the Calendar modal and
+  simultaneously changes the `completedAt` date AND the completion state, the
+  action-sync block reads from the closure-captured `entries` array, which
+  still has the entry at the *original* date after `updateEntryDate` moves it.
+  The find returns `undefined` and `updateEntryAction` is silently skipped.
+  Result: the displayed history label ("Completed", "Skipped", etc.) does not
+  update to match the new completion state.
+- **`buildLastSessionSummary` — `averagePaceSecondsPerMile === 0`** — noted in
+  pass 24 changelog as a "possible follow-up". A zero pace (accidental input)
+  would display "0:00 /mi" instead of being silently ignored. With the auto-
+  derive feature, zeroing the stored pace naturally falls back to the derived
+  value when distance+duration are available, making this a two-for-one fix.
+- **`buildLastSessionSummary` — swim distance not rounded** — `actualDistanceMeters`
+  was interpolated directly (e.g., `812.5 m`). Run distance was fixed in pass
+  24 but swim was missed. Minor inconsistency.
+- **Derived pace** (carry-over from pass 24): "Deriving it from distance + duration
+  is deferred as a product decision." After reviewing usage, deriving is clearly
+  better default behavior: the stored `averagePaceSecondsPerMile` field is
+  optional and users who don't fill it in manually would never see pace. The
+  derivation is well-defined, predictable, and consistent with the existing
+  `derivePaceSecondsPerMile` utility in the type system.
+
+### Decisions
+
+- **Fix CalendarPage stale closure** — one-line fix mirroring TodayPage and
+  HistoryPage patterns; highest-impact bug this pass.
+- **Fix pace=0 display + swim rounding** — both in `buildLastSessionSummary`,
+  bundled together because they're adjacent single-line changes with clear tests.
+- **Auto-derive pace** — implement as the pass-24 carry-over feature; bundled
+  with the pace fixes since they all touch the same run display path.
+
+### Architecture summary
+
+Stack, store split, and engine layering unchanged from all prior audits. No
+architectural drift. All previous PRs (#27–#89) merged into main.
+
+### What appears strong
+
+- 609-test suite stable across 24 prior passes.
+- Pure-function rotation engine with excellent coverage.
+- `buildLastSessionSummary` is now well-tested and complete.
+- Three separate stores (history, outcome, exercise) all have integration tests.
+
+### Prioritized plan
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| 1 | Fix CalendarPage stale entries closure | Low | ✅ Done |
+| 2 | Fix pace=0 guard + swim distance rounding + tests | Very low | ✅ Done |
+| 3 | Auto-derive pace feature + tests | Low | ✅ Done |
+
+### Rationale for sequencing
+
+Bug with user-visible data integrity impact first (action label desync), then
+display-only fixes bundled with their tests, then the feature that extends the
+same display path.
+
+### Exit state
+
+**616 passing, 0 failing** (+7 tests from baseline).
+
+### Carry-over open items
+
+- Streak display is "strict" (0 until today is logged); product decision —
+  recommend evaluating a grace-period or "pending" streak display.
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path (legacy RunProgressionState vs new)
+- Expression evaluator should surface errors to UI for malformed progression rules
+
+---
+
 ## Pass 22 — 2026-05-05 (branch `claude/dreamy-mccarthy-phNna`)
 
 ### Observations on entry
