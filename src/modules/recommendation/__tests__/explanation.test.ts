@@ -197,4 +197,24 @@ describe('summariseRunOutcome', () => {
     }))
     expect(result).toBe('45 min')
   })
+
+  it('omits pace when averagePaceSecondsPerMile is 0 (bad data guard)', () => {
+    const result = summariseRunOutcome(makeOutcome({
+      runActual: {
+        actualDistanceMiles: 3,
+        actualDurationMin: 30,
+        averagePaceSecondsPerMile: 0,
+      },
+    }))
+    expect(result).toBe('3 mi · 30 min')
+  })
+
+  it('uses formatPace to prevent secs=60 display edge case', () => {
+    // 599.5 sec/mi — raw Math.round(599.5 % 60) = 60, which would produce "9:60 /mi"
+    // formatPace rounds totalSecs first, producing "10:00 /mi" instead
+    const result = summariseRunOutcome(makeOutcome({
+      runActual: { averagePaceSecondsPerMile: 599.5 },
+    }))
+    expect(result).toBe('10:00 /mi')
+  })
 })
