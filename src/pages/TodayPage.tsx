@@ -639,8 +639,15 @@ export function TodayPage() {
       )}
 
       {/* Previous-session hint — visible only when pending, not in double-day mode */}
-      {lastSessionSummary && !doubleDay && (
-        <p className="text-xs text-slate-500 -mt-2 ml-1 truncate">{lastSessionSummary}</p>
+      {(lastSessionSummary || prevSessionOutcome?.notes) && !doubleDay && (
+        <div className="-mt-2 ml-1 space-y-0.5">
+          {lastSessionSummary && (
+            <p className="text-xs text-slate-500 truncate">{lastSessionSummary}</p>
+          )}
+          {prevSessionOutcome?.notes && (
+            <p className="text-xs text-slate-600 italic truncate">"{prevSessionOutcome.notes}"</p>
+          )}
+        </div>
       )}
 
       {/* Double-day bonus workout */}
