@@ -1,5 +1,52 @@
 # Test Results
 
+## 2026-05-13 (twenty-sixth pass) — branch `claude/dreamy-mccarthy-G6yaB`
+
+**Result: 617 passing, 0 failing** (+1 test from 616 baseline)
+
+### Tests reviewed
+
+All 18 test files reviewed. No regressions. Key files audited in depth:
+
+| File | Tests | Notes |
+|---|---|---|
+| `rotationEngine.test.ts` | 62 | Thorough; covers overrides, wrap-around, guards |
+| `historyStats.test.ts` | 97 | Complete coverage of all exported functions |
+| `sessionSummary.test.ts` | 35 | Excellent; covers PB, pace derivation, edge cases |
+| `progression.test.ts` | (passing) | Covers all slot types and action outcomes |
+| `expressionEval.test.ts` | (passing) | Arithmetic, logical, function, update expressions |
+
+### Tests added this pass
+
+| File | Test | Purpose |
+|---|---|---|
+| `src/engine/__tests__/rotationEngine.test.ts` | `isPlanExpired weeks > is never expired when duration value is 0` | Regression anchor for the weeks+zero bug fix |
+
+### Test results (run output)
+
+```
+Test Files  18 passed (18)
+     Tests  617 passed (617)
+  Start at  07:16:42
+  Duration  1.76s
+```
+
+### Important areas still untested
+
+1. **TodayPage React component** — the session notes feature is in JSX and
+   cannot be unit tested without a component testing setup (vitest-browser or
+   Testing Library). Visual verification required.
+2. **CalendarPage** — complex retroactive editing flows (backdate, jump override
+   removal+re-add) are tested at the engine level but not at the component level.
+3. **`outcomeStore.logOutcomeWithProgression` with program progression rules** —
+   the full pipeline (condition eval → var update → store write) is tested
+   through `programStore.test.ts` but not through the outcome store integration
+   layer.
+4. **CSV import/export round-trip** — `csv.test.ts` tests parsing/serialization
+   but not the full store import flow triggered by the Settings page.
+
+---
+
 ## 2026-05-12 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-OjsGg`
 ## 2026-05-11 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-3SEA4`
 

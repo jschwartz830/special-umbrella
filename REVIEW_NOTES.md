@@ -1,5 +1,133 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-13 (twenty-sixth pass) — branch `claude/dreamy-mccarthy-G6yaB`
+
+### Executive summary
+
+**What changed**: Fixed `isPlanExpired` for the weeks+zero edge case (+1
+test), added previous session notes to the TodayPage pending-state hint
+(feature). **617 tests, all green**. The codebase is stable and well-covered
+after 25 prior passes; this was a light maintenance pass.
+
+**Highest confidence**: The `isPlanExpired` fix — single-line guard hoist,
+parallel to an identical guard that already existed for rotations plans, no
+behavior change for valid configs.
+
+**What is risky**: The session notes feature makes a small style choice (italic
+`"..."` framing) that you may want to tweak. No logic or data risk.
+
+**Review first**: The `isPlanExpired` bug fix (commit `1ea728e`). It's one
+moved line. Then the feature commit (`643014e`) — three JSX lines that replace
+one.
+
+---
+
+### Biggest issues found
+
+1. **`isPlanExpired` weeks+zero (FIXED)**: See above. Silent edge case with
+   a valid code path (plan builder doesn't prevent value=0; a malformed YAML
+   import could produce one).
+
+2. **`last7Completed` / "This week" label mismatch (NOT FIXED — recommendation
+   only)**: The stat counts the last 7 rolling calendar days, not the current
+   Mon–Sun week. On a Wednesday, "this week" to most users means Mon–Wed (3
+   days) but the code counts the last 7 (Thu last week through today).
+   Changing it would break the existing stat semantics for all users. Document
+   your intent and decide whether to rename the label or change the window.
+
+3. **`workoutInstanceId` parsing via `split('_')` (NOT FIXED — recommendation
+   only)**: `outcomeStore.ts:136` extracts `planId` from the instance ID by
+   splitting on `_`. Works correctly given the current ID format (alphanumeric
+   plan IDs, hyphen-only calendar dates) but is fragile if either format ever
+   changes. Consider a named helper or explicit comment.
+
+---
+
+### Improvements completed
+
+| # | Description | Commit | Risk |
+|---|---|---|---|
+| 1 | Fix `isPlanExpired` weeks+zero guard | `1ea728e` | None |
+| 2 | Test: weeks+zero guard | `c4fe308` | None |
+| 3 | Feature: previous session notes hint | `643014e` | Low |
+
+---
+
+### Small features added
+
+**Previous session notes in TodayPage** (`643014e`): When pending, if the
+most recent completed session for the same plan day has non-empty notes, those
+notes appear as an italic second line below the "Last: …" summary. Uses
+`prevSessionOutcome` which was already computed. Zero new state or data fetching.
+
+---
+
+### Medium-complexity feature explored
+
+None this pass. The codebase is stable and the bug + small feature consumed
+the available budget. See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md.
+
+---
+
+### Definitely keep
+
+- **`isPlanExpired` fix** — closes a real edge case with zero risk.
+- **The new test** — direct regression anchor for the fix.
+
+### Probably keep but tweak
+
+- **Previous session notes** — the feature is useful; the italic `"..."` style
+  is one option. You may prefer a different visual treatment or want to show
+  notes only when they're short enough (e.g., < 80 chars). Easy to adjust.
+
+### Do not keep
+
+- Nothing to revert.
+
+### Recommendations only (not implemented)
+
+1. **Rename "This week" → "Last 7 days"** in the stats bar, or change the
+   window to be Mon–Sun. Low code risk, medium product consideration.
+2. **Named helper for `workoutInstanceId` parsing** in `outcomeStore.ts` — a
+   `parseWorkoutInstanceId(id)` function with a comment about the format
+   contract would make future readers more confident.
+3. **`WorkoutType` deprecated values cleanup** — `weightlifting`, `long_run`,
+   `recovery_run`, `rest` remain in the union for backward compat. Once you're
+   satisfied the migration covers all user devices, the union could be narrowed.
+4. **`getTodayResolvedDay` — 0-day plan guard** — `plan.days[0]` is undefined
+   when a plan has no days; the return type lies (`planDay: PlanDay`). The UI
+   prevents 0-day plans, but a guard would make it explicit.
+
+---
+
+### Open questions for you
+
+1. Should the session notes feature suppress the notes line when the note is
+   very long (e.g., > 100 chars)? Currently truncated by CSS.
+2. Is "This week" in the stats bar intentionally a rolling 7-day window, or
+   should it be a Mon–Sun calendar week? This affects streak UX too.
+3. The "Plan complete!" banner is suppressed by the carry-over `isPlanExpired`
+   fix for 0-value plans — is the plan builder expected to validate `value > 0`
+   before saving, or is it OK to rely on the engine guard?
+
+---
+
+### Known issues or incomplete work
+
+- No browser/visual testing was performed (CLI-only environment). The session
+  notes feature should be verified in the actual UI.
+- The `truncate` CSS class clips notes without a visible ellipsis on some
+  overflow scenarios — consider `overflow-hidden text-ellipsis` explicitly if
+  the browser behavior differs from expectation.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-12 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-OjsGg`
 ## 2026-05-11 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-3SEA4`
 
