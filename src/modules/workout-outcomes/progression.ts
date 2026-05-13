@@ -94,7 +94,12 @@ function buildWeightsRecommendation(
   }
 
   if (mode === 'double') {
-    const allHit = completedSets.every(s => s.actualReps != null && typeof s.targetReps === 'number' ? s.actualReps >= s.targetReps : true)
+    // Require every set to be completed AND every completed set to hit its rep target.
+    // Checking only completedSets would give a false 'progress' on partial workouts.
+    const allSetsCompleted = allSets.every(s => s.completed === true)
+    const allHit = allSetsCompleted && completedSets.every(s =>
+      s.actualReps != null && typeof s.targetReps === 'number' ? s.actualReps >= s.targetReps : true,
+    )
     return {
       discipline: 'weights',
       mode,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -895,5 +895,131 @@ describe('computePersonalRecords', () => {
     expect(result[0].maxLoadDate).toBeNull()
     expect(result[0].maxReps).toBe(20)
     expect(result[0].maxRepsDate).toBe('2026-01-01')
+  })
+})
+
+// ── computePlanStreak ──────────────────────────────────────────────────────────
+
+describe('computePlanStreak', () => {
+  const TODAY = '2026-05-12'
+
+  function planEntry(
+    date: string,
+    action: HistoryEntry['action'],
+    planId = 'plan-1',
+  ): HistoryEntry {
+    return {
+      id: `pe-${planId}-${date}`,
+      planId,
+      calendarDate: date,
+      planDayIndex: action === 'day_off' ? undefined : 0,
+      action,
+      createdAt: `${date}T12:00:00Z`,
+    }
+  }
+
+  function planExtra(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+    return {
+      id: `ex-${planId}-${date}`,
+      planId,
+      calendarDate: date,
+      workoutType: 'yoga',
+      workoutName: 'Yoga',
+      createdAt: `${date}T13:00:00Z`,
+    }
+  }
+
+  it('returns 0 with no entries at all', () => {
+    expect(computePlanStreak('plan-1', [], [], TODAY)).toBe(0)
+  })
+
+  it('returns 0 when today has no qualifying entry for this plan', () => {
+    const entries = [planEntry('2026-05-11', 'complete')]
+    expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(0)
+  })
+
+  it('returns 1 when only today is complete', () => {
+    const entries = [planEntry(TODAY, 'complete')]
+    expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('counts consecutive complete days ending today', () => {
+    const entries = [
+      planEntry('2026-05-10', 'complete'),
+      planEntry('2026-05-11', 'complete'),
+      planEntry(TODAY, 'complete'),
+    ]
+    expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(3)
+  })
+
+  it('day_off entries count toward streak', () => {
+    const entries = [
+      planEntry('2026-05-11', 'day_off'),
+      planEntry(TODAY, 'complete'),
+    ]
+    expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(2)
+  })
+
+  it('skip entries alone do NOT count (break the streak)', () => {
+    const entries = [
+      planEntry('2026-05-10', 'complete'),
+      planEntry('2026-05-11', 'skip'),
+      planEntry(TODAY, 'complete'),
+    ]
+    // May 11 is skip only → streak resets; only today counts
+    expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('a gap day breaks the streak', () => {
+    const entries = [
+      planEntry('2026-05-09', 'complete'),
+      // May 10 missing
+      planEntry('2026-05-11', 'complete'),
+      planEntry(TODAY, 'complete'),
+    ]
+    expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(2)
+  })
+
+  it('extras for the same plan count toward streak', () => {
+    const extras = [planExtra('2026-05-11'), planExtra(TODAY)]
+    expect(computePlanStreak('plan-1', [], extras, TODAY)).toBe(2)
+  })
+
+  it('a skip is rescued by an extra on the same day', () => {
+    const entries = [planEntry('2026-05-11', 'skip'), planEntry(TODAY, 'complete')]
+    const extras = [planExtra('2026-05-11')]
+    // May 11: skip + extra → extra makes it streakable
+    expect(computePlanStreak('plan-1', entries, extras, TODAY)).toBe(2)
+  })
+
+  it('ignores entries and extras for different plans', () => {
+    const entries = [
+      planEntry('2026-05-11', 'complete', 'plan-2'),
+      planEntry(TODAY, 'complete', 'plan-1'),
+    ]
+    const extras = [planExtra('2026-05-11', 'plan-2')]
+    // Only today belongs to plan-1
+    expect(computePlanStreak('plan-1', entries, extras, TODAY)).toBe(1)
+  })
+
+  it('duplicate-date entries do not double-count (Set deduplication)', () => {
+    const entries = [
+      planEntry(TODAY, 'complete'),
+      { ...planEntry(TODAY, 'day_off'), id: 'pe-dup' },
+    ]
+    expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('streak is independent of the global streak (different plan history)', () => {
+    // Plan-1 has entries for today only; plan-2 has a long streak.
+    // Plan-1 streak should be 1 regardless of plan-2.
+    const entries = [
+      planEntry(TODAY, 'complete', 'plan-1'),
+      planEntry('2026-05-10', 'complete', 'plan-2'),
+      planEntry('2026-05-11', 'complete', 'plan-2'),
+      planEntry(TODAY, 'complete', 'plan-2'),
+    ]
+    expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(1)
+    expect(computePlanStreak('plan-2', entries, [], TODAY)).toBe(3)
   })
 })
