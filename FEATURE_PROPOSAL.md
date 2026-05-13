@@ -1,3 +1,88 @@
+# Feature Proposal — Auto-Derive Pace in Run Session Summary
+
+Date: 2026-05-10
+Branch: `claude/dreamy-mccarthy-ApbpW`
+Status: **Implemented this run**
+
+## Feature selected
+
+**Auto-derive pace from distance + duration in the TodayPage last-session hint.**
+
+When `averagePaceSecondsPerMile` is absent (null or 0) but both `actualDistanceMiles`
+and `actualDurationMin` are available and positive, compute pace as
+`(durationMin × 60) / distanceMiles` and display it using `formatPace`.
+
+## Why it was selected
+
+- Pass 24 explicitly added pace display for *stored* pace values but deferred
+  derivation as "a product decision". After review, derivation is clearly the
+  right default: the field is optional in the OutcomeModal and most users fill
+  in distance + duration but not a separate pace field.
+- `derivePaceSecondsPerMile(distance, duration)` already exists in
+  `workout-outcomes/types.ts` — the math is defined, tested, and canonical.
+- Stored pace retains strict priority, so GPS-recorded or explicitly entered
+  values are never overridden.
+- Bundled with the pace=0 guard and swim-rounding fixes since all three
+  changes touch the same run display path in `buildLastSessionSummary`.
+
+## Expected user value
+
+- Users who log distance + duration (the common case) now see all three key run
+  metrics — "Last: 3.1 mi · 28 min · 9:02 /mi" — without any additional data
+  entry.
+- Pace is the metric most runners use to evaluate and compare sessions. Showing
+  it by default reduces the number of "what was my pace last time?" trips to the
+  Calendar.
+
+## Implementation scope for this run
+
+Modified `buildLastSessionSummary` in `src/lib/sessionSummary.ts`:
+- Extracted stored-pace check into a `storedPace` variable
+- Added `derivedPace` computed when `storedPace` is null
+- Final `pace = storedPace ?? derivedPace`
+- Display guard: `if (pace != null) parts.push(formatPace(pace))`
+
+5 existing tests updated to include derived pace in expected strings.
+7 new tests added covering: absent pace, null pace, zero-pace fallback,
+stored-wins, duration-only (no derive), no-data (null result).
+
+## Assumptions being made
+
+- Derivation is always desirable when both inputs are available. If a user
+  entered implausible values (distance=0.01, duration=60), the derived pace
+  would be shown. Accepted as-is — the data is the user's own.
+- `formatPace` handles all formatting edge cases (tested in pass 24).
+
+## Open product / UX decisions
+
+- Should the OutcomeModal auto-populate `averagePaceSecondsPerMile` when
+  distance + duration are filled? This would store derived pace and make it
+  available to the progression system, not just the hint.
+- Should there be a user setting to disable pace derivation? Likely not needed
+  for v1.
+
+## Architecture or schema impact
+
+None. No new fields, no store changes, no new imports.
+
+## Risks
+
+Low. Display-only change. The only regression risk is showing a derived pace
+that the user considers incorrect — they can silence it by explicitly entering
+a "correct" pace (or zeroing distance/duration).
+
+## Rollback strategy
+
+`git revert 35d5856` — reverts `sessionSummary.ts` and all test changes.
+
+## What is intentionally not being built yet
+
+- Auto-population of `averagePaceSecondsPerMile` in the OutcomeModal
+- Per-user setting to opt out of pace derivation
+- Swim pace derivation (swim pace per 100m is a different metric)
+
+---
+
 # Feature Proposal — Pace Display in Run Session Summary
 
 Date: 2026-05-07

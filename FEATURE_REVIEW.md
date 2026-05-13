@@ -1,3 +1,57 @@
+# Feature Review — Auto-Derive Pace in Run Session Summary
+
+Date: 2026-05-10
+Branch: `claude/dreamy-mccarthy-ApbpW`
+Classification: **Keep**
+
+## What was actually built
+
+Modified `buildLastSessionSummary` in `src/lib/sessionSummary.ts` to derive
+`averagePaceSecondsPerMile` from distance + duration when the stored value is
+null or 0. Stored pace retains strict priority. 7 new tests, 5 updated tests.
+
+## Assumptions encoded
+
+- Derivation is desirable whenever distance + duration are both > 0.
+- Stored pace (when > 0) always wins.
+- Zero stored pace is treated as "not entered" (existing behavior of the guard).
+
+## What worked well
+
+- Bundling with the pace=0 guard and swim-rounding fixes was natural — all three
+  changes are in the same 20-line run block.
+- The `storedPace ?? derivedPace` pattern is clear and easy to follow.
+- 7 new tests are comprehensive enough to catch regressions in both the stored
+  and derived paths.
+
+## What feels risky or incomplete
+
+- No OutcomeModal auto-population — derived pace is display-only. If a user
+  later checks their stored outcome, they won't see the pace there.
+- The 5 updated tests change expected strings that downstream PRs might have
+  relied on — verify there are no other test files importing from sessionSummary.
+
+## What I should evaluate tomorrow
+
+- Does the derived pace make sense for all run subtypes? (easy runs, intervals,
+  long runs all now show pace — confirm this is appropriate for intervals where
+  pace is less meaningful as a single number.)
+- Manually confirm: log a run with distance + duration but no pace → TodayPage
+  should show "Last: X mi · Y min · Z /mi" on the next workout.
+
+## Recommended next steps
+
+1. Consider auto-populating `averagePaceSecondsPerMile` in OutcomeModal when
+   distance + duration are both filled — would make it available to progression.
+2. Consider swim pace derivation (per 100m) as a parallel feature.
+
+## Keep / revise / prototype only / reject
+
+**Keep** — the feature is correct, well-tested, and closes an obvious UX gap
+with minimal surface area. No new dependencies, no schema changes, easy to revert.
+
+---
+
 # Feature Review — Pace Display in Run Session Summary
 
 Date: 2026-05-07

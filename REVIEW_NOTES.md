@@ -1,5 +1,108 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
+
+### Executive summary
+
+1. **What changed:** 3 commits — one correctness bug fix (CalendarPage action
+   desync), two small display fixes bundled with tests, and one medium-complexity
+   feature (auto-derive pace) also bundled in the same file.
+2. **Highest confidence:** All three changes are in well-tested pure functions or
+   follow established patterns. The CalendarPage fix mirrors the pass-18 HistoryPage
+   fix exactly.
+3. **Risky:** Auto-derive pace changes the expected output of 5 existing tests —
+   review those test updates to confirm the new behavior is desirable.
+4. **Review first:** The CalendarPage fix (`ebecc5f`) — it corrects silent data
+   inconsistency when a user edits both the date AND the completion state in one
+   modal edit. Confirm this scenario with a manual test if possible.
+
+---
+
+### Biggest issues found
+
+| # | Severity | Description | Status |
+|---|----------|-------------|--------|
+| B1 | Medium | CalendarPage `handleOutcomeConfirm` stale `entries` closure: action label not updated when both date and completion state change in same edit. Same class of bug as pass-18 HistoryPage fix. | Fixed |
+| B2 | Low | `buildLastSessionSummary`: `averagePaceSecondsPerMile === 0` displays "0:00 /mi" (carry-over from pass 24). | Fixed (superseded by auto-derive) |
+| B3 | Low | `buildLastSessionSummary`: swim `actualDistanceMeters` displayed as raw float; run was fixed in pass 24 but swim was missed. | Fixed |
+
+---
+
+### Improvements completed
+
+| # | Description | Files |
+|---|-------------|-------|
+| 1 | CalendarPage stale closure fix | `CalendarPage.tsx` |
+| 2 | Pace=0 guard + swim rounding + 2 tests | `sessionSummary.ts`, `sessionSummary.test.ts` |
+| 3 | Auto-derive pace feature + 7 tests (5 updated, 7 new) | `sessionSummary.ts`, `sessionSummary.test.ts` |
+
+---
+
+### Medium-complexity feature explored
+
+**Auto-derive pace in run session summary** (pass-24 carry-over)
+
+Previously: pace shown only when `averagePaceSecondsPerMile` was manually
+stored. Now: when that field is null or 0, pace is derived from distance +
+duration and shown with the same `formatPace` formatting.
+
+Classification: **Keep**
+
+---
+
+### Definitely keep
+
+- CalendarPage stale closure fix — correctness bug, no risk.
+- Swim rounding fix — cosmetic consistency.
+
+### Probably keep but tweak
+
+- Auto-derive pace — the behavior change is correct but review the 5 updated
+  test cases to confirm you're comfortable with "always show pace when
+  distance+duration are both present".
+
+### Do not keep
+
+- Nothing to reject this pass.
+
+### Recommendations only (not implemented)
+
+- **Streak "pending" display**: show yesterday's streak + a pending indicator
+  for today rather than resetting to 0 each morning. Product decision.
+- **Plan builder `duration.value > 0` validation**: UI guard to prevent
+  plans that immediately expire. Low priority, no crash risk.
+- **Narrow CalendarPage Zustand selectors**: `entries` and `overrides` are
+  subscribed globally; split into plan-scoped selectors to reduce re-renders.
+  Performance, not urgent.
+- **Expression evaluator error surfacing**: malformed YAML progression rules
+  silently return 0. Surfacing errors in the plan detail UI would help authors.
+
+---
+
+### Open questions
+
+- Is auto-deriving pace always desirable, or should there be a setting/flag
+  for users who prefer to only show explicitly entered pace?
+- Should `averagePaceSecondsPerMile` be auto-populated in the OutcomeModal
+  itself when distance + duration are entered (so it's stored, not just derived
+  in the hint)? This would surface pace in the progression system too.
+
+---
+
+### Known issues or incomplete work
+
+- No React component integration tests — CalendarPage bug fix is tested
+  indirectly through the store unit tests but the UI interaction itself
+  cannot be verified without a browser or component test harness.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-07 (twenty-fourth pass) — branch `claude/dreamy-mccarthy-Q6elc`
 
 ### Executive summary
