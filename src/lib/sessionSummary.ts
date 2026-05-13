@@ -37,8 +37,12 @@ export function findPreviousSessionForPlanDay(
  * Format a compact one-line summary of a previous workout outcome.
  *
  * - Weights: "Last: 3×8 @ 135 lb Bench Press [· PB]"
- * - Run:     "Last: 2.5 mi · 28 min"
- * - Swim:    "Last: 800 m · 30 min"
+ * - Run:     "Last: 2.5 mi · 28 min · 9:02 /mi"
+ * - Swim:    "Last: 800 m · 30 min · 2:30 /100m"
+ *
+ * Pace (run) and pace (swim) are shown from the stored field when present and
+ * > 0; otherwise derived from distance + duration when both are available.
+ * A stored value of 0 is treated as bad data and triggers derivation.
  *
  * Pass `maxLoadByExercise` (a map of exercise name → all-time max load in lb)
  * to enable personal-best detection. When the displayed load equals the map's
@@ -95,13 +99,22 @@ export function buildLastSessionSummary(
     if (pace != null) parts.push(formatPace(pace))
     if (parts.length) return `Last: ${parts.join(' · ')}`
   }
-  // Swim: distance and/or duration
+  // Swim: distance, duration, and pace when available (derivation mirrors run)
   const swim = outcome.swimActual
   if (swim) {
     const parts: string[] = []
     if (swim.actualDistanceMeters != null) parts.push(`${Math.round(swim.actualDistanceMeters)} m`)
     if (swim.actualDurationMin != null) parts.push(`${swim.actualDurationMin} min`)
-    if (swim.averagePaceSecondsPer100m != null && swim.averagePaceSecondsPer100m > 0) parts.push(formatSwimPace(swim.averagePaceSecondsPer100m))
+    const storedSwimPace = swim.averagePaceSecondsPer100m != null && swim.averagePaceSecondsPer100m > 0
+      ? swim.averagePaceSecondsPer100m
+      : null
+    const derivedSwimPace = storedSwimPace == null &&
+      swim.actualDistanceMeters != null && swim.actualDistanceMeters > 0 &&
+      swim.actualDurationMin != null && swim.actualDurationMin > 0
+        ? (swim.actualDurationMin * 60) / (swim.actualDistanceMeters / 100)
+        : null
+    const swimPace = storedSwimPace ?? derivedSwimPace
+    if (swimPace != null) parts.push(formatSwimPace(swimPace))
     if (parts.length) return `Last: ${parts.join(' · ')}`
   }
   return null

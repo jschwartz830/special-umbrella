@@ -306,14 +306,16 @@ describe('buildLastSessionSummary', () => {
     expect(buildLastSessionSummary(outcome)).toBeNull()
   })
 
-  it('formats swim with distance and duration', () => {
+  it('formats swim with distance, duration, and derived pace', () => {
+    // 800 m in 20 min → 1200 s / 8 = 150 s/100m = 2:30 /100m
     const outcome = swimOutcome('2026-05-01', 800, 20)
-    expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min')
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min · 2:30 /100m')
   })
 
-  it('rounds swim distance to the nearest whole meter', () => {
+  it('rounds swim distance to the nearest whole meter (with derived pace)', () => {
+    // 812.5 m in 22 min → 1320 s / 8.125 ≈ 162.46 s/100m → round=162 → 2:42 /100m
     const outcome = swimOutcome('2026-05-01', 812.5, 22)
-    expect(buildLastSessionSummary(outcome)).toBe('Last: 813 m · 22 min')
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 813 m · 22 min · 2:42 /100m')
   })
 
   it('ignores stored pace of 0 and falls back to derived pace', () => {
@@ -566,7 +568,8 @@ describe('buildLastSessionSummary', () => {
     expect(buildLastSessionSummary(outcome)).toBe('Last: 1000 m · 30 min · 2:00 /100m')
   })
 
-  it('omits swim pace when averagePaceSecondsPer100m is null', () => {
+  it('derives swim pace from distance+duration when averagePaceSecondsPer100m is null', () => {
+    // 800 m in 20 min = 150 s/100m = 2:30 /100m
     const outcome: WorkoutOutcome = {
       workoutInstanceId: 'p1_2026-05-01',
       completionState: 'completed',
@@ -577,10 +580,11 @@ describe('buildLastSessionSummary', () => {
       runActual: null,
       swimActual: { actualDistanceMeters: 800, actualDurationMin: 20, averagePaceSecondsPer100m: null },
     }
-    expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min')
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min · 2:30 /100m')
   })
 
-  it('omits swim pace when averagePaceSecondsPer100m is 0 (guard against bad data)', () => {
+  it('derives swim pace from distance+duration when averagePaceSecondsPer100m is 0 (bad data fallback)', () => {
+    // stored 0 is bogus; derived from 800 m / 20 min = 2:30 /100m
     const outcome: WorkoutOutcome = {
       workoutInstanceId: 'p1_2026-05-01',
       completionState: 'completed',
@@ -591,6 +595,35 @@ describe('buildLastSessionSummary', () => {
       runActual: null,
       swimActual: { actualDistanceMeters: 800, actualDurationMin: 20, averagePaceSecondsPer100m: 0 },
     }
-    expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min')
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m · 20 min · 2:30 /100m')
+  })
+
+  it('does not derive swim pace when only distance is available (no duration)', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T08:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: { actualDistanceMeters: 800, actualDurationMin: null },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 800 m')
+  })
+
+  it('prefers stored swim pace over derived when both are available', () => {
+    // stored 120 s/100m (2:00); derived from 1000m/30min = 180 s/100m (3:00) — stored wins
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T08:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: 30,
+      notes: null,
+      runActual: null,
+      swimActual: { actualDistanceMeters: 1000, actualDurationMin: 30, averagePaceSecondsPer100m: 120 },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 1000 m · 30 min · 2:00 /100m')
   })
 })
