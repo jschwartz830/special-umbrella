@@ -1,3 +1,91 @@
+# Feature Proposal — Swim Pace Derivation in Session Summary Hint
+
+Date: 2026-05-13
+Branch: `claude/dreamy-mccarthy-JEVCy`
+Status: **Implemented this run**
+
+## Feature selected
+
+Derive swim pace from distance + duration in `buildLastSessionSummary` when
+`averagePaceSecondsPer100m` is absent or is 0 (bad-data). The derivation
+mirrors the existing run pace derivation added in pass 24/25.
+
+## Why it was selected
+
+The session summary hint on TodayPage already surfaces `x m · y min` for
+swim workouts. If no GPS or manual pace was recorded, the hint is less useful
+than it could be — the user can see how far and how long, but not how fast.
+The derivation formula is identical to the one already proven for run:
+
+```
+pace (s/100m) = (durationMin × 60) / (distanceMeters / 100)
+```
+
+This is:
+1. **Low-risk** — a single formula, results fed to the existing `formatSwimPace`
+   function whose output format and edge cases are already tested.
+2. **Consistent** — the run block already derives pace with identical guard
+   logic (store=0 → bad data → fall back to derived). This mirrors it exactly.
+3. **Useful** — many swim logging apps record only distance + time, not pace.
+   Without derivation, swim hints are uniformly pace-free even when pace is
+   fully calculable.
+
+## What was not selected and why
+
+**Showing derived pace visually differently** (e.g. a "~" prefix to signal
+estimation) was considered and rejected. The run block does not distinguish
+stored vs. derived pace in the hint. Treating swim differently would add
+inconsistency; and at this stage the hint is already considered a useful-but-
+rough signal, not a certified data point.
+
+**Adding a UI setting to disable derivation** was rejected as premature. No
+user has asked to suppress derived pace; if one does, the opt-out can be added
+at that time.
+
+## How the feature was implemented
+
+In `src/lib/sessionSummary.ts`, the swim block was extended from:
+
+```typescript
+if (swim.actualDistanceMeters != null) parts.push(...)
+if (swim.actualDurationMin != null) parts.push(...)
+if (swim.averagePaceSecondsPer100m != null) parts.push(formatSwimPace(...))
+```
+
+to the same stored-vs-derived pattern used in the run block:
+
+```typescript
+const storedSwimPace = swim.averagePaceSecondsPer100m != null && swim.averagePaceSecondsPer100m > 0
+  ? swim.averagePaceSecondsPer100m : null
+const derivedSwimPace = storedSwimPace == null &&
+  swim.actualDistanceMeters != null && swim.actualDistanceMeters > 0 &&
+  swim.actualDurationMin != null && swim.actualDurationMin > 0
+    ? (swim.actualDurationMin * 60) / (swim.actualDistanceMeters / 100) : null
+const swimPace = storedSwimPace ?? derivedSwimPace
+if (swimPace != null) parts.push(formatSwimPace(swimPace))
+```
+
+This means:
+- Stored pace (> 0) always wins.
+- Stored pace of 0 is treated as bad data (same as run); derivation kicks in.
+- If only distance or only duration is present, no pace is shown.
+
+## Test coverage added
+
+7 new or updated tests in `src/lib/__tests__/sessionSummary.test.ts`:
+
+| Test | Purpose |
+|------|---------|
+| formats swim with distance, duration, and derived pace | Core happy path |
+| rounds swim distance to the nearest whole meter (with derived pace) | Float rounding check |
+| includes swim pace when averagePaceSecondsPer100m is present | Stored pace wins |
+| derives swim pace when averagePaceSecondsPer100m is null | Null → derive |
+| derives swim pace when stored is 0 (bad data fallback) | 0 → derive |
+| does not derive swim pace when only distance (no duration) | Derivation requires both |
+| prefers stored swim pace over derived when both are available | Priority test |
+
+---
+
 # Feature Proposal — Previous Session Notes in TodayPage Hint
 
 Date: 2026-05-13

@@ -1,5 +1,69 @@
 # Test Results
 
+## 2026-05-13 (twenty-seventh pass) — branch `claude/dreamy-mccarthy-JEVCy`
+
+**Result: 639 passing, 0 failing** (+9 new tests; 4 previously-failing tests fixed)
+
+### Entry state
+
+On branch checkout, `sessionSummary.test.ts` had 4 failing tests caused by
+two issues carried in from prior passes:
+
+1. **Double pace push** (3 failures) — a leftover `parts.push(formatPace(...))`
+   call remained above the new storedPace/derivedPace block, causing pace to
+   appear twice in the run hint.
+2. **Stale zero-pace test** (1 failure) — a test asserting "stored pace = 0 →
+   no pace shown" contradicted the intentional "stored pace = 0 → treat as bad
+   data → fall back to derived" behavior documented in pass 25.
+
+Both were fixed in the first commit of this pass. After the fix, all pre-existing
+tests pass and the intent is now consistently encoded in both code and tests.
+
+### Tests added this pass
+
+| File | Test | Purpose |
+|------|------|---------|
+| `sessionSummary.test.ts` | formats swim with distance, duration, and derived pace | Core swim derivation happy path |
+| `sessionSummary.test.ts` | rounds swim distance to the nearest whole meter (with derived pace) | Float display regression lock |
+| `sessionSummary.test.ts` | derives pace from distance+duration when averagePaceSecondsPerMile is 0 (bad data fallback) | Updated from "omits" to "derives" — documents the actual zero-guard behavior |
+| `sessionSummary.test.ts` | derives swim pace from distance+duration when averagePaceSecondsPer100m is null | Null stored → derive |
+| `sessionSummary.test.ts` | derives swim pace from distance+duration when averagePaceSecondsPer100m is 0 (bad data fallback) | Zero stored → treat as bad, derive |
+| `sessionSummary.test.ts` | does not derive swim pace when only distance is available (no duration) | Guards against divide-by-zero / partial data |
+| `sessionSummary.test.ts` | prefers stored swim pace over derived when both are available | Priority verification |
+| `explanation.test.ts` | omits pace when averagePaceSecondsPerMile is 0 (bad data guard) | Regression lock for `summariseRunOutcome` zero-guard |
+| `explanation.test.ts` | uses formatPace to prevent secs=60 display edge case | Tests 599.5 s/mi → "10:00 /mi" through `summariseRunOutcome` |
+
+**Total new test additions: 9**
+
+### Tests updated (not added)
+
+Two `sessionSummary.test.ts` tests had their names and assertions updated to
+reflect the derivation behavior (previously they expected pace to be *omitted*
+when stored pace was present but equal to 0; after the fix they correctly
+expect derived pace to be *shown*). These are updates to pre-existing test
+intentions, not new tests.
+
+### Test results (run output)
+
+```
+Test Files  18 passed (18)
+     Tests  639 passed (639)
+  Start at  13:17:37
+  Duration  1.69s
+```
+
+### Important areas still untested
+
+| Area | Notes |
+|------|-------|
+| `TodayPage` React component | Session hint display requires React Testing Library or jsdom — not in test config |
+| `ActiveWorkoutTracker.tsx` | Large component with real-time timer and exercise tracking; no tests |
+| `OutcomeModal.tsx` | Complex form state; no tests |
+| `CalendarPage.tsx` retroactive edit flows | Tested at engine/store level, no component integration coverage |
+| `summariseRunOutcome` — derived pace | The function is not called from the app (only from tests); pace derivation uses `formatPace` which is tested, but the derivation path itself has no unit test |
+
+---
+
 ## 2026-05-13 (twenty-sixth pass) — branch `claude/dreamy-mccarthy-G6yaB`
 
 **Result: 617 passing, 0 failing** (+1 test from 616 baseline)

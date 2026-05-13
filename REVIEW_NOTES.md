@@ -1,5 +1,136 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-13 (twenty-seventh pass) — branch `claude/dreamy-mccarthy-JEVCy`
+
+### Executive summary
+
+**What changed**: Fixed 4 pre-existing test failures in `buildLastSessionSummary`
+(double pace push + stale zero guard), fixed `summariseRunOutcome` to use
+`formatPace` and guard against zero pace, renamed "This week" → "7-day" on TodayPage,
+and added swim pace derivation to `buildLastSessionSummary` as the session feature.
+**639 tests, all green** (was 631 passing / 4 failing on entry).
+
+**Highest confidence**: The double-push fix (remove stale line) and the `summariseRunOutcome`
+`formatPace` migration — both are pure consistency fixes with no behavioral ambiguity.
+
+**What is risky**: The zero-pace behavior change: `stored=0` now falls back to derived
+pace in both run and swim summaries. This is correct per the pass-25 intent, but users
+who had manually entered 0 as their pace (an unlikely but possible edge case) will now
+see derived pace instead of nothing. Reviewed the test conflict carefully — the pass-25
+implementation plan explicitly described this as the intended behavior.
+
+**Review first**: Commit `a124b14` (double-push + zero-guard fix) — it's the core
+correctness fix and contains the resolved test conflict. Then `547f181` (swim pace
+feature) — four updated tests and four new ones confirm the symmetric behavior.
+
+---
+
+### Biggest issues found
+
+1. **4 failing tests on entry (FIXED)**: `buildLastSessionSummary` had two bugs from
+   pass 25 — a stale line that pushed pace twice, and a `derivedPace` condition that
+   mis-handled `stored=0`. Three tests failed from double-push; one test failed because
+   it was written for pre-derivation behavior and not updated when the feature landed.
+
+2. **`summariseRunOutcome` pace formatting (FIXED)**: Inline `Math.floor/Math.round`
+   arithmetic had a latent "9:60 /mi" display bug for 599.5 s/mi inputs. Using
+   `formatPace()` fixes this. Also lacked the `> 0` guard present in every other
+   pace display path.
+
+3. **"This week" label vs rolling 7-day window (FIXED)**: Flagged in pass 26 review
+   notes. One-line change.
+
+4. **`workoutInstanceId` parsing via `split('_')` (NOT FIXED — recommendation)**: Still
+   fragile if planId format ever changes. nanoid is currently alphanumeric, so safe in
+   practice. Consider adding a named helper `parseWorkoutInstanceId` in a future pass.
+
+---
+
+### Improvements completed
+
+| # | Change | Files | Commit |
+|---|---|---|---|
+| 1 | Fix double pace push in run summary | sessionSummary.ts | a124b14 |
+| 2 | Fix zero-pace derivation guard + update stale test | sessionSummary.ts, sessionSummary.test.ts | a124b14 |
+| 3 | Fix summariseRunOutcome: use formatPace + > 0 guard | explanation.ts, explanation.test.ts | 193ffe6 |
+| 4 | Rename "This week" → "7-day" on TodayPage | TodayPage.tsx | a1ad26d |
+
+### Feature added
+
+**Swim pace derivation in `buildLastSessionSummary`** (commit `547f181`): When
+`averagePaceSecondsPer100m` is absent or 0, and both distance and duration are
+available, pace is now derived and shown in the session hint — symmetric with run.
+See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md for full analysis.
+
+---
+
+### Definitely keep
+
+- Double-push fix (commit `a124b14`) — correctness bug fix, zero risk.
+- `summariseRunOutcome` formatPace (commit `193ffe6`) — consistency fix, tests anchor it.
+- "7-day" label (commit `a1ad26d`) — UX improvement, single line.
+
+### Probably keep but tweak
+
+- Swim pace derivation (commit `547f181`) — verify the hint displays cleanly on a
+  narrow-screen device. The logic is correct and well-tested. The visual output
+  ("Last: 800 m · 20 min · 2:30 /100m") might be long on 320px. If cramped, consider
+  wrapping to two lines or abbreviating "min" to "m" in the hint.
+
+### Do not keep
+
+Nothing in this pass falls in this category.
+
+### Recommendations only (not implemented)
+
+1. **`workoutInstanceId` named parser helper**: Extract `split('_')` in
+   `outcomeStore.ts:syncExerciseHistory` and `exerciseHistoryStore.ts:upsertFromOutcome`
+   into a shared `parseWorkoutInstanceId(id)` function that returns `{ planId, calendarDate }`.
+   Currently safe since nanoid is alphanumeric, but the fragility was flagged in pass 26.
+
+2. **`computePlanStreak` UI wiring**: The function has been exported and tested since
+   pass 23. In TodayPage, `planEntries` is already plan-scoped so `computeHistoryStats`
+   gives the same result. Wiring `computePlanStreak` wouldn't change behavior there.
+   The value would be higher in HistoryPage when "all plans" is selected but a plan-
+   specific streak is desired — worth a future pass.
+
+3. **PB amber color styling**: The "· PB" marker in run/swim hints is in muted slate
+   text. Changing it to `text-amber-400` would make it more visible without extra space.
+   One-line CSS change. Deferred since it's cosmetic.
+
+4. **Swim pace derivation in `summariseRunOutcome`**: The parallel fix was applied to
+   `buildLastSessionSummary` but `summariseRunOutcome` has no derivation path at all.
+   Since `summariseRunOutcome` is currently only called from tests (not from any UI),
+   this is low priority.
+
+---
+
+### Open questions for me
+
+1. Should "· PB" be styled in amber/gold for weights, and could there be a swim
+   distance PB equivalent (e.g., "· PB dist" when longest session)?
+2. Do you want the swim hint line to wrap gracefully on 320px, or should it abbreviate?
+3. For HistoryPage, should the "plan-scoped streak" be surfaced when a specific plan is
+   selected in the filter? Currently shows global streak filtered to plan entries, which
+   is equivalent but the label doesn't make the scope obvious.
+
+---
+
+### Known issues or incomplete work
+
+- No React component tests. TodayPage and CalendarPage have significant UI logic
+  untested at the component level (double-day flows, retroactive edits). A Testing
+  Library setup would be needed.
+- Swim pace derivation visual QA not possible in CLI environment — verify in-app.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-13 (twenty-sixth pass) — branch `claude/dreamy-mccarthy-G6yaB`
 
 ### Executive summary
