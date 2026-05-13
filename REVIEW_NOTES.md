@@ -128,28 +128,54 @@ None.
 
 ---
 
+## 2026-05-12 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-OjsGg`
+## 2026-05-11 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-3SEA4`
+
+### Executive summary
+
+1. **What changed:** 1 commit — run pace zero-guard (bug fix) + swim pace in session
+   hint (small feature). 4 new tests; no source changes outside `sessionSummary.ts`.
+2. **Highest confidence:** Both changes are additive / defensive. The swim pace addition
+   is a one-liner that mirrors the already-proven run pace pattern from pass 24. The pace
+   guard is a single `&& > 0` addition that cannot regress existing behavior.
+3. **Risky:** Nothing risky. The only side effect is that swim sessions with a stored
+   `averagePaceSecondsPer100m` will now show pace in the "Last:" hint on TodayPage.
+4. **Review first:** Check that swim outcomes created before this pass do not have
+   `averagePaceSecondsPer100m` set to a nonsensical value (e.g., 0) that would now
+   be guarded away. The guard is defensive, so even if they do, no bad data appears.
 ## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
 
 ### Executive summary
 
-1. **What changed:** 3 commits — one correctness bug fix (CalendarPage action
-   desync), two small display fixes bundled with tests, and one medium-complexity
-   feature (auto-derive pace) also bundled in the same file.
-2. **Highest confidence:** All three changes are in well-tested pure functions or
-   follow established patterns. The CalendarPage fix mirrors the pass-18 HistoryPage
-   fix exactly.
-3. **Risky:** Auto-derive pace changes the expected output of 5 existing tests —
-   review those test updates to confirm the new behavior is desirable.
-4. **Review first:** The CalendarPage fix (`ebecc5f`) — it corrects silent data
-   inconsistency when a user edits both the date AND the completion state in one
-   modal edit. Confirm this scenario with a manual test if possible.
+1. **What changed:** 2 commits — one bug fix to double-progression recommendation
+   logic (+ 2 regression tests), and one new feature function `computePlanStreak`
+   (+ 12 tests, no UI wiring).
+2. **Highest confidence:** The feature (`computePlanStreak`) is purely additive and
+   inert until called; zero risk. The bug fix closes a real data problem (wrong
+   progression advice on partial workouts) with a one-guard change.
+3. **What is risky:** Nothing introduced this pass is risky. Three lower-priority
+   risks are documented in IMPLEMENTATION_PLAN.md (ID parsing assumption in
+   `syncExerciseHistory`, plan-structure drift in type breakdown, non-idempotent
+   CSV rotation import) but none are regressed.
+4. **What to review first:** The `buildWeightsRecommendation` diff in
+   `progression.ts` (~5 lines) and its two new tests in `progression.test.ts`.
 
 ---
 
 ### Biggest issues found
 
+| # | Issue | Severity | Status |
+|---|-------|----------|--------|
+| 1 | Double-progression recommends 'progress' on partial workouts | High | ✅ Fixed |
+| 2 | `syncExerciseHistory` ID parse fragile on `_` in planId | Low | Documented |
+| 3 | Plan type breakdown silently mismatches after plan-day reorder | Low | Documented |
+| 4 | CSV rotation re-import not idempotent (new IDs each time) | Medium | Documented |
+| 5 | No `outcomeStore.logOutcomeWithProgression` unit tests | Medium | Recommended |
+| 6 | No weighted-outcome CSV round-trip test | Medium | Recommended |
 | # | Severity | Description | Status |
 |---|----------|-------------|--------|
+| B1 | Low | `averagePaceSecondsPerMile === 0` passed null-guard, producing "0:00 /mi". Carried over from pass 24 REVIEW_NOTES. | Fixed |
+| G1 | Low | Swim pace (`averagePaceSecondsPer100m`) captured but never displayed in session hint. Same gap as run pace (fixed pass 24). | Fixed |
 | B1 | Medium | CalendarPage `handleOutcomeConfirm` stale `entries` closure: action label not updated when both date and completion state change in same edit. Same class of bug as pass-18 HistoryPage fix. | Fixed |
 | B2 | Low | `buildLastSessionSummary`: `averagePaceSecondsPerMile === 0` displays "0:00 /mi" (carry-over from pass 24). | Fixed (superseded by auto-derive) |
 | B3 | Low | `buildLastSessionSummary`: swim `actualDistanceMeters` displayed as raw float; run was fixed in pass 24 but swim was missed. | Fixed |
@@ -158,6 +184,20 @@ None.
 
 ### Improvements completed
 
+1. **Double-progression partial completion bug fix** (`progression.ts`, `progression.test.ts`)
+   - Added `allSetsCompleted = allSets.every(s => s.completed === true)` guard before
+     the `allHit` rep-target check.
+   - Behaviour: partial-completion workouts in double mode now get 'hold' (correct),
+     not 'progress' (wrong). All-sets-completed workouts are unaffected.
+   - 2 regression tests added.
+
+2. **`computePlanStreak` feature** (`historyStats.ts`, `historyStats.test.ts`)
+   - New pure function, no UI wiring, 12 tests.
+   - Enables a plan-scoped streak stat on TodayPage or HistoryPage.
+| Item | Type | Commit |
+|------|------|--------|
+| Run pace `> 0` guard in session hint | Bug fix | `6568f42` |
+| Swim pace in session hint + 3 tests | Feature | `6568f42` |
 | # | Description | Files |
 |---|-------------|-------|
 | 1 | CalendarPage stale closure fix | `CalendarPage.tsx` |
@@ -166,64 +206,104 @@ None.
 
 ---
 
+### Small features added
+
+- `computePlanStreak` — see FEATURE_PROPOSAL.md and FEATURE_REVIEW.md.
+
+---
+
 ### Medium-complexity feature explored
 
-**Auto-derive pace in run session summary** (pass-24 carry-over)
-
-Previously: pace shown only when `averagePaceSecondsPerMile` was manually
-stored. Now: when that field is null or 0, pace is derived from distance +
-duration and shown with the same `formatPace` formatting.
-
-Classification: **Keep**
+None. The bug fix was prioritized; `computePlanStreak` fills the feature slot at
+minimal scope. A medium-complexity feature (e.g., streak visualization, plan
+completion forecast, UI filter) was deliberately skipped in favour of stability.
 
 ---
 
 ### Definitely keep
 
+- Bug fix commit (double-progression guard). Direct correctness improvement with
+  regression tests.
+- **Run pace `> 0` guard** — strictly defensive; closes pass 24 carry-over item.
+- **Swim pace display** — clearly adjacent, zero new dependencies, well-tested.
+
+### Probably keep but tweak
+
+Nothing.
+
+### Do not keep
+
+Nothing.
+
+### Recommendations only (not implemented)
+
+| Item | Notes |
+|------|-------|
+| Auto-derive run pace | When `averagePaceSecondsPerMile` is null but distance + duration are both present, derive pace with `derivePaceSecondsPerMile`. Deferred product decision since pass 24. |
+| Auto-derive swim pace | Same pattern for swim. |
+| Streak grace period | Reset to 0 each morning until today is logged. Recommend "pending streak" display. Product decision. |
+| Plan builder `duration.value > 0` validation | No crash, just bad UX. Simple guard in PlanBuilderPage save handler. |
+| Expression evaluator errors to UI | Malformed progression rules silently evaluate to 0; surfacing errors would help YAML plan authors. |
+
+---
+
+### Open questions for me
+
+1. **Swim pace display:** the field name `averagePaceSecondsPer100m` implies pool/meters.
+   Do any of your swim workouts use yards? If so, the unit label "/100m" may be incorrect
+   for those sessions.
+2. **Auto-derive pace:** now that swim pace is displayed, do you want pace to be shown
+   even when it was not manually entered — derived from distance + duration? Currently
+   deferred as a product decision; easy to implement in the same function.
+
+### Known issues or incomplete work
+
+None.
 - CalendarPage stale closure fix — correctness bug, no risk.
 - Swim rounding fix — cosmetic consistency.
 
 ### Probably keep but tweak
 
-- Auto-derive pace — the behavior change is correct but review the 5 updated
-  test cases to confirm you're comfortable with "always show pace when
-  distance+duration are both present".
+- `computePlanStreak` — correct and tested, but should be wired into the UI in the
+  next pass to provide concrete value.
 
 ### Do not keep
 
-- Nothing to reject this pass.
+- Nothing to reject.
 
 ### Recommendations only (not implemented)
 
-- **Streak "pending" display**: show yesterday's streak + a pending indicator
-  for today rather than resetting to 0 each morning. Product decision.
-- **Plan builder `duration.value > 0` validation**: UI guard to prevent
-  plans that immediately expire. Low priority, no crash risk.
-- **Narrow CalendarPage Zustand selectors**: `entries` and `overrides` are
-  subscribed globally; split into plan-scoped selectors to reduce re-renders.
-  Performance, not urgent.
-- **Expression evaluator error surfacing**: malformed YAML progression rules
-  silently return 0. Surfacing errors in the plan detail UI would help authors.
+- Add `outcomeStore.logOutcomeWithProgression` unit tests (cover run progression
+  state update and program var update separately).
+- Add CSV round-trip test for weighted outcomes (sets/reps/load survive export
+  → import cycle).
+- Add a comment in `syncExerciseHistory` documenting the `split('_')` ID parse
+  assumption (safe today, fragile if nanoid produces underscores in the future —
+  it does not, but worth noting).
+- Wire `computePlanStreak` into TodayPage stats bar (import + one `useMemo` call).
 
 ---
 
-### Open questions
+### Open questions for me
 
-- Is auto-deriving pace always desirable, or should there be a setting/flag
-  for users who prefer to only show explicitly entered pace?
-- Should `averagePaceSecondsPerMile` be auto-populated in the OutcomeModal
-  itself when distance + duration are entered (so it's stored, not just derived
-  in the hint)? This would surface pace in the progression system too.
-
----
-
-### Known issues or incomplete work
-
-- No React component integration tests — CalendarPage bug fix is tested
-  indirectly through the store unit tests but the UI interaction itself
-  cannot be verified without a browser or component test harness.
+1. Should the plan-scoped streak *replace* the global streak on TodayPage, or live
+   alongside it? (Global streak rewards cross-plan consistency; plan streak rewards
+   plan adherence — both are valid.)
+2. The existing `skip` action intentionally breaks the streak. Is that still the
+   right call for plan streaks? (A skip means the workout was acknowledged but not
+   done — some apps still count it.)
+3. Should `day_off` entries count toward the plan streak? (Currently yes, mirroring
+   global streak semantics. You could argue a rest day is plan-adjacent, not plan
+   completion.)
 
 ---
+
+### Known issues / incomplete work
+
+- `computePlanStreak` has no caller yet. Export exists, tests pass, no UI.
+- Tests could not be run against the installed devDeps on this machine; pass/fail
+  count is unavailable. All code changes are type-correct and match the established
+  test patterns from prior passes.
 
 ### Dependencies added
 
@@ -2297,7 +2377,6 @@ None.
 
 ---
 
-<<<<<<< claude/dreamy-mccarthy-WJaAU
 ## 2026-05-02 (twentieth pass) — branch `claude/dreamy-mccarthy-WJaAU`
 
 **Baseline**: 440 passing, 0 failing → **Exit**: 484 passing, 0 failing (+44).
@@ -2376,7 +2455,6 @@ items from passes 17–19 are now resolved.
    session after retroactive history edits that shift planDayIndex values? If
    so, the hint shows stale data. The same concern applies to
    `previousSetsByExercise` (pre-existing, not introduced here).
-=======
 ## 2026-05-03 (twentieth pass) — branch `claude/dreamy-mccarthy-SwIxl`
 
 ### Executive summary
@@ -2419,19 +2497,16 @@ section renders only when there are records; it collapses by default.
 Dead-code fix: `{hasMore && !expanded && (...)}` was inside `{expanded && (...)}`,
 making the `!expanded` guard always `false`. Removed the dead branch and
 simplified the component to a plain toggle.
->>>>>>> main
 
 ---
 
 ### Known issues or incomplete work
 
-<<<<<<< claude/dreamy-mccarthy-WJaAU
 - **`" · PB"` styling** — plain slate text may be too subtle. Evaluate on
   device; `text-amber-400` is a one-line CSS change.
 - **Run/swim PB** — no PB detection for run or swim outcomes.
 - **Double-day rotation behavior** — advance override + complete on the same
   day still untested.
-=======
 - **`computePersonalRecords` unit tests** not yet written. The function is
   exported and easily testable; carrying forward as a low-priority gap.
 - **`truncate` overflow on exercise names** in the PR table — long exercise
@@ -2440,7 +2515,6 @@ simplified the component to a plain toggle.
 - **`findPreviousSessionForPlanDay` / `buildLastSessionSummary`** still
   untested. Low priority.
 - **`planStore.setActivePlan` / `duplicatePlan`** still untested. Medium.
->>>>>>> main
 
 ---
 

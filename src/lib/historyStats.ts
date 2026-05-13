@@ -368,6 +368,45 @@ export function computePersonalRecords(
   return [...byExercise.values()].sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
 }
 
+// ── Plan-scoped streak ────────────────────────────────────────────────────────
+
+/**
+ * Compute the current consecutive-day streak for a single plan.
+ *
+ * Counts backward from `today` (inclusive) while each day has at least one
+ * of the following for `planId`:
+ *   - a `complete` or `day_off` rotation entry, OR
+ *   - any extra workout entry.
+ *
+ * A `skip` entry alone does NOT count — the same deliberate rule as the
+ * global streak in `computeHistoryStats`.
+ *
+ * Returns 0 if today has no qualifying activity for this plan.
+ */
+export function computePlanStreak(
+  planId: string,
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  today: string,
+): number {
+  const streakable = new Set<string>()
+  for (const e of entries) {
+    if (e.planId !== planId) continue
+    if (e.action === 'complete' || e.action === 'day_off') streakable.add(e.calendarDate)
+  }
+  for (const e of extras) {
+    if (e.planId === planId) streakable.add(e.calendarDate)
+  }
+
+  let streak = 0
+  let cursor = today
+  while (streakable.has(cursor)) {
+    streak++
+    cursor = shiftDay(cursor, -1)
+  }
+  return streak
+}
+
 // ── Per-plan-day completion counter ──────────────────────────────────────────
 
 /**

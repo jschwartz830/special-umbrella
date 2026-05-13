@@ -83,87 +83,88 @@ migration, no store changes, no downstream effects.
 ---
 
 # Feature Proposal — Auto-Derive Pace in Run Session Summary
+# Feature Proposal — Plan-Scoped Streak (`computePlanStreak`)
 
-Date: 2026-05-10
-Branch: `claude/dreamy-mccarthy-ApbpW`
-Status: **Implemented this run**
+Date: 2026-05-12
+Branch: `claude/dreamy-mccarthy-OjsGg`
+Status: **Implemented this run (logic layer only; UI wiring deferred)**
 
-## Feature selected
+## Feature Selected
 
-**Auto-derive pace from distance + duration in the TodayPage last-session hint.**
+`computePlanStreak(planId, entries, extras, today): number` — a plan-scoped
+consecutive-day streak counter exported from `src/lib/historyStats.ts`.
 
-When `averagePaceSecondsPerMile` is absent (null or 0) but both `actualDistanceMiles`
-and `actualDurationMin` are available and positive, compute pace as
-`(durationMin × 60) / distanceMiles` and display it using `formatPace`.
+## Why It Was Selected
 
-## Why it was selected
+The current global streak (`computeHistoryStats.currentStreak`) aggregates
+across all plans and extra workouts. For a user who finishes one plan and
+starts another, the streak count carries over from the previous plan's
+history. This produces noise ("30-day streak" when most of those days belong
+to a different program).
 
-- Pass 24 explicitly added pace display for *stored* pace values but deferred
-  derivation as "a product decision". After review, derivation is clearly the
-  right default: the field is optional in the OutcomeModal and most users fill
-  in distance + duration but not a separate pace field.
-- `derivePaceSecondsPerMile(distance, duration)` already exists in
-  `workout-outcomes/types.ts` — the math is defined, tested, and canonical.
-- Stored pace retains strict priority, so GPS-recorded or explicitly entered
-  values are never overridden.
-- Bundled with the pace=0 guard and swim-rounding fixes since all three
-  changes touch the same run display path in `buildLastSessionSummary`.
+A plan-scoped streak:
+- Gives the user a cleaner signal: "You've been consistent on *this* plan for N days."
+- Naturally integrates with the TodayPage stats bar (current streak, 7-day, total).
+- Requires no store changes, no schema changes, no UI changes to ship a safe version.
 
-## Expected user value
+## Expected User Value
 
-- Users who log distance + duration (the common case) now see all three key run
-  metrics — "Last: 3.1 mi · 28 min · 9:02 /mi" — without any additional data
-  entry.
-- Pace is the metric most runners use to evaluate and compare sessions. Showing
-  it by default reduces the number of "what was my pace last time?" trips to the
-  Calendar.
+Users following a specific training program benefit from seeing how long they
+have maintained *that program* without a gap — independent of other workouts
+they may log. This is a common feature in dedicated fitness apps (e.g., Strava
+challenges, Garmin "streak for this activity type") and maps naturally to the
+plan-centric model here.
 
-## Implementation scope for this run
+## Implementation Scope for This Run
 
-Modified `buildLastSessionSummary` in `src/lib/sessionSummary.ts`:
-- Extracted stored-pace check into a `storedPace` variable
-- Added `derivedPace` computed when `storedPace` is null
-- Final `pace = storedPace ?? derivedPace`
-- Display guard: `if (pace != null) parts.push(formatPace(pace))`
+- Add `computePlanStreak` to `src/lib/historyStats.ts` — ~20 lines of pure logic.
+- Add 12 tests covering: zero entries, today-only, consecutive days, gap breaks,
+  day_off counts, skip does not count, extras rescue a skip-only day, multi-plan
+  isolation, Set deduplication.
+- Export from `historyStats.ts` (no re-export barrel needed).
+- **Not wiring into UI this run** — the function exists but is not yet called
+  from any component. UI integration is deferred so this pass remains small and
+  reviewable.
 
-5 existing tests updated to include derived pace in expected strings.
-7 new tests added covering: absent pace, null pace, zero-pace fallback,
-stored-wins, duration-only (no derive), no-data (null result).
+## Assumptions Being Made
 
-## Assumptions being made
+- Same streak semantics as global streak: `complete` or `day_off` entries count;
+  `skip` alone does not; extras always count.
+- The function does not need to know about the plan's start date (entries before
+  plan start should not exist in practice; not guarded).
+- A "plan streak" should not cross into another plan's history even if the user
+  had back-to-back plans that share a calendar date. Scoping by `planId` is
+  sufficient.
 
-- Derivation is always desirable when both inputs are available. If a user
-  entered implausible values (distance=0.01, duration=60), the derived pace
-  would be shown. Accepted as-is — the data is the user's own.
-- `formatPace` handles all formatting edge cases (tested in pass 24).
+## Open Product / UX Decisions
 
-## Open product / UX decisions
+- **Where to surface it:** TodayPage stats bar (replacing or supplementing global
+  streak), HistoryPage plan header, or plan cards on PlansPage.
+- **Label:** "streak" vs "active streak" vs "plan streak" — all reasonable.
+- **Edge case:** if the active plan changes mid-streak, should the old plan's
+  streak remain visible? Current impl: each planId has its own independent count.
 
-- Should the OutcomeModal auto-populate `averagePaceSecondsPerMile` when
-  distance + duration are filled? This would store derived pace and make it
-  available to the progression system, not just the hint.
-- Should there be a user setting to disable pace derivation? Likely not needed
-  for v1.
+## Architecture / Schema Impact
 
-## Architecture or schema impact
-
-None. No new fields, no store changes, no new imports.
+None. Pure function, no state, no persistence, no store changes.
 
 ## Risks
 
-Low. Display-only change. The only regression risk is showing a derived pace
-that the user considers incorrect — they can silence it by explicitly entering
-a "correct" pace (or zeroing distance/duration).
+- Unused export until UI is wired. Not a runtime risk; minor style concern.
+- Semantic mismatch with global streak if user sees both at once (one could be
+  higher than the other depending on extra workouts for other plans). Acceptable
+  — they measure different things.
 
-## Rollback strategy
+## Rollback Strategy
 
-`git revert 35d5856` — reverts `sessionSummary.ts` and all test changes.
+`git revert` the feature commit. No migration needed. No data modified.
 
-## What is intentionally not being built yet
+## What Is Intentionally Not Being Built Yet
 
-- Auto-population of `averagePaceSecondsPerMile` in the OutcomeModal
-- Per-user setting to opt out of pace derivation
-- Swim pace derivation (swim pace per 100m is a different metric)
+- UI component/prop changes
+- "Longest streak" all-time record for a plan
+- Streak freeze / grace day mechanics
+- Integration with the plan expiry or progress indicators
 
 ---
 

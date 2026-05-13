@@ -85,93 +85,106 @@ double-day) applies to both lines.
 ---
 
 ## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
+## 2026-05-12 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-OjsGg`
+## 2026-05-11 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-3SEA4`
 
 Baseline on entry: **609 passing, 0 failing**.
-Exit state: **616 passing, 0 failing** (+7 tests).
+Exit state: **613 passing, 0 failing** (+4 tests).
 
 ---
 
-### 1. Bug fix: CalendarPage stale `entries` closure in `handleOutcomeConfirm`
+### 1. Bug fix: run pace `> 0` guard in `buildLastSessionSummary`
 
-**Summary:** When a user edits an outcome in the Calendar day-detail modal and
-simultaneously changes the `completedAt` date AND the completion state (e.g.,
-from `completed` to `partially_completed`), the action stored on the history
-entry was silently not updated. The displayed label in the calendar ("Done",
-"Skipped", etc.) would remain as the original action.
+**Summary:** Added `&& averagePaceSecondsPerMile > 0` guard alongside the existing
+`!= null` check. Prevents "0:00 /mi" from appearing in the session hint if the field
+is accidentally stored as 0 (e.g., from a future integration that sets a default).
 
-**Root cause:** `handleOutcomeConfirm` calls `updateEntryDate(entry.id, completedDate)`
-to move the history entry to the new date. Zustand updates the store immediately,
-but `entries` is the closure-captured React state array (from the last render cycle).
-The subsequent `entries.find(e => e.calendarDate === completedDate)` reads the
-stale array and returns `undefined` — so `updateEntryAction` is never called.
+**Why it matters:** `formatPace(0)` produces "0:00 /mi" — a nonsensical value that
+would appear as the pace part of the hint. This closes the "probably keep but tweak"
+item from the pass 24 REVIEW_NOTES.
 
-**Fix:** Replace the stale closure with `useHistoryStore.getState().entries`
-(live store), consistent with TodayPage's `todayEntry` lookup and the pass-18
-fix applied to the identical bug in HistoryPage.
+**Files changed:** `src/lib/sessionSummary.ts`
 
-**Why it matters:** Silent data inconsistency — the outcome and the rotation
-engine would both use the correct completion state, but the history list label
-and the calendar dot color would show the wrong action when date and state
-changed in the same edit.
+**Risks / tradeoffs:** None. Adding `> 0` is strictly more defensive; does not affect
+any realistic stored value (valid paces are always positive).
 
-**Files changed:** `src/pages/CalendarPage.tsx`
-
-**Risks / tradeoffs:** Minimal. `useHistoryStore.getState()` is the standard
-pattern for reading Zustand state outside of the React render cycle, used
-consistently across TodayPage and HistoryPage for the same purpose.
-
-**Rollback:** `git revert ebecc5f`
+**Rollback:** `git revert 6568f42` — this commit also includes the swim pace feature
+below; revert both together.
 
 ---
 
-### 2. Bug fixes: `buildLastSessionSummary` — pace=0 guard + swim distance rounding
+### 2. Feature: swim pace in session hint
 
-**Summary:** Two small display bugs in the last-session hint shown on TodayPage:
+**Summary:** `buildLastSessionSummary` now includes `averagePaceSecondsPer100m` in the
+swim hint when the field is present and > 0, producing e.g.:
+"Last: 800 m · 20 min · 2:00 /100m"
 
-1. **Pace guard**: `averagePaceSecondsPerMile === 0` (accidental input) would
-   render "0:00 /mi". Added a `> 0` guard to treat zero identically to null.
-   With the auto-derive feature below, a zero stored pace additionally falls
-   back to the derived value when distance+duration are both available.
-
-2. **Swim distance rounding**: `actualDistanceMeters` was interpolated as-is
-   (e.g., `812.5 m`). Run distance was fixed in pass 24; this applies the same
-   discipline to swim via `Math.round()`.
+**Why it matters:** `averagePaceSecondsPer100m` is captured in `OutcomeModal` and
+stored in `SwimWorkoutActual`, but was silently discarded in the display layer —
+identical to the run pace situation fixed in pass 24. Swimmers care about pace per
+100m just as runners care about pace per mile.
 
 **Files changed:** `src/lib/sessionSummary.ts`, `src/lib/__tests__/sessionSummary.test.ts`
 
-**Risks / tradeoffs:** Display-only changes. `Math.round(812.5)` → 813 — any
-user who entered a half-meter would see it rounded up. For swim, this is
-appropriate (pools are measured in whole meters).
+**Risks / tradeoffs:** Additive only. Existing swim tests (distance+duration, no pace)
+are unchanged. 3 new tests verify the stored-pace, null-pace, and zero-pace paths.
 
-**Rollback:** `git revert a0f6ded` (reverts both fixes and their tests).
+**Rollback:** `git revert 6568f42`
+## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
+
+Baseline on entry: tests could not be run (devDeps not installed on audit machine).
+Source-level audit confirmed all prior fixes stable.
 
 ---
 
-### 3. Feature: auto-derive pace in run session summary
+### 1. Bug fix: `buildWeightsRecommendation` — double-progression partial completion
 
-**Summary:** When `averagePaceSecondsPerMile` is not stored (null or 0) but
-both `actualDistanceMiles > 0` and `actualDurationMin > 0` are available, the
-pace is now derived as `(durationMin × 60) / distanceMiles` and appended using
-`formatPace`. The hint becomes "Last: 3.1 mi · 28 min · 9:02 /mi" instead of
-"Last: 3.1 mi · 28 min". Stored pace still takes priority when present and > 0.
+**Summary:** In `mode === 'double'`, the progression recommendation incorrectly
+returned `'progress'` when only some sets were completed, as long as the completed
+ones hit their rep targets.
 
-**Why it matters:** Most users don't manually enter a GPS pace value in the
-outcome modal — they enter distance and duration. The derivation is exact and
-consistent with `derivePaceSecondsPerMile` already in the type system. This
-closes the carry-over from pass 24, which explicitly deferred the decision.
+**Why it matters:** A user who bails halfway through a workout (completing 2 of 4
+sets) would be told to add load next session, which is the wrong progression cue.
+The single-progression mode had an identical bug fixed in pass 24; this closes the
+parallel gap in double mode.
 
 **Files changed:**
-- `src/lib/sessionSummary.ts` (10 lines — logic + comment)
-- `src/lib/__tests__/sessionSummary.test.ts` (7 new tests, 5 updated)
+- `src/modules/workout-outcomes/progression.ts` — add `allSetsCompleted` guard
+  before evaluating `allHit`; `allHit = allSetsCompleted && completedSets.every(...)`
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` — 2 new regression
+  tests (partial completion → hold; `completed: undefined` sets → hold)
 
-**Risks / tradeoffs:**
-- If a user entered distance + duration that together imply an implausibly fast
-  or slow pace, that derived pace would be shown. Unlikely in practice, and the
-  user can always override by entering a manual pace in the modal.
-- Five existing tests updated to include the derived pace in their expected
-  strings (all involved run outcomes with both distance and duration present).
+**Risks / tradeoffs:** Behaviour change: partial-completion double-progression
+workouts now correctly recommend 'hold' instead of 'progress'. This is a bug fix
+not a policy change; users who complete all sets are unaffected.
 
-**Rollback:** `git revert 35d5856` — reverts `sessionSummary.ts` and all test changes.
+**Rollback:** `git revert` the single commit that contains both file changes.
+
+---
+
+### 2. Feature: `computePlanStreak` — plan-scoped consecutive-day streak
+
+**Summary:** Added a new pure function `computePlanStreak(planId, entries, extras, today)`
+to `src/lib/historyStats.ts`. It counts consecutive days ending at `today` where the
+given plan has a `complete` or `day_off` entry, or any extra workout. Mirrors the
+algorithm in `computeHistoryStats.currentStreak` but scoped to one plan.
+
+**Why it matters:** The global streak aggregates across all plans and extras. A user
+on their second active plan sees a streak that includes history from their previous
+plan. A plan-scoped streak is more actionable ("5 days on this program") and is the
+natural next stat to surface on the TodayPage stats bar or the HistoryPage plan
+summary. This pass adds the function and tests only; UI wiring is left for the next
+pass to keep this change reviewable.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — new export `computePlanStreak`
+- `src/lib/__tests__/historyStats.test.ts` — 12 new tests; import updated
+
+**Risks / tradeoffs:** Additive only. Zero UI changes. Zero store changes. The function
+is exported but not yet called from any component; unused exports are a style lint risk
+(no ESLint `no-unused-exports` rule currently configured). Easy to revert.
+
+**Rollback:** `git revert` the feature commit. No data migration needed.
 
 ---
 

@@ -47,22 +47,59 @@ Test Files  18 passed (18)
 
 ---
 
-## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
+## 2026-05-12 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-OjsGg`
+## 2026-05-11 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-3SEA4`
 
-**Result: 616 passing, 0 failing** (+7 tests from 609 baseline)
+**Result: 613 passing, 0 failing** (+4 tests from 609 baseline)
 
 ### Tests added this pass
 
-| File | Change | What they cover |
-|------|--------|-----------------|
-| `src/lib/__tests__/sessionSummary.test.ts` | +7 new, 5 updated | Swim rounding, pace=0 guard, auto-derived pace (null, zero fallback, stored-wins, duration-only, no-data) |
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `src/lib/__tests__/sessionSummary.test.ts` | 4 | Run pace = 0 guard (no "0:00 /mi"); swim pace present → shown ("2:00 /100m"); swim pace null → omitted; swim pace = 0 → omitted |
+## 2026-05-10 (twenty-fifth pass) — branch `claude/dreamy-mccarthy-ApbpW`
+
+**Result: Could not run** — devDependencies not installed on audit machine
+(`vitest` not found; `npx vitest run` attempted installation but failed due to
+missing `vite` peer dependency in the test environment).
+
+All source changes are type-correct (TypeScript strict mode) and follow
+the established test patterns used across the existing 609-test suite.
+Tests were reviewed for correctness by inspection.
+
+### Tests added this pass
+
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `src/modules/workout-outcomes/__tests__/progression.test.ts` | +2 | Double-progression partial completion → 'hold'; sets with `completed: undefined` → 'hold' |
+| `src/lib/__tests__/historyStats.test.ts` | +12 | `computePlanStreak`: zero entries, today-only, consecutive days, gap break, day_off, skip alone, skip rescued by extra, multi-plan isolation, Set dedup, cross-plan independence |
+
+**Total new tests this pass: 14**
+**Expected passing total (unverified): 623** (609 baseline + 14)
 
 ### Tests reviewed (no changes)
 
-All 609 existing tests reviewed implicitly by full suite run — zero regressions.
+All existing tests in the following files were inspected and remain correct:
+- `src/engine/__tests__/rotationEngine.test.ts` (28 tests) — unaffected
+- `src/store/__tests__/historyStore.test.ts` — unaffected
+- `src/store/__tests__/planStore.test.ts` — unaffected
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` — 2 new tests added; existing 34 tests unaffected by the fix (they all use all-sets-completed scenarios)
+- `src/lib/__tests__/historyStats.test.ts` — 12 new tests added to new describe block; existing 98 tests unaffected
 
-### Notable test highlights
+### Important areas still untested
 
+| Area | Gap | Priority |
+|------|-----|----------|
+| `outcomeStore.logOutcomeWithProgression` | Run progression state update and program var update paths have no unit tests | Medium |
+| `csv.ts historyFromCsv` | No round-trip test for weighted outcomes (sets/reps/load in `weightsActual`) | Medium |
+| `exerciseHistoryStore.upsertFromOutcome` | No direct unit tests for missing planDayIndex, null sets edge cases | Low |
+| `calendarProjection.buildMonthGrid` | Coverage unknown — test file exists but was not visible on audit machine | Unknown |
+- **"omits run pace when averagePaceSecondsPerMile is 0"** — regression anchor for the
+  zero-pace guard. Without this test, `formatPace(0)` producing "0:00 /mi" in the hint
+  would be invisible until a user reported it.
+- **"includes swim pace when averagePaceSecondsPer100m is present"** — first test
+  exercising the swim pace display path end-to-end, with `formatSwimPace` called
+  through the full `buildLastSessionSummary` function.
 - **"derives pace from distance + duration when averagePaceSecondsPerMile is absent"** —
   the primary regression anchor for the auto-derive feature.
 - **"prefers stored pace over derived pace"** — ensures GPS/manually-entered pace
@@ -75,6 +112,11 @@ All 609 existing tests reviewed implicitly by full suite run — zero regression
 
 | Area | Notes |
 |------|-------|
+| `ActiveWorkoutTracker.tsx` | Large component (real-time timer, exercise tracking). No tests; would require significant harness work. |
+| `OutcomeModal.tsx` | Large component (21.8KB) with complex form state. No tests. |
+| `CalendarPage.tsx` retroactive edit flows | Complex multi-step edit flows. Tested implicitly by engine/store unit tests, no integration coverage. |
+| `csv.ts` outcome fields round-trip | CSV round-trip for weights/run/swim fields not separately verified. |
+| `expressionEval.ts` error paths | Malformed expressions return `0` silently; error-handling behavior untested. |
 | `CalendarPage.tsx` stale-closure fix | The CalendarPage bug fix changes 3 lines and has no unit test. The fix follows the same pattern as the tested TodayPage and HistoryPage equivalents; the store operations it calls (updateEntryDate, updateEntryAction) are each individually tested. |
 | `ActiveWorkoutTracker.tsx` | Large component with real-time timer, exercise tracking, rest timer. No tests. |
 | `OutcomeModal.tsx` | Large component with complex form state. No tests. |
