@@ -81,9 +81,8 @@ export function buildLastSessionSummary(
       parts.push(`${dist} mi`)
     }
     if (run.actualDurationMin != null) parts.push(`${run.actualDurationMin} min`)
-    if (run.averagePaceSecondsPerMile != null && run.averagePaceSecondsPerMile > 0) parts.push(formatPace(run.averagePaceSecondsPerMile))
-    // Use stored pace when present; fall back to computing it from distance + duration
-    // so users who don't manually enter pace still see it in the hint.
+    // Stored pace takes priority. A stored value of 0 is bad data — fall back to deriving
+    // from distance+duration (same as when pace is absent). "0:00 /mi" is never displayed.
     const storedPace = run.averagePaceSecondsPerMile != null && run.averagePaceSecondsPerMile > 0
       ? run.averagePaceSecondsPerMile
       : null
