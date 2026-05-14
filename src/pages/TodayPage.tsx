@@ -642,7 +642,11 @@ export function TodayPage() {
       {(lastSessionSummary || prevSessionOutcome?.notes) && !doubleDay && (
         <div className="-mt-2 ml-1 space-y-0.5">
           {lastSessionSummary && (
-            <p className="text-xs text-slate-500 truncate">{lastSessionSummary}</p>
+            <p className="text-xs text-slate-500 truncate">
+              {lastSessionSummary.endsWith(' · PB')
+                ? <>{lastSessionSummary.slice(0, -5)}<span className="text-amber-400 font-medium"> · PB</span></>
+                : lastSessionSummary}
+            </p>
           )}
           {prevSessionOutcome?.notes && (
             <p className="text-xs text-slate-600 italic truncate">"{prevSessionOutcome.notes}"</p>
