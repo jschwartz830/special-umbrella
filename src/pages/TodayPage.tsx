@@ -501,6 +501,9 @@ export function TodayPage() {
               {stats.currentStreak}
               <span className="text-xs font-normal text-slate-400 ml-1">day{stats.currentStreak !== 1 ? 's' : ''}</span>
             </p>
+            {stats.longestStreak > stats.currentStreak && (
+              <p className="text-xs text-slate-600 leading-none mt-0.5">Best: {stats.longestStreak}</p>
+            )}
           </div>
         </div>
         <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/60">
@@ -642,7 +645,11 @@ export function TodayPage() {
       {(lastSessionSummary || prevSessionOutcome?.notes) && !doubleDay && (
         <div className="-mt-2 ml-1 space-y-0.5">
           {lastSessionSummary && (
-            <p className="text-xs text-slate-500 truncate">{lastSessionSummary}</p>
+            <p className="text-xs text-slate-500 truncate">
+              {lastSessionSummary.endsWith(' · PB')
+                ? <>{lastSessionSummary.slice(0, -5)}<span className="text-amber-400 font-medium"> · PB</span></>
+                : lastSessionSummary}
+            </p>
           )}
           {prevSessionOutcome?.notes && (
             <p className="text-xs text-slate-600 italic truncate">"{prevSessionOutcome.notes}"</p>

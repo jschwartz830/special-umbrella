@@ -1,5 +1,44 @@
 # Test Results
 
+## 2026-05-14 (twenty-eighth pass) — branch `claude/dreamy-mccarthy-nJAOH`
+
+**Result: 644 passing, 0 failing** (+5 new tests; 0 previously-failing tests)
+
+### Entry state
+
+Baseline: 639 passing, 0 failing across 18 test files.
+
+### Changes
+
+| File | Tests added | Notes |
+|---|---|---|
+| `src/lib/__tests__/csv.test.ts` | +1 | Out-of-range month/day validation |
+| `src/lib/__tests__/historyStats.test.ts` | +4 | `longestStreak` edge cases |
+
+### New tests detail
+
+**`csv.test.ts` — "rejects out-of-range dates that pass the format regex"**  
+Verifies that `2026-13-01`, `2026-00-15`, and `2026-04-32` each produce an empty `entries`
+array and an "invalid calendarDate" warning. Covers the `isNaN(new Date(...))` guard added
+to `historyFromCsv`.
+
+**`historyStats.test.ts` — longestStreak suite (4 tests)**
+1. `longestStreak equals currentStreak when there is no prior run` — single unbroken run
+2. `longestStreak captures an older run longer than the current one` — 5-day old run vs 2-day current
+3. `longestStreak is 0 when streakable set is empty` — only skip entries, no qualifying dates
+4. `longestStreak works across a mix of entries and extras` — 3-day run via combined sources, currentStreak = 0
+
+### Updated snapshot test
+
+The `computeHistoryStats` "returns zeros for empty inputs" test updated its `.toEqual()`
+shape to include `longestStreak: 0`.
+
+### Exit state
+
+644 passing, 0 failing across 18 test files.
+
+---
+
 ## 2026-05-13 (twenty-seventh pass) — branch `claude/dreamy-mccarthy-JEVCy`
 
 **Result: 639 passing, 0 failing** (+9 new tests; 4 previously-failing tests fixed)

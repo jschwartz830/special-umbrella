@@ -41,6 +41,7 @@ describe('computeHistoryStats', () => {
       last7Completed: 0,
       last30Completed: 0,
       currentStreak: 0,
+      longestStreak: 0,
     })
   })
 
@@ -186,6 +187,57 @@ describe('computeHistoryStats', () => {
     ]
     const s = computeHistoryStats([], extras, '2026-04-17')
     expect(s.currentStreak).toBe(1)
+  })
+
+  // ── longestStreak ──────────────────────────────────────────────────────────
+
+  it('longestStreak equals currentStreak when there is no prior run', () => {
+    const entries = [
+      entry('2026-04-15', 'complete'),
+      entry('2026-04-16', 'complete'),
+      entry('2026-04-17', 'complete'),
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.longestStreak).toBe(3)
+    expect(s.currentStreak).toBe(3)
+  })
+
+  it('longestStreak captures an older run longer than the current one', () => {
+    const entries = [
+      // old 5-day run
+      entry('2026-03-10', 'complete'),
+      entry('2026-03-11', 'complete'),
+      entry('2026-03-12', 'complete'),
+      entry('2026-03-13', 'complete'),
+      entry('2026-03-14', 'complete'),
+      // gap on 2026-03-15
+      // current 2-day run
+      entry('2026-04-16', 'complete'),
+      entry('2026-04-17', 'complete'),
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.currentStreak).toBe(2)
+    expect(s.longestStreak).toBe(5)
+  })
+
+  it('longestStreak is 0 when streakable set is empty', () => {
+    const entries = [entry('2026-04-15', 'skip')]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.longestStreak).toBe(0)
+  })
+
+  it('longestStreak works across a mix of entries and extras', () => {
+    const entries = [
+      entry('2026-04-10', 'complete'),
+      entry('2026-04-11', 'complete'),
+    ]
+    const extras = [
+      extra('2026-04-12'), // extends the run via extra
+    ]
+    const s = computeHistoryStats(entries, extras, '2026-04-15')
+    // 3-day run: 4/10, 4/11, 4/12 — currentStreak is 0 (no activity on 4/15)
+    expect(s.longestStreak).toBe(3)
+    expect(s.currentStreak).toBe(0)
   })
 })
 

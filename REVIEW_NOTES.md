@@ -1,5 +1,73 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-14 (twenty-eighth pass) — branch `claude/dreamy-mccarthy-nJAOH`
+
+### Executive summary
+
+**What changed**: Strengthened CSV date validation to reject semantically invalid dates
+(month 0, month 13, day 32) that pass the format regex. Highlighted the `· PB` marker in
+amber on TodayPage for visual distinction. Added `longestStreak` to `HistoryStats` and
+surfaced it as a "Best: N" sub-label in the streak tile when the current streak hasn't
+matched the all-time best.
+
+**Test delta**: +5 tests (22 CSV, 93 historyStats, total 644 passing, 0 failing).
+
+**Risk profile**: All changes are low-risk. The CSV fix adds a guard that narrows accepted
+values (no previously-valid data is rejected — only newly-invalid data). The PB styling
+is purely cosmetic. The `longestStreak` field is additive to an interface that is only read
+(no serialisation, no store persistence).
+
+---
+
+### Finding 1 — CSV date guard: format-only validation
+
+**Severity**: Medium  
+**File**: `src/lib/csv.ts` ~line 618
+
+The format regex `/^\d{4}-\d{2}-\d{2}$/` accepted `2026-13-01`, `2026-00-15`, `2026-04-32`.
+These passed into `historyFromCsv` and produced `HistoryEntry` objects with corrupted
+`calendarDate` strings. All date comparisons in `historyStats.ts` and `rotationEngine.ts`
+use string comparison on YYYY-MM-DD; an impossible month 13 silently sorts after all valid
+December dates. Fixed by adding `isNaN(new Date(d).getTime())`.
+
+**Note**: JavaScript's Date deliberately normalizes date overflow (Feb 30 → Mar 2), so
+`2026-02-30` is not caught by this guard. That is consistent behaviour; the date would be
+stored as the literal string `2026-02-30`, not the rolled-over date, which *would* be a bug.
+A future pass could add month/day range checks via regex capture groups if needed.
+
+---
+
+### Finding 2 — PB marker not visually distinct
+
+**Severity**: Low (UX)  
+**File**: `src/pages/TodayPage.tsx` ~line 644
+
+The ` · PB` suffix was indistinguishable from the surrounding muted text. No code change
+was required in `buildLastSessionSummary` — the fix is entirely in JSX render logic.
+
+---
+
+### Finding 3 — No all-time best streak metric
+
+**Severity**: Low (feature gap)  
+**File**: `src/lib/historyStats.ts`
+
+`computeHistoryStats` computed `currentStreak` by walking backward from today, but never
+tracked the historical maximum. The `streakable` Set already contains all qualifying dates;
+sorting it and scanning for the longest run adds O(n log n) with negligible practical cost
+(sets are bounded by history size which is typically < 1000 entries).
+
+---
+
+### Closed findings
+
+- **Pass 22 — wire `computePlanStreak` into TodayPage**: Confirmed as a no-op.
+  `useActivePlan` pre-filters `planEntries` to `activePlanId`, so
+  `computeHistoryStats(planEntries, planExtras, today).currentStreak` is already
+  plan-scoped. Recommendation closed.
+
+---
+
 ## 2026-05-13 (twenty-seventh pass) — branch `claude/dreamy-mccarthy-JEVCy`
 
 ### Executive summary

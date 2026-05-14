@@ -7,6 +7,7 @@ export interface HistoryStats {
   last7Completed: number
   last30Completed: number
   currentStreak: number
+  longestStreak: number
 }
 
 /**
@@ -59,7 +60,19 @@ export function computeHistoryStats(
     cursor = shiftDay(cursor, -1)
   }
 
-  return { totalLogged, totalCompleted, last7Completed, last30Completed, currentStreak }
+  const sortedDates = [...streakable].sort()
+  let longestStreak = 0
+  let runLen = 0
+  for (let i = 0; i < sortedDates.length; i++) {
+    if (i === 0 || dateDiffDays(sortedDates[i - 1], sortedDates[i]) === 1) {
+      runLen++
+    } else {
+      runLen = 1
+    }
+    if (runLen > longestStreak) longestStreak = runLen
+  }
+
+  return { totalLogged, totalCompleted, last7Completed, last30Completed, currentStreak, longestStreak }
 }
 
 // ── Plan progress ─────────────────────────────────────────────────────────────
