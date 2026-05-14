@@ -1,3 +1,44 @@
+# Feature Review — All-Time Best Streak (`longestStreak`)
+
+Date: 2026-05-14
+Branch: `claude/dreamy-mccarthy-nJAOH`
+Classification: **Keep**
+
+## What was actually built
+
+`computeHistoryStats` now returns `longestStreak: number` alongside `currentStreak`.
+The value is computed by sorting the `streakable` Set's dates and finding the longest
+consecutive run using `dateDiffDays` between adjacent elements.
+
+TodayPage's streak tile shows `"Best: N"` below the current count only when
+`longestStreak > currentStreak`.
+
+## Review verdict: Keep
+
+**Correctness**: The algorithm is straightforward and well-tested. The four new tests cover:
+parity with current streak, a historical run longer than the current one, the empty-set
+edge case, and a mixed entries/extras run. The zero-shape snapshot test was updated.
+
+**No regressions**: All 644 tests pass. TypeScript is clean.
+
+**UI impact**: The sub-label is hidden when the user is on their personal-best streak
+(no redundancy). When below best, it provides useful motivational context. The visual
+footprint is minimal (one extra muted line inside the existing tile).
+
+**Interface contract**: `HistoryStats` is a read-only computed type with no persistence.
+Adding `longestStreak` is non-breaking for callers that destructure only the fields they
+need. The TypeScript compiler flags any call site that does a full `.toEqual()` shape
+comparison (exactly one test was updated accordingly).
+
+## What to watch
+
+- `computeHistoryStats` is called on every render via `useActivePlan`. The sort is
+  O(n log n) over the `streakable` Set; with typical history sizes this is fast. If history
+  grows into tens of thousands of entries (unlikely for a personal tracker), consider
+  memoizing via a selector.
+
+---
+
 # Feature Review — Swim Pace Derivation in Session Summary Hint
 
 Date: 2026-05-13

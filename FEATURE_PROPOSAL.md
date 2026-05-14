@@ -1,3 +1,52 @@
+# Feature Proposal — All-Time Best Streak (`longestStreak`)
+
+Date: 2026-05-14
+Branch: `claude/dreamy-mccarthy-nJAOH`
+Status: **Implemented this run**
+
+## Feature selected
+
+Surface the user's all-time best consecutive-day workout streak alongside the current
+streak on TodayPage, providing motivational context when the current streak is below the
+personal best.
+
+## Problem statement
+
+TodayPage's stats bar showed only the *current* streak. After a streak break, users had no
+way to see their historical best — a piece of data that is both motivating (aiming to beat
+it) and informative (shows long-term consistency). The data was available but never computed.
+
+## Design
+
+**Data layer**: Add `longestStreak: number` to `HistoryStats`. Compute it inside
+`computeHistoryStats` by:
+1. Collecting all qualifying dates into the existing `streakable` Set.
+2. Sorting them (YYYY-MM-DD lexicographic sort is correct date order).
+3. Walking the sorted array, resetting a run counter on any gap > 1 day, tracking the max.
+
+O(n log n) where n = number of distinct qualifying dates — negligible for typical history
+sizes (< 1000 entries).
+
+**UI layer**: In TodayPage's streak tile, conditionally render a muted `"Best: N"` line
+below the current streak count, visible only when `longestStreak > currentStreak`. When
+the user is on their all-time best streak, the sub-label is hidden (no noise, no redundancy).
+
+## Alternatives considered
+
+- **Separate tile**: A dedicated "Best Streak" tile would add visual weight for data that
+  is mostly static. Sub-label approach is lighter.
+- **Persist longestStreak in store**: Not needed — it can always be recomputed from history.
+  Avoids store schema migration.
+- **Show even when equal**: Decided against — "Best: 5" when current is also 5 is redundant.
+
+## Risk
+
+Low. The `longestStreak` field is purely additive to a read-only interface. No store
+serialization, no breaking changes to existing callers (all callers only read stats fields
+they need). Type-checker enforces the new field throughout.
+
+---
+
 # Feature Proposal — Swim Pace Derivation in Session Summary Hint
 
 Date: 2026-05-13

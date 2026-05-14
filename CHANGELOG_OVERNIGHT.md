@@ -1,5 +1,64 @@
 # Overnight Changelog
 
+## 2026-05-14 (twenty-eighth pass) — branch `claude/dreamy-mccarthy-nJAOH`
+
+Baseline on entry: **639 passing, 0 failing**. Exit state: **644 passing, 0 failing** (+5 tests).
+
+---
+
+### 1. Bug fix: CSV date validation — out-of-range month/day accepted silently
+
+**File**: `src/lib/csv.ts`
+
+The `historyFromCsv` date guard used only a format regex (`/^\d{4}-\d{2}-\d{2}$/`). A
+value like `2026-13-01` (month 13) or `2026-04-32` (day 32) passed the regex and produced
+an entry with an invalid `calendarDate` string that would silently corrupt date comparisons
+throughout the app. Added `isNaN(new Date(calendarDate).getTime())` as a third condition:
+
+```typescript
+if (
+  !calendarDate ||
+  !/^\d{4}-\d{2}-\d{2}$/.test(calendarDate) ||
+  isNaN(new Date(calendarDate).getTime())
+) { … }
+```
+
+New test in `src/lib/__tests__/csv.test.ts` covers month 13, month 0, and day 32.
+
+---
+
+### 2. UX fix: · PB marker rendered in amber on TodayPage
+
+**File**: `src/pages/TodayPage.tsx`
+
+The personal-best marker embedded in `lastSessionSummary` was rendered entirely in muted
+slate (`text-slate-500`), matching the surrounding text. It was easy to miss.
+
+The JSX render now splits on the ` · PB` suffix and wraps it in
+`<span className="text-amber-400 font-medium">`, making it visually distinct without
+changing `buildLastSessionSummary`'s string API or any existing tests.
+
+---
+
+### 3. Feature: `longestStreak` added to `HistoryStats`
+
+**Files**: `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts`,
+`src/pages/TodayPage.tsx`
+
+`computeHistoryStats` now also returns `longestStreak: number` — the length of the longest
+consecutive day-streak ever logged (across all qualifying dates in the `streakable` Set).
+Algorithm: sort the Set's dates lexicographically (safe for YYYY-MM-DD), walk the array,
+reset `runLen` to 1 on any gap > 1 day, track maximum.
+
+TodayPage's streak tile shows a muted `"Best: N"` sub-label whenever `longestStreak >
+currentStreak`, giving users a personal-best reference without cluttering the tile when
+they're on their best streak already.
+
+Four new tests added covering: parity with current streak, older run longer than current,
+empty streakable set, and mixed entries + extras.
+
+---
+
 ## 2026-05-13 (twenty-seventh pass) — branch `claude/dreamy-mccarthy-JEVCy`
 
 Baseline on entry: **4 failing, 631 passing** (pre-existing failures in

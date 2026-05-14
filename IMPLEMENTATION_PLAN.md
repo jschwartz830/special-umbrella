@@ -1,5 +1,78 @@
 # Implementation Plan
 
+## Pass 28 — 2026-05-14 (branch `claude/dreamy-mccarthy-nJAOH`)
+
+### Observations on entry
+
+- Baseline: **639 passing, 0 failing** — clean baseline inherited from pass 27.
+- **CSV date validation gap**: `historyFromCsv` uses `/^\d{4}-\d{2}-\d{2}$/` to validate
+  `calendarDate`. This accepts structurally correct but semantically invalid values such as
+  `2026-13-01` (month 13), `2026-02-31` (February 31), or `2026-00-15` (month 0). Downstream
+  date comparisons (string sort) would silently store bad data in the history store.
+- **PB marker not visually distinct**: `buildLastSessionSummary` appends " · PB" to the hint
+  string when a personal-best load is detected. TodayPage renders the whole string in muted
+  `text-slate-500`. The PB indicator is easy to miss. FEATURE_REVIEW from pass 21 explicitly
+  flagged this and recommended amber styling. The fix is narrow: split the string at " · PB"
+  in the TodayPage render and color that suffix in `text-amber-400`.
+- **No all-time longest streak metric**: `computeHistoryStats` returns `currentStreak` but has
+  no `longestStreak`. The `currentStreak` tells the user their current run; without a reference
+  high-water mark they have no way to know how it compares to their best. The natural
+  follow-on is `longestStreak` — a new field that scans the same streakable Set for the max
+  consecutive run, sharing the Set already built for `currentStreak` with zero extra work.
+- **`computePlanStreak` wiring** (from pass 22 recommendation): Analyzed and closed as
+  not needed. `computeHistoryStats(planEntries, planExtras, today)` already produces a
+  plan-scoped result because `planEntries` and `planExtras` are pre-filtered to `activePlanId`
+  in TodayPage. The existing `stats.currentStreak` is already plan-scoped.
+
+### Decisions
+
+- **Fix CSV date validation** — add `isNaN(new Date(calendarDate).getTime())` after the regex
+  check. This catches invalid months/days that pass the format regex. Tests added.
+- **Style PB marker in amber** — render `" · PB"` in `text-amber-400 font-medium` in TodayPage.
+  No change to `buildLastSessionSummary` or its tests (the string contract is unchanged;
+  only the render-layer splits the string). Safe, display-only change.
+- **Add `longestStreak` to `HistoryStats` + wire in TodayPage** — selected as the session
+  feature. Narrowest slice: add the field to `computeHistoryStats`, add tests, show "Best: X"
+  below the current streak count when the all-time best exceeds the current streak. The logic
+  shares the already-built `streakable` Set so there is zero redundant computation.
+
+### Architecture summary
+
+React + TypeScript + Zustand + Vite PWA. Core state in four persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`. Rotation logic is a
+pure function in `rotationEngine.ts`. Stats and summaries are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`. Two main pages drive the
+daily flow: `TodayPage.tsx` and `CalendarPage.tsx`.
+
+### Key strengths
+
+- Pure-function engine with excellent test coverage (18 test files, 639 tests on entry).
+- Careful stale-closure handling in CalendarPage and TodayPage (fixed in passes 18 and 25).
+- Well-structured store actions with consistent deduplication and cleanup.
+- Modular session summary system with per-discipline derivation paths.
+- Comprehensive unit tests for all core logic modules.
+
+### Key risks (carried forward)
+
+- `workoutInstanceId` parsing via `split('_')` in `outcomeStore.ts` and
+  `exerciseHistoryStore.ts` is fragile if plan ID format ever changes (nanoid is
+  alphanumeric only today, so currently safe).
+- No React component tests — CalendarPage/TodayPage logic is only tested at the
+  engine/utility layer. Complex UI flows (retroactive editing, double-day) have no
+  automated regression coverage.
+- `buildLastSessionSummary` shows total active sets (not sets-at-max-load) in the hint
+  when a workout mixes warmup and work sets. "3×8 @ 185 lb" when only 2 of 3 sets were
+  at 185 is technically accurate in set count but may read as "3 sets at 185." Documented
+  as known UX quirk; not changed (intentional per existing test expectations).
+
+### Prioritized plan
+
+1. **Fix CSV date validation** (bug fix, high-confidence, no risk)
+2. **Style PB marker in amber** (UX fix, high-confidence, display-only)
+3. **Feature: `longestStreak`** (additive metric, medium complexity, good ROI)
+
+---
+
 ## Pass 27 — 2026-05-13 (branch `claude/dreamy-mccarthy-JEVCy`)
 
 ### Observations on entry
