@@ -298,6 +298,18 @@ describe('historyToCsv + historyFromCsv', () => {
     expect(warnings.some(w => w.includes('invalid calendarDate'))).toBe(true)
   })
 
+  it('rejects out-of-range dates that pass the format regex', () => {
+    const bad = ['2026-13-01', '2026-00-15', '2026-04-32']
+    for (const date of bad) {
+      const csv =
+        'entryKind,planId,calendarDate,planDayIndex,action,createdAt\n' +
+        `rotation,${plan.id},${date},0,complete,2026-04-10T00:00:00Z`
+      const { entries: parsed, warnings } = historyFromCsv(csv, planIds)
+      expect(parsed).toEqual([])
+      expect(warnings.some(w => w.includes('invalid calendarDate'))).toBe(true)
+    }
+  })
+
   // ── Extras round-trip ──────────────────────────────────────────────────────
 
   it('round-trips extraEntries and their outcomes', () => {

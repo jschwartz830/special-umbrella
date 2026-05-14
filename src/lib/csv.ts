@@ -616,7 +616,11 @@ export function historyFromCsv(
       return
     }
     const calendarDate = row.calendarDate?.trim()
-    if (!calendarDate || !/^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) {
+    if (
+      !calendarDate ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(calendarDate) ||
+      isNaN(new Date(calendarDate).getTime())
+    ) {
       warnings.push(`Row ${lineNum}: invalid calendarDate "${row.calendarDate}" — skipped.`)
       return
     }
