@@ -1,3 +1,70 @@
+# Feature Proposal — Rotation Plan Remaining Counter
+
+Date: 2026-05-15
+Branch: `claude/dreamy-mccarthy-rtcbO`
+Status: **Implemented this run**
+
+## Feature selected
+
+Surface how many workouts remain to complete a rotations-based plan in the TodayPage
+header subtitle, visible only during the final rotation.
+
+## Why it was selected
+
+The existing cycle-progress indicator shows "N/M done" within the current rotation but
+nothing about how many workouts remain to finish the whole plan. Users near the end of a
+multi-rotation plan have no way to tell they are close to completion without mentally
+computing `(total_rotations − rotations_done) × days_per_rotation − done_in_cycle`.
+A "3 left to finish" label adds meaningful motivation at exactly the moment it matters
+most, without cluttering earlier phases.
+
+## Expected user value
+
+- Motivation near the finish line.
+- Clear signal to start thinking about a follow-up plan.
+- Consistent with the "last one!" / "last week!" patterns already present.
+
+## Implementation scope for this run
+
+- `computeRotationPlanRemaining(plan, entries): number | null` in `historyStats.ts`
+- 11 unit tests
+- TodayPage header: one JSX conditional spanning 4 lines
+
+## Assumptions being made
+
+- "Final rotation" (remaining ≤ plan.days.length) is the right visibility threshold.
+- Users prefer seeing the label only near the end, not from day one ("42 left to finish"
+  is demotivating; "3 left to finish" is motivating).
+
+## Open product / UX decisions
+
+- Visibility threshold is a judgment call. Could be `≤ 2 × plan.days.length` (two
+  rotations left) or `=== 1` (only the last workout). Chosen threshold is one rotation.
+- Should the label appear on the expiry banner ("plan complete!") day? Currently suppressed
+  since `!planExpired` hides it when remaining === 0.
+
+## Architecture / schema impact
+
+None. Pure computation over existing store data. No store changes.
+
+## Risks
+
+- Minimal. The label is a single additive JSX element. Removing it fully reverts the UX.
+- The function has no side effects and is fully unit-tested.
+
+## Rollback strategy
+
+Remove the `rotationPlanRemaining` computation and the JSX conditional in TodayPage (~6
+lines). Remove the import. All tests still pass since no existing behavior changed.
+
+## What is intentionally not being built yet
+
+- Display for weeks-based plans (no obvious "workouts remaining" metric for time-based plans)
+- A progress bar or visual indicator (the text label keeps it minimal)
+- Notifications or push reminders when near plan completion
+
+---
+
 # Feature Proposal — All-Time Best Streak (`longestStreak`)
 
 Date: 2026-05-14

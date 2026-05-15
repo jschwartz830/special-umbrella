@@ -1,3 +1,63 @@
+# Feature Review — Rotation Plan Remaining Counter
+
+Date: 2026-05-15
+Branch: `claude/dreamy-mccarthy-rtcbO`
+Classification: **Keep with revisions (threshold tuning welcome)**
+
+## What was actually built
+
+- `computeRotationPlanRemaining(plan, entries): number | null` in `src/lib/historyStats.ts`
+  — pure function, 8 lines
+- 11 unit tests in `src/lib/__tests__/historyStats.test.ts`
+- TodayPage header: "· N left to finish" conditional rendered when
+  `rotationPlanRemaining !== null && rotationPlanRemaining > 0 && rotationPlanRemaining <=
+  plan.days.length && !planExpired`
+
+## What assumptions were encoded
+
+- "Final rotation" threshold (`remaining ≤ plan.days.length`) is approximately right for
+  typical plans. This means for a 3-day rotation the label shows when ≤ 3 workouts remain.
+- Day_off entries do not count toward plan completion (consistent with `isPlanExpired`).
+- Label is suppressed when the plan is expired (remaining === 0 implies expiry).
+
+## What worked well
+
+- Zero store changes, zero schema changes.
+- The function reuses the same filtering rule as `isPlanExpired` and
+  `computeRotationCycleProgress`, making behavior consistent.
+- The visibility threshold cleanly separates motivation context (near the end) from noise.
+- All 11 tests pass and cover the important edge cases.
+
+## What feels risky or incomplete
+
+- The visibility threshold is a product judgment call. Users with short 2-day rotations
+  will see "1 left to finish" (fine), but users with 7-day rotations will see the label
+  for the entire 7-workout final cycle — which might be longer than feels "near the end."
+- No display for weeks plans. A "N days left" equivalent for weeks plans could be
+  motivated by the same UX goal but is out of scope for this run.
+
+## What I should evaluate tomorrow
+
+1. Does the visibility threshold feel right in your actual plans?
+2. Does it appear at the right moment in your rotation cycle, or should the threshold
+   be adjusted?
+
+## Recommended next steps
+
+- If 1 rotation remaining feels too early for your long plans: change the condition to
+  `rotationPlanRemaining <= Math.ceil(plan.days.length / 2)` (half a rotation) or `=== 1`
+  (only the last workout).
+- Consider a similar "N days left" label for weeks-based plans using
+  `differenceInCalendarDays`.
+
+## Keep / revise / prototype only / reject
+
+**Keep with revisions** — the utility function and tests are clearly keep-quality. The
+visibility threshold in TodayPage is the one tunable parameter and should be adjusted
+to taste.
+
+---
+
 # Feature Review — All-Time Best Streak (`longestStreak`)
 
 Date: 2026-05-14

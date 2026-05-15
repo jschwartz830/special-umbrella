@@ -1,5 +1,50 @@
 # Test Results
 
+## 2026-05-15 (twenty-ninth pass) — branch `claude/dreamy-mccarthy-rtcbO`
+
+**Result: 656 passing, 0 failing** (+12 new tests; 0 previously-failing tests)
+
+### Entry state
+
+Baseline: 644 passing, 0 failing across 18 test files.
+
+### Changes
+
+| File | Tests added | Notes |
+|---|---|---|
+| `src/engine/__tests__/rotationEngine.test.ts` | +1 | planDayIndex/historyEntry divergence after advance override |
+| `src/lib/__tests__/historyStats.test.ts` | +11 | `computeRotationPlanRemaining` full suite |
+
+### New tests detail
+
+**`rotationEngine.test.ts` — "planDayIndex diverges from historyEntry.planDayIndex after an advance override on a completed day"**  
+Verifies that when today has a `complete` entry (planDayIndex=0) and an `advance` override,
+`getTodayResolvedDay` returns `planDayIndex=1` while `historyEntry.planDayIndex=0`. This
+documents why TodayPage uses `primaryPlanDayIndex` for header/card display.
+
+**`historyStats.test.ts` — `computeRotationPlanRemaining` suite (11 tests)**  
+1. `returns null for a weeks-duration plan`
+2. `returns null for a plan with no days`
+3. `returns null when duration.value is 0`
+4. `returns totalNeeded when no entries exist` — fresh 4-rotation 3-day plan = 12
+5. `decrements by each complete entry` — 3 entries → remaining=9
+6. `counts skip entries the same as complete entries`
+7. `does NOT count day_off entries`
+8. `returns 0 once plan is complete`
+9. `returns 0 and does not go negative when over-completed (clamped by Math.max)`
+10. `ignores entries for a different plan`
+11. `returns 1 when exactly one workout remains in the final rotation`
+
+### Important areas still untested (carried forward)
+
+- React component behavior: double-day flow, retroactive calendar edits, Undo
+- CalendarPage `logForDate` jump-override anchoring (engine-level regression test exists
+  but no component-level test)
+- OutcomeModal pre-fill behavior from ActiveWorkoutTracker
+- Double-day Undo advance-override leak (documented bug, not yet fixed)
+
+---
+
 ## 2026-05-14 (twenty-eighth pass) — branch `claude/dreamy-mccarthy-nJAOH`
 
 **Result: 644 passing, 0 failing** (+5 new tests; 0 previously-failing tests)

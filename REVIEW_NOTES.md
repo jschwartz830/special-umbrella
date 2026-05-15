@@ -1,5 +1,133 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-15 (twenty-ninth pass) — branch `claude/dreamy-mccarthy-rtcbO`
+
+### Executive summary
+
+**What changed**: Fixed a visual inconsistency in the TodayPage header day counter (wrong
+day number displayed after double-day advance override), added a regression test anchoring
+that fix, and introduced `computeRotationPlanRemaining` with 11 tests + a narrow "N left
+to finish" label in the header for the final rotation phase.
+
+**Test delta**: +12 tests (644 → 656 all passing, 0 failing).
+
+**Risk profile**: All three changes are low-risk. The header fix is a 1-line swap of an
+already-defined variable. The test is additive. The feature adds a new utility function
+(no store changes) and a single JSX conditional hidden until the final rotation.
+
+**What to review first**: The header fix (1 line) is highest confidence. The feature "N
+left to finish" is worth a quick look at the display condition (`remaining ≤
+plan.days.length`) to confirm the visibility threshold suits your plans. Read the
+Undo/advance-leak finding before your next double-day session.
+
+---
+
+### Finding 1 — Header "Day N" counter wrong after double-day
+
+**Severity**: Medium (visual inconsistency, not data corruption)  
+**File**: `src/pages/TodayPage.tsx` line 478
+
+After a double-day, `actions.advance()` adds an `advance` override for today.
+`getTodayResolvedDay` applies this override and shifts `planDayIndex` forward. The header
+was using `todayResolved.planDayIndex + 1` while the card used `primaryPlanDayIndex`
+(`historyEntry.planDayIndex`). Result: the header said "Day 4 of 5" while the card showed
+the Day 3 workout.
+
+**Fix applied**: Changed to `primaryPlanDayIndex + 1` (1-line).  
+**Regression test**: added to `getTodayResolvedDay` in `rotationEngine.test.ts`.
+
+**Status**: ✅ Fixed.
+
+---
+
+### Finding 2 — Undo does not reverse double-day advance override
+
+**Severity**: Low-medium (UX friction, not data corruption)  
+**File**: `src/pages/TodayPage.tsx` Undo handler (~line 741)
+
+The Undo button removes the entry, outcome, and double-day extras — but NOT the `advance`
+override added by the double-day flow. After Undo the rotation is still +1 from the
+correct position. The user must manually use Override → "Go back one day".
+
+**Root cause**: `OverrideEntry` has no `source` field; double-day advances are
+indistinguishable from manual advances.
+
+**Recommended fix**: Add `source?: 'double_day' | 'manual'` to `OverrideEntry`. Store
+`'double_day'` when the advance originates from the double-day handler. Undo handler
+removes overrides matching `type === 'advance' && source === 'double_day'` for today.
+
+**Status**: ❌ NOT fixed this pass. Documented for next pass.
+
+---
+
+### Finding 3 — Feature: rotation plan remaining counter
+
+**File**: `src/lib/historyStats.ts` + `src/pages/TodayPage.tsx`
+
+`computeRotationPlanRemaining(plan, entries)` computes total complete/skip entries still
+needed to finish a rotations plan. TodayPage shows "· N left to finish" in the header
+subtitle only in the final rotation (remaining ≤ plan.days.length) to avoid premature
+noise.
+
+**Decisions encoded**:
+- Visibility threshold: `plan.days.length`. Adjust if this fires too early or late.
+- Suppressed when plan is expired, for weeks plans, and for plans with `value ≤ 0`.
+
+**Status**: ✅ Implemented, 11 tests passing.
+
+---
+
+### Improvements completed this pass
+
+| # | Change | Confidence | Risk |
+|---|---|---|---|
+| 1 | Fix TodayPage header day counter (1 line) | High | None |
+| 2 | Regression test for planDayIndex divergence | High | None |
+| 3 | `computeRotationPlanRemaining` + TodayPage label | High | Very low |
+
+---
+
+### Definitely keep
+
+- Header fix (#1) — clear bug, 1-line, no tradeoffs
+- Regression test (#2) — documents an important invariant
+
+### Probably keep but tweak
+
+- Rotation remaining counter (#3) — useful near plan end. The visibility threshold
+  `remaining ≤ plan.days.length` is the main tunable parameter.
+
+### Do not keep
+
+- Nothing this pass; all changes are narrow and individually revertable.
+
+### Recommendations only (not implemented)
+
+1. **Fix double-day Undo advance leak** (Finding 2 above): Add `source` field to
+   `OverrideEntry`; pass `'double_day'` from the double-day handler; Undo removes matching
+   advance overrides for today. ~30-line change across types + store + TodayPage.
+2. **`workoutInstanceId` parsing refactor**: Replace `split('_')` in `outcomeStore.ts`
+   and `exerciseHistoryStore.ts` with a shared `parseWorkoutInstanceId(id)` helper.
+
+### Open questions
+
+1. Is the "N left to finish" threshold (one full rotation) right for your plan lengths?
+   Would you prefer it to show earlier (e.g. ≤ 2 × plan.days.length) or only at the very
+   end (remaining === 1)?
+2. How often do you Undo a double-day session? The advance-leak is a friction point if
+   this is frequent.
+
+### Known issues / incomplete work
+
+- Double-day Undo advance leak (Finding 2) — not fixed this pass.
+- No React component tests for TodayPage / CalendarPage UI flows.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-14 (twenty-eighth pass) — branch `claude/dreamy-mccarthy-nJAOH`
 
 ### Executive summary
