@@ -169,6 +169,35 @@ export function computeRotationCycleProgress(
   }
 }
 
+// ── Plan workouts remaining ───────────────────────────────────────────────────
+
+/**
+ * Total complete/skip entries still needed to finish a rotations-based plan.
+ *
+ * Returns `null` for weeks plans, plans with no days, or a `value <= 0`
+ * duration — the same guard conditions used by `isPlanExpired` and
+ * `computeRotationCycleProgress`. Returns 0 when the plan is already done.
+ *
+ * Counts only entries belonging to `plan.id`; day_off entries do not count
+ * toward rotation completion and are excluded (mirrors `isPlanExpired`).
+ */
+export function computeRotationPlanRemaining(
+  plan: Plan,
+  entries: HistoryEntry[],
+): number | null {
+  if (
+    plan.duration.type !== 'rotations' ||
+    plan.days.length === 0 ||
+    plan.duration.value <= 0
+  ) return null
+
+  const totalNeeded = plan.duration.value * plan.days.length
+  const done = entries.filter(
+    e => e.planId === plan.id && (e.action === 'complete' || e.action === 'skip'),
+  ).length
+  return Math.max(0, totalNeeded - done)
+}
+
 /** Difference in calendar days between two YYYY-MM-DD strings (b − a). */
 function dateDiffDays(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number)

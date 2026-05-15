@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -1073,5 +1073,90 @@ describe('computePlanStreak', () => {
     ]
     expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(1)
     expect(computePlanStreak('plan-2', entries, [], TODAY)).toBe(3)
+  })
+})
+
+// ── computeRotationPlanRemaining ──────────────────────────────────────────────
+
+describe('computeRotationPlanRemaining', () => {
+  const FOUR_ROTATION_PLAN = makePlan({ duration: { type: 'rotations', value: 4 } })
+  // 4 rotations × 3 days = 12 total workouts needed
+
+  it('returns null for a weeks-duration plan', () => {
+    const weeksPlan = makePlan({ duration: { type: 'weeks', value: 8 } })
+    expect(computeRotationPlanRemaining(weeksPlan, [])).toBeNull()
+  })
+
+  it('returns null for a plan with no days', () => {
+    const emptyPlan = makePlan({ days: [], duration: { type: 'rotations', value: 4 } })
+    expect(computeRotationPlanRemaining(emptyPlan, [])).toBeNull()
+  })
+
+  it('returns null when duration.value is 0', () => {
+    const zeroPlan = makePlan({ duration: { type: 'rotations', value: 0 } })
+    expect(computeRotationPlanRemaining(zeroPlan, [])).toBeNull()
+  })
+
+  it('returns totalNeeded when no entries exist', () => {
+    // 4 rotations × 3 days = 12
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, [])).toBe(12)
+  })
+
+  it('decrements by each complete entry', () => {
+    const entries = [
+      completeEntry('2026-01-01'),
+      completeEntry('2026-01-02'),
+      completeEntry('2026-01-03'),
+    ]
+    // 12 - 3 = 9
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(9)
+  })
+
+  it('counts skip entries the same as complete entries', () => {
+    const entries: HistoryEntry[] = [
+      completeEntry('2026-01-01'),
+      { ...completeEntry('2026-01-02'), action: 'skip' },
+    ]
+    // 12 - 2 = 10
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(10)
+  })
+
+  it('does NOT count day_off entries', () => {
+    const entries: HistoryEntry[] = [
+      completeEntry('2026-01-01'),
+      { id: 'e-d', planId: 'plan-1', calendarDate: '2026-01-02', action: 'day_off', createdAt: '2026-01-02T12:00:00Z' },
+    ]
+    // 12 - 1 = 11 (day_off excluded)
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(11)
+  })
+
+  it('returns 0 once plan is complete (totalDone >= totalNeeded)', () => {
+    const entries = Array.from({ length: 12 }, (_, i) =>
+      completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
+    )
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(0)
+  })
+
+  it('returns 0 and does not go negative when over-completed (clamped by Math.max)', () => {
+    const entries = Array.from({ length: 15 }, (_, i) =>
+      completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
+    )
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(0)
+  })
+
+  it('ignores entries for a different plan', () => {
+    const entries = [
+      completeEntry('2026-01-01', 'plan-1'),
+      completeEntry('2026-01-02', 'plan-2'), // different plan
+    ]
+    // Only 1 entry for plan-1; 12 - 1 = 11
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(11)
+  })
+
+  it('returns 1 when exactly one workout remains in the final rotation', () => {
+    const entries = Array.from({ length: 11 }, (_, i) =>
+      completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
+    )
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(1)
   })
 })

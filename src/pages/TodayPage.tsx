@@ -35,7 +35,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions } from '../lib/historyStats'
+import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
@@ -277,6 +277,11 @@ export function TodayPage() {
   // Rotation cycle progress — for rotations-duration plans only
   const cycleProgress = computeRotationCycleProgress(plan, planEntries)
 
+  // Total workouts remaining to finish the whole plan (rotations plans only).
+  // Shown only in the final rotation so it doesn't clutter the header during
+  // earlier phases.
+  const rotationPlanRemaining = computeRotationPlanRemaining(plan, planEntries)
+
   // Week progress — for weeks-duration plans only (null for rotations plans)
   const weekProgress = plan.duration.type === 'weeks'
     ? computePlanProgress(plan, planEntries, today)
@@ -479,6 +484,12 @@ export function TodayPage() {
           )}
           {cycleProgress?.justCompletedRotation && !planExpired && (
             <span className="ml-1.5 text-emerald-400/80">· rotation complete!</span>
+          )}
+          {rotationPlanRemaining !== null && rotationPlanRemaining > 0 &&
+           rotationPlanRemaining <= plan.days.length && !planExpired && (
+            <span className="ml-1.5 text-slate-400">
+              · {rotationPlanRemaining} left to finish
+            </span>
           )}
           {weekProgress && weekProgress.completed < weekProgress.total && (
             <span className="ml-1.5">
