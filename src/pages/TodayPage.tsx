@@ -470,7 +470,7 @@ export function TodayPage() {
         </p>
         <h1 className="text-2xl font-bold text-white mt-0.5">{plan.name}</h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Day {todayResolved.planDayIndex + 1} of {plan.days.length} in rotation
+          Day {primaryPlanDayIndex + 1} of {plan.days.length} in rotation
           {cycleProgress && cycleProgress.doneInCycle > 0 && !planExpired && (
             <span className="ml-1.5">
               · <span className="text-slate-400">{cycleProgress.doneInCycle}/{cycleProgress.rotationLength} done</span>
