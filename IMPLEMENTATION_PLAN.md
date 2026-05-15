@@ -1,5 +1,73 @@
 # Implementation Plan
 
+## Pass 29 — 2026-05-15 (branch `claude/dreamy-mccarthy-rtcbO`)
+
+### Observations on entry
+
+- Baseline: **644 passing, 0 failing** — clean baseline inherited from pass 28.
+- **Header day counter off-by-one after double-day**: `TodayPage` header displayed
+  `todayResolved.planDayIndex + 1` in "Day N of M in rotation". After a double-day
+  `actions.advance()` adds an override for today, which shifts `planDayIndex` to the
+  advanced position. The card below uses `primaryPlanDayIndex` (which reads
+  `historyEntry.planDayIndex`) and correctly showed the completed workout. The header
+  showed the wrong number — one higher than the card. Fix: use `primaryPlanDayIndex + 1`.
+- **No "plan completion countdown" for rotations plans**: `computeRotationCycleProgress`
+  shows within-cycle progress (N/M done) but not how many workouts remain to finish the
+  whole plan. In the final rotation a user might want to know "3 workouts left to finish"
+  without computing it manually. A new `computeRotationPlanRemaining` utility and a
+  targeted header label can address this with no store changes.
+- **Undo leaves advance override after double-day (documented risk)**: The Undo button on
+  TodayPage removes the primary entry, primary outcome, and double-day extras, but does
+  NOT remove the `advance` override added by the double-day flow. After undo the rotation
+  pointer is +1 from where it should be. The user must manually "Go back" via the Override
+  modal. Fixing this properly requires tagging override entries with a source
+  (e.g. `'double_day'`) so Undo can target only the right ones. Not implemented this pass
+  to avoid the schema/store change; documented for the next pass.
+- **`planDayIndex` divergence behavior untested**: No test explicitly documented that
+  `getTodayResolvedDay.planDayIndex` diverges from `historyEntry.planDayIndex` when an
+  advance override is applied after today's workout is logged. Added as a regression anchor.
+
+### Decisions
+
+- **Fix header day counter** (bug fix, 1-line change, high-confidence, no risk)
+- **Add regression test for planDayIndex divergence** (test only, low risk)
+- **Feature: `computeRotationPlanRemaining` + TodayPage "N left to finish"** (narrow feature)
+
+### Architecture summary
+
+React + TypeScript + Zustand + Vite PWA. Core state in four persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`. Rotation logic is a
+pure function in `rotationEngine.ts`. Stats and summaries are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`. Two main pages drive the
+daily flow: `TodayPage.tsx` and `CalendarPage.tsx`.
+
+### Key strengths
+
+- Pure-function engine with excellent test coverage (18 test files, 656 tests on exit).
+- Careful `primaryPlanDayIndex` pattern in TodayPage to separate "pointer state" from
+  "what was actually logged" — now consistently applied in both the header and the card.
+- Modular stats layer (`historyStats.ts`) with all public functions unit-tested.
+- Well-structured store actions with consistent deduplication and cleanup.
+
+### Key risks (carried forward)
+
+- **Double-day Undo does not remove advance override** — rotation pointer is +1 after
+  undoing a double-day session. Requires `source` field on `OverrideEntry` to fix cleanly.
+- `workoutInstanceId` parsing via `split('_')` in `outcomeStore.ts` and
+  `exerciseHistoryStore.ts` is fragile if plan ID format ever changes (nanoid is
+  alphanumeric only today, so currently safe).
+- No React component tests — CalendarPage/TodayPage logic is only tested at the
+  engine/utility layer.
+
+### Prioritized plan
+
+1. **Fix header day counter** (bug fix, high-confidence, no risk) ✓ done
+2. **Regression test for planDayIndex divergence** ✓ done
+3. **Feature: rotation plan remaining** (additive, 11 tests, narrow) ✓ done
+4. **Fix double-day Undo advance leak** (requires OverrideEntry `source` field — next pass)
+
+---
+
 ## Pass 28 — 2026-05-14 (branch `claude/dreamy-mccarthy-nJAOH`)
 
 ### Observations on entry

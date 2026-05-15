@@ -1,5 +1,74 @@
 # Overnight Changelog
 
+## 2026-05-15 (twenty-ninth pass) — branch `claude/dreamy-mccarthy-rtcbO`
+
+Baseline on entry: **644 passing, 0 failing**. Exit state: **656 passing, 0 failing** (+12 tests).
+
+---
+
+### 1. Bug fix: TodayPage header shows wrong day number after double-day advance
+
+**File**: `src/pages/TodayPage.tsx` (1 line)  
+**Commit**: `fix: use primaryPlanDayIndex in TodayPage header day counter`
+
+**Problem**: The "Day N of M in rotation" header used `todayResolved.planDayIndex + 1`.
+After a double-day, `actions.advance()` adds an override for today, which shifts
+`todayResolved.planDayIndex` forward by one. The workout card below the header already
+used `primaryPlanDayIndex` (which reads `historyEntry.planDayIndex`) and showed the
+correct completed workout. The header showed one position higher — e.g. "Day 4 of 5"
+while the card showed "Day 3: Upper Body".
+
+**Fix**: Changed the single reference to `primaryPlanDayIndex + 1`. The variable already
+existed and was defined as `historyEntry?.planDayIndex ?? todayResolved.planDayIndex`,
+so pending days and day-offs fall back to the rotation pointer identically to before.
+
+**Risk**: None. `primaryPlanDayIndex` was already used for the card, logs, and outcome
+modal — this change makes the header consistent with everything else.
+
+---
+
+### 2. Regression test: planDayIndex diverges from historyEntry.planDayIndex
+
+**File**: `src/engine/__tests__/rotationEngine.test.ts` (+1 test)  
+**Commit**: `test: document planDayIndex vs historyEntry.planDayIndex divergence`
+
+Added a test in the `getTodayResolvedDay` suite that documents the invariant:
+
+> After completing today's workout (entry logged as day 0), adding an advance override
+> shifts `planDayIndex` to 1 while `historyEntry.planDayIndex` stays at 0.
+
+This anchors the header fix above — any future refactor that removes `primaryPlanDayIndex`
+will be caught by this test explaining why the distinction matters.
+
+---
+
+### 3. Feature: rotation plan remaining counter
+
+**Files**: `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts`,
+`src/pages/TodayPage.tsx`  
+**Commit**: `feat: show total workouts remaining in final rotation of a plan`
+
+**Added `computeRotationPlanRemaining(plan, entries): number | null`**
+
+Computes `max(0, duration.value × days.length − logged count)` where "logged" means
+`complete` or `skip` entries (same rule as `isPlanExpired` and
+`computeRotationCycleProgress`). Returns `null` for weeks plans, empty plans, and
+`value ≤ 0` guards.
+
+**TodayPage header**: When `rotationPlanRemaining ≤ plan.days.length` and `> 0` (the final
+rotation phase), the header subtitle now shows "· N left to finish" alongside the existing
+cycle progress. The condition keeps it invisible during earlier phases to avoid premature
+noise ("42 workouts left" is demoralizing; "3 left to finish" is motivating).
+
+**11 new tests** cover: null guards, fresh plan (totalNeeded returned), decrement by
+complete, decrement by skip, day_off exclusion, at-completion (returns 0), over-completion
+(clamped by Math.max), cross-plan isolation, and the single-remaining case.
+
+**Risk**: Additive. Removing the JSX span reverts to prior behavior. The function has no
+side effects and is already fully tested.
+
+---
+
 ## 2026-05-14 (twenty-eighth pass) — branch `claude/dreamy-mccarthy-nJAOH`
 
 Baseline on entry: **639 passing, 0 failing**. Exit state: **644 passing, 0 failing** (+5 tests).

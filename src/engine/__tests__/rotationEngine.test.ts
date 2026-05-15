@@ -282,6 +282,25 @@ describe('getTodayResolvedDay', () => {
     expect(rd.planDayIndex).toBe(2)
     expect(rd.planDay.label).toBe('Day 3')
   })
+
+  it('planDayIndex diverges from historyEntry.planDayIndex after an advance override on a completed day', () => {
+    // Regression anchor for TodayPage header: after a double-day the advance
+    // override shifts planDayIndex to the next slot, but historyEntry.planDayIndex
+    // still records what was actually logged.  TodayPage must display
+    // historyEntry.planDayIndex (via primaryPlanDayIndex) so the header label
+    // matches the workout card.
+    const plan = makePlan(4)
+    const entries = [makeEntry('2026-01-01', 'complete', 0)]
+    const overrides = [makeOverride('2026-01-01T14:00:00Z', 'advance')]
+
+    const rd = getTodayResolvedDay(plan, entries, overrides, '2026-01-01')
+    // planDayIndex reflects base pointer (0) plus the advance override (+1) = 1
+    expect(rd.planDayIndex).toBe(1)
+    // historyEntry.planDayIndex is the index that was logged before the override
+    expect(rd.historyEntry?.planDayIndex).toBe(0)
+    // They differ — the header must use historyEntry.planDayIndex, not planDayIndex
+    expect(rd.planDayIndex).not.toBe(rd.historyEntry?.planDayIndex)
+  })
 })
 
 // ── getUpcomingDays ───────────────────────────────────────────────────────────
