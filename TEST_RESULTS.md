@@ -1,5 +1,58 @@
 # Test Results
 
+## 2026-05-16 (thirtieth pass) — branch `claude/dreamy-mccarthy-9y4SP`
+
+**Result: 664 passing, 0 failing** (+8 new tests; 0 previously-failing tests)
+
+### Entry state
+
+Baseline: 656 passing, 0 failing across 18 test files.
+
+### Changes
+
+| File | Tests added | Notes |
+|---|---|---|
+| `src/lib/__tests__/expressionEval.test.ts` | +8 | Parser edge cases for `splitStatements`, `resolveLoad`, `resolveQuantityString` |
+
+### New tests detail
+
+**`splitStatements` — nested comma inside function call**  
+- `'easy_miles = min(easy_miles + 0.5, 8), bench += 5'` → 2 statements (comma in `min()` not treated as separator)
+- `'squat = round5(min(squat * 0.85, 200)), bench += 5'` → 2 statements (deeply nested)
+
+**`resolveLoad` — boundary inputs**  
+- `resolveLoad('')` → `null` (empty string)
+- `resolveLoad('round5(135', ctx)` → `null` (unclosed parenthesis; parse error, not crash)
+- `resolveLoad('225LB', ctx)` → `225` (uppercase suffix accepted)
+
+**`resolveQuantityString` — value/unit extraction**  
+- `'30 s'` → `{ value: 30, unit: 's' }`
+- `'1.5 h'` → `{ value: 1.5, unit: 'h' }`
+- `'squat'` with `ctx({ squat: 225 })` → `{ value: 225, unit: '' }` (bare variable resolves through expression evaluator)
+
+### Test suite overview (exit state)
+
+| File | Tests |
+|---|---|
+| `rotationEngine.test.ts` | 62 |
+| `calendarProjection.test.ts` | 13 |
+| `historyStats.test.ts` | 100+ |
+| `expressionEval.test.ts` | 100+ |
+| `sessionSummary.test.ts` | 40+ |
+| `csv.test.ts` | 50+ |
+| 12 other files | remainder |
+| **Total** | **664** |
+
+### Important areas still untested (carried forward)
+
+- React component behavior: double-day flow, retroactive calendar edits, Undo
+- CalendarPage `logForDate` jump-override anchoring (engine-level regression test exists
+  but no component-level test)
+- OutcomeModal pre-fill behavior from ActiveWorkoutTracker
+- Double-day Undo advance-override leak (documented bug, not yet fixed)
+
+---
+
 ## 2026-05-15 (twenty-ninth pass) — branch `claude/dreamy-mccarthy-rtcbO`
 
 **Result: 656 passing, 0 failing** (+12 new tests; 0 previously-failing tests)

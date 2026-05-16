@@ -1,5 +1,64 @@
 # Implementation Plan
 
+## Pass 30 — 2026-05-16 (branch `claude/dreamy-mccarthy-9y4SP`)
+
+### Observations on entry
+
+- Baseline: **656 passing, 0 failing** — clean baseline inherited from pass 29.
+- **`HistoryPage.handleOutcomeConfirm` missing `removeOutcome` before `moveOutcome`**
+  (DATA INTEGRITY BUG). When a user changes a workout date in the History page, the
+  rotation-entry path calls `moveOutcome(oldId, newId)` without first calling
+  `removeOutcome(newId)`. If the destination date already has an outcome,
+  `exerciseHistoryStore` records for the displaced outcome are silently orphaned
+  (the outcome key is overwritten but `syncExerciseHistory` is not called for the
+  removed outcome). TodayPage and CalendarPage both correctly call
+  `removeOutcome(nextId)` first; HistoryPage was the outlier.
+- **`expressionEval.ts` edge cases uncovered**: The safe expression evaluator had
+  no tests for: `splitStatements` handling commas nested inside function calls (a
+  comma in `min(a, b)` must not be treated as a statement separator), and the
+  `resolveLoad` / `resolveQuantityString` fallback paths for empty strings, unclosed
+  parens, and case-insensitive suffixes.
+
+### Decisions
+
+- **Fix HistoryPage `moveOutcome` missing `removeOutcome`** — one-line addition
+  matching the pattern already used in TodayPage and CalendarPage. High confidence,
+  no behavioral change for the common case (no pre-existing outcome at destination).
+- **Add expressionEval edge-case tests** — 8 targeted tests covering the two
+  untested surface areas above. Additive, no behavioral changes.
+
+### Architecture summary
+
+React + TypeScript + Zustand + Vite PWA. Core state in four persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`. Rotation logic is a
+pure function in `rotationEngine.ts`. Stats and summaries are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`. Two main pages drive
+the daily flow: `TodayPage.tsx` and `CalendarPage.tsx`.
+
+### Key strengths
+
+- Pure-function engine with excellent test coverage (18 test files, 664 tests on exit).
+- All three pages (Today, Calendar, History) now consistently guard `moveOutcome` with
+  a preceding `removeOutcome` for rotation entries.
+- Modular stats layer (`historyStats.ts`) fully tested across all exported functions.
+- `expressionEval.ts` now has edge-case coverage for parser boundary conditions.
+
+### Key risks (carried forward)
+
+- **Double-day Undo does not remove advance override** — rotation pointer is +1 after
+  undoing a double-day session. Requires `source` field on `OverrideEntry` to fix cleanly.
+- `workoutInstanceId` parsing via `split('_')` is fragile if plan ID format ever
+  changes (nanoid is alphanumeric only today, so currently safe).
+- No React component tests — CalendarPage/TodayPage logic is only tested at the
+  engine/utility layer.
+
+### Prioritized plan (executed)
+
+1. **Fix HistoryPage `moveOutcome` missing `removeOutcome`** (data integrity bug, high-confidence) ✓ done
+2. **Add expressionEval edge-case tests** (additive, low risk) ✓ done
+
+---
+
 ## Pass 29 — 2026-05-15 (branch `claude/dreamy-mccarthy-rtcbO`)
 
 ### Observations on entry
