@@ -268,6 +268,9 @@ export function HistoryPage() {
           updateEntryDate(entryToMove.id, completedDate)
         }
         const nextId = makeWorkoutInstanceId(outcomeTarget.planId, completedDate)
+        // Remove any existing outcome at the destination so its exercise history
+        // records don't become orphaned when the moved outcome overwrites the key.
+        removeOutcome(nextId)
         moveOutcome(outcomeTarget.instanceId, nextId)
         finalOutcome = { ...outcome, workoutInstanceId: nextId }
       }
