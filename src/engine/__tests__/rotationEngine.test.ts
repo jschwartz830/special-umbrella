@@ -283,6 +283,18 @@ describe('getTodayResolvedDay', () => {
     expect(rd.planDay.label).toBe('Day 3')
   })
 
+  it('uses most recent entry when multiple entries exist for today', () => {
+    const plan = makePlan(4)
+    const entries: HistoryEntry[] = [
+      { ...makeEntry('2026-01-05', 'complete', 0), id: 'e1', createdAt: '2026-01-05T08:00:00Z' },
+      { ...makeEntry('2026-01-05', 'skip', 0),    id: 'e2', createdAt: '2026-01-05T16:00:00Z' },
+    ]
+    // Most recent is skip — status must reflect that, not the earlier complete
+    const rd = getTodayResolvedDay(plan, entries, [], '2026-01-05')
+    expect(rd.status).toBe('today_skip')
+    expect(rd.historyEntry?.id).toBe('e2')
+  })
+
   it('planDayIndex diverges from historyEntry.planDayIndex after an advance override on a completed day', () => {
     // Regression anchor for TodayPage header: after a double-day the advance
     // override shifts planDayIndex to the next slot, but historyEntry.planDayIndex

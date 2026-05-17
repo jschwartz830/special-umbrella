@@ -93,7 +93,12 @@ export function getTodayResolvedDay(
   idx = applyOverridesForDate(idx, sortedOverrides, today, plan.days.length)
 
   const planDay = plan.days[idx]
-  const entry = entries.find(e => e.calendarDate === today)
+  // Match deduplication behavior of computeCurrentDayIndex / getResolvedDaysRange:
+  // pick the entry with the newest createdAt when duplicates exist for today.
+  const todayEntries = entries.filter(e => e.calendarDate === today)
+  const entry = todayEntries.length > 1
+    ? todayEntries.reduce((best, e) => (e.createdAt > best.createdAt ? e : best))
+    : todayEntries[0]
 
   let status: DayStatus = 'today_pending'
   if (entry) {

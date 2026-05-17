@@ -1,3 +1,50 @@
+# Feature Review — Weekly Workout Breakdown Utility
+
+Date: 2026-05-17
+Branch: `claude/dreamy-mccarthy-UaphK`
+Classification: **Keep**
+
+## What was actually built
+
+`computeWeeklyBreakdown(planId, entries, extras, fromDate, toDate): WeeklyBreakdown[]` in `src/lib/historyStats.ts`, with a private `isoWeekStart(date)` helper. The function groups rotation history entries and extra workout entries into ISO weeks (Mon–Sun), counting completed/skipped/dayOffs/extras/totalLogged per week. Weeks with no activity are not returned.
+
+15 tests added to `src/lib/__tests__/historyStats.test.ts`.
+
+## What assumptions were encoded
+
+- ISO Monday start for weeks. This is consistent with the ISO 8601 standard but differs from the CalendarPage's Sunday-start visual grid.
+- Weeks with zero activity are omitted — not padded with empty `WeeklyBreakdown` objects.
+- The function does not internally compute a "current week" indicator; callers compare `weekStart` to today themselves.
+
+## What worked well
+
+- Clean, small implementation (27 lines of logic + helper).
+- Reuses the private `shiftDay` utility already in the file.
+- 15 tests cover all edge cases: Sunday-assignment, range clamping, cross-plan isolation, mixed action types, extras, multi-week sorting.
+- No coupling to stores, React, or UI layer.
+
+## What feels risky or incomplete
+
+- **Monday vs. Sunday** — the week-start choice is not surfaced to the caller. If HistoryPage renders a Sunday-aligned chart, dates will visually misalign unless `isoWeekStart` is adapted.
+- **No UI yet** — the function is production-ready but not wired anywhere. It will not appear in the app until a follow-up PR adds a UI component.
+
+## What I should evaluate tomorrow
+
+- Does the weekly breakdown make sense for plans with sporadic logging? (Unlogged days are invisible to the function — they're simply absent entries.)
+- Should "this week" be highlighted differently from past weeks in the future UI?
+
+## Recommended next steps
+
+1. Wire into HistoryPage as a collapsible "Weekly breakdown" section below the per-type chart.
+2. Decide on Sunday vs. Monday week start based on CalendarPage grid alignment.
+3. Consider adding a `computeWeeklyBreakdown` variant that fills empty weeks with zero-counts for charting purposes.
+
+## Keep / revise / prototype only / reject
+
+**Keep.** The function is clean, fully tested, and ready to use. The UI wiring is straightforward next-pass work. No changes needed to the implementation before shipping.
+
+---
+
 # Feature Review — Rotation Plan Remaining Counter
 
 Date: 2026-05-15

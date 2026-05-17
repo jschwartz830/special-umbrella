@@ -1,5 +1,32 @@
 # Test Results
 
+## 2026-05-17 (thirty-first pass) — branch `claude/dreamy-mccarthy-UaphK`
+
+**Result: 686 passing, 0 failing** (+22 new tests; 0 previously-failing tests)
+
+### Tests reviewed
+
+All 18 existing test files reviewed. No failures on entry (664 baseline).
+
+### Tests added or updated
+
+| File | New Tests | Description |
+|------|-----------|-------------|
+| `src/engine/__tests__/rotationEngine.test.ts` | +1 | `getTodayResolvedDay` uses most recent entry when duplicates exist for today |
+| `src/engine/__tests__/calendarProjection.test.ts` | +8 | `buildMonthGrid` with real entries (past_complete, past_skip, past_day_off, today_pending), overrides (jump applies correct planDayIndex), pointer advancement, and cross-plan isolation |
+| `src/lib/__tests__/historyStats.test.ts` | +15 | `computeWeeklyBreakdown` — empty inputs, different-plan isolation, ISO week grouping (Mon–Sun), Sunday-assignment, range filtering, action-type separation, extras, multi-week totals, sorted output, no empty-week placeholders, inclusive range edges |
+
+**Total: +22 tests. All 686 pass.**
+
+### Important areas still untested
+
+- React component logic in `TodayPage.tsx` and `CalendarPage.tsx` — complex UI flows (double-day, retroactive editing, undo) have no automated test coverage.
+- `outcomeStore.logOutcomeWithProgression` — the integration between outcome storage, run progression, and program variable updates is not unit-tested.
+- Double-day undo advance leak — confirmed behavioral gap but no regression test yet (fixing it requires a store schema change).
+- `syncExerciseHistory` error path — no test for the case where `upsertFromOutcome` throws after the outcome is saved.
+
+---
+
 ## 2026-05-16 (thirtieth pass) — branch `claude/dreamy-mccarthy-9y4SP`
 
 **Result: 664 passing, 0 failing** (+8 new tests; 0 previously-failing tests)
