@@ -5,6 +5,7 @@ import type { ExerciseSpec, WarmupRampSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import { resolveLoad, type EvalContext } from '../../lib/expressionEval'
 import { EXERCISE_LIBRARY } from '../../lib/exerciseLibrary'
+import { usePlanStore } from '../../store/planStore'
 
 interface SetTrackState {
   setElapsedSeconds: number
@@ -24,6 +25,7 @@ interface ExerciseTrackState {
   isWarmup: boolean
   sets: SetTrackState[]
   previousSets?: LoggedSetActual[]
+  addedDuringWorkout?: boolean
 }
 
 
@@ -173,18 +175,21 @@ type ExercisePickerMode = { mode: 'add' } | { mode: 'replace'; exIdx: number }
 function ExercisePicker({
   mode,
   exerciseNames,
+  canSaveToTemplate,
   onSelect,
   onClose,
 }: {
   mode: 'add' | 'replace'
   exerciseNames: string[]
-  onSelect: (name: string, insertAt: number) => void
+  canSaveToTemplate: boolean
+  onSelect: (name: string, insertAt: number, saveToTemplate: boolean) => void
   onClose: () => void
 }) {
   const [query, setQuery] = useState('')
   const [customName, setCustomName] = useState('')
   const [insertAt, setInsertAt] = useState(exerciseNames.length)
   const [showCustom, setShowCustom] = useState(false)
+  const [saveToTemplate, setSaveToTemplate] = useState(false)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -193,7 +198,7 @@ function ExercisePicker({
   }, [query])
 
   function handleSelect(name: string) {
-    onSelect(name, insertAt)
+    onSelect(name, insertAt, saveToTemplate)
   }
 
   function handleCustomSubmit() {
@@ -214,6 +219,17 @@ function ExercisePicker({
         <h2 className="text-sm font-bold text-white flex-1">
           {mode === 'add' ? 'Add Exercise' : 'Replace Exercise'}
         </h2>
+        {canSaveToTemplate && (
+          <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
+            <span className="text-[10px] text-slate-400 leading-none">Save to plan</span>
+            <div
+              onClick={() => setSaveToTemplate(v => !v)}
+              className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${saveToTemplate ? 'bg-sky-500' : 'bg-slate-600'}`}
+            >
+              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${saveToTemplate ? 'left-[18px]' : 'left-0.5'}`} />
+            </div>
+          </label>
+        )}
       </div>
 
       {mode === 'add' && exerciseNames.length > 0 && (
@@ -309,7 +325,7 @@ function ExercisePicker({
 }
 
 export function ActiveWorkoutTracker({
-  planId: _planId,
+  planId,
   workoutInstanceId,
   planDay,
   slot,
@@ -944,6 +960,7 @@ export function ActiveWorkoutTracker({
     const newEx: ExerciseTrackState = {
       exercise: name,
       isWarmup: false,
+      addedDuringWorkout: true,
       sets: Array.from({ length: 3 }, () => ({
         setElapsedSeconds: 0,
         completed: false,
@@ -964,6 +981,70 @@ export function ActiveWorkoutTracker({
     setExercisePicker(null)
   }
 
+  function saveExerciseToTemplate(name: string, insertAt: number) {
+    const plan = usePlanStore.getState().plans[planId]
+    if (!plan) return
+    const dayIdx = plan.days.findIndex(d => d.id === planDay.id)
+    if (dayIdx === -1) return
+    const slotIdx = plan.days[dayIdx].slots.findIndex(s => s.id === slot.id)
+    if (slotIdx === -1) return
+    const targetSlot = plan.days[dayIdx].slots[slotIdx]
+    // Compute insertion position among work exercises only (exclude warmups)
+    const warmupsBefore = exercises.slice(0, insertAt).filter(ex => ex.isWarmup).length
+    const workExInsertAt = insertAt - warmupsBefore
+    const currentExercises = targetSlot.exercises ?? []
+    const newEx: ExerciseSpec = { exercise: name, sets: 3 }
+    const newExercises = [
+      ...currentExercises.slice(0, workExInsertAt),
+      newEx,
+      ...currentExercises.slice(workExInsertAt),
+    ]
+    const newDays = plan.days.map((d, di) =>
+      di !== dayIdx ? d : {
+        ...d,
+        slots: d.slots.map((s, si) =>
+          si !== slotIdx ? s : { ...s, exercises: newExercises }
+        ),
+      }
+    )
+    usePlanStore.getState().updatePlan(planId, { days: newDays })
+  }
+
+  function replaceExerciseInTemplate(exIdx: number, name: string) {
+    const plan = usePlanStore.getState().plans[planId]
+    if (!plan) return
+    const dayIdx = plan.days.findIndex(d => d.id === planDay.id)
+    if (dayIdx === -1) return
+    const slotIdx = plan.days[dayIdx].slots.findIndex(s => s.id === slot.id)
+    if (slotIdx === -1) return
+    const targetSlot = plan.days[dayIdx].slots[slotIdx]
+    const exToReplace = exercises[exIdx]
+    if (!exToReplace) return
+    let newSlot = { ...targetSlot }
+    if (exToReplace.isWarmup) {
+      const warmupIdx = exercises.slice(0, exIdx + 1).filter(ex => ex.isWarmup).length - 1
+      const newWarmup = (targetSlot.warmup ?? []).map((ex, i) =>
+        i === warmupIdx ? { ...ex, exercise: name } : ex
+      )
+      newSlot = { ...newSlot, warmup: newWarmup }
+    } else {
+      const workExIdx = exercises.slice(0, exIdx + 1).filter(ex => !ex.isWarmup).length - 1
+      const newExercises = (targetSlot.exercises ?? []).map((ex, i) =>
+        i === workExIdx ? { ...ex, exercise: name } : ex
+      )
+      newSlot = { ...newSlot, exercises: newExercises }
+    }
+    const newDays = plan.days.map((d, di) =>
+      di !== dayIdx ? d : {
+        ...d,
+        slots: d.slots.map((s, si) =>
+          si !== slotIdx ? s : newSlot
+        ),
+      }
+    )
+    usePlanStore.getState().updatePlan(planId, { days: newDays })
+  }
+
   function replaceExercise(exIdx: number, name: string) {
     setExercises(prev => prev.map((ex, ei) =>
       ei !== exIdx ? ex : { ...ex, exercise: name, previousSets: undefined }
@@ -971,12 +1052,14 @@ export function ActiveWorkoutTracker({
     setExercisePicker(null)
   }
 
-  function handlePickerSelect(name: string, insertAt: number) {
+  function handlePickerSelect(name: string, insertAt: number, saveToTemplate: boolean) {
     if (!exercisePicker) return
     if (exercisePicker.mode === 'add') {
       addExercise(name, insertAt)
+      if (saveToTemplate) saveExerciseToTemplate(name, insertAt)
     } else {
       replaceExercise(exercisePicker.exIdx, name)
+      if (saveToTemplate) replaceExerciseInTemplate(exercisePicker.exIdx, name)
     }
   }
 
@@ -1350,6 +1433,10 @@ export function ActiveWorkoutTracker({
       <ExercisePicker
         mode={exercisePicker.mode}
         exerciseNames={exercises.map(ex => ex.exercise)}
+        canSaveToTemplate={
+          exercisePicker.mode !== 'replace' ||
+          !exercises[exercisePicker.exIdx]?.addedDuringWorkout
+        }
         onSelect={handlePickerSelect}
         onClose={() => setExercisePicker(null)}
       />
