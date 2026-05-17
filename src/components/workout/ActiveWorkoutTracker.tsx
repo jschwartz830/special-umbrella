@@ -356,6 +356,8 @@ export function ActiveWorkoutTracker({
   const restOwnerRef = useRef<{ exIdx: number; setIdx: number } | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const scheduledRestNodesRef = useRef<OscillatorNode[]>([])
+  const audioKeepaliveRef = useRef<OscillatorNode | null>(null)
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
   const workoutWallBaseRef = useRef<{ elapsed: number; time: number }>({ elapsed: 0, time: Date.now() })
   const restWallBaseRef = useRef<{ elapsed: number; time: number } | null>(null)
 
@@ -561,7 +563,11 @@ export function ActiveWorkoutTracker({
       if (restRunRef.current && restoredRestElapsed != null && restoredRestTarget != null) {
         restWallBaseRef.current = { elapsed: restoredRestElapsed, time: Date.now() }
         const ctx = getAudioContext()
-        if (ctx) scheduleRestAudio(ctx, restoredRestTarget, restoredRestElapsed)
+        if (ctx) {
+          scheduleRestAudio(ctx, restoredRestTarget, restoredRestElapsed)
+          startAudioKeepalive(ctx)
+        }
+        void acquireWakeLock()
       }
       if (typeof draft.workoutElapsed === 'number') {
         workoutWallBaseRef.current = { elapsed: draft.workoutElapsed, time: Date.now() }
@@ -627,8 +633,50 @@ export function ActiveWorkoutTracker({
     scheduledRestNodesRef.current = []
   }
 
+  // Keep an inaudible audio source playing for the duration of rest so iOS Safari
+  // doesn't suspend the AudioContext when backgrounded — that's what lets pre-scheduled
+  // rest end / wood-block tones still fire on time while the app is in the background.
+  function startAudioKeepalive(ctx: AudioContext) {
+    if (audioKeepaliveRef.current) return
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(440, ctx.currentTime)
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start()
+    audioKeepaliveRef.current = osc
+  }
+
+  function stopAudioKeepalive() {
+    const osc = audioKeepaliveRef.current
+    if (!osc) return
+    audioKeepaliveRef.current = null
+    try { osc.stop() } catch { /* already stopped */ }
+  }
+
+  async function acquireWakeLock() {
+    if (wakeLockRef.current) return
+    if (typeof navigator === 'undefined' || !navigator.wakeLock) return
+    try {
+      const sentinel = await navigator.wakeLock.request('screen')
+      sentinel.addEventListener('release', () => {
+        if (wakeLockRef.current === sentinel) wakeLockRef.current = null
+      })
+      wakeLockRef.current = sentinel
+    } catch { /* permission denied or unsupported */ }
+  }
+
+  function releaseWakeLock() {
+    const sentinel = wakeLockRef.current
+    if (!sentinel) return
+    wakeLockRef.current = null
+    void sentinel.release().catch(() => { /* ignore */ })
+  }
+
   // Pre-schedule rest audio via AudioContext hardware clock so it fires even when backgrounded.
-  // Sets the warning/alerted ref flags immediately to prevent interval double-play.
+  // Flags are set to true so the per-second interval fallback never double-plays the same alert.
+  // The visibility-change handler re-arms flags if the schedule may have been missed during suspension.
   function scheduleRestAudio(ctx: AudioContext, targetSeconds: number, fromElapsed: number) {
     cancelScheduledRestAudio()
     const nodes: OscillatorNode[] = []
@@ -637,9 +685,9 @@ export function ActiveWorkoutTracker({
     const remainingToEnd = targetSeconds - fromElapsed
 
     if (targetSeconds > 15 && remainingToWoodBlock > 0) {
-      // wood block: short percussive double-tap
+      // Single wood-block: percussive transient with a touch of layered timbre for body.
       nodes.push(scheduleTone(ctx, 880, base + remainingToWoodBlock, 0.045, 0.28, 'triangle'))
-      nodes.push(scheduleTone(ctx, 440, base + remainingToWoodBlock + 0.025, 0.04, 0.14, 'triangle'))
+      nodes.push(scheduleTone(ctx, 440, base + remainingToWoodBlock + 0.005, 0.04, 0.14, 'triangle'))
     }
     if (remainingToEnd > 0) {
       nodes.push(scheduleTone(ctx, 920, base + remainingToEnd, 0.2, 0.22, 'square'))
@@ -649,9 +697,8 @@ export function ActiveWorkoutTracker({
     }
     scheduledRestNodesRef.current = nodes
 
-    // Mark flags so interval never double-plays
-    restWarningAlertedRef.current = targetSeconds <= 15 || remainingToWoodBlock <= 0
-    restAlertedRef.current = remainingToEnd <= 0
+    restWarningAlertedRef.current = true
+    restAlertedRef.current = true
   }
 
   // Fallback (fires only when AudioContext unavailable or pre-scheduling wasn't done)
@@ -697,6 +744,8 @@ export function ActiveWorkoutTracker({
 
   function stopRest(recordElapsed = true) {
     cancelScheduledRestAudio()
+    stopAudioKeepalive()
+    releaseWakeLock()
     if (recordElapsed) recordRestElapsed()
     restRunRef.current = false
     setRestRunning(false)
@@ -747,10 +796,18 @@ export function ActiveWorkoutTracker({
   }, [])
 
   // On resume from background/lock, reconcile timers against system clock rather than
-  // relying on throttled setInterval ticks.
+  // relying on throttled setInterval ticks. While hidden, re-arm the alert flags so any
+  // pre-scheduled tones that didn't actually fire (iOS suspends AudioContext when hidden
+  // unless audio is actively playing) can still be picked up by maybeAlertForRest on resume.
   useEffect(() => {
-    const onVisible = () => {
-      if (document.hidden) return
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (restRunRef.current) {
+          restWarningAlertedRef.current = false
+          restAlertedRef.current = false
+        }
+        return
+      }
       if (workoutRunRef.current) {
         const { elapsed, time } = workoutWallBaseRef.current
         const actual = elapsed + Math.floor((Date.now() - time) / 1000)
@@ -764,10 +821,19 @@ export function ActiveWorkoutTracker({
         restWallBaseRef.current = { elapsed: actual, time: Date.now() }
         setRestElapsed(actual)
         maybeAlertForRest(actual)
+        void acquireWakeLock()
       }
     }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
+
+  // Release wake lock + tear down keepalive oscillator on unmount.
+  useEffect(() => {
+    return () => {
+      stopAudioKeepalive()
+      releaseWakeLock()
+    }
   }, [])
 
   function startRest(seconds: number, owner: { exIdx: number; setIdx: number }) {
@@ -783,7 +849,11 @@ export function ActiveWorkoutTracker({
     activeSetRef.current = null
     setActiveSetTimer(null)
     restWallBaseRef.current = { elapsed: 0, time: Date.now() }
-    if (ctx) scheduleRestAudio(ctx, seconds, 0)
+    if (ctx) {
+      scheduleRestAudio(ctx, seconds, 0)
+      startAudioKeepalive(ctx)
+    }
+    void acquireWakeLock()
   }
 
   function toggleWorkout(e?: React.MouseEvent) {
@@ -798,6 +868,8 @@ export function ActiveWorkoutTracker({
       restRunRef.current = false
       setRestRunning(false)
       cancelScheduledRestAudio()
+      stopAudioKeepalive()
+      releaseWakeLock()
       return
     }
 
@@ -813,7 +885,11 @@ export function ActiveWorkoutTracker({
       setRestRunning(true)
       restWallBaseRef.current = { elapsed: restElapsedRef.current, time: Date.now() }
       const ctx = getAudioContext()
-      if (ctx && restTargetRef.current != null) scheduleRestAudio(ctx, restTargetRef.current, restElapsedRef.current)
+      if (ctx && restTargetRef.current != null) {
+        scheduleRestAudio(ctx, restTargetRef.current, restElapsedRef.current)
+        startAudioKeepalive(ctx)
+      }
+      void acquireWakeLock()
       return
     }
 
@@ -829,6 +905,8 @@ export function ActiveWorkoutTracker({
     if (restElapsedRef.current == null) return
     if (restRunning) {
       cancelScheduledRestAudio()
+      stopAudioKeepalive()
+      releaseWakeLock()
       restRunRef.current = false
       setRestRunning(false)
       restWallBaseRef.current = null
@@ -839,7 +917,11 @@ export function ActiveWorkoutTracker({
     restRunRef.current = true
     setRestRunning(true)
     restWallBaseRef.current = { elapsed: restElapsedRef.current, time: Date.now() }
-    if (ctx && restTargetRef.current != null) scheduleRestAudio(ctx, restTargetRef.current, restElapsedRef.current)
+    if (ctx && restTargetRef.current != null) {
+      scheduleRestAudio(ctx, restTargetRef.current, restElapsedRef.current)
+      startAudioKeepalive(ctx)
+    }
+    void acquireWakeLock()
   }
 
   function resetRest(e: React.MouseEvent) {
