@@ -350,4 +350,88 @@ describe('buildMonthGrid', () => {
     // And cover all 31 days of January plus padding
     expect(totalCells).toBeGreaterThanOrEqual(31)
   })
+
+  it('propagates past_complete status through resolvedDay for a completed entry', () => {
+    const plan = makePlan(4) // startDate = 2026-01-01
+    const entry = makeEntry('2026-01-10', 'complete', 0)
+    const weeks = buildMonthGrid(2026, 0, plan, [entry], [], '2026-01-15')
+    const allCells = weeks.flat()
+    const cell = allCells.find(c => c.date === '2026-01-10')!
+    expect(cell.resolvedDay).toBeDefined()
+    expect(cell.resolvedDay!.status).toBe('past_complete')
+    expect(cell.resolvedDay!.historyEntry?.action).toBe('complete')
+  })
+
+  it('propagates past_skip status for a skipped entry', () => {
+    const plan = makePlan(4)
+    const entry = makeEntry('2026-01-08', 'skip', 0)
+    const weeks = buildMonthGrid(2026, 0, plan, [entry], [], '2026-01-15')
+    const cell = weeks.flat().find(c => c.date === '2026-01-08')!
+    expect(cell.resolvedDay!.status).toBe('past_skip')
+  })
+
+  it('propagates past_day_off status for a day_off entry', () => {
+    const plan = makePlan(4)
+    const entry = makeEntry('2026-01-07', 'day_off')
+    const weeks = buildMonthGrid(2026, 0, plan, [entry], [], '2026-01-15')
+    const cell = weeks.flat().find(c => c.date === '2026-01-07')!
+    expect(cell.resolvedDay!.status).toBe('past_day_off')
+  })
+
+  it('shows today_pending status for today with no entry', () => {
+    const plan = makePlan(4)
+    const today = '2026-01-15'
+    const weeks = buildMonthGrid(2026, 0, plan, [], [], today)
+    const cell = weeks.flat().find(c => c.date === today)!
+    expect(cell.isToday).toBe(true)
+    expect(cell.resolvedDay!.status).toBe('today_pending')
+  })
+
+  it('applies a jump override to the planDayIndex shown on that date', () => {
+    // Jump override on Jan 5 → planDayIndex = 3, not the natural 0
+    const plan = makePlan(4) // startDate = 2026-01-01; no prior entries → pointer is 0 on Jan 5
+    const override = makeOverride('2026-01-05T12:00:00Z', 'jump', { targetDayIndex: 3 })
+    const weeks = buildMonthGrid(2026, 0, plan, [], [override], '2026-01-15')
+    const cell = weeks.flat().find(c => c.date === '2026-01-05')!
+    expect(cell.resolvedDay!.planDayIndex).toBe(3)
+  })
+
+  it('pointer advancement from a complete entry affects subsequent dates in the grid', () => {
+    // Jan 1 complete at day 0 → Jan 2 should show day 1 (pointer advanced)
+    const plan = makePlan(4)
+    const entry = makeEntry('2026-01-01', 'complete', 0)
+    const weeks = buildMonthGrid(2026, 0, plan, [entry], [], '2026-01-15')
+    const allCells = weeks.flat()
+    const jan1 = allCells.find(c => c.date === '2026-01-01')!
+    const jan2 = allCells.find(c => c.date === '2026-01-02')!
+    expect(jan1.resolvedDay!.planDayIndex).toBe(0)
+    expect(jan2.resolvedDay!.planDayIndex).toBe(1)
+  })
+
+  it('past_unlogged days do not advance the pointer', () => {
+    // Jan 1–4 all unlogged → Jan 5 still at day 0
+    const plan = makePlan(4)
+    const weeks = buildMonthGrid(2026, 0, plan, [], [], '2026-01-15')
+    const allCells = weeks.flat()
+    const jan5 = allCells.find(c => c.date === '2026-01-05')!
+    expect(jan5.resolvedDay!.planDayIndex).toBe(0)
+  })
+
+  it('entries from a different plan are not included in resolvedDay', () => {
+    // otherPlan's entry on Jan 10 should not affect the grid for plan-1
+    const plan = makePlan(4)
+    const foreignEntry: HistoryEntry = {
+      id: 'foreign',
+      planId: 'other-plan',
+      calendarDate: '2026-01-10',
+      planDayIndex: 2,
+      action: 'complete',
+      createdAt: '2026-01-10T12:00:00Z',
+    }
+    const weeks = buildMonthGrid(2026, 0, plan, [foreignEntry], [], '2026-01-15')
+    const cell = weeks.flat().find(c => c.date === '2026-01-10')!
+    // Should show past_unlogged for plan-1 (no plan-1 entry on Jan 10)
+    expect(cell.resolvedDay!.status).toBe('past_unlogged')
+    expect(cell.resolvedDay!.historyEntry).toBeUndefined()
+  })
 })
