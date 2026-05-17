@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -1158,5 +1158,180 @@ describe('computeRotationPlanRemaining', () => {
       completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
     )
     expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(1)
+  })
+})
+
+// ── computeWeeklyBreakdown ────────────────────────────────────────────────────
+
+function weekEntry(
+  date: string,
+  action: HistoryEntry['action'],
+  planId = 'plan-1',
+): HistoryEntry {
+  return {
+    id: `we-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    planDayIndex: action === 'day_off' ? undefined : 0,
+    action,
+    createdAt: `${date}T12:00:00Z`,
+  }
+}
+
+function weekExtra(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+  return {
+    id: `wx-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    workoutType: 'yoga',
+    workoutName: 'Yoga',
+    createdAt: `${date}T13:00:00Z`,
+  }
+}
+
+describe('computeWeeklyBreakdown', () => {
+  it('returns empty array when no entries or extras exist', () => {
+    const result = computeWeeklyBreakdown('plan-1', [], [], '2026-01-01', '2026-01-31')
+    expect(result).toEqual([])
+  })
+
+  it('returns empty array when entries exist for a different plan', () => {
+    const entries = [weekEntry('2026-01-05', 'complete', 'other-plan')]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toEqual([])
+  })
+
+  it('groups entries into the correct ISO week (Mon–Sun)', () => {
+    // 2026-01-05 is a Monday; 2026-01-11 is a Sunday — same ISO week
+    const entries = [
+      weekEntry('2026-01-05', 'complete'), // Mon
+      weekEntry('2026-01-11', 'complete'), // Sun — same week as Jan 5
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    expect(result[0].weekStart).toBe('2026-01-05')
+    expect(result[0].weekEnd).toBe('2026-01-11')
+    expect(result[0].completed).toBe(2)
+  })
+
+  it('separates entries in adjacent weeks', () => {
+    // Jan 5 (Mon) and Jan 12 (Mon) are in different weeks
+    const entries = [
+      weekEntry('2026-01-05', 'complete'),
+      weekEntry('2026-01-12', 'complete'),
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(2)
+    expect(result[0].weekStart).toBe('2026-01-05')
+    expect(result[1].weekStart).toBe('2026-01-12')
+  })
+
+  it('counts completed, skipped, and day_off entries separately', () => {
+    const entries = [
+      weekEntry('2026-01-05', 'complete'),
+      weekEntry('2026-01-06', 'skip'),
+      weekEntry('2026-01-07', 'day_off'),
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    const week = result[0]
+    expect(week.completed).toBe(1)
+    expect(week.skipped).toBe(1)
+    expect(week.dayOffs).toBe(1)
+    expect(week.extras).toBe(0)
+    expect(week.totalLogged).toBe(3)
+  })
+
+  it('counts extras separately from rotation entries', () => {
+    const entries = [weekEntry('2026-01-05', 'complete')]
+    const extras = [weekExtra('2026-01-06')]
+    const result = computeWeeklyBreakdown('plan-1', entries, extras, '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    const week = result[0]
+    expect(week.completed).toBe(1)
+    expect(week.extras).toBe(1)
+    expect(week.totalLogged).toBe(2)
+  })
+
+  it('assigns a Sunday entry to the Monday-anchored ISO week containing it', () => {
+    // 2026-01-04 is a Sunday → its ISO week starts 2025-12-29 (Monday)
+    const entries = [weekEntry('2026-01-04', 'complete')]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    expect(result[0].weekStart).toBe('2025-12-29')
+    expect(result[0].weekEnd).toBe('2026-01-04')
+  })
+
+  it('excludes entries outside the fromDate/toDate range', () => {
+    const entries = [
+      weekEntry('2026-01-01', 'complete'), // before range
+      weekEntry('2026-01-05', 'complete'), // inside range
+      weekEntry('2026-01-31', 'complete'), // after range
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-04', '2026-01-10')
+    expect(result).toHaveLength(1)
+    expect(result[0].completed).toBe(1)
+  })
+
+  it('excludes extras outside the date range', () => {
+    const extras = [
+      weekExtra('2026-01-01'), // before
+      weekExtra('2026-01-07'), // inside
+    ]
+    const result = computeWeeklyBreakdown('plan-1', [], extras, '2026-01-05', '2026-01-11')
+    expect(result).toHaveLength(1)
+    expect(result[0].extras).toBe(1)
+  })
+
+  it('returns weeks sorted by weekStart ascending', () => {
+    const entries = [
+      weekEntry('2026-01-19', 'complete'), // later week first in array
+      weekEntry('2026-01-05', 'complete'),
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result.length).toBeGreaterThanOrEqual(2)
+    expect(result[0].weekStart).toBe('2026-01-05')
+    expect(result[result.length - 1].weekStart).toBe('2026-01-19')
+  })
+
+  it('does not include weeks with no activity (no empty-week placeholders)', () => {
+    // Only week of Jan 5 has activity; weeks of Jan 12 and Jan 19 are silent
+    const entries = [weekEntry('2026-01-05', 'complete')]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+  })
+
+  it('correctly totals a multi-week plan with mixed action types', () => {
+    const entries = [
+      weekEntry('2026-01-05', 'complete'),  // week of Jan 5
+      weekEntry('2026-01-06', 'skip'),
+      weekEntry('2026-01-07', 'day_off'),
+      weekEntry('2026-01-12', 'complete'),  // week of Jan 12
+      weekEntry('2026-01-14', 'complete'),
+    ]
+    const extras = [weekExtra('2026-01-13')] // week of Jan 12
+    const result = computeWeeklyBreakdown('plan-1', entries, extras, '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(2)
+
+    const w1 = result[0]
+    expect(w1.weekStart).toBe('2026-01-05')
+    expect(w1.completed).toBe(1)
+    expect(w1.skipped).toBe(1)
+    expect(w1.dayOffs).toBe(1)
+    expect(w1.totalLogged).toBe(3)
+
+    const w2 = result[1]
+    expect(w2.weekStart).toBe('2026-01-12')
+    expect(w2.completed).toBe(2)
+    expect(w2.extras).toBe(1)
+    expect(w2.totalLogged).toBe(3)
+  })
+
+  it('fromDate and toDate are both inclusive', () => {
+    // Range = Jan 5 to Jan 5 (single day)
+    const entries = [weekEntry('2026-01-05', 'complete')]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-05', '2026-01-05')
+    expect(result).toHaveLength(1)
+    expect(result[0].completed).toBe(1)
   })
 })

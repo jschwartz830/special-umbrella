@@ -474,3 +474,84 @@ export function countPlanDayCompletions(
       e.calendarDate !== excludeDate,
   ).length
 }
+
+// ── Weekly breakdown ──────────────────────────────────────────────────────────
+
+export interface WeeklyBreakdown {
+  /** YYYY-MM-DD of the Monday that starts this ISO week */
+  weekStart: string
+  /** YYYY-MM-DD of the Sunday that ends this ISO week */
+  weekEnd: string
+  completed: number
+  skipped: number
+  dayOffs: number
+  extras: number
+  /** completed + skipped + dayOffs + extras */
+  totalLogged: number
+}
+
+/**
+ * Aggregate per-ISO-week stats for a plan over a date range.
+ *
+ * Weeks begin on Monday (ISO convention). Only entries/extras whose
+ * `calendarDate` falls in `[fromDate, toDate]` are included; the range
+ * edges may be mid-week, so the first and last returned weeks can be partial.
+ *
+ * Only entries for `planId` are counted — pass unfiltered store arrays safely.
+ *
+ * @returns Array of WeeklyBreakdown objects sorted by weekStart ascending.
+ *          Weeks with no activity are not included.
+ */
+export function computeWeeklyBreakdown(
+  planId: string,
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  fromDate: string,
+  toDate: string,
+): WeeklyBreakdown[] {
+  const weekMap = new Map<string, WeeklyBreakdown>()
+
+  function getOrCreate(weekStart: string): WeeklyBreakdown {
+    if (!weekMap.has(weekStart)) {
+      weekMap.set(weekStart, {
+        weekStart,
+        weekEnd: shiftDay(weekStart, 6),
+        completed: 0,
+        skipped: 0,
+        dayOffs: 0,
+        extras: 0,
+        totalLogged: 0,
+      })
+    }
+    return weekMap.get(weekStart)!
+  }
+
+  for (const e of entries) {
+    if (e.planId !== planId) continue
+    if (e.calendarDate < fromDate || e.calendarDate > toDate) continue
+    const week = getOrCreate(isoWeekStart(e.calendarDate))
+    if (e.action === 'complete') week.completed++
+    else if (e.action === 'skip') week.skipped++
+    else if (e.action === 'day_off') week.dayOffs++
+    week.totalLogged++
+  }
+
+  for (const e of extras) {
+    if (e.planId !== planId) continue
+    if (e.calendarDate < fromDate || e.calendarDate > toDate) continue
+    const week = getOrCreate(isoWeekStart(e.calendarDate))
+    week.extras++
+    week.totalLogged++
+  }
+
+  return [...weekMap.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+}
+
+/** Return the Monday of the ISO week containing `date` (YYYY-MM-DD). */
+function isoWeekStart(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  const day = dt.getUTCDay() // 0=Sun, 1=Mon, ..., 6=Sat
+  const mondayOffset = day === 0 ? -6 : 1 - day
+  return shiftDay(date, mondayOffset)
+}
