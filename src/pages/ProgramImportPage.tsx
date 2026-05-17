@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode, type UIEvent } from 'react'
 import gzclp5kTemplate from '../programs/gzclp-5k.yaml?raw'
 import upperLowerTemplate from '../programs/upper-lower-hybrid-12w.yaml?raw'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Upload, AlertCircle, CheckCircle, ChevronDown, ChevronRight, Dumbbell, Footprints } from 'lucide-react'
+import { ArrowLeft, Upload, AlertCircle, CheckCircle, ChevronDown, ChevronRight, Dumbbell, Footprints, Maximize2, Minimize2 } from 'lucide-react'
 import { parseYamlProgram } from '../engine/programParser'
 import { usePlanStore } from '../store/planStore'
 import { useProgramStore } from '../store/programStore'
@@ -167,6 +167,231 @@ function PlanPreview({ plan }: { plan: Omit<Plan, 'id' | 'createdAt' | 'updatedA
   )
 }
 
+
+// ── YAML editor ────────────────────────────────────────────────────────────────
+
+const YAML_PLACEHOLDER = `name: "My Program"
+duration:
+  type: weeks
+  value: 8
+vars:
+  squat: 135
+days:
+  - label: "Day A"
+    slots:
+      - type: weights
+        name: "Squat"
+        exercises:
+          - exercise: Squat
+            sets: 5
+            reps: 3
+            load: squat
+            rest: 3m
+            progress:
+              if: all_reps
+              then: "squat += 5"`
+
+function findYamlCommentIndex(line: string) {
+  let quote: 'single' | 'double' | null = null
+  let escaped = false
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i]
+
+    if (quote === 'double' && escaped) {
+      escaped = false
+      continue
+    }
+
+    if (quote === 'double' && char === '\\') {
+      escaped = true
+      continue
+    }
+
+    if (!quote && char === '"') quote = 'double'
+    else if (quote === 'double' && char === '"') quote = null
+    else if (!quote && char === "'") quote = 'single'
+    else if (quote === 'single' && char === "'") quote = null
+    else if (!quote && char === '#') return i
+  }
+
+  return -1
+}
+
+function highlightYamlValue(value: string, keyPrefix: string): ReactNode[] {
+  const parts: ReactNode[] = []
+  const tokenPattern = /("(?:\\.|[^"\\])*"|'[^']*'|\b(?:true|false|null)\b|\b\d+(?:\.\d+)?(?:ms|s|m|h|lb|kg|mi|km|%)?\b)/gi
+  let lastIndex = 0
+  let tokenIndex = 0
+
+  for (const match of value.matchAll(tokenPattern)) {
+    const token = match[0]
+    const index = match.index ?? 0
+
+    if (index > lastIndex) parts.push(value.slice(lastIndex, index))
+
+    const lower = token.toLowerCase()
+    const className = token.startsWith('"') || token.startsWith("'")
+      ? 'text-amber-300'
+      : lower === 'true' || lower === 'false' || lower === 'null'
+        ? 'text-fuchsia-300'
+        : 'text-emerald-300'
+
+    parts.push(<span key={`${keyPrefix}-token-${tokenIndex}`} className={className}>{token}</span>)
+    lastIndex = index + token.length
+    tokenIndex += 1
+  }
+
+  if (lastIndex < value.length) parts.push(value.slice(lastIndex))
+
+  return parts
+}
+
+function highlightYamlLine(line: string, lineIndex: number): ReactNode {
+  const commentIndex = findYamlCommentIndex(line)
+  const code = commentIndex >= 0 ? line.slice(0, commentIndex) : line
+  const comment = commentIndex >= 0 ? line.slice(commentIndex) : ''
+  const keyMatch = code.match(/^(\s*)(-\s*)?([A-Za-z_][\w-]*)(\s*:)(.*)$/)
+  const nodes: ReactNode[] = []
+
+  if (keyMatch) {
+    const [, indent, listMarker = '', key, colon, value] = keyMatch
+    nodes.push(indent)
+    if (listMarker) {
+      nodes.push(<span key={`${lineIndex}-dash`} className="text-sky-300">{listMarker}</span>)
+    }
+    nodes.push(<span key={`${lineIndex}-key`} className="text-cyan-300">{key}</span>)
+    nodes.push(<span key={`${lineIndex}-colon`} className="text-slate-400">{colon}</span>)
+    nodes.push(...highlightYamlValue(value, `${lineIndex}-value`))
+  } else {
+    const listMatch = code.match(/^(\s*)(-\s*)(.*)$/)
+
+    if (listMatch) {
+      const [, indent, listMarker, value] = listMatch
+      nodes.push(indent)
+      nodes.push(<span key={`${lineIndex}-dash`} className="text-sky-300">{listMarker}</span>)
+      nodes.push(...highlightYamlValue(value, `${lineIndex}-value`))
+    } else {
+      nodes.push(...highlightYamlValue(code, `${lineIndex}-value`))
+    }
+  }
+
+  if (comment) nodes.push(<span key={`${lineIndex}-comment`} className="text-slate-500">{comment}</span>)
+
+  return nodes
+}
+
+function YamlEditor({
+  value,
+  onChange,
+  onDirty,
+  onPreview,
+}: {
+  value: string
+  onChange: (value: string) => void
+  onDirty: () => void
+  onPreview: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const highlightRef = useRef<HTMLPreElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const lines = useMemo(() => value.split('\n'), [value])
+  const lineCount = Math.max(1, lines.length)
+  const highlighted = useMemo(
+    () => lines.map((line, index) => (
+      <span key={index}>
+        {highlightYamlLine(line, index)}
+        {index < lines.length - 1 ? '\n' : null}
+      </span>
+    )),
+    [lines],
+  )
+
+  useEffect(() => {
+    if (!expanded) return undefined
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    textareaRef.current?.focus()
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [expanded])
+
+  const handleScroll = (event: UIEvent<HTMLTextAreaElement>) => {
+    if (!highlightRef.current) return
+    highlightRef.current.scrollTop = event.currentTarget.scrollTop
+    highlightRef.current.scrollLeft = event.currentTarget.scrollLeft
+  }
+
+  const editorHeightClass = expanded
+    ? 'h-[calc(100dvh-9.5rem-env(safe-area-inset-bottom))] min-h-0'
+    : 'h-64'
+  const frameClass = expanded
+    ? 'fixed inset-0 z-50 flex flex-col bg-slate-950 px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-[max(env(safe-area-inset-top),0.75rem)]'
+    : ''
+
+  return (
+    <div className={frameClass}>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div>
+          <label className="text-xs text-slate-400 uppercase tracking-wider">
+            Program YAML
+          </label>
+          {expanded && (
+            <p className="text-[11px] text-slate-500">IDE-style colors · {lineCount} line{lineCount === 1 ? '' : 's'}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {expanded && (
+            <button
+              onClick={onPreview}
+              disabled={!value.trim()}
+              className="rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Preview
+            </button>
+          )}
+          <button
+            onClick={() => setExpanded(isExpanded => !isExpanded)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700"
+            aria-pressed={expanded}
+            aria-label={expanded ? 'Collapse YAML editor' : 'Expand YAML editor'}
+          >
+            {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            {expanded ? 'Done' : 'Expand'}
+          </button>
+        </div>
+      </div>
+
+      <div className={`relative overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-inner ${editorHeightClass}`}>
+        <pre
+          ref={highlightRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-auto whitespace-pre-wrap break-words px-3 py-2.5 font-mono text-[16px] leading-6 text-slate-200"
+        >
+          {value ? highlighted : <span className="text-slate-600">{YAML_PLACEHOLDER}</span>}
+        </pre>
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={e => { onChange(e.target.value); onDirty() }}
+          onScroll={handleScroll}
+          placeholder={YAML_PLACEHOLDER}
+          className={`absolute inset-0 h-full w-full resize-none overflow-auto rounded-xl bg-transparent px-3 py-2.5 font-mono text-[16px] leading-6 caret-white placeholder-slate-600 selection:bg-sky-500/30 focus:outline-none focus:ring-2 focus:ring-sky-500/50 ${value ? 'text-transparent' : 'text-slate-200'}`}
+          spellCheck={false}
+          autoCapitalize="none"
+          autoCorrect="off"
+        />
+      </div>
+      <p className="mt-2 text-[11px] text-slate-500">
+        Tap Expand for a phone-friendly full-screen editor with YAML keys, strings, numbers, booleans, lists, and comments color coded.
+      </p>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function ProgramImportPage() {
@@ -228,36 +453,30 @@ export function ProgramImportPage() {
       </div>
 
       <div className="px-4 py-4 space-y-4 max-w-lg mx-auto">
-        {/* Textarea */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs text-slate-400 uppercase tracking-wider">
-              Program YAML
-            </label>
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedTemplate}
-                onChange={e => setSelectedTemplate(e.target.value as (typeof TEMPLATE_OPTIONS)[number]['id'])}
-                className="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-md px-2 py-1"
-              >
-                {TEMPLATE_OPTIONS.map(t => (
-                  <option key={t.id} value={t.id}>{t.label}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => handleLoadExample(selectedTemplate)}
-                className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
-              >
-                Load template
-              </button>
-            </div>
+        {/* YAML editor */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-end gap-2">
+            <select
+              value={selectedTemplate}
+              onChange={e => setSelectedTemplate(e.target.value as (typeof TEMPLATE_OPTIONS)[number]['id'])}
+              className="min-w-0 flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-md px-2 py-2 sm:flex-none"
+            >
+              {TEMPLATE_OPTIONS.map(t => (
+                <option key={t.id} value={t.id}>{t.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => handleLoadExample(selectedTemplate)}
+              className="shrink-0 text-xs text-sky-400 hover:text-sky-300 transition-colors"
+            >
+              Load template
+            </button>
           </div>
-          <textarea
+          <YamlEditor
             value={yaml}
-            onChange={e => { setYaml(e.target.value); setParseResult(null); setImported(false) }}
-            placeholder={`name: "My Program"\nduration:\n  type: weeks\n  value: 8\nvars:\n  squat: 135\ndays:\n  - label: "Day A"\n    slots:\n      - type: weights\n        name: "Squat"\n        exercises:\n          - exercise: Squat\n            sets: 5\n            reps: 3\n            load: squat\n            rest: 3m\n            progress:\n              if: all_reps\n              then: "squat += 5"`}
-            className="w-full h-56 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 font-mono text-xs text-slate-200 placeholder-slate-600 resize-none focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50"
-            spellCheck={false}
+            onChange={setYaml}
+            onDirty={() => { setParseResult(null); setImported(false) }}
+            onPreview={handleParse}
           />
         </div>
 
