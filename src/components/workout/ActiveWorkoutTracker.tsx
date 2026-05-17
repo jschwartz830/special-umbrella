@@ -1189,26 +1189,25 @@ export function ActiveWorkoutTracker({
                       {previousSetDisplay(ex, setIdx)}
                     </span>
                     <input
-                      type="number"
-                      min="0"
+                      type="text"
+                      inputMode="numeric"
                       value={s.actualReps ?? ''}
                       onChange={e => updateSet(exIdx, setIdx, {
                         actualReps: e.target.value ? Number(e.target.value) : null,
                       })}
-                      onFocus={() => handleFieldFocus(exIdx, setIdx, 'reps')}
+                      onFocus={e => { handleFieldFocus(exIdx, setIdx, 'reps'); e.target.select() }}
                       onBlur={handleFieldBlur}
                       placeholder={String(s.targetReps ?? 'reps')}
                       className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
                     />
                     <input
-                      type="number"
-                      min="0"
-                      step="0.5"
+                      type="text"
+                      inputMode="decimal"
                       value={s.actualLoad ?? ''}
                       onChange={e => updateSet(exIdx, setIdx, {
                         actualLoad: e.target.value ? Number(e.target.value) : null,
                       })}
-                      onFocus={() => handleFieldFocus(exIdx, setIdx, 'weight')}
+                      onFocus={e => { handleFieldFocus(exIdx, setIdx, 'weight'); e.target.select() }}
                       onBlur={handleFieldBlur}
                       placeholder={
                         s.resolvedLoadLbs != null && s.resolvedLoadLbs > 0
