@@ -1,5 +1,66 @@
 # Overnight Changelog
 
+## 2026-05-16 (thirtieth pass) — branch `claude/dreamy-mccarthy-9y4SP`
+
+Baseline on entry: **656 passing, 0 failing**. Exit state: **664 passing, 0 failing** (+8 tests).
+
+---
+
+### 1. Bug fix: HistoryPage missing removeOutcome before moveOutcome on date change
+
+**File**: `src/pages/HistoryPage.tsx`  
+**Commit**: `fix(history): remove destination outcome before moveOutcome on date change`
+
+**Problem**: In `handleOutcomeConfirm`, when a user changes a workout date via the
+History page (non-extra path), the code called `moveOutcome(oldId, nextId)` without
+first calling `removeOutcome(nextId)`. `moveOutcome` in `outcomeStore` overwrites the
+destination key and calls `syncExerciseHistory` for the moved record — but it does NOT
+clean up the `exerciseHistoryStore` records that belonged to any pre-existing outcome
+at `nextId`. Those exercise history records become orphaned: they can no longer be
+associated with any displayed outcome.
+
+TodayPage and CalendarPage both correctly call `removeOutcome(nextId)` before
+`moveOutcome` in their analogous date-change paths. HistoryPage was the only outlier.
+
+**Fix**: Added `removeOutcome(nextId)` immediately before the `moveOutcome` call in
+the rotation-entry branch of `handleOutcomeConfirm`. Extras are safe (each extra has
+a unique `nanoid()` ID so the destination key is always fresh); only rotation entries
+needed the guard.
+
+**Risk**: Minimal. If no outcome exists at `nextId`, `removeOutcome` is a no-op. If
+one does exist, the old behavior silently corrupted exercise history — the new behavior
+correctly cleans it up first.
+
+**Rollback**: `git revert 05e6ba5`
+
+---
+
+### 2. Tests: expressionEval edge cases for splitStatements, resolveLoad, resolveQuantityString
+
+**File**: `src/lib/__tests__/expressionEval.test.ts` (+8 tests)  
+**Commit**: `test(expressionEval): add edge-case tests for splitStatements, resolveLoad, resolveQuantityString`
+
+Added targeted edge-case tests for three previously uncovered parser/resolver paths:
+
+**`splitStatements` nested-comma handling** — the tokenizer must not split on commas
+that appear inside function call arguments (e.g. `min(easy_miles + 0.5, 8)` is one
+expression). Two tests: a simple nested case and a deeply nested case combining
+`round5(min(...))` with a second outer statement.
+
+**`resolveLoad` boundary conditions** — empty string → `null`; unclosed parenthesis
+`'round5(135'` → `null` (parse error, not a crash); case-insensitive unit suffix
+`'225LB'` → `225`.
+
+**`resolveQuantityString` value/unit extraction** — `'30 s'` → `{ value: 30, unit: 's' }`;
+`'1.5 h'` → `{ value: 1.5, unit: 'h' }`; bare variable name `'squat'` with a context
+where `squat=225` → `{ value: 225, unit: '' }`.
+
+**Risk**: Additive only — no behavioral changes. All 664 tests pass.
+
+**Rollback**: `git revert 8d9936b`
+
+---
+
 ## 2026-05-15 (twenty-ninth pass) — branch `claude/dreamy-mccarthy-rtcbO`
 
 Baseline on entry: **644 passing, 0 failing**. Exit state: **656 passing, 0 failing** (+12 tests).

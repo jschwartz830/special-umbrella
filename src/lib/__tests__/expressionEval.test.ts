@@ -389,10 +389,6 @@ describe('evaluateUpdates', () => {
   })
 
   describe('edge cases', () => {
-    it('returns empty object for an empty string', () => {
-      expect(evaluateUpdates('', ctx())).toEqual({})
-    })
-
     it('skips malformed statements (no variable name)', () => {
       const result = evaluateUpdates('= 5', ctx())
       expect(Object.keys(result)).toHaveLength(0)
@@ -406,6 +402,34 @@ describe('evaluateUpdates', () => {
     it('uses current var when += references a var that exists', () => {
       const result = evaluateUpdates('squat += 10', ctx({ squat: 100 }))
       expect(result.squat).toBe(110)
+    })
+
+    it('returns empty object for an empty string', () => {
+      expect(evaluateUpdates('', ctx())).toEqual({})
+    })
+  })
+
+  describe('splitStatements — commas inside function calls are not separators', () => {
+    it('treats comma inside min() as part of the expression, not a separator', () => {
+      // The string has two statements separated by an outer comma,
+      // but the first statement's RHS contains an inner comma inside min().
+      const result = evaluateUpdates(
+        'easy_miles = min(easy_miles + 0.5, 8), bench += 5',
+        ctx({ easy_miles: 3, bench: 95 }),
+      )
+      expect(result.easy_miles).toBe(3.5)
+      expect(result.bench).toBe(100)
+    })
+
+    it('handles deeply nested parens in a multi-statement update', () => {
+      // round5(min(squat * 0.85, 200)) — two nested function calls
+      const result = evaluateUpdates(
+        'squat = round5(min(squat * 0.85, 200)), bench += 5',
+        ctx({ squat: 240, bench: 185 }),
+      )
+      // squat * 0.85 = 204; min(204, 200) = 200; round5(200) = 200
+      expect(result.squat).toBe(200)
+      expect(result.bench).toBe(190)
     })
   })
 })
@@ -443,6 +467,18 @@ describe('resolveLoad', () => {
 
   it('rounds result to 2 decimal places', () => {
     expect(resolveLoad('1 / 3', ctx())).toBeCloseTo(0.33, 2)
+  })
+
+  it('returns null for empty string', () => {
+    expect(resolveLoad('', ctx())).toBeNull()
+  })
+
+  it('returns null for expression with unclosed parenthesis', () => {
+    expect(resolveLoad('round5(135', ctx())).toBeNull()
+  })
+
+  it('strips case-insensitive "LB" suffix', () => {
+    expect(resolveLoad('225LB', ctx())).toBe(225)
   })
 })
 
@@ -491,5 +527,18 @@ describe('resolveQuantityString', () => {
   it('resolves expression with unit: "(easy_miles + 0.5) mi"', () => {
     const result = resolveQuantityString('(easy_miles + 0.5) mi', ctx({ easy_miles: 3 }))
     expect(result).toEqual({ value: 3.5, unit: 'mi' })
+  })
+
+  it('parses "30 s" (seconds unit)', () => {
+    expect(resolveQuantityString('30 s', ctx())).toEqual({ value: 30, unit: 's' })
+  })
+
+  it('parses "1.5 h" (hours unit)', () => {
+    expect(resolveQuantityString('1.5 h', ctx())).toEqual({ value: 1.5, unit: 'h' })
+  })
+
+  it('resolves a variable expression as bare (no unit)', () => {
+    const result = resolveQuantityString('squat', ctx({ squat: 225 }))
+    expect(result).toEqual({ value: 225, unit: '' })
   })
 })

@@ -1,5 +1,69 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-16 (thirtieth pass) — branch `claude/dreamy-mccarthy-9y4SP`
+
+### Executive summary
+
+**What changed**: Fixed a data-integrity bug in HistoryPage where changing a workout
+date could silently orphan `exerciseHistoryStore` records; added 8 edge-case tests for
+the expression evaluator's parser boundary conditions.
+
+**Test delta**: +8 tests (656 → 664, all passing, 0 failing).
+
+**Risk profile**: Low. The bug fix is a one-line addition that matches the pattern
+already used in TodayPage and CalendarPage. The tests are purely additive.
+
+**What to review first**: The bug fix in `HistoryPage.tsx` — specifically the two-line
+block at `handleOutcomeConfirm` around `removeOutcome(nextId)` / `moveOutcome(...)`.
+Confirm that the scope guard (rotation entries only, not extras) is correct for your
+data model.
+
+---
+
+### Finding 1 — HistoryPage missing removeOutcome before moveOutcome (data integrity)
+
+**Severity**: Medium (silent exercise history record orphaning, not visible data loss)  
+**File**: `src/pages/HistoryPage.tsx`, `handleOutcomeConfirm`
+
+When a user edits a History entry's date, the rotation path called
+`moveOutcome(oldId, nextId)` without first calling `removeOutcome(nextId)`. If
+`nextId` already had an outcome (i.e., another workout was already logged on the
+target date), the exercise history records belonging to that displaced outcome were
+silently orphaned in `exerciseHistoryStore` — no longer keyed to any displayed entry.
+
+TodayPage and CalendarPage both guard this correctly. HistoryPage was the outlier.
+
+**Fix applied**: Added `removeOutcome(nextId)` before `moveOutcome`.  
+**Status**: ✅ Fixed.
+
+---
+
+### Finding 2 — expressionEval parser untested on boundary inputs
+
+**Severity**: Low (no known bug; coverage gap increases regression risk)  
+**File**: `src/lib/expressionEval.ts`
+
+Three parser/resolver paths had no test coverage:
+1. `splitStatements` with commas nested inside function arguments (e.g. `min(a, b)`)
+2. `resolveLoad` with empty string, unclosed parenthesis, case-insensitive suffix
+3. `resolveQuantityString` with time units and variable-name inputs
+
+**Fix applied**: Added 8 targeted tests covering these paths.  
+**Status**: ✅ Tested.
+
+---
+
+### Ongoing findings (not fixed this pass)
+
+**Double-day Undo advance-override leak** (from pass 29): Undo does not remove the
+`advance` override added by the double-day flow. Rotation pointer is +1 after Undo.
+Requires `source` field on `OverrideEntry`. Not changed.
+
+**`nanoid()` in rotationEngine.ts**: Utility is unrelated to rotation logic, but
+moving it would require updating 5+ import sites. Low priority, not worth the churn.
+
+---
+
 ## 2026-05-15 (twenty-ninth pass) — branch `claude/dreamy-mccarthy-rtcbO`
 
 ### Executive summary
