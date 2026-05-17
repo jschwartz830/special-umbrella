@@ -1,5 +1,86 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-17 (thirty-first pass) — branch `claude/dreamy-mccarthy-UaphK`
+
+### Executive summary
+
+1. **What changed:** One behavioral fix (getTodayResolvedDay deduplication), one test suite expansion (buildMonthGrid integration), and one new pure utility function (computeWeeklyBreakdown) with 15 tests.
+2. **Highest confidence:** The deduplication fix is mechanically correct and aligns three engine functions that were previously inconsistent. All 22 new tests pass.
+3. **What is risky:** Nothing this pass. All changes are additive or align existing behavior.
+4. **Review first:** The deduplication fix in `rotationEngine.ts:95-100` — it's the only behavioral change. The new test at `rotationEngine.test.ts:246` anchors the correct behavior.
+
+---
+
+### Biggest issues found
+
+1. **`getTodayResolvedDay` entry deduplication inconsistency** (FIXED) — see CHANGELOG.
+2. **`buildMonthGrid` integration gap** (FIXED with tests) — see CHANGELOG.
+3. **No per-week analytics** (ADDRESSED with `computeWeeklyBreakdown`).
+
+### Improvements completed
+
+| Change | Commit | Risk |
+|--------|--------|------|
+| Fix `getTodayResolvedDay` deduplication | `5063bcb` | Low |
+| 8 new `buildMonthGrid` integration tests | `f663712` | None |
+| `computeWeeklyBreakdown` + 15 tests | `2f9d724` | None |
+
+### Medium-complexity feature explored
+
+`computeWeeklyBreakdown` — see FEATURE_PROPOSAL.md and FEATURE_REVIEW.md.
+
+---
+
+### Verdict on each change
+
+**Definitely keep:**
+- Fix `getTodayResolvedDay` deduplication — correct behavioral alignment, no tradeoffs.
+- 8 new `buildMonthGrid` tests — pure test coverage improvement.
+- `computeWeeklyBreakdown` — clean pure utility, well-tested, enables future UI without risk.
+
+**Probably keep but tweak:**
+- None this pass.
+
+**Do not keep:**
+- None this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+1. **Defensive planId guard in engine functions** — add `&& e.planId === plan.id` to entry lookups inside `getTodayResolvedDay`, `computeCurrentDayIndex`, and `getResolvedDaysRange`. Would make the functions safe when called with unfiltered entries. The change is simple but breaks the established convention that callers pre-filter.
+
+2. **`duplicatePlan` should return `null` not `''` on failure** — returning an empty string for a missing source plan is an unusual pattern. Callers that don't guard against empty string would silently pass a bogus plan ID to downstream actions.
+
+3. **Wire `computeWeeklyBreakdown` into HistoryPage** — show a weekly breakdown chart for the active plan's history. The function is ready; only UI work remains.
+
+4. **Add planId guard to override functions** — `applyOverridesForDate` does not filter overrides by planId; callers are expected to pre-filter. Same defensive pattern as item 1.
+
+5. **Tag override entries with a `source` field** — would enable Undo to clean up the advance override added by the double-day flow. The carry-over risk from pass 29 is still open.
+
+---
+
+### Open questions for you
+
+1. **Weekly breakdown — Monday or Sunday start?** `computeWeeklyBreakdown` uses ISO Monday start. The CalendarPage grid uses Sunday start. When wiring into a UI, which week anchor should the chart use?
+
+2. **`computeWeeklyBreakdown` scope** — should it filter to `[plan.startDate, today]` automatically, or leave range selection to the caller? Current design: caller controls the range.
+
+3. **Double-day Undo advance leak** — this has been documented for several passes. Should the next pass attempt the `source` field on `OverrideEntry` to fix it?
+
+---
+
+### Known issues or incomplete work
+
+- Double-day Undo leaves a stale advance override (rotation pointer +1). Documented in every pass since 29; not fixed pending a schema decision.
+- `computeWeeklyBreakdown` has no corresponding UI component yet. The function is ready; wiring is next-pass work.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-16 (thirtieth pass) — branch `claude/dreamy-mccarthy-9y4SP`
 
 ### Executive summary

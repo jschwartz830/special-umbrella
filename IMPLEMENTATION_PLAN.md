@@ -1,5 +1,80 @@
 # Implementation Plan
 
+## Pass 31 — 2026-05-17 (branch `claude/dreamy-mccarthy-UaphK`)
+
+### Observations on entry
+
+- Baseline: **664 passing, 0 failing** — clean baseline inherited from pass 30.
+- **`getTodayResolvedDay` entry deduplication inconsistency** (BEHAVIORAL BUG).
+  `computeCurrentDayIndex` and `getResolvedDaysRange` both build an `entryByDate` Map
+  and select the most recent entry by `createdAt` when duplicates exist for the same
+  date. `getTodayResolvedDay` used `entries.find()` which picks the _first_ array match
+  without regard to creation time. In normal usage `addEntry()` prevents duplicates, so
+  this is only reachable after CSV import followed by a second log action. Fixed by
+  adopting the same reduce-by-createdAt pattern.
+- **`buildMonthGrid` integration tests missing** — the existing tests verified cell
+  structure (isCurrentMonth, isToday, startDate clamping) but none confirmed that entry
+  statuses (past_complete, past_skip, past_day_off) or override application are correctly
+  propagated through the grid. The underlying `getResolvedDaysRange` function is
+  well-tested in isolation, but the integration via `buildMonthGrid` was not.
+- **No weekly aggregation utility** — `historyStats.ts` has per-entry, per-plan-day,
+  and per-type stats but no per-week grouping. The existing `last7Completed` is a rolling
+  count, not a breakdown by week. A `computeWeeklyBreakdown` function would enable weekly
+  frequency charts in HistoryPage without any architectural changes.
+
+### Decisions
+
+- **Fix `getTodayResolvedDay` deduplication** — aligns with `computeCurrentDayIndex` and
+  `getResolvedDaysRange`; one-line implementation change + test. High confidence, no risk.
+- **Add `buildMonthGrid` integration tests** — 8 tests covering entries, overrides, and
+  plan isolation. Additive, no code changes.
+- **Feature: `computeWeeklyBreakdown`** — new pure utility function. Grouping by ISO week
+  (Monday start), returns completed/skipped/dayOffs/extras/totalLogged per week. Skips
+  weeks with no activity. Sorted ascending by weekStart. 15 tests added.
+
+### Architecture summary
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`.
+Rotation logic is a pure function in `rotationEngine.ts`. Stats are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`. Two main pages drive the
+daily flow: `TodayPage.tsx` (1,070 lines) and `CalendarPage.tsx` (923 lines).
+
+### Key strengths (unchanged from prior passes)
+
+- Pure-function engine with 686 tests across 18 files on exit.
+- `computeWeeklyBreakdown` adds another testable pure layer without touching any store.
+- `buildMonthGrid` integration tests close a gap left from pass 18.
+- No store changes, no UI changes — all additions are purely additive and reversible.
+
+### Key risks (carried forward)
+
+- **Double-day Undo does not remove advance override** — rotation pointer is +1 after
+  undoing a double-day session. Requires a `source` field on `OverrideEntry` to fix cleanly.
+- `workoutInstanceId` parsing via `split('_')` in `outcomeStore.ts` is brittle if plan
+  ID format ever changes (base-36 alphanumeric only today, so currently safe).
+- No React component tests — TodayPage/CalendarPage logic only tested at engine/utility layer.
+- Engine functions accept unfiltered entries by convention (callers pre-filter by planId).
+  Adding defensive planId guards inside the functions would improve robustness but would
+  break the established calling convention.
+- `duplicatePlan` returns `''` on failure — unusual TypeScript pattern; callers should check.
+
+### Prioritized plan (executed)
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| P0 | Fix `getTodayResolvedDay` deduplication inconsistency | Low | ✅ Done |
+| P1 | Add `buildMonthGrid` integration tests (8 tests) | None | ✅ Done |
+| P2 | Add `computeWeeklyBreakdown` + 15 tests | None | ✅ Done |
+| P3 | Defensive planId guard in engine functions | Low — convention change | Recommendation |
+| P3 | `duplicatePlan` return null on failure | Low — caller updates needed | Recommendation |
+
+### Exit state
+
+**686 passing, 0 failing** (+22 tests from baseline of 664).
+
+---
+
 ## Pass 30 — 2026-05-16 (branch `claude/dreamy-mccarthy-9y4SP`)
 
 ### Observations on entry

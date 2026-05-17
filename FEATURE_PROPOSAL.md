@@ -1,3 +1,71 @@
+# Feature Proposal — Weekly Workout Breakdown Utility
+
+Date: 2026-05-17
+Branch: `claude/dreamy-mccarthy-UaphK`
+Status: **Implemented this run**
+
+## Feature selected
+
+`computeWeeklyBreakdown` — a new pure utility function in `historyStats.ts` that aggregates workout history into per-ISO-week buckets.
+
+## Why it was selected
+
+The existing stats layer has:
+- `computeHistoryStats` — rolling totals and streaks
+- `computePlanProgress` — overall plan progress
+- `computeRotationCycleProgress` — within-cycle progress
+- `computeWorkoutTypeBreakdown` — per-type aggregation
+
+Missing: per-week grouping. This is a natural gap — users often think about their training in weekly blocks ("how many days did I work out this week?"). The data is already in historyStore; only the grouping logic was missing.
+
+## Expected user value
+
+Once wired into a UI (HistoryPage or TodayPage), users can:
+- See their weekly consistency at a glance (e.g., "3 days completed, 1 skip, 1 day off")
+- Compare current week to recent weeks without scrolling through the calendar
+- Identify weeks where extra workouts filled in missed rotation days
+
+## Implementation scope for this run
+
+- New function `computeWeeklyBreakdown(planId, entries, extras, fromDate, toDate): WeeklyBreakdown[]`
+- New interface `WeeklyBreakdown { weekStart, weekEnd, completed, skipped, dayOffs, extras, totalLogged }`
+- Private helper `isoWeekStart(date)` — Monday of the ISO week containing `date`
+- 15 tests covering all edge cases
+- No UI changes — function is ready for future wiring
+
+## Assumptions being made
+
+- ISO week (Monday start) is the correct week anchor. This differs from the CalendarPage grid which uses Sunday start. If the UI needs Sunday-based weeks, the `isoWeekStart` helper is the only place to change.
+- Weeks with no activity are omitted (not padded with zeros). Callers that need to show empty weeks must fill gaps themselves.
+- `planId` is always passed — no global (cross-plan) weekly breakdown in this slice.
+
+## Open product / UX decisions
+
+1. **Monday vs. Sunday week start** — ISO standard (Monday) chosen; needs confirmation if UI uses Sunday-aligned weeks.
+2. **Range selection** — caller controls fromDate/toDate. Should the default range be the plan's full duration, or just the last N weeks?
+3. **Empty weeks** — omitted for now. UI must decide whether to fill or skip.
+
+## Architecture or schema impact
+
+None. Pure utility function with no store or component dependencies.
+
+## Risks
+
+None. The function is purely additive. Removing it requires reverting one commit.
+
+## Rollback strategy
+
+`git revert 2f9d724`
+
+## What is intentionally not being built yet
+
+- UI component showing the weekly breakdown chart or table
+- Cross-plan (global) weekly breakdown
+- Sunday-based week variant
+- Aggregation by workout type within each week
+
+---
+
 # Feature Proposal — Rotation Plan Remaining Counter
 
 Date: 2026-05-15

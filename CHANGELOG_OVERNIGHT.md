@@ -1,5 +1,47 @@
 # Overnight Changelog
 
+## 2026-05-17 (thirty-first pass) — branch `claude/dreamy-mccarthy-UaphK`
+
+Baseline on entry: **664 passing, 0 failing**. Exit state: **686 passing, 0 failing** (+22 tests).
+
+---
+
+### Change 1 — fix: `getTodayResolvedDay` entry deduplication
+
+**Why it matters:** `computeCurrentDayIndex` and `getResolvedDaysRange` both deduplicate history entries for the same calendar date by choosing the one with the latest `createdAt`. `getTodayResolvedDay` used `entries.find()` which picks the first array match — whichever order entries happen to be stored in. After a CSV import that produces duplicates for today, then a second log action, the displayed status could reflect the older entry rather than the newest. Now aligned with the deduplication contract of the other two engine functions.
+
+**Files changed:** `src/engine/rotationEngine.ts`, `src/engine/__tests__/rotationEngine.test.ts`
+
+**Risks / tradeoffs:** None. Logic-only change in the engine layer. Tests verify the new behavior explicitly.
+
+**Rollback:** `git revert 5063bcb`
+
+---
+
+### Change 2 — test: `buildMonthGrid` integration tests with entry and override data
+
+**Why it matters:** The existing `buildMonthGrid` tests verified grid structure (cell counts, isCurrentMonth, isToday, plan.startDate clamping) but none confirmed that entry statuses (past_complete, past_skip, past_day_off, today_pending) or override application are correctly propagated through the grid. These new tests exercise the full integration path: `buildMonthGrid` → `getResolvedDaysRange` → resolvedDay with entry and override data. Also verifies that entries from a different plan do not bleed into the active plan's grid.
+
+**Files changed:** `src/engine/__tests__/calendarProjection.test.ts` (8 new tests)
+
+**Risks / tradeoffs:** None. Test-only addition.
+
+**Rollback:** `git revert f663712`
+
+---
+
+### Change 3 — feat: `computeWeeklyBreakdown` in `historyStats.ts`
+
+**Why it matters:** The existing stats layer has per-plan totals, per-day counts, rolling 7-day and 30-day windows, and streak tracking — but no per-week breakdown. `computeWeeklyBreakdown` fills this gap: it groups history entries and extra workouts into ISO weeks (Monday–Sunday), counting completed/skipped/dayOffs/extras/totalLogged per week. Weeks with no activity are not returned (no empty placeholders). Results are sorted ascending by weekStart. This enables future weekly-report views in HistoryPage or TodayPage with no architectural changes — the data was already in historyStore.
+
+**Files changed:** `src/lib/historyStats.ts` (new function + `isoWeekStart` helper), `src/lib/__tests__/historyStats.test.ts` (15 new tests)
+
+**Risks / tradeoffs:** Purely additive. No existing behavior changed. The `isoWeekStart` helper is private to the file. The function is plan-scoped and date-range-scoped so callers have full control over what slice they request. ISO week (Monday start) is a deliberate choice — differs from the CalendarPage's Sunday-start grid. If the UI needs Sunday-based weeks, the `isoWeekStart` helper can be adapted in one place.
+
+**Rollback:** `git revert 2f9d724`
+
+---
+
 ## 2026-05-16 (thirtieth pass) — branch `claude/dreamy-mccarthy-9y4SP`
 
 Baseline on entry: **656 passing, 0 failing**. Exit state: **664 passing, 0 failing** (+8 tests).
