@@ -1,5 +1,6 @@
 import { format, addDays, parseISO, differenceInCalendarDays } from 'date-fns'
 import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay, DayStatus } from '../types'
+export { nanoid } from '../lib/utils'
 
 /** Symmetric modulo — handles negative values from go_back */
 export function mod(n: number, m: number): number {
@@ -253,7 +254,3 @@ export function isPlanExpired(
   return Math.floor(completeSkip.length / plan.days.length) >= value
 }
 
-/** Generate a short unique id */
-export function nanoid(): string {
-  return Math.random().toString(36).slice(2, 11)
-}
