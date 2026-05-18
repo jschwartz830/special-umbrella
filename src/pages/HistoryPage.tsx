@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, addDays } from 'date-fns'
 import {
   CheckCircle2,
   SkipForward,
@@ -22,8 +22,8 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords } from '../lib/historyStats'
-import type { PersonalRecord } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown } from '../lib/historyStats'
+import type { PersonalRecord, WeeklyBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
@@ -171,6 +171,14 @@ export function HistoryPage() {
     () => computePersonalRecords(allExerciseRecords, filterPlanId === 'all' ? null : filterPlanId),
     [allExerciseRecords, filterPlanId],
   )
+
+  const weeklyBreakdown = useMemo<WeeklyBreakdown[]>(() => {
+    if (filterPlanId === 'all') return []
+    const from = format(addDays(new Date(), -55), 'yyyy-MM-dd')
+    return computeWeeklyBreakdown(filterPlanId, filteredEntries, filteredExtras, from, todayKey)
+      .slice()
+      .reverse()
+  }, [filterPlanId, filteredEntries, filteredExtras, todayKey])
 
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')
@@ -408,6 +416,10 @@ export function HistoryPage() {
 
       {personalRecords.length > 0 && (
         <PersonalRecordsSection records={personalRecords} />
+      )}
+
+      {weeklyBreakdown.length > 0 && (
+        <WeeklyActivitySection weeks={weeklyBreakdown} />
       )}
 
       {flatItems.length === 0 && filterPlanId !== 'all' && (
@@ -890,6 +902,63 @@ function PersonalRecordsSection({ records }: { records: PersonalRecord[] }) {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function WeeklyActivitySection({ weeks }: { weeks: WeeklyBreakdown[] }) {
+  const [expanded, setExpanded] = useState(true)
+
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-1 py-1 text-left group"
+        aria-expanded={expanded}
+      >
+        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          Recent Weeks
+        </span>
+        {expanded ? (
+          <ChevronUp size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+        ) : (
+          <ChevronDown size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="mt-1 rounded-xl border border-slate-700/50 bg-slate-800/40 overflow-hidden">
+          <div className="grid grid-cols-[auto_1fr_auto] gap-x-3 px-3 py-1.5 border-b border-slate-700/40">
+            <span className="text-[10px] text-slate-600 uppercase tracking-wider font-medium">Week</span>
+            <span />
+            <span className="text-[10px] text-slate-600 uppercase tracking-wider font-medium text-right">Done</span>
+          </div>
+          {weeks.map(w => {
+            const weekLabel = format(parseISO(w.weekStart), 'MMM d')
+            const endLabel = format(parseISO(w.weekEnd), 'd')
+            const context = [
+              w.skipped > 0 ? `${w.skipped} skip` : '',
+              w.dayOffs > 0 ? `${w.dayOffs} off` : '',
+              w.extras > 0 ? `+${w.extras} extra` : '',
+            ].filter(Boolean).join(' · ')
+
+            return (
+              <div
+                key={w.weekStart}
+                className="grid grid-cols-[auto_1fr_auto] gap-x-3 px-3 py-2 border-b border-slate-700/30 last:border-0 items-center"
+              >
+                <p className="text-xs text-slate-400 tabular-nums whitespace-nowrap">
+                  {weekLabel}–{endLabel}
+                </p>
+                <p className="text-[10px] text-slate-600 truncate">{context}</p>
+                <p className="text-xs font-semibold text-emerald-400 text-right tabular-nums">
+                  {w.completed}
+                </p>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
