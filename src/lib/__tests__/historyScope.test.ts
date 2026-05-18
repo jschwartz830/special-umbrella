@@ -38,7 +38,9 @@ function extra(planId: string): ExtraWorkoutEntry {
   }
 }
 
-describe('historyScope helpers', () => {
+// ── getPlansWithHistory ───────────────────────────────────────────────────────
+
+describe('getPlansWithHistory', () => {
   it('includes plans that have only rotation entries', () => {
     const plans = { p1: plan('p1'), p2: plan('p2') }
     const results = getPlansWithHistory(plans, [entry('p2')], [])
@@ -51,12 +53,77 @@ describe('historyScope helpers', () => {
     expect(results.map(p => p.id)).toEqual(['p1'])
   })
 
-  it('hasPlanHistory returns true for extras-only plans', () => {
+  it('includes a plan that has both entries and extras', () => {
+    const plans = { p1: plan('p1') }
+    const results = getPlansWithHistory(plans, [entry('p1')], [extra('p1')])
+    expect(results).toHaveLength(1)
+    expect(results[0].id).toBe('p1')
+  })
+
+  it('returns empty array when plans dict is empty', () => {
+    const results = getPlansWithHistory({}, [entry('p1')], [extra('p1')])
+    expect(results).toEqual([])
+  })
+
+  it('does not include plans in the dict that have no history', () => {
+    const plans = { p1: plan('p1'), p2: plan('p2') }
+    const results = getPlansWithHistory(plans, [entry('p1')], [])
+    expect(results.map(p => p.id)).not.toContain('p2')
+  })
+
+  it('does not include plans referenced only in overrides (not entries or extras)', () => {
+    // Overrides are not considered — only entries and extraEntries signal history.
+    const plans = { p1: plan('p1') }
+    const results = getPlansWithHistory(plans, [], [])
+    expect(results).toHaveLength(0)
+  })
+
+  it('ignores entries/extras whose planId is not in the plans dict', () => {
+    // Orphaned entries (plan deleted but history remains) should not surface phantom plans.
+    const plans = { p1: plan('p1') }
+    const results = getPlansWithHistory(plans, [entry('deleted-plan')], [])
+    expect(results).toHaveLength(0)
+  })
+
+  it('includes multiple plans when each has at least one entry', () => {
+    const plans = { p1: plan('p1'), p2: plan('p2'), p3: plan('p3') }
+    const results = getPlansWithHistory(plans, [entry('p1'), entry('p2')], [])
+    expect(results.map(p => p.id).sort()).toEqual(['p1', 'p2'])
+  })
+})
+
+// ── hasPlanHistory ────────────────────────────────────────────────────────────
+
+describe('hasPlanHistory', () => {
+  it('returns true when plan has a rotation entry', () => {
+    expect(hasPlanHistory('p1', [entry('p1')], [])).toBe(true)
+  })
+
+  it('returns true for extras-only plans', () => {
     expect(hasPlanHistory('p1', [], [extra('p1')])).toBe(true)
   })
 
-  it('hasPlanHistory returns false for null and unknown ids', () => {
+  it('returns true when plan has both entries and extras', () => {
+    expect(hasPlanHistory('p1', [entry('p1')], [extra('p1')])).toBe(true)
+  })
+
+  it('returns false for null planId', () => {
     expect(hasPlanHistory(null, [entry('p1')], [extra('p1')])).toBe(false)
+  })
+
+  it('returns false for unknown planId', () => {
     expect(hasPlanHistory('p3', [entry('p1')], [extra('p2')])).toBe(false)
+  })
+
+  it('returns false when only entries for other plans exist', () => {
+    expect(hasPlanHistory('p2', [entry('p1')], [])).toBe(false)
+  })
+
+  it('returns false when only extras for other plans exist', () => {
+    expect(hasPlanHistory('p2', [], [extra('p1')])).toBe(false)
+  })
+
+  it('returns false with empty entries and extras', () => {
+    expect(hasPlanHistory('p1', [], [])).toBe(false)
   })
 })
