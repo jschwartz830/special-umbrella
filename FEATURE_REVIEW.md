@@ -1,3 +1,58 @@
+# Feature Review — Weekly Activity Panel in HistoryPage
+
+Date: 2026-05-18
+Branch: `claude/dreamy-mccarthy-THUP4`
+Classification: **Keep**
+
+## What was actually built
+
+A collapsible "Recent Weeks" section in HistoryPage that surfaces the last 8 weeks of
+workout activity for the currently selected plan. Each row shows the week date range
+(Mon–Sun), skips/day-offs/extras context, and the completed count highlighted in green.
+Hidden when "All plans" is selected in the filter.
+
+## What assumptions were encoded
+
+- Newest-first order (matches the existing workout list convention).
+- 8 weeks back from today (hardcoded to `addDays(new Date(), -55)`).
+- Expanded by default (`useState(true)`).
+- Per-plan only — no cross-plan aggregation.
+
+## What worked well
+
+- Re-using the existing `computeWeeklyBreakdown` function meant zero new logic to write
+  or test. The UI change is a pure consumer of pre-validated data.
+- The 3-column grid (date | context | count) scales well with varying amounts of context.
+- The collapsible pattern matches `PersonalRecordsSection` — consistent UX.
+
+## What feels risky or incomplete
+
+- **No component test** — the `WeeklyActivitySection` component renders JSX that is not
+  covered by any test. The underlying data is tested; the rendering path is not.
+- **Default expanded** — on a plan with many active weeks, the section could be tall and
+  push content below the fold. Monitor for feedback.
+- **"All plans" gap** — users who never select a specific plan won't see the panel.
+
+## What you should evaluate tomorrow
+
+1. Does the panel placement (between Personal Records and the workout list) feel right?
+2. Is "expanded by default" the right behavior, or does it add visual noise?
+3. Are there users who have more than 8 weeks of history and would benefit from a longer
+   or configurable range?
+
+## Recommended next steps
+
+- If the panel placement is confirmed, consider adding a brief component smoke test.
+- If "All plans" weekly aggregation is desired, extend `computeWeeklyBreakdown` (or write
+  a new function) that takes all entries/extras and groups by week without planId filtering.
+
+## Keep / revise / prototype only / reject
+
+**Keep** — the panel is useful immediately, is additive, and has no risk of data loss or
+behavioral regression. The only product question is the default-expanded state.
+
+---
+
 # Feature Review — Weekly Workout Breakdown Utility
 
 Date: 2026-05-17

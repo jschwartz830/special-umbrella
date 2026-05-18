@@ -1,3 +1,81 @@
+# Feature Proposal — Weekly Activity Panel in HistoryPage
+
+Date: 2026-05-18
+Branch: `claude/dreamy-mccarthy-THUP4`
+Status: **Implemented this run**
+
+## Feature selected
+
+Weekly Activity panel — a collapsible "Recent Weeks" section in HistoryPage that displays
+the last 8 weeks of workout activity, newest first, using the `computeWeeklyBreakdown`
+utility added in pass 31.
+
+## Why it was selected
+
+`computeWeeklyBreakdown` was added in pass 31 with 15 tests but had zero UI consumers.
+It was the most obvious pending follow-up from that pass. The feature is:
+- Fully adjacent (uses existing utility, existing data, existing design patterns)
+- Narrowly scoped (one new component, one memo computation)
+- Immediately testable (the utility is already tested; the UI is simple)
+- Easy to revert (one component + one JSX insertion point)
+
+## Expected user value
+
+Weekly consistency is the metric most users care about during a training program.
+The existing stats grid (streak, 7-day, 30-day, total) gives aggregate numbers but no
+week-by-week breakdown. A user who completed 3 workouts last week, 5 the week before,
+and 1 the week before that can see the pattern at a glance without scrolling through
+individual log entries.
+
+## Implementation scope for this run
+
+- Add `addDays` to date-fns import in HistoryPage
+- Import `computeWeeklyBreakdown` and `WeeklyBreakdown` type from `lib/historyStats`
+- Add `weeklyBreakdown` useMemo (last 8 weeks, reversed to newest-first, hidden for "All plans")
+- Add `WeeklyActivitySection` component (collapsible, 3-column grid: date range, context, done count)
+- Insert `<WeeklyActivitySection>` between PersonalRecordsSection and the workout list
+
+## Assumptions being made
+
+- "All plans" filter: weekly breakdown is per-plan, so the panel is hidden when no
+  specific plan is selected.
+- 8 weeks (~56 days) is a reasonable default window. Most plan cycles are 4–12 weeks.
+- Newest-first order matches the workout list ordering convention.
+- Expanding by default is preferable to collapsed-by-default for immediate visibility.
+
+## Open product / UX decisions
+
+1. Collapsed vs. expanded default — currently expanded. Could be a personal preference.
+2. "All plans" weekly breakdown — possible via cross-plan aggregation, not implemented.
+3. Date range — hardcoded to 8 weeks; could be user-configurable.
+4. Empty weeks — currently omitted. Could show them as grey rows for gap visibility.
+5. Label format — "May 12–18" vs. "This week / Last week" relative labels.
+
+## Architecture / schema impact
+
+None. No new stores, no schema changes. Pure UI wiring of existing utility.
+
+## Risks
+
+- The component defaults to expanded (`useState(true)`). If the section is large (many
+  active weeks), it could push personal records and the workout list below the fold.
+  Mitigated by the collapsible design.
+- Hidden for "All plans" filter — users with multiple plans who never select a specific
+  plan won't see the panel. This is a known limitation, not a bug.
+
+## Rollback strategy
+
+`git revert e47af7c` removes all UI changes. No data, no store, no schema affected.
+
+## What is intentionally not being built yet
+
+- Cross-plan weekly aggregation
+- Week sparklines / visual bar charts
+- Configurable date range
+- Comparison to previous period ("↑ 2 more workouts than last 8 weeks")
+
+---
+
 # Feature Proposal — Weekly Workout Breakdown Utility
 
 Date: 2026-05-17

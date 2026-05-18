@@ -1,5 +1,64 @@
 # Overnight Changelog
 
+## 2026-05-18 (thirty-second pass) — branch `claude/dreamy-mccarthy-THUP4`
+
+Baseline on entry: **686 passing, 0 failing**. Exit state: **698 passing, 0 failing** (+12 tests).
+
+---
+
+### Change 1 — refactor: move `nanoid` to `src/lib/utils.ts`
+
+**Why it matters:** `nanoid` is a general-purpose ID generator with no conceptual
+relationship to the rotation engine. All five stores and several lib files were importing
+from `rotationEngine.ts` just to get an ID — coupling them to the engine layer unnecessarily.
+`src/lib/utils.ts` is the proper home. `rotationEngine.ts` re-exports from there for
+backward compatibility so all existing importers (programParser, csv, PlanBuilderPage,
+exerciseHistoryStore) continue to compile unchanged.
+
+**Files changed:** `src/lib/utils.ts` (new), `src/engine/rotationEngine.ts`,
+`src/store/historyStore.ts`, `src/store/planStore.ts`
+
+**Risks / tradeoffs:** None. No behavioral change. Existing importers via the re-export
+path continue to work unchanged.
+
+**Rollback:** `git revert d6b79c5`
+
+---
+
+### Change 2 — test: expand `historyScope` coverage from 4 → 16 tests
+
+**Why it matters:** `hasPlanHistory` and `getPlansWithHistory` are called on every
+HistoryPage render to decide which plans appear in the plan selector and whether the
+weekly breakdown shows. Prior coverage was 4 tests covering only two happy-path scenarios.
+Edge cases — empty plans dict, orphaned entries (plan deleted, history remains), plans with
+no activity, entries from other plans — were untested.
+
+**Files changed:** `src/lib/__tests__/historyScope.test.ts`
+
+**Risks / tradeoffs:** None. Test-only addition.
+
+**Rollback:** `git revert ff0bc1a`
+
+---
+
+### Change 3 — feat: Weekly Activity panel in HistoryPage
+
+**Why it matters:** `computeWeeklyBreakdown` was added in pass 31 with 15 tests but had
+no UI consumer. Users had no way to see their week-by-week consistency at a glance. The
+new collapsible "Recent Weeks" section in HistoryPage surfaces the last 8 weeks newest-first
+when a single plan is selected, showing completed count alongside skips, day-offs, and extras.
+
+**Files changed:** `src/pages/HistoryPage.tsx`
+
+**Risks / tradeoffs:** UI-only addition. The panel is hidden when "All plans" is selected
+(breakdown is per-plan) and when no weeks have activity. Defaults to expanded. If the
+collapsed-by-default behavior is preferred, change `useState(true)` to `useState(false)`
+in `WeeklyActivitySection`.
+
+**Rollback:** `git revert e47af7c`
+
+---
+
 ## 2026-05-17 (thirty-first pass) — branch `claude/dreamy-mccarthy-UaphK`
 
 Baseline on entry: **664 passing, 0 failing**. Exit state: **686 passing, 0 failing** (+22 tests).
