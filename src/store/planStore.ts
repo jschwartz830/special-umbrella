@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Plan, PlanDay, WorkoutSlot, WorkoutType } from '../types'
-import { nanoid } from '../engine/rotationEngine'
+import { nanoid } from '../lib/utils'
 import { format } from 'date-fns'
 import type { WorkoutTag } from '../modules/workout-metadata/types'
 

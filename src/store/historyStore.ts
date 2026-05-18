@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { format } from 'date-fns'
 import type { HistoryEntry, OverrideEntry, ExtraWorkoutEntry, ActionType, OverrideType, WorkoutType } from '../types'
-import { nanoid } from '../engine/rotationEngine'
+import { nanoid } from '../lib/utils'
 
 interface HistoryState {
   entries: HistoryEntry[]

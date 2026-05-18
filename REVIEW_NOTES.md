@@ -1,5 +1,98 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-18 (thirty-second pass) — branch `claude/dreamy-mccarthy-THUP4`
+
+### Executive summary
+
+1. **What changed:** Code organization refactor (`nanoid` → `lib/utils.ts`), expanded
+   `historyScope` test coverage (4 → 16 tests), and a new Weekly Activity panel in
+   HistoryPage wiring the `computeWeeklyBreakdown` utility that was idle since pass 31.
+2. **Highest confidence:** The `nanoid` relocation is a pure refactor with a re-export
+   bridge — nothing can break. The test additions are additive with no risk. The Weekly
+   Activity panel is new UI but additive (hidden when no data, hidden for "All plans" view).
+3. **What is risky:** Nothing this pass. The weekly panel's default-expanded state
+   (`useState(true)`) is a product choice — if you'd prefer collapsed-by-default, change
+   one line: `WeeklyActivitySection` in `HistoryPage.tsx`.
+4. **Review first:** The Weekly Activity panel in `HistoryPage.tsx:409-414` (insertion
+   point) and the new `WeeklyActivitySection` component at the bottom of the file (~line 910).
+
+---
+
+### Biggest issues found
+
+1. **`nanoid` in wrong module** (FIXED) — ID utility was defined in `rotationEngine.ts`,
+   causing stores to import from a scheduling-layer module.
+2. **`historyScope` under-tested** (FIXED with 12 new tests).
+3. **`computeWeeklyBreakdown` had no UI consumer** (FIXED with HistoryPage panel).
+
+### Improvements completed
+
+| Change | Commit | Risk |
+|--------|--------|------|
+| `nanoid` → `src/lib/utils.ts` | `d6b79c5` | None |
+| 12 new `historyScope` tests | `ff0bc1a` | None |
+| Weekly Activity panel in HistoryPage | `e47af7c` | Very low |
+
+### Medium-complexity feature explored
+
+Weekly Activity panel — see FEATURE_PROPOSAL.md and FEATURE_REVIEW.md.
+
+---
+
+### Verdict on each change
+
+**Definitely keep:**
+- `nanoid` relocation — clean code organization; backward-compatible re-export means
+  zero risk to existing callers.
+- `historyScope` tests — pure coverage gain.
+- Weekly Activity panel — immediately useful, easy to revert, no new data structures.
+
+**Probably keep but tweak:**
+- The weekly panel defaults to expanded. If you find it visually noisy, change
+  `useState(true)` → `useState(false)` for collapsed-by-default.
+
+**Do not keep:**
+- Nothing this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+1. **Full `nanoid` import migration** — Only `historyStore` and `planStore` import from
+   `lib/utils` directly; `programParser`, `csv`, `PlanBuilderPage`, and `exerciseHistoryStore`
+   still import via the `rotationEngine` re-export. The re-export is safe, but migrating all
+   callers would complete the refactor. Low priority.
+2. **Weekly panel: "All plans" cross-plan breakdown** — Currently hidden when "All plans"
+   is selected because `computeWeeklyBreakdown` is per-plan. A cross-plan version could
+   aggregate all entries/extras by week. Medium complexity; not needed until the feature
+   is validated.
+3. **Weekly panel: date range picker** — Currently hardcoded to 8 weeks back. A date range
+   selector (or "4 / 8 / 12 weeks" toggle) would add flexibility. Can wait until user
+   feedback.
+4. **`TodayPage.tsx` split** — At ~1,100 lines it is the largest file. No immediate problem
+   but extracting sub-components (ActiveWorkoutSection, UpcomingSection, StatsSection) would
+   improve readability.
+
+---
+
+### Open questions for review
+
+1. Does the Weekly Activity panel belong in HistoryPage (historical view) or TodayPage
+   (daily context)? Currently in HistoryPage since the data is retrospective.
+2. Should the "Recent Weeks" section show week labels relative to today ("This week",
+   "Last week") instead of absolute dates?
+3. Should skipped weeks (no activity) be shown as empty rows or omitted? Currently omitted.
+
+### Known issues or incomplete work
+
+- None this pass.
+
+### Dependencies added
+
+- None.
+
+---
+
 ## 2026-05-17 (thirty-first pass) — branch `claude/dreamy-mccarthy-UaphK`
 
 ### Executive summary

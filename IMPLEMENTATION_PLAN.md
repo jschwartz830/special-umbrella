@@ -1,5 +1,51 @@
 # Implementation Plan
 
+## Pass 32 — 2026-05-18 (branch `claude/dreamy-mccarthy-THUP4`)
+
+### Observations on entry
+
+- Baseline: **686 passing, 0 failing** — clean baseline inherited from pass 31.
+- **`nanoid` misplaced in `rotationEngine.ts`**: Every store and lib that needs
+  an ID generator (`historyStore`, `planStore`, `programParser`, `exerciseHistoryStore`,
+  `csv`, `PlanBuilderPage`) imported from the rotation engine — a pure scheduling module
+  with no conceptual relationship to ID generation.
+- **`historyScope` tests sparse** — 4 tests covered only two happy-path scenarios.
+  Edge cases (empty plans dict, orphaned entries, plans with no history, entries from
+  other plans) were untested.
+- **`computeWeeklyBreakdown` unconnected** — the utility added in pass 31 (15 tests)
+  had no UI consumer.
+- **No behavioral bugs found** — engine logic is well-audited after 31 prior passes.
+
+### Decisions
+
+- **Refactor `nanoid` to `src/lib/utils.ts`**: Proper home for general-purpose utilities.
+  Re-exports from `rotationEngine.ts` for backward compat so existing importers continue
+  to compile. Two stores updated to import from the canonical location.
+- **Expand `historyScope` tests from 4 → 16**: Covers all meaningful edge cases.
+- **Wire `computeWeeklyBreakdown` into HistoryPage**: Collapsible "Recent Weeks" panel
+  showing last 8 weeks for the selected plan.
+
+### Architecture summary
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`.
+Rotation logic is a pure function in `rotationEngine.ts`. Stats are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function engine with 698 tests across 18 files on exit.
+- All store mutations are well-guarded and tested.
+- Clean separation between engine, store, and UI layers.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,100 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `workoutInstanceId` parsing relies on `nanoid` never generating `_` (holds for
+  base-36 output, but worth documenting).
+
+---
+
 ## Pass 31 — 2026-05-17 (branch `claude/dreamy-mccarthy-UaphK`)
 
 ### Observations on entry

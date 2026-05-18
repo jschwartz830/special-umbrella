@@ -1,5 +1,51 @@
 # Test Results
 
+## 2026-05-18 (thirty-second pass) — branch `claude/dreamy-mccarthy-THUP4`
+
+**Result: 698 passing, 0 failing** (+12 new tests; 0 previously-failing tests)
+
+### Tests reviewed
+
+All 18 test files reviewed. Baseline on entry: 686 passing, 0 failing.
+
+### Tests added / updated
+
+| File | Change | Count |
+|------|--------|-------|
+| `src/lib/__tests__/historyScope.test.ts` | Rewrote: 4 → 16 tests | +12 |
+
+### Test breakdown by area
+
+| Area | Tests | Notes |
+|------|-------|-------|
+| `rotationEngine` | 65 | Unchanged — fully covers mod, computeCurrentDayIndex, getTodayResolvedDay, getUpcomingDays, getResolvedDaysRange, isPlanExpired |
+| `calendarProjection` | 22 | Unchanged |
+| `historyStats` | 117 | Unchanged — covers all stat functions including computeWeeklyBreakdown |
+| `historyScope` | 16 | +12 new edge-case tests |
+| `sessionSummary` | 25+ | Unchanged |
+| `historyStore` | ~30 | Unchanged |
+| `outcomeStore` | ~25 | Unchanged |
+| `planStore` | ~20 | Unchanged |
+| `planDeleteCleanup` | 8 | Unchanged |
+| `programStore` | varies | Unchanged |
+| `exerciseHistoryStore` | varies | Unchanged |
+| `csv` | varies | Unchanged |
+| `expressionEval` | varies | Unchanged |
+| `useExpiryDismiss` | varies | Unchanged |
+| `run-adaptation/engine` | varies | Unchanged |
+| `workout-outcomes/progression` | varies | Unchanged |
+| `workout-outcomes/types` | varies | Unchanged |
+
+### Important areas still untested
+
+- `WeeklyActivitySection` component (new UI component in HistoryPage) — no component
+  tests. The underlying `computeWeeklyBreakdown` logic is well-tested; only the rendering
+  path is uncovered.
+- `nanoid` itself — randomness is not meaningfully testable in unit tests; no tests added.
+  Collision risk is negligible for a personal-scale tracker (~10^14 ID space).
+
+---
+
 ## 2026-05-17 (thirty-first pass) — branch `claude/dreamy-mccarthy-UaphK`
 
 **Result: 686 passing, 0 failing** (+22 new tests; 0 previously-failing tests)
