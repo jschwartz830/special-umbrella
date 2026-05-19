@@ -1621,3 +1621,66 @@ not failing tests. The test additions close structural coverage gaps.
 2. **CalendarPage retroactive logging flow**
 3. **PlanBuilderPage unsaved-changes guard**
 4. **TodayPage action handlers** (startWorkout, confirmPrimary, etc.)
+
+---
+
+## Pass 33 Test Results — 2026-05-19
+
+### Run command
+
+```
+node_modules/.bin/vitest run
+```
+
+### Final result
+
+```
+Test Files  18 passed (18)
+     Tests  708 passed (708)
+  Start at  07:22:40
+  Duration  2.00s
+```
+
+**+10 tests from pass 32 baseline (698 → 708). 0 failures.**
+
+### New tests added
+
+#### `src/lib/__tests__/historyStats.test.ts` — 6 new tests (getUnloggedPastDates)
+
+| Test | Assertion |
+|------|-----------|
+| returns newest-first dates with no entry | Correct date list returned, ordered newest-first |
+| returns empty when all days have entries | Empty array when window fully logged |
+| stops at plan start date | Dates before planStart excluded |
+| returns empty for zero lookback | `lookbackDays=0` → `[]` |
+| does not count entries from other plans | Cross-plan isolation |
+| countPastUnloggedDays delegates correctly | `count === dates.length` |
+
+#### `src/store/__tests__/historyStore.test.ts` — 4 new tests (markDaysAsOff)
+
+| Test | Assertion |
+|------|-----------|
+| adds a day_off entry for each date | 3 entries created, all day_off, planDayIndex undefined |
+| replaces an existing entry for the same date | Only 1 entry remains, action=day_off |
+| is a no-op when dates array is empty | No entries created |
+| does not affect entries for other plans | Other plan entry unchanged |
+
+### Coverage impact
+
+| Change | Test impact |
+|--------|-------------|
+| `getUnloggedPastDates` extracted | 6 unit tests covering all branches |
+| `markDaysAsOff` added | 4 unit tests covering all branches |
+| Dead `moveOutcome` call removed | No tests changed; verified by code review |
+| Stall nudge UI | UI component; covered by code review |
+
+### Important logic still untested (carry-over)
+
+1. **`moveOutcome` no-op guard** — `outcomeStore` has no test for the case where
+   source outcome is missing (confirmed no-op). Recommended for pass 34.
+2. **`importOutcomes`** — no unit tests.
+3. **`removeProgressionStates`** — no unit tests.
+4. **Double-day rotation behavior**
+5. **CalendarPage retroactive logging flow**
+6. **PlanBuilderPage unsaved-changes guard**
+7. **TodayPage action handlers** (startWorkout, confirmPrimary, etc.)

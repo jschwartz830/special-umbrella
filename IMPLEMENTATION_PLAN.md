@@ -1230,3 +1230,74 @@ reviewability. Bug fix first (item 1), feature additive on top (item 2).
 - Auto-derive run pace from distance + duration when `averagePaceSecondsPerMile` is
   null — deferred as product decision.
 - Auto-derive swim pace from distance + duration — deferred, same rationale.
+
+---
+
+## Pass 33 — 2026-05-19 (branch `claude/dreamy-mccarthy-I8ssV`)
+
+### Observations on entry
+
+- Baseline: **698 passing, 0 failing** — clean baseline inherited from pass 32.
+- **Dead `moveOutcome` call in `TodayPage.handleOutcomeConfirm`**: A
+  `moveOutcome(today-id, target-id)` was called before `logOutcomeWithProgression`,
+  but at that point `outcomes[today-id]` doesn't exist yet (the outcome is
+  written by `logOutcomeWithProgression` later in the same handler). The
+  `moveOutcome` implementation has an `if (!existing) return s` guard, so this
+  was a guaranteed no-op. The outcome is correctly placed at the right key via
+  `outcome.workoutInstanceId` patching.
+- **Stall nudge lacked actionability**: The 7-day unlogged days nudge was a
+  single `<button>` that navigated to Calendar. Users with several unlogged days
+  had no quick path to resolve the stall without manually updating each date.
+- **`countPastUnloggedDays` discarded date information**: The function counted
+  matching dates but threw them away. Callers that needed the actual dates had
+  to re-derive them separately.
+
+### Decisions
+
+1. **Remove dead `moveOutcome` call** (bug fix, zero-risk): Delete the call and
+   its associated `removeOutcome` + `moveByWorkoutInstance` side-effects from the
+   retroactive-date branch in `handleOutcomeConfirm`. The outcome key is patched
+   correctly via `workoutInstanceId` before `logOutcomeWithProgression` runs.
+
+2. **Refactor `countPastUnloggedDays` → `getUnloggedPastDates`**: New function
+   returns the actual `string[]` of unlogged dates (newest-first). Existing
+   `countPastUnloggedDays` delegates to it so behavior is unchanged for all
+   existing call sites.
+
+3. **Add `markDaysAsOff(planId, dates[])` to `historyStore`**: Batch-logs a
+   `day_off` entry per date, replacing any existing entry for the same
+   `(planId, calendarDate)` key. Uses the existing `addEntry` dedup semantics.
+
+4. **Upgrade stall nudge UI**: Replace the single `<button>` with a `<div>` row
+   containing two separate actions — a "Calendar →" navigate link and a
+   "Mark N as Day Off" quick-action button. The nudge disappears automatically
+   once the catch-up fires (all unlogged dates now have entries).
+
+### Architecture summary
+
+No new dependencies or stores. Changes are confined to:
+- `src/lib/historyStats.ts` — pure function addition (no side effects)
+- `src/store/historyStore.ts` — additive action
+- `src/pages/TodayPage.tsx` — dead code removal + UI update
+
+### Commits
+
+| # | Description | Files |
+|---|---|---|
+| 1 | feat: quick catch-up — batch-mark unlogged days as Day Off from stall nudge | historyStats.ts, historyStore.ts, TodayPage.tsx |
+| 2 | test: add tests for getUnloggedPastDates and markDaysAsOff | historyStats.test.ts, historyStore.test.ts |
+
+### Exit state
+
+**708 passing, 0 failing** (+10 tests from baseline).
+
+### Carry-over open items
+
+- Streak display is "strict" (0 until today is logged); product decision needed.
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX).
+- Narrow Zustand selectors in CalendarPage (performance, not urgent).
+- Document progression system migration path.
+- Expression evaluator should surface errors to UI for malformed progression rules.
+- Auto-derive run pace from distance + duration — deferred as product decision.
+- Auto-derive swim pace from distance + duration — deferred, same rationale.
+- Wire `computePlanStreak` into TodayPage or HistoryPage stat display.

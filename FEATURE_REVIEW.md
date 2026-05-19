@@ -938,3 +938,46 @@ Classification: **Keep**
 **Keep** — passive, zero-friction PB detection using fully available data.
 The only open question is styling (plain text vs. colour highlight). The
 feature is complete and correct; styling can be tuned without any logic change.
+
+---
+
+## Pass 33 Feature Review — Quick catch-up: batch-mark unlogged days as Day Off
+
+**Date:** 2026-05-19
+**Branch:** `claude/dreamy-mccarthy-I8ssV`
+
+### Implementation correctness
+
+The feature is implemented as proposed with no scope creep.
+
+- `getUnloggedPastDates` returns correct newest-first date list; 6 unit tests
+  cover all branches including planStart cutoff and cross-plan isolation.
+- `markDaysAsOff` correctly delegates to `addEntry` which handles dedup; 4
+  unit tests cover batch creation, replace-existing, empty-input, and
+  cross-plan isolation.
+- TodayPage nudge: condition `unloggedDates.length > 0` matches old
+  `unloggedCount > 0` exactly. Auto-dismiss works correctly because
+  `getUnloggedPastDates` re-derives from store state on every render.
+
+### Risks assessed
+
+**Destructive if misused** — acknowledged in the proposal. The Calendar path
+remains available for corrections. The amber colour on the catch-up button
+provides visual differentiation from the navigation action, reducing the chance
+of accidental taps.
+
+**N subscriber notifications** — `markDaysAsOff` calls `addEntry` in a loop,
+producing N Zustand notifications. For the 7-day lookback window (max 7
+iterations), this is below any perceptible threshold. Batching into a single
+`set()` would complicate the dedup logic with no practical benefit.
+
+### What was not built
+
+- Undo button — not needed given Calendar editing path
+- Confirmation dialog — not warranted for a low-stakes Day Off log
+- Configurable lookback window — 7 days is sufficient for the catch-up use case
+
+### Verdict
+
+**Keep** — the feature is minimal, correct, and directly addresses the UX gap
+identified during the stall nudge audit. Risk is low; rollback is trivial.
