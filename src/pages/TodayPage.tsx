@@ -309,10 +309,6 @@ export function TodayPage() {
     setShowOutcomeModal(true)
   }
 
-  function handleCompleteClick() {
-    setShowOutcomeModal(true)
-  }
-
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
     setActiveTrackedExercises(null)
     setActiveTrackedDurationMin(null)
@@ -399,10 +395,6 @@ export function TodayPage() {
   function handleSkip() {
     if (!todayResolved) return
     actions.skip(todayResolved.planDayIndex)
-  }
-
-  function handleDayOff() {
-    actions.dayOff()
   }
 
   function handleEditOutcome() {
@@ -697,33 +689,6 @@ export function TodayPage() {
         </button>
       )}
 
-      {/* Action buttons — only show if pending */}
-      {isPending && (
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            onClick={handleCompleteClick}
-            className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 transition-colors active:scale-95"
-          >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <span className="text-xs font-semibold">Complete</span>
-          </button>
-          <button
-            onClick={handleSkip}
-            className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 transition-colors active:scale-95"
-          >
-            <SkipForward size={22} />
-            <span className="text-xs font-semibold">Skip</span>
-          </button>
-          <button
-            onClick={handleDayOff}
-            className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 transition-colors active:scale-95"
-          >
-            <Coffee size={22} />
-            <span className="text-xs font-semibold">Day Off</span>
-          </button>
-        </div>
-      )}
-
       {/* Double-day toggle — only when pending and there's a next workout */}
       {isPending && upcoming.length > 0 && (
         doubleDay ? (
@@ -789,6 +754,14 @@ export function TodayPage() {
         >
           <Shuffle size={13} /> Override
         </button>
+        {isPending && (
+          <button
+            onClick={handleSkip}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
+          >
+            <SkipForward size={13} /> Skip
+          </button>
+        )}
       </div>
 
       {/* Upcoming */}
