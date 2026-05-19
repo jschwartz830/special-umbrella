@@ -64,6 +64,13 @@ interface HistoryState {
   updateEntryDate: (id: string, newDate: string) => void
   /** Move an extra entry to a new calendarDate (caller must also call moveOutcome). */
   updateExtraEntryDate: (id: string, newDate: string) => void
+
+  /**
+   * Batch-log a Day Off entry for each date in `dates`. Dates that already
+   * have an entry are replaced (addEntry dedup semantics). Designed for the
+   * "quick catch-up" flow that marks a streak of unlogged past days at once.
+   */
+  markDaysAsOff: (planId: string, dates: string[]) => void
 }
 
 /** Keep the entry with the newest createdAt for each (planId, calendarDate) pair. */
@@ -233,6 +240,12 @@ export const useHistoryStore = create<HistoryState>()(
         set(s => ({
           extraEntries: s.extraEntries.map(e => e.id === id ? { ...e, calendarDate: newDate } : e),
         }))
+      },
+
+      markDaysAsOff(planId, dates) {
+        for (const calendarDate of dates) {
+          get().addEntry({ planId, calendarDate, planDayIndex: undefined, action: 'day_off' })
+        }
       },
     }),
     { name: 'wpt_history' },
