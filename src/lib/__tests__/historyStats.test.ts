@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -1333,5 +1333,54 @@ describe('computeWeeklyBreakdown', () => {
     const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-05', '2026-01-05')
     expect(result).toHaveLength(1)
     expect(result[0].completed).toBe(1)
+  })
+})
+
+// ── getUnloggedPastDates ──────────────────────────────────────────────────────
+
+describe('getUnloggedPastDates', () => {
+  const planStart = '2026-01-01'
+
+  it('returns newest-first dates that have no entry', () => {
+    const entries: HistoryEntry[] = [entry('2026-05-18', 'complete')]
+    // today = 2026-05-19, lookback = 3 → checks 18, 17, 16
+    // 18 has an entry, 17 and 16 do not
+    const result = getUnloggedPastDates('plan-1', entries, planStart, '2026-05-19', 3)
+    expect(result).toEqual(['2026-05-17', '2026-05-16'])
+  })
+
+  it('returns empty array when all days in window have entries', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-05-18', 'complete'),
+      entry('2026-05-17', 'skip'),
+    ]
+    const result = getUnloggedPastDates('plan-1', entries, planStart, '2026-05-19', 2)
+    expect(result).toEqual([])
+  })
+
+  it('stops at plan start date', () => {
+    const entries: HistoryEntry[] = []
+    // planStart = 2026-05-18, today = 2026-05-19, lookback = 7
+    // Only 2026-05-18 is ≥ planStart
+    const result = getUnloggedPastDates('plan-1', entries, '2026-05-18', '2026-05-19', 7)
+    expect(result).toEqual(['2026-05-18'])
+  })
+
+  it('returns empty when lookbackDays is 0', () => {
+    const result = getUnloggedPastDates('plan-1', [], planStart, '2026-05-19', 0)
+    expect(result).toEqual([])
+  })
+
+  it('does not count entries from a different plan', () => {
+    const entries: HistoryEntry[] = [entry('2026-05-18', 'complete', 'other-plan')]
+    const result = getUnloggedPastDates('plan-1', entries, planStart, '2026-05-19', 1)
+    expect(result).toEqual(['2026-05-18'])
+  })
+
+  it('countPastUnloggedDays delegates correctly to getUnloggedPastDates', () => {
+    const entries: HistoryEntry[] = [entry('2026-05-18', 'complete')]
+    const count = countPastUnloggedDays('plan-1', entries, planStart, '2026-05-19', 3)
+    const dates = getUnloggedPastDates('plan-1', entries, planStart, '2026-05-19', 3)
+    expect(count).toBe(dates.length)
   })
 })
