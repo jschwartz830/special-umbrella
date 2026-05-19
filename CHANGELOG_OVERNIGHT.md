@@ -2779,3 +2779,87 @@ integration test never verified this. Added:
 
 **Files changed**:
 - `src/store/__tests__/planDeleteCleanup.test.ts` — +1 test, updated beforeEach
+
+---
+
+## 2026-05-19 (thirty-third pass) — branch `claude/dreamy-mccarthy-I8ssV`
+
+Baseline on entry: **698 passing, 0 failing**. Exit state: **708 passing, 0 failing** (+10 tests).
+
+---
+
+### 1. Bug fix: remove dead `moveOutcome` call in `TodayPage.handleOutcomeConfirm`
+
+**Why it matters**: In the retroactive-date branch of `handleOutcomeConfirm`, a
+call to `moveOutcome(makeWorkoutInstanceId(plan.id, today), makeWorkoutInstanceId(plan.id, completedDate))`
+was present before `logOutcomeWithProgression`. At that point, the outcome for
+today doesn't exist yet (it's created by `logOutcomeWithProgression` below). The
+`moveOutcome` store action has an `if (!existing) return s` guard, so the call
+was a guaranteed no-op on every retroactive log. The outcome key is correctly
+placed via `outcome.workoutInstanceId` patching, which runs right before
+`logOutcomeWithProgression`. The dead call also triggered an unnecessary
+`useExerciseHistoryStore.getState().moveByWorkoutInstance()` call through the
+store middleware — that too was a no-op.
+
+**Fix**: Remove the dead `moveOutcome` call and the associated `removeOutcome`
+call that preceded it. No behavioral change; this is pure cleanup.
+
+**Files changed**:
+- `src/pages/TodayPage.tsx` — remove dead `moveOutcome` + `removeOutcome` calls
+
+### 2. Feature: quick catch-up — batch-mark unlogged days as Day Off
+
+**Why it matters**: When the rotation stall nudge appeared ("N days in the past
+week without entries"), the only action was to navigate to Calendar, where the
+user had to open each date individually and log Day Off. For a user returning
+after a week away, this was 7 interactions instead of 1.
+
+**Changes**:
+
+#### `src/lib/historyStats.ts` — extract `getUnloggedPastDates`
+
+`countPastUnloggedDays` refactored to delegate to a new `getUnloggedPastDates`
+function that returns the actual `string[]` of unlogged calendar dates
+(newest-first). The existing `countPastUnloggedDays` signature is unchanged —
+it now returns `.length`. No behavioral difference for existing call sites.
+
+#### `src/store/historyStore.ts` — add `markDaysAsOff`
+
+New action `markDaysAsOff(planId: string, dates: string[])` batch-logs a
+`day_off` history entry per date. Uses existing `addEntry` dedup semantics
+(replaces any existing entry for the same `(planId, calendarDate)` key).
+
+#### `src/pages/TodayPage.tsx` — upgrade stall nudge UI
+
+- Replace `countPastUnloggedDays(...)` → `getUnloggedPastDates(...)` (returns dates, not count)
+- Replace the single `<button onClick=navigate('/calendar')>` wrapper with a
+  `<div>` row containing two distinct actions:
+  - "Calendar →" button (sky-400) — navigates to calendar for manual editing
+  - "Mark N as Day Off" button (amber-400) — calls `markDaysAsOff(plan.id, unloggedDates)`
+- The nudge disappears automatically after the catch-up fires (all unlogged dates
+  have entries, so `unloggedDates.length === 0`)
+
+**Files changed**:
+- `src/lib/historyStats.ts` — new `getUnloggedPastDates`, refactored `countPastUnloggedDays`
+- `src/store/historyStore.ts` — new `markDaysAsOff` action
+- `src/pages/TodayPage.tsx` — dead code removal + stall nudge UI upgrade
+
+### 3. Tests: `getUnloggedPastDates` and `markDaysAsOff`
+
+**`historyStats.test.ts`** — 6 new tests:
+- Returns newest-first dates missing entries
+- Returns empty when all days have entries
+- Stops at plan start date
+- Returns empty for zero lookback
+- Ignores entries from other plans
+- `countPastUnloggedDays` delegates correctly (count equals dates.length)
+
+**`historyStore.test.ts`** — 4 new tests:
+- Adds day_off entry for each date with `planDayIndex: undefined`
+- Replaces an existing entry for the same date
+- No-op when dates array is empty
+- Does not affect entries for other plans
+
+**Files changed**:
+- `src/lib/__tests__/historyStats.test.ts` — +6 tests
+- `src/store/__tests__/historyStore.test.ts` — +4 tests

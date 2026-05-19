@@ -244,19 +244,35 @@ export function countPastUnloggedDays(
   today: string,
   lookbackDays = 7,
 ): number {
-  if (lookbackDays <= 0) return 0
+  return getUnloggedPastDates(planId, entries, planStartDate, today, lookbackDays).length
+}
+
+/**
+ * Return the YYYY-MM-DD dates (newest-first) in the lookback window that have
+ * no history entry for the given plan. Mirrors `countPastUnloggedDays` but
+ * surfaces the actual dates so callers can act on each one (e.g. batch mark
+ * as Day Off).
+ */
+export function getUnloggedPastDates(
+  planId: string,
+  entries: import('../types').HistoryEntry[],
+  planStartDate: string,
+  today: string,
+  lookbackDays = 7,
+): string[] {
+  if (lookbackDays <= 0) return []
 
   const entryDates = new Set(
     entries.filter(e => e.planId === planId).map(e => e.calendarDate),
   )
 
-  let count = 0
+  const dates: string[] = []
   for (let i = 1; i <= lookbackDays; i++) {
     const date = shiftDay(today, -i)
     if (date < planStartDate) break
-    if (!entryDates.has(date)) count++
+    if (!entryDates.has(date)) dates.push(date)
   }
-  return count
+  return dates
 }
 
 // ── Workout type breakdown ────────────────────────────────────────────────────

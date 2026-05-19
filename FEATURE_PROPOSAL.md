@@ -1093,3 +1093,62 @@ from `buildLastSessionSummary` in `sessionSummary.ts`. No data to migrate.
 - PB in the active workout tracker (live comparison during a session)
 - All-time PR board / personal records page
 - Time-bounded PB windows (e.g., "PR in last 90 days")
+
+---
+
+## Pass 33 Feature Proposal — Quick catch-up: batch-mark unlogged days as Day Off
+
+**Date:** 2026-05-19
+**Branch:** `claude/dreamy-mccarthy-I8ssV`
+**Status:** Implemented
+
+### Problem
+
+The 7-day stall nudge on TodayPage alerts the user when recent days have no
+history entry, indicating the rotation pointer may be stalled. Previously, the
+only action was to navigate to Calendar, open each unlogged date, and manually
+log Day Off — up to 7 individual interactions for a user returning from a
+multi-day break.
+
+### Proposed solution
+
+Add a "Mark N as Day Off" button to the stall nudge row. One tap batch-logs a
+`day_off` entry for every unlogged date in the 7-day lookback window. The nudge
+auto-dismisses after the action because all dates now have entries.
+
+### Implementation scope
+
+**Minimal**:
+- `getUnloggedPastDates` (pure function, 15 lines) — returns the actual date
+  strings instead of a count, enabling the batch action
+- `markDaysAsOff` (store action, 5 lines) — loops over dates, calls `addEntry`
+  for each
+- TodayPage nudge UI — replace single `<button>` with `<div>` + two child buttons
+
+**No new dependencies.** No new stores. No schema changes.
+
+### User-facing behaviour
+
+Before: Nudge shows "3 days in the past week without entries — rotation may be
+stalled" as a single tappable area that navigates to Calendar.
+
+After: Same message, with two actions:
+- **Calendar →** (sky) — navigates to Calendar for manual editing
+- **Mark 3 as Day Off** (amber) — batch-logs Day Off for all 3 dates, nudge
+  disappears immediately
+
+### Risks
+
+- **Destructive if misused**: If the user has actually been working out but
+  forgot to log, pressing "Mark as Day Off" would incorrectly set those days as
+  day_off rather than complete. However, `addEntry` dedup semantics mean this is
+  recoverable — the user can go to Calendar and change the action for any date.
+- **No undo**: No explicit undo button. Mitigated by the Calendar path always
+  being available for corrections.
+
+### Rollback
+
+Remove `getUnloggedPastDates` from historyStats (keep `countPastUnloggedDays`).
+Remove `markDaysAsOff` from historyStore interface and implementation.
+Revert TodayPage nudge JSX to original `<button onClick=navigate('/calendar')>`.
+No data migration needed — existing history entries are unaffected.

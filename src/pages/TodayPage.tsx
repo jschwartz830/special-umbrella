@@ -35,7 +35,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, countPastUnloggedDays, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
@@ -155,6 +155,7 @@ export function TodayPage() {
   const addExtraEntry = useHistoryStore(s => s.addExtraEntry)
   const updateExtraEntryDate = useHistoryStore(s => s.updateExtraEntryDate)
   const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
+  const markDaysAsOff = useHistoryStore(s => s.markDaysAsOff)
   const extraEntries = useHistoryStore(s => s.extraEntries)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const getOutcome = useOutcomeStore(s => s.getOutcome)
@@ -271,8 +272,8 @@ export function TodayPage() {
   // Stats for the compact stats bar (scoped to the active plan's history)
   const stats = computeHistoryStats(planEntries, planExtras, today)
 
-  // Count recent past days with no entry — used to show the stall nudge.
-  const unloggedCount = countPastUnloggedDays(plan.id, planEntries, plan.startDate, today)
+  // Collect recent past days with no entry — used to show the stall nudge and quick catch-up.
+  const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today)
 
   // Rotation cycle progress — for rotations-duration plans only
   const cycleProgress = computeRotationCycleProgress(plan, planEntries)
@@ -331,11 +332,10 @@ export function TodayPage() {
       }
       // Remove any existing outcome at the target date so its exercise history
       // records don't become orphaned when the new outcome overwrites the key.
+      // Note: we do NOT call moveOutcome here — the outcome for today hasn't been
+      // written yet (logOutcomeWithProgression runs below), so there is nothing to
+      // move. We patch the instanceId directly so it lands at the right key.
       removeOutcome(makeWorkoutInstanceId(plan!.id, completedDate))
-      moveOutcome(
-        makeWorkoutInstanceId(plan!.id, today),
-        makeWorkoutInstanceId(plan!.id, completedDate),
-      )
       outcome = { ...outcome, workoutInstanceId: makeWorkoutInstanceId(plan!.id, completedDate) }
     }
 
@@ -543,17 +543,25 @@ export function TodayPage() {
       <WeeklyActivityStrip planEntries={planEntries} planExtras={planExtras} today={today} />
 
       {/* Unlogged past days nudge — shown when the rotation may be stalled */}
-      {!planExpired && unloggedCount > 0 && (
-        <button
-          onClick={() => navigate('/calendar')}
-          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-700/50 border border-slate-600/50 text-left hover:bg-slate-700 transition-colors"
-        >
+      {!planExpired && unloggedDates.length > 0 && (
+        <div className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-700/50 border border-slate-600/50">
           <Info size={13} className="text-slate-400 flex-shrink-0" />
           <p className="flex-1 text-xs text-slate-400">
-            {unloggedCount} day{unloggedCount === 1 ? '' : 's'} in the past week without entries — rotation may be stalled.
+            {unloggedDates.length} day{unloggedDates.length === 1 ? '' : 's'} in the past week without entries — rotation may be stalled.
           </p>
-          <span className="text-xs text-sky-400 font-medium flex-shrink-0">Calendar →</span>
-        </button>
+          <button
+            onClick={() => markDaysAsOff(plan.id, unloggedDates)}
+            className="text-xs text-amber-400 font-medium flex-shrink-0 hover:text-amber-300 transition-colors"
+          >
+            Mark {unloggedDates.length === 1 ? 'as' : `${unloggedDates.length} as`} Day Off
+          </button>
+          <button
+            onClick={() => navigate('/calendar')}
+            className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
+          >
+            Calendar →
+          </button>
+        </div>
       )}
 
       {/* Plan completion / expiry banner */}

@@ -738,3 +738,42 @@ describe('ExtraWorkoutEntry.source field', () => {
     expect(getState().extraEntries).toHaveLength(2)
   })
 })
+
+// ── markDaysAsOff ─────────────────────────────────────────────────────────────
+
+describe('markDaysAsOff', () => {
+  const getState = () => useHistoryStore.getState()
+
+  beforeEach(() => {
+    useHistoryStore.setState({ entries: [], overrides: [], extraEntries: [] })
+  })
+
+  it('adds a day_off entry for each date', () => {
+    getState().markDaysAsOff('plan-1', ['2026-01-01', '2026-01-02', '2026-01-03'])
+    const entries = getState().entries.filter(e => e.planId === 'plan-1')
+    expect(entries).toHaveLength(3)
+    expect(entries.every(e => e.action === 'day_off')).toBe(true)
+    expect(entries.every(e => e.planDayIndex === undefined)).toBe(true)
+  })
+
+  it('replaces an existing entry for the same date', () => {
+    getState().addEntry({ planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete' })
+    getState().markDaysAsOff('plan-1', ['2026-01-01'])
+    const entries = getState().entries.filter(e => e.planId === 'plan-1' && e.calendarDate === '2026-01-01')
+    expect(entries).toHaveLength(1)
+    expect(entries[0].action).toBe('day_off')
+  })
+
+  it('is a no-op when dates array is empty', () => {
+    getState().markDaysAsOff('plan-1', [])
+    expect(getState().entries).toHaveLength(0)
+  })
+
+  it('does not affect entries for other plans', () => {
+    getState().addEntry({ planId: 'plan-2', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete' })
+    getState().markDaysAsOff('plan-1', ['2026-01-01'])
+    const plan2Entries = getState().entries.filter(e => e.planId === 'plan-2')
+    expect(plan2Entries).toHaveLength(1)
+    expect(plan2Entries[0].action).toBe('complete')
+  })
+})

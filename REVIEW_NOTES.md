@@ -3128,3 +3128,84 @@ Five changes landing on this pass:
 ### Dependencies added
 
 None.
+
+---
+
+## Pass 33 Review Notes — 2026-05-19 (branch `claude/dreamy-mccarthy-I8ssV`)
+
+### Summary
+
+One confirmed bug fixed, one small actionability improvement, 10 new tests.
+No new dependencies. No architectural changes. All 708 tests pass.
+
+### Changes reviewed
+
+#### 1. Dead `moveOutcome` call removed — `TodayPage.tsx`
+
+**Risk: None** — verified no-op by tracing execution:
+- `handleOutcomeConfirm` calls `moveOutcome(today-id, target-id)` before
+  `logOutcomeWithProgression`.
+- At call time, `outcomes[today-id]` doesn't exist (it's written by
+  `logOutcomeWithProgression` below).
+- `moveOutcome` implementation: `if (!existing) return s` — guaranteed early return.
+- The outcome lands at the correct key because `outcome.workoutInstanceId` is
+  patched to `makeWorkoutInstanceId(plan.id, completedDate)` before the write.
+- The associated `removeOutcome(target-id)` cleanup (meant to prevent orphaned
+  exercise history at the destination) was also dead because nothing writes
+  to `target-id` before this point.
+
+**Confidence: High** — pure dead code removal with a clear traced execution path.
+
+#### 2. `getUnloggedPastDates` extracted — `historyStats.ts`
+
+**Risk: None** — `countPastUnloggedDays` now delegates to it. No loop logic
+changed; the existing 7-day lookback, planStart cutoff, and cross-plan filter
+all carry over verbatim. The new function is purely additive. 6 tests added.
+
+**Design note**: Returning dates newest-first (i=1 → i=lookbackDays) mirrors
+the temporal ordering a user would expect when reviewing a list of missed days.
+
+#### 3. `markDaysAsOff` added — `historyStore.ts`
+
+**Risk: Low** — additive action. Uses the existing `addEntry` dedup semantics
+(replaces existing entries for the same key). No existing state is mutated
+except through the well-tested `addEntry` path. 4 tests added.
+
+**Atomicity note**: The implementation loops with `get().addEntry(...)` rather
+than batching into a single `set()`. This is consistent with the existing
+store patterns and produces the correct dedup behaviour because each `addEntry`
+call includes the filter-and-replace logic. The tradeoff is N separate Zustand
+subscriber notifications instead of 1; for a 7-day lookback this is negligible.
+
+#### 4. Stall nudge UI upgrade — `TodayPage.tsx`
+
+**Risk: Low** — layout change from `<button>` to `<div>` with two child buttons.
+The "Calendar →" action is preserved. The "Mark N as Day Off" action is additive.
+
+**UX note**: The amber colour for the Day Off button differentiates it visually
+from the sky "Calendar →" link. The nudge auto-dismisses after the batch action
+fires (all unlogged dates now have entries → `unloggedDates.length === 0`).
+
+**Label wording**: "Mark as Day Off" (singular) vs "Mark N as Day Off" (plural)
+branches on `unloggedDates.length === 1` for grammatical correctness.
+
+### Items reviewed but not changed
+
+- `moveOutcome` in `outcomeStore` — tests for the no-op guard (missing source)
+  were noted as absent; out of scope for this pass but recommended for pass 34.
+- `importOutcomes` in `outcomeStore` — similarly untested; carry-over.
+- `removeProgressionStates` — added in pass 30; dedicated tests still absent.
+
+### Remaining open items
+
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path
+- Expression evaluator should surface errors to UI for malformed progression rules
+- `PlanCard` defined inside `PlansPage` function body (low priority)
+- `moveOutcome` / `importOutcomes` / `removeProgressionStates` — missing unit tests
+- Wire `computePlanStreak` into TodayPage or HistoryPage stat display
+
+### Dependencies added
+
+None.
