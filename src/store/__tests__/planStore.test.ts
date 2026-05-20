@@ -284,7 +284,7 @@ describe('duplicatePlan', () => {
           id: 's1',
           type: 'run',
           name: 'Run',
-          segments: [{ kind: 'easy', duration: '10m', notes: 'warmup' }],
+          segments: [{ type: 'easy', duration: '10m', notes: 'warmup' }],
         }],
       }],
     }
