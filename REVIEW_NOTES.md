@@ -1,5 +1,117 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-20 (thirty-fourth pass) — branch `claude/dreamy-mccarthy-zGJFa`
+
+### Executive summary
+
+1. **What changed:** Fixed a shallow-clone bug in `duplicatePlan` (YAML-imported plans
+   with exercises/segments shared array references across copies); added gap-week rows to
+   the Weekly Activity panel so training breaks are visually explicit.
+2. **Highest confidence:** The deep-clone fix is pure correctness — no behavioral change
+   in the common case (manually-built plans with no nested arrays), zero risk. The gap-week
+   feature is additive display logic with a pure utility function and 5 tests.
+3. **What is risky:** Nothing this pass. Both changes are narrowly scoped.
+4. **Review first:** `planStore.ts:24-35` (clone fix) and `historyStats.ts:567-612`
+   (`padWeekGaps`). `HistoryPage.tsx:175-181` (useMemo change) and the `WeeklyActivitySection`
+   render update (~line 938).
+
+---
+
+### Biggest issues found
+
+1. **Shallow-clone bug in `deepCloneWorkoutSlot`** (FIXED) — `duplicatePlan` shared
+   `exercises`, `segments`, `warmup` array references between original and copy.
+2. **Gap weeks invisible in Weekly Activity panel** (FIXED) — training breaks silently
+   compressed the week list, making consistency harder to assess.
+3. **`syncExerciseHistory` uses `split('_')` implicitly relying on `nanoid` format**
+   (NOT FIXED — documented recommendation). The code is correct given that `nanoid()`
+   returns base-36 alphanumeric chars (no underscores) and calendarDate uses hyphens.
+   A comment in the code would guard against future regressions if the ID format changes.
+   Not urgent but worth adding on the next pass.
+
+### Improvements completed
+
+| Change | Commit | Risk |
+|--------|--------|------|
+| Deep-clone `exercises/segments/warmup` in `deepCloneWorkoutSlot` | `52faf8d` | None |
+| 2 new planStore tests for deep-clone isolation | `52faf8d` | None |
+| `padWeekGaps` utility + 5 tests | `d2ac3fb` | None |
+| Gap weeks rendered in Weekly Activity panel | `d2ac3fb` | Very low |
+
+### Medium-complexity feature explored
+
+Gap weeks — see FEATURE_PROPOSAL.md and FEATURE_REVIEW.md.
+
+---
+
+### Verdict on each change
+
+**Definitely keep:**
+- Deep-clone fix — prevents potential data corruption on YAML-imported plan duplication.
+  Backwards-compatible; no observable change for non-YAML plans.
+- `padWeekGaps` tests — pure coverage gain for the utility.
+- Gap weeks in Weekly Activity panel — makes training gaps honest and visible.
+
+**Probably keep but tweak:**
+- The gap rows show "No activity" as context text and "—" as the count. If you prefer
+  a more compact row (e.g., just the date range with grey text and no count column),
+  adjust `WeeklyActivitySection` in `HistoryPage.tsx` (~line 938).
+- Currently gap weeks are only filled between the first and last active week in the 8-week
+  window. If you want to also pad from the start of the window even when there's no early
+  activity, pass a `from`/`to` boundary to `padWeekGaps`.
+
+**Do not keep:**
+- Nothing this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+1. **Add a comment to `syncExerciseHistory`** clarifying that `split('_')[0]` is safe
+   because `nanoid()` produces base-36 (no underscores) and dates use hyphens.
+   Without this comment the split looks fragile to future readers.
+
+2. **`outcomeStore` cross-store coupling**: `logOutcomeWithProgression` directly reads
+   `useProgramStore.getState()`, `usePlanStore.getState()`, and `useHistoryStore.getState()`
+   inside its action. This makes the outcome store hard to unit-test in isolation (requires
+   all four stores to be seeded). A cleaner pattern would pass needed context in from the
+   call site. Low priority — existing test coverage mitigates the risk.
+
+3. **Expression evaluator silent-failure modes**: unknown variable names silently evaluate
+   to 0 (`vars[expr.name] ?? 0`), and division by zero silently returns 0. These are design
+   choices that could mask typos in progression rules. A future pass could add an optional
+   `strict` mode that throws on undefined variables. Not urgent.
+
+4. **`TodayPage.tsx` and `CalendarPage.tsx` line counts** (~1,100 and ~950 lines). Both
+   pages are large but internally coherent. A split into smaller sub-components or custom
+   hooks would improve readability without behavioral changes. Recommended as a dedicated
+   refactor pass rather than an overnight change.
+
+---
+
+### Open questions for review
+
+1. **Gap week density**: If a user is very new or had a long break, `padWeekGaps` could
+   produce many empty rows (up to 7 for an 8-week window with only one active week). Is
+   that acceptable, or should empty rows be capped at N per display?
+
+2. **Deep-clone depth**: The current fix does a one-level deep clone of `exercises` and
+   `segments` (`slot.exercises.map(e => ({ ...e }))`). Each `ExerciseSpec` itself has no
+   nested arrays in the current type definition, so this is sufficient. If `ExerciseSpec`
+   ever gains nested arrays (e.g., `sets: SetSpec[]`), the clone would need to go deeper.
+
+---
+
+### Known issues or incomplete work
+
+- None. All committed changes pass the 715-test suite with 0 failures.
+
+### Dependencies added
+
+- None.
+
+---
+
 ## 2026-05-18 (thirty-second pass) — branch `claude/dreamy-mccarthy-THUP4`
 
 ### Executive summary

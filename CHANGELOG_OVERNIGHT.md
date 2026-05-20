@@ -1,5 +1,52 @@
 # Overnight Changelog
 
+## 2026-05-20 (thirty-fourth pass) — branch `claude/dreamy-mccarthy-zGJFa`
+
+Baseline on entry: **708 passing, 0 failing**. Exit state: **715 passing, 0 failing** (+7 tests).
+
+---
+
+### Change 1 — fix: deep-clone nested arrays in `duplicatePlan`
+
+**Summary:** `deepCloneWorkoutSlot` only did a top-level spread (`{ ...slot, id: nanoid() }`).
+Slots from YAML-imported plans have nested `exercises`, `segments`, and `warmup` arrays.
+With a shallow spread both the original and the duplicate plan shared the same array objects.
+Any in-place mutation of those arrays (e.g. from a plan editor) would corrupt both plans.
+
+**Why it matters:** Duplicating a YAML-imported plan and later editing either copy's exercises
+would silently overwrite the other copy's data. Hard to notice until data is already corrupt.
+
+**Files changed:** `src/store/planStore.ts`, `src/store/__tests__/planStore.test.ts`
+
+**Risk:** None. The fix only affects three optional fields (`warmup`, `exercises`, `segments`).
+For slots without these fields the spread is identical to before.
+
+**Rollback:** `git revert 52faf8d`
+
+---
+
+### Change 2 — feat: gap weeks in Weekly Activity panel
+
+**Summary:** `computeWeeklyBreakdown` omits weeks with zero activity, so a training break
+appeared as a silent jump between rows in the HistoryPage Weekly Activity panel. Added
+`padWeekGaps(weeks)` to `historyStats.ts` — fills ISO-week holes between the first and
+last active week with zero-count placeholder rows (`isEmpty: true`). `WeeklyActivitySection`
+renders gap rows in muted text with a "No activity" label and a `—` count instead of a number.
+
+**Why it matters:** Gaps in training are now visible at a glance without scrolling the full
+history list. Makes consistency auditing honest: a user returning after two missed weeks
+sees the gap rather than an artificially compressed list.
+
+**Files changed:** `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts`,
+`src/pages/HistoryPage.tsx`
+
+**Risk:** Very low. The gap-filling is applied after the existing computation so the existing
+data model is unchanged. `padWeekGaps` is a pure function with no side effects.
+
+**Rollback:** `git revert d2ac3fb`
+
+---
+
 ## 2026-05-18 (thirty-second pass) — branch `claude/dreamy-mccarthy-THUP4`
 
 Baseline on entry: **686 passing, 0 failing**. Exit state: **698 passing, 0 failing** (+12 tests).

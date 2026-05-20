@@ -1,3 +1,58 @@
+# Feature Review — Gap Weeks in Weekly Activity Panel
+
+Date: 2026-05-20
+Branch: `claude/dreamy-mccarthy-zGJFa`
+Classification: **Keep**
+
+## What was actually built
+
+`padWeekGaps(weeks)` — a pure utility in `historyStats.ts` that fills ISO-week holes
+between the first and last active week with zero-count placeholder rows (`isEmpty: true`).
+The HistoryPage `weeklyBreakdown` useMemo now calls `padWeekGaps` before reversing the
+result, and `WeeklyActivitySection` renders gap rows with muted grey styling, "No activity"
+text in the context column, and a "—" in the count column.
+
+## What assumptions were encoded
+
+- Only gaps between existing active weeks are filled (not before first or after last).
+- `padWeekGaps` requires ≥ 2 active weeks to do anything; a single active week returns unchanged.
+- The `isEmpty?: boolean` field is optional so existing callers of `WeeklyBreakdown` are unaffected.
+
+## What worked well
+
+- Pure function with no side effects — easy to test and reason about.
+- Five tests cover all edge cases (empty, single, consecutive, single gap, multi-gap).
+- The visual treatment (muted text + "—" count) is immediately legible without needing a legend.
+
+## What feels risky or incomplete
+
+- A user with 7 empty weeks and 1 active week gets only 1 row (correct, by design). But
+  if the user expects to see all 8 rows including the 7 empty ones, they'd be confused.
+  Consider clarifying the panel header: "Recent weeks with activity" vs. "Last 8 weeks".
+- The gap rows are always shown (no cap). If a user had a 6-week break, 6 grey rows appear.
+  This is honest but may feel heavy. A collapse-gaps button or "N weeks with no activity"
+  summary row could be friendlier.
+
+## What I should evaluate tomorrow
+
+- Visually check the Weekly Activity section on a real device for a user who has
+  a multi-week gap. Is the grey row density acceptable?
+- Confirm that the section header "Recent Weeks" remains accurate when gap weeks are shown.
+
+## Recommended next steps
+
+- Consider changing "Recent Weeks" to "Last 8 Weeks" to set correct expectations.
+- If gap density becomes a complaint, add an option to collapse consecutive empty rows
+  into a single "N weeks: no activity" summary row.
+
+## Keep / revise / prototype only / reject
+
+**Keep** — the change is small, well-tested, and makes the panel more honest. The visual
+treatment is clear. The gap-filling only adds rows between existing activity; it cannot
+suppress or alter existing data.
+
+---
+
 # Feature Review — Weekly Activity Panel in HistoryPage
 
 Date: 2026-05-18

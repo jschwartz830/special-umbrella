@@ -1,5 +1,50 @@
 # Test Results
 
+## 2026-05-20 (thirty-fourth pass) — branch `claude/dreamy-mccarthy-zGJFa`
+
+**Result: 715 passing, 0 failing** (+7 new tests; 0 previously-failing tests)
+
+### Tests reviewed
+
+All 18 test files reviewed. Baseline on entry: 708 passing, 0 failing.
+
+### Tests added / updated
+
+| File | Change | Count |
+|------|--------|-------|
+| `src/store/__tests__/planStore.test.ts` | 2 new tests for deep-clone isolation in `duplicatePlan` | +2 |
+| `src/lib/__tests__/historyStats.test.ts` | 5 new tests for `padWeekGaps` | +5 |
+
+#### planStore — new deep-clone tests
+
+- `deep-clones exercises array so edits to one plan do not affect the other` — verifies
+  that after `duplicatePlan`, mutating the exercises array in one plan does not touch the
+  other. Checks reference inequality and content equality.
+- `deep-clones segments array so edits to one plan do not affect the other` — same for
+  the `segments` field used by run-type YAML slots.
+
+#### historyStats — new padWeekGaps tests
+
+- Returns input unchanged when fewer than 2 weeks provided
+- Returns unchanged array when no gaps exist between consecutive weeks
+- Inserts empty placeholder rows for missing weeks
+- Returns rows sorted ascending by weekStart regardless of input order
+- Empty placeholder row has all counts at zero
+
+### Important areas still untested
+
+- `TodayPage` and `CalendarPage` page components — no integration or component tests.
+  Both pages are large and the risk of missing UI regressions is real. A future pass
+  could add React Testing Library tests for the most critical flows.
+- `OutcomeModal` and `ActiveWorkoutTracker` components — not tested; complex state.
+- `logOutcomeWithProgression` in outcomeStore — cross-store side effects make this
+  hard to unit-test in isolation. The `planDeleteCleanup` integration test provides
+  some coverage of the store wiring.
+- YAML program parser edge cases — silent coercion of invalid types to `'other'` is
+  not unit-tested (test would need to import and parse a malformed YAML string).
+
+---
+
 ## 2026-05-18 (thirty-second pass) — branch `claude/dreamy-mccarthy-THUP4`
 
 **Result: 698 passing, 0 failing** (+12 new tests; 0 previously-failing tests)
