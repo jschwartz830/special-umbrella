@@ -22,7 +22,16 @@ interface PlanState {
 }
 
 function deepCloneWorkoutSlot(slot: WorkoutSlot): WorkoutSlot {
-  return { ...slot, id: nanoid() }
+  return {
+    ...slot,
+    id: nanoid(),
+    // Deep-clone nested arrays so duplicated plans don't share exercise/segment references.
+    // These fields are only present on YAML-imported slots; the spread above copies them by
+    // reference without this guard, which would make both plans mutate the same objects.
+    ...(slot.warmup    ? { warmup:    slot.warmup.map(e => ({ ...e })) }    : {}),
+    ...(slot.exercises ? { exercises: slot.exercises.map(e => ({ ...e })) } : {}),
+    ...(slot.segments  ? { segments:  slot.segments.map(s => ({ ...s })) }  : {}),
+  }
 }
 
 function deepClonePlanDay(day: PlanDay): PlanDay {

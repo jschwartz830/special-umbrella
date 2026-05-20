@@ -247,4 +247,54 @@ describe('duplicatePlan', () => {
     const result = getState().duplicatePlan('does-not-exist')
     expect(result).toBe('')
   })
+
+  it('deep-clones exercises array so edits to one plan do not affect the other', () => {
+    const planWithExercises: Plan = {
+      ...makePlan('plan-1'),
+      days: [{
+        id: 'd1',
+        label: 'Day 1',
+        slots: [{
+          id: 's1',
+          type: 'weights',
+          name: 'Weights',
+          exercises: [{ exercise: 'Squat', sets: 3, reps: '5', load: '135lb' }],
+        }],
+      }],
+    }
+    usePlanStore.setState({ plans: { 'plan-1': planWithExercises } })
+    const newId = getState().duplicatePlan('plan-1')
+
+    const origSlot = getState().plans['plan-1'].days[0].slots[0]
+    const copySlot = getState().plans[newId].days[0].slots[0]
+
+    // Array references must differ
+    expect(origSlot.exercises).not.toBe(copySlot.exercises)
+    // But content must be equal
+    expect(copySlot.exercises).toEqual(origSlot.exercises)
+  })
+
+  it('deep-clones segments array so edits to one plan do not affect the other', () => {
+    const planWithSegments: Plan = {
+      ...makePlan('plan-1'),
+      days: [{
+        id: 'd1',
+        label: 'Day 1',
+        slots: [{
+          id: 's1',
+          type: 'run',
+          name: 'Run',
+          segments: [{ kind: 'easy', duration: '10m', notes: 'warmup' }],
+        }],
+      }],
+    }
+    usePlanStore.setState({ plans: { 'plan-1': planWithSegments } })
+    const newId = getState().duplicatePlan('plan-1')
+
+    const origSlot = getState().plans['plan-1'].days[0].slots[0]
+    const copySlot = getState().plans[newId].days[0].slots[0]
+
+    expect(origSlot.segments).not.toBe(copySlot.segments)
+    expect(copySlot.segments).toEqual(origSlot.segments)
+  })
 })
