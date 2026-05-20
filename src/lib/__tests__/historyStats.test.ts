@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -1382,5 +1382,79 @@ describe('getUnloggedPastDates', () => {
     const count = countPastUnloggedDays('plan-1', entries, planStart, '2026-05-19', 3)
     const dates = getUnloggedPastDates('plan-1', entries, planStart, '2026-05-19', 3)
     expect(count).toBe(dates.length)
+  })
+})
+
+// ── padWeekGaps ───────────────────────────────────────────────────────────────
+
+function makeWeek(weekStart: string, completed = 0): import('../historyStats').WeeklyBreakdown {
+  return {
+    weekStart,
+    weekEnd: (() => {
+      const [y, m, d] = weekStart.split('-').map(Number)
+      const dt = new Date(Date.UTC(y, m - 1, d + 6))
+      return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`
+    })(),
+    completed,
+    skipped: 0,
+    dayOffs: 0,
+    extras: 0,
+    totalLogged: completed,
+  }
+}
+
+describe('padWeekGaps', () => {
+  it('returns input unchanged when fewer than 2 weeks provided', () => {
+    expect(padWeekGaps([])).toEqual([])
+    const one = [makeWeek('2026-01-05', 3)]
+    expect(padWeekGaps(one)).toEqual(one)
+  })
+
+  it('returns unchanged array when no gaps exist between consecutive weeks', () => {
+    const weeks = [
+      makeWeek('2026-01-05', 3),
+      makeWeek('2026-01-12', 4),
+      makeWeek('2026-01-19', 2),
+    ]
+    const result = padWeekGaps(weeks)
+    expect(result).toHaveLength(3)
+    expect(result.every(w => !w.isEmpty)).toBe(true)
+  })
+
+  it('inserts empty placeholder rows for missing weeks', () => {
+    const weeks = [
+      makeWeek('2026-01-05', 3),
+      // gap: Jan 12 and Jan 19 missing
+      makeWeek('2026-01-26', 2),
+    ]
+    const result = padWeekGaps(weeks)
+    expect(result).toHaveLength(4)
+    expect(result[0].weekStart).toBe('2026-01-05')
+    expect(result[1].weekStart).toBe('2026-01-12')
+    expect(result[1].isEmpty).toBe(true)
+    expect(result[1].completed).toBe(0)
+    expect(result[2].weekStart).toBe('2026-01-19')
+    expect(result[2].isEmpty).toBe(true)
+    expect(result[3].weekStart).toBe('2026-01-26')
+    expect(result[3].isEmpty).toBeUndefined()
+  })
+
+  it('returns rows sorted ascending by weekStart regardless of input order', () => {
+    const weeks = [makeWeek('2026-01-26', 2), makeWeek('2026-01-05', 3)]
+    const result = padWeekGaps(weeks)
+    expect(result[0].weekStart).toBe('2026-01-05')
+    expect(result[result.length - 1].weekStart).toBe('2026-01-26')
+  })
+
+  it('empty placeholder row has all counts at zero', () => {
+    const weeks = [makeWeek('2026-01-05', 3), makeWeek('2026-01-19', 1)]
+    const result = padWeekGaps(weeks)
+    const gap = result.find(w => w.weekStart === '2026-01-12')!
+    expect(gap.completed).toBe(0)
+    expect(gap.skipped).toBe(0)
+    expect(gap.dayOffs).toBe(0)
+    expect(gap.extras).toBe(0)
+    expect(gap.totalLogged).toBe(0)
+    expect(gap.isEmpty).toBe(true)
   })
 })
