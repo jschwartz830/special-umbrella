@@ -1,5 +1,63 @@
 # Implementation Plan
 
+## Pass 34 — 2026-05-20 (branch `claude/dreamy-mccarthy-zGJFa`)
+
+### Observations on entry
+
+- Baseline: **708 passing, 0 failing** — clean baseline inherited from pass 33.
+- **Shallow-clone bug in `deepCloneWorkoutSlot`**: `duplicatePlan` called
+  `{ ...slot, id: nanoid() }` which is a top-level spread. Slots from YAML-imported
+  plans carry `exercises: ExerciseSpec[]`, `segments: RunSegment[]`, and
+  `warmup: ExerciseSpec[]` nested arrays. With a shallow spread both the original and
+  the duplicate share the same array objects. Any in-place mutation of those arrays
+  (possible via future plan-editing code) would corrupt both plans simultaneously.
+- **Gap weeks not visible in Weekly Activity panel**: `computeWeeklyBreakdown` omits
+  weeks with zero activity. A user returning after a two-week break would see the panel
+  jump from week N to week N+3 with no indication of the gap, making training consistency
+  harder to audit honestly.
+- **`syncExerciseHistory` uses `split('_')` without documentation**: relies on the
+  invariant that `nanoid()` never generates underscores and that calendarDate uses
+  hyphens — valid, but silently breaks if the ID format changes. Added a clarifying
+  comment in REVIEW_NOTES; no code change needed (behaviour is correct).
+- No behavioral regressions found. The engine, stores, and core utilities remain solid.
+
+### Decisions
+
+- **Fix `deepCloneWorkoutSlot`** (BEHAVIOURAL BUG): deep-clone `exercises`, `segments`,
+  `warmup` arrays via `map(e => ({ ...e }))`. Only affects the three optional fields;
+  slots without them are unchanged. Zero risk — one additional spread per field when present.
+- **Two new planStore tests**: verify that duplicating a plan with exercises or segments
+  produces independent array references. Catches any future regression of the clone depth.
+- **Feature: `padWeekGaps`** — new exported utility in `historyStats.ts`. Fills ISO-week
+  holes between the first and last active week with zero-count placeholder rows
+  (`isEmpty: true`). Five tests. HistoryPage `weeklyBreakdown` memo now calls it before
+  reversing; `WeeklyActivitySection` renders gap rows with muted styling and "No activity"
+  label.
+
+### Architecture summary (unchanged from pass 33)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`.
+Rotation logic is a pure function in `rotationEngine.ts`. Stats are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function engine with 715 tests across 18 files on exit.
+- All store mutations are well-guarded and tested.
+- Clean separation between engine, store, and UI layers.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,100 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `workoutInstanceId` parsing relies on `nanoid` never generating `_` (holds for
+  base-36 output — documented in REVIEW_NOTES for future maintainers).
+- `outcomeStore` has cross-store calls to `planStore`, `historyStore`, `programStore`,
+  and `exerciseHistoryStore` inside `logOutcomeWithProgression`. Not broken, but
+  the coupling makes unit-testing the outcome store harder.
+
+---
+
 ## Pass 32 — 2026-05-18 (branch `claude/dreamy-mccarthy-THUP4`)
 
 ### Observations on entry

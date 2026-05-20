@@ -22,7 +22,7 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps } from '../lib/historyStats'
 import type { PersonalRecord, WeeklyBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -175,9 +175,9 @@ export function HistoryPage() {
   const weeklyBreakdown = useMemo<WeeklyBreakdown[]>(() => {
     if (filterPlanId === 'all') return []
     const from = format(addDays(new Date(), -55), 'yyyy-MM-dd')
-    return computeWeeklyBreakdown(filterPlanId, filteredEntries, filteredExtras, from, todayKey)
-      .slice()
-      .reverse()
+    const active = computeWeeklyBreakdown(filterPlanId, filteredEntries, filteredExtras, from, todayKey)
+    // Fill gap weeks so training breaks are visible rather than silently skipped.
+    return padWeekGaps(active).reverse()
   }, [filterPlanId, filteredEntries, filteredExtras, todayKey])
 
   function openEdit(entry: HistoryEntry) {
@@ -938,23 +938,25 @@ function WeeklyActivitySection({ weeks }: { weeks: WeeklyBreakdown[] }) {
           {weeks.map(w => {
             const weekLabel = format(parseISO(w.weekStart), 'MMM d')
             const endLabel = format(parseISO(w.weekEnd), 'd')
-            const context = [
-              w.skipped > 0 ? `${w.skipped} skip` : '',
-              w.dayOffs > 0 ? `${w.dayOffs} off` : '',
-              w.extras > 0 ? `+${w.extras} extra` : '',
-            ].filter(Boolean).join(' · ')
+            const context = w.isEmpty
+              ? 'No activity'
+              : [
+                  w.skipped > 0 ? `${w.skipped} skip` : '',
+                  w.dayOffs > 0 ? `${w.dayOffs} off` : '',
+                  w.extras > 0 ? `+${w.extras} extra` : '',
+                ].filter(Boolean).join(' · ')
 
             return (
               <div
                 key={w.weekStart}
                 className="grid grid-cols-[auto_1fr_auto] gap-x-3 px-3 py-2 border-b border-slate-700/30 last:border-0 items-center"
               >
-                <p className="text-xs text-slate-400 tabular-nums whitespace-nowrap">
+                <p className={`text-xs tabular-nums whitespace-nowrap ${w.isEmpty ? 'text-slate-600' : 'text-slate-400'}`}>
                   {weekLabel}–{endLabel}
                 </p>
                 <p className="text-[10px] text-slate-600 truncate">{context}</p>
-                <p className="text-xs font-semibold text-emerald-400 text-right tabular-nums">
-                  {w.completed}
+                <p className={`text-xs font-semibold text-right tabular-nums ${w.isEmpty ? 'text-slate-700' : 'text-emerald-400'}`}>
+                  {w.isEmpty ? '—' : w.completed}
                 </p>
               </div>
             )

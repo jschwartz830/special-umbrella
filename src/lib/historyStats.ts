@@ -504,6 +504,8 @@ export interface WeeklyBreakdown {
   extras: number
   /** completed + skipped + dayOffs + extras */
   totalLogged: number
+  /** True when this row was synthesised by `padWeekGaps` to fill a gap; all counts are 0. */
+  isEmpty?: boolean
 }
 
 /**
@@ -564,10 +566,50 @@ export function computeWeeklyBreakdown(
 }
 
 /** Return the Monday of the ISO week containing `date` (YYYY-MM-DD). */
-function isoWeekStart(date: string): string {
+export function isoWeekStart(date: string): string {
   const [y, m, d] = date.split('-').map(Number)
   const dt = new Date(Date.UTC(y, m - 1, d))
   const day = dt.getUTCDay() // 0=Sun, 1=Mon, ..., 6=Sat
   const mondayOffset = day === 0 ? -6 : 1 - day
   return shiftDay(date, mondayOffset)
+}
+
+/**
+ * Fill any ISO-week gaps in a `computeWeeklyBreakdown` result array with
+ * zero-count placeholder rows. Gaps are filled only between the first and
+ * last week of the provided `weeks` array (not beyond); each missing week
+ * in that span is inserted in chronological order.
+ *
+ * Placeholder rows have all numeric fields set to 0 and an `isEmpty: true`
+ * flag so callers can style them differently. Weeks that already exist in the
+ * input are kept unchanged. The returned array is always sorted ascending by
+ * `weekStart`.
+ *
+ * No-op when `weeks` has fewer than 2 entries.
+ */
+export function padWeekGaps(weeks: WeeklyBreakdown[]): WeeklyBreakdown[] {
+  if (weeks.length < 2) return weeks
+
+  const sorted = [...weeks].sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+  const byStart = new Map(sorted.map(w => [w.weekStart, w]))
+
+  const result: WeeklyBreakdown[] = []
+  let cursor = sorted[0].weekStart
+  const last = sorted[sorted.length - 1].weekStart
+
+  while (cursor <= last) {
+    result.push(byStart.get(cursor) ?? {
+      weekStart: cursor,
+      weekEnd: shiftDay(cursor, 6),
+      completed: 0,
+      skipped: 0,
+      dayOffs: 0,
+      extras: 0,
+      totalLogged: 0,
+      isEmpty: true,
+    })
+    cursor = shiftDay(cursor, 7)
+  }
+
+  return result
 }

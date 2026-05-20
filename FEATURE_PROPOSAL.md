@@ -1,3 +1,85 @@
+# Feature Proposal — Gap Weeks in Weekly Activity Panel
+
+Date: 2026-05-20
+Branch: `claude/dreamy-mccarthy-zGJFa`
+Status: **Implemented this run**
+
+## Feature selected
+
+Gap weeks — fill the Weekly Activity panel with zero-count placeholder rows for any ISO
+weeks between the first and last active week that have no logged entries.
+
+## Why it was selected
+
+`computeWeeklyBreakdown` (pass 31) returns only weeks with activity. If a user took two
+weeks off, the panel jumped from week 4 to week 7 with no indication of the gap. This
+made the panel optimistic and inconsistent: a user with 6 good weeks, then 2 missed weeks,
+then 1 more week would see 7 rows that looked like consecutive progress rather than 6+1
+with a visible break.
+
+The fix was the next logical step after the Weekly Activity panel was wired in pass 32.
+
+## Expected user value
+
+- **Honest consistency view**: gaps are visible at a glance — "I had two missed weeks in
+  April" is legible without scrolling the full history list.
+- **Accountability**: seeing a grey row for a missed week is a mild motivational signal
+  without being heavy-handed.
+- **No learning curve**: gap rows look like ordinary rows but are visually muted, so
+  users understand them intuitively.
+
+## Implementation scope for this run
+
+1. Export `isoWeekStart` from `historyStats.ts` (was private) for use by callers.
+2. Add `WeeklyBreakdown.isEmpty?: boolean` optional flag.
+3. Add `padWeekGaps(weeks: WeeklyBreakdown[]): WeeklyBreakdown[]` — pure utility that
+   fills holes between the first and last week with zero-count placeholder rows.
+4. 5 unit tests for `padWeekGaps` in `historyStats.test.ts`.
+5. Update `weeklyBreakdown` useMemo in `HistoryPage` to call `padWeekGaps` before reversing.
+6. Update `WeeklyActivitySection` to render gap rows with muted styling and "No activity" text.
+
+## Assumptions being made
+
+- Gap rows are only filled between the first and last active week in the displayed range,
+  not before the first or after the last active week.
+- The 8-week window is unchanged; gap filling just makes existing gaps visible.
+- "No activity" text and "—" count are clear enough for users — no tooltip needed.
+
+## Open product / UX decisions
+
+1. Should gap rows be rendered at all for very long gaps (e.g., 6 empty rows in a row)?
+   Currently shown; could be capped at N to avoid excessive grey rows.
+2. Clicking a gap row could navigate to Calendar to that week. Not implemented.
+3. Should the current week appear as a gap row if today is mid-week and no entry exists yet?
+   Currently: yes, if the current week is inside the range and has no activity yet.
+
+## Architecture / schema impact
+
+`WeeklyBreakdown` gains an optional `isEmpty?: boolean` field. No store changes, no
+localStorage changes, no breaking changes to existing callers (the field is optional).
+
+## Risks
+
+- A user with only one active week in the 8-week window gets a single row (no change,
+  since `padWeekGaps` requires ≥ 2 weeks to fill).
+- A user whose only active week is the most recent one also gets a single row (no change).
+- Very inactive users (only 2 active weeks in 8 weeks) may see up to 5 gap rows, which
+  could feel verbose. Low probability; and the visual cue is still useful.
+
+## Rollback strategy
+
+`git revert d2ac3fb` reverts `historyStats.ts`, `historyStats.test.ts`, and
+`HistoryPage.tsx`. No data migration, no store schema changes, no downstream effects.
+
+## What is intentionally not being built yet
+
+- Filling gaps before the first active week or after the last active week
+- Clicking a gap row to navigate to Calendar
+- Configurable gap row appearance (e.g., a "rest block" label vs. "No activity")
+- Cross-plan gap visibility
+
+---
+
 # Feature Proposal — Weekly Activity Panel in HistoryPage
 
 Date: 2026-05-18
