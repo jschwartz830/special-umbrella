@@ -12,14 +12,14 @@ import { useProgramStore } from './programStore'
 import { usePlanStore } from './planStore'
 import { useHistoryStore } from './historyStore'
 import { useExerciseHistoryStore } from './exerciseHistoryStore'
+import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 
 /** Resolve plan/workout name context and sync a weights outcome to exerciseHistoryStore. */
 function syncExerciseHistory(outcome: WorkoutOutcome): void {
   if (!outcome.weightsActual?.exercises?.length) return
-  const parts = outcome.workoutInstanceId.split('_')
-  const planId = parts[0]
-  const calendarDate = parts[1]
-  if (!planId || !calendarDate) return
+  const parsed = parseWorkoutInstanceId(outcome.workoutInstanceId)
+  if (!parsed) return
+  const { planId, calendarDate } = parsed
 
   const plan = usePlanStore.getState().plans[planId]
   const planName = plan?.name ?? null
@@ -133,7 +133,7 @@ export const useOutcomeStore = create<OutcomeState>()(
         }
 
         // 3. Evaluate program-level progression rules (YAML-imported plans)
-        const planId = outcome.workoutInstanceId.split('_')[0]
+        const planId = parseWorkoutInstanceId(outcome.workoutInstanceId)?.planId
         if (!planId) return
 
         const programStore = useProgramStore.getState()
