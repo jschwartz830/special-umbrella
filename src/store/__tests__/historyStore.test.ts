@@ -776,4 +776,27 @@ describe('markDaysAsOff', () => {
     expect(plan2Entries).toHaveLength(1)
     expect(plan2Entries[0].action).toBe('complete')
   })
+
+  it('all batch entries share the same createdAt timestamp', () => {
+    getState().markDaysAsOff('plan-1', ['2026-01-01', '2026-01-02', '2026-01-03'])
+    const entries = getState().entries.filter(e => e.planId === 'plan-1')
+    expect(entries).toHaveLength(3)
+    const timestamps = entries.map(e => e.createdAt)
+    expect(new Set(timestamps).size).toBe(1)
+  })
+
+  it('replaces all existing entries in the batch with a single set call (no partial state)', () => {
+    // Pre-seed three existing entries across two plans
+    getState().addEntry({ planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete' })
+    getState().addEntry({ planId: 'plan-1', calendarDate: '2026-01-02', planDayIndex: 1, action: 'skip' })
+    getState().addEntry({ planId: 'plan-2', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete' })
+    getState().markDaysAsOff('plan-1', ['2026-01-01', '2026-01-02'])
+    const plan1 = getState().entries.filter(e => e.planId === 'plan-1')
+    expect(plan1).toHaveLength(2)
+    expect(plan1.every(e => e.action === 'day_off')).toBe(true)
+    // plan-2 should be untouched
+    const plan2 = getState().entries.filter(e => e.planId === 'plan-2')
+    expect(plan2).toHaveLength(1)
+    expect(plan2[0].action).toBe('complete')
+  })
 })

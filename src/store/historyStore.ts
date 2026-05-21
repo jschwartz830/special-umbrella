@@ -243,9 +243,23 @@ export const useHistoryStore = create<HistoryState>()(
       },
 
       markDaysAsOff(planId, dates) {
-        for (const calendarDate of dates) {
-          get().addEntry({ planId, calendarDate, planDayIndex: undefined, action: 'day_off' })
-        }
+        if (dates.length === 0) return
+        const now = new Date().toISOString()
+        const incoming: HistoryEntry[] = dates.map(calendarDate => ({
+          id: nanoid(),
+          planId,
+          calendarDate,
+          planDayIndex: undefined,
+          action: 'day_off',
+          createdAt: now,
+        }))
+        set(s => {
+          const dateSet = new Set(dates)
+          const filtered = s.entries.filter(
+            e => !(e.planId === planId && dateSet.has(e.calendarDate)),
+          )
+          return { entries: [...filtered, ...incoming] }
+        })
       },
     }),
     { name: 'wpt_history' },
