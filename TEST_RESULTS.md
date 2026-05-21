@@ -1729,3 +1729,70 @@ Test Files  18 passed (18)
 5. **CalendarPage retroactive logging flow**
 6. **PlanBuilderPage unsaved-changes guard**
 7. **TodayPage action handlers** (startWorkout, confirmPrimary, etc.)
+
+---
+
+## Pass 35 — 2026-05-21 — Branch `claude/dreamy-mccarthy-w8aCb`
+
+### Test run summary
+
+**Baseline entering this pass:** 715 passing, 0 failing  
+**Exit state:** 726 passing, 0 failing  
+**Net new tests:** +11
+
+Command: `npm test -- --run`  
+Runner: Vitest  
+Duration: ~8s
+
+### New test files
+
+| File | Tests | Description |
+|------|-------|-------------|
+| `src/lib/__tests__/workoutInstanceId.test.ts` | 9 | `parseWorkoutInstanceId` utility — all input shapes |
+
+### Modified test files
+
+| File | Tests added | Tests changed |
+|------|-------------|---------------|
+| `src/store/__tests__/historyStore.test.ts` | +2 | 0 |
+
+### Test details
+
+#### `workoutInstanceId.test.ts` (9 new)
+
+| Test | Covers |
+|------|--------|
+| parses a standard instanceId (planId without underscores) | Happy path |
+| parses an instanceId where planId contains underscores | Core bug scenario |
+| parses an extra workout instanceId (planId_date_extra_extraId) | Extra workout IDs |
+| parses an extra instanceId where planId contains underscores | Combined edge case |
+| returns null for a string without a YYYY-MM-DD date | Null path |
+| returns null for an empty string | Null path |
+| returns null when date is present but no leading underscore separator | Null path (date at pos 0) |
+| returns the FIRST date when multiple date-like substrings exist | Multiple dates |
+| works with a real nanoid-style planId (21 chars, may include hyphen) | Real-world IDs |
+
+#### `historyStore.test.ts` (2 new, in `markDaysAsOff` block)
+
+| Test | Covers |
+|------|--------|
+| all batch entries share the same createdAt timestamp | Batching guarantee |
+| replaces all existing entries in the batch with a single set call | Atomicity + cross-plan isolation |
+
+### Coverage impact
+
+| Change | Test impact |
+|--------|-------------|
+| `parseWorkoutInstanceId` utility | 9 unit tests covering all input shapes |
+| `markDaysAsOff` single-`set()` rewrite | 2 new tests for timestamp and atomicity guarantees |
+| `upcomingSessionCounts` in TodayPage | UI-only wiring; covered by existing `countPlanDayCompletions` tests |
+
+### Important logic still untested (carry-over)
+
+1. **`moveOutcome` no-op guard** — no test for missing source. Recommended for pass 35+.
+2. **`importOutcomes`** — no unit tests.
+3. **`removeProgressionStates`** — no unit tests.
+4. **Double-day rotation behavior**
+5. **CalendarPage retroactive logging flow**
+6. **PlanBuilderPage unsaved-changes guard**
+7. **TodayPage action handlers** (startWorkout, confirmPrimary, etc.)

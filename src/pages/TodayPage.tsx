@@ -302,6 +302,17 @@ export function TodayPage() {
     ? countPlanDayCompletions(plan.id, primaryPlanDayIndex, planEntries, today)
     : undefined
 
+  // Session counts for each upcoming day — same context shown on upcoming cards.
+  const upcomingSessionCounts = useMemo(() => {
+    if (!plan) return {} as Record<string, number>
+    return Object.fromEntries(
+      upcoming.map(rd => [
+        rd.calendarDate,
+        countPlanDayCompletions(plan.id, rd.planDayIndex, planEntries),
+      ]),
+    )
+  }, [plan, upcoming, planEntries])
+
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     setActiveTrackedExercises(exercises)
     setActiveTrackedDurationMin(Math.round(meta.totalElapsedSeconds / 60) || null)
@@ -789,7 +800,12 @@ export function TodayPage() {
                     </p>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <WorkoutDayCard resolved={rd} planId={plan?.id} onClick={() => setLoggingUpcoming({ rd })} />
+                    <WorkoutDayCard
+                      resolved={rd}
+                      planId={plan?.id}
+                      sessionCount={upcomingSessionCounts[rd.calendarDate]}
+                      onClick={() => setLoggingUpcoming({ rd })}
+                    />
                     {upcomingNote && (
                       <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
                         <TrendingUp size={10} />{upcomingNote}

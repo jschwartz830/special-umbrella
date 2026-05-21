@@ -1359,3 +1359,80 @@ No new dependencies or stores. Changes are confined to:
 - Auto-derive run pace from distance + duration — deferred as product decision.
 - Auto-derive swim pace from distance + duration — deferred, same rationale.
 - Wire `computePlanStreak` into TodayPage or HistoryPage stat display.
+
+---
+
+## Pass 35 — Overnight Hardening & Feature Polish
+
+**Date:** 2026-05-21  
+**Branch:** `claude/dreamy-mccarthy-w8aCb`  
+**Goal:** Audit codebase for bugs and edge cases; strengthen tests; ship one user-facing feature improvement.
+
+### Findings
+
+**Bug 1 — Fragile `workoutInstanceId` parsing (HIGH CONFIDENCE)**
+
+Both `exerciseHistoryStore.ts` and `outcomeStore.ts` parsed `workoutInstanceId` by calling `split('_')[0]`/`[1]` to extract `planId` and `calendarDate`. This is incorrect: nanoid's default alphabet includes `_`, so planIds like `abc_def_gh` produce wrong `planId` and `calendarDate` values. The correct approach is to search for the rightmost date pattern (`YYYY-MM-DD`) then extract everything before the `_date` separator as `planId`.
+
+**Bug 2 — `markDaysAsOff` fired N separate `set()` calls (MEDIUM CONFIDENCE)**
+
+The original implementation looped over dates calling `get().addEntry()` once per date. Each `addEntry` call invokes `set()`, triggering a Zustand subscriber notification and a React re-render. Logging 7 catch-up days would fire 7 re-renders. Batching into a single `set()` is strictly better: one re-render, one localStorage write, and all entries get the same `createdAt` timestamp (useful for identifying batch operations).
+
+**Feature gap — Upcoming cards show no session count**
+
+`WorkoutDayCard` already accepted a `sessionCount` prop (renders an "×N done" badge), and `countPlanDayCompletions` already existed in `historyStats.ts`. The upcoming cards in TodayPage passed `sessionCount={undefined}`, leaving the badge invisible for repeat workout days. Adding a `useMemo` to compute per-day counts required ~10 lines of code with no new dependencies.
+
+### Changes Made
+
+#### 1. `src/lib/workoutInstanceId.ts` (NEW)
+
+New pure utility that parses a `workoutInstanceId` to `{ planId, calendarDate }` using a regex search for `YYYY-MM-DD` rather than a fragile `split`. Returns `null` on malformed input.
+
+#### 2. `src/lib/__tests__/workoutInstanceId.test.ts` (NEW)
+
+9 tests covering: simple IDs, planIds with underscores, extra workout IDs, extra IDs with underscore planIds, no-date strings, empty strings, date-at-position-0, multiple date-like substrings, real nanoid-style IDs with hyphens.
+
+#### 3. `src/store/outcomeStore.ts` (MODIFIED)
+
+Replaced two `split('_')` usages in `syncExerciseHistory` and `logOutcomeWithProgression` with `parseWorkoutInstanceId`.
+
+#### 4. `src/store/exerciseHistoryStore.ts` (MODIFIED)
+
+Replaced `split('_')` usage in `upsertFromOutcome` with `parseWorkoutInstanceId`. Removed outdated comment claiming planIds are base36 (no underscores).
+
+#### 5. `src/store/historyStore.ts` (MODIFIED)
+
+Rewrote `markDaysAsOff` to use a single `set()` call. Uses a `Set` for O(1) date lookup, builds all entries in a single `map`, and removes existing entries for the same `(planId, date)` pairs in the same `set()`.
+
+#### 6. `src/store/__tests__/historyStore.test.ts` (MODIFIED)
+
+Added 2 new tests to the `markDaysAsOff` block:
+- All batch entries share the same `createdAt` timestamp
+- Cross-plan isolation and replacement semantics under single `set()`
+
+#### 7. `src/pages/TodayPage.tsx` (MODIFIED)
+
+Added `upcomingSessionCounts` useMemo computing `countPlanDayCompletions` for each upcoming day. Passed `sessionCount` to each upcoming `WorkoutDayCard`.
+
+### Commits
+
+| # | Description | Files |
+|---|---|---|
+| 1 | fix: robust workoutInstanceId parsing | workoutInstanceId.ts (new), workoutInstanceId.test.ts (new), outcomeStore.ts, exerciseHistoryStore.ts |
+| 2 | fix: batch markDaysAsOff into single set() call | historyStore.ts, historyStore.test.ts |
+| 3 | feat: show session count on upcoming workout cards | TodayPage.tsx |
+
+### Exit state
+
+**726 passing, 0 failing** (+18 tests from Pass 34 baseline, +11 from this pass).
+
+### Carry-over open items
+
+- Streak display is "strict" (0 until today is logged); product decision needed.
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX).
+- Narrow Zustand selectors in CalendarPage (performance, not urgent).
+- Document progression system migration path.
+- Expression evaluator should surface errors to UI for malformed progression rules.
+- Auto-derive run pace from distance + duration — deferred as product decision.
+- Auto-derive swim pace from distance + duration — deferred, same rationale.
+- Wire `computePlanStreak` into TodayPage or HistoryPage stat display.

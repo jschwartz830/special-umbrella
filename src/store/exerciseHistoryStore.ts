@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { nanoid } from '../engine/rotationEngine'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 
 // ── Per-set record ────────────────────────────────────────────────────────────
 
@@ -102,12 +103,9 @@ export const useExerciseHistoryStore = create<ExerciseHistoryState>()(
         const exercises = outcome.weightsActual?.exercises
         if (!exercises || exercises.length === 0) return
 
-        // workoutInstanceId is `${planId}_${calendarDate}[_extra_${extraId}]`
-        // planIds are base36 (no underscores), calendarDate is YYYY-MM-DD
-        const parts = outcome.workoutInstanceId.split('_')
-        const planId = parts[0] || null
-        const calendarDate = parts[1] || null
-        if (!calendarDate) return
+        const parsed = parseWorkoutInstanceId(outcome.workoutInstanceId)
+        if (!parsed) return
+        const { planId, calendarDate } = parsed
 
         const now = new Date().toISOString()
         const newRecords: ExerciseSessionRecord[] = exercises.map(ex => {

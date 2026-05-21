@@ -1234,3 +1234,52 @@ Remove `getUnloggedPastDates` from historyStats (keep `countPastUnloggedDays`).
 Remove `markDaysAsOff` from historyStore interface and implementation.
 Revert TodayPage nudge JSX to original `<button onClick=navigate('/calendar')>`.
 No data migration needed — existing history entries are unaffected.
+
+---
+
+## Pass 35 Feature Proposal — Session count on upcoming workout cards
+
+**Date:** 2026-05-21  
+**Branch:** `claude/dreamy-mccarthy-w8aCb`  
+**Status:** Implemented
+
+### Problem
+
+When TodayPage shows upcoming workout days (the next N days in the rotation), each `WorkoutDayCard` renders without any indication of how many times that workout has been done before. Users who follow repeating rotation plans have no quick visual confirmation that "I've done this one 4 times" before the workout shows up again.
+
+The same gap existed for the today card in an earlier pass (Pass 21) and was closed then — this proposal closes the same gap for upcoming cards.
+
+### Existing infrastructure
+
+- `WorkoutDayCard` already accepts an optional `sessionCount: number` prop. When provided and non-zero, it renders a muted "×N done" badge below the workout name.
+- `countPlanDayCompletions(planId, planDayIndex, entries)` already exists in `src/lib/historyStats.ts` and is tested. Returns the number of `complete` entries for the given `(planId, planDayIndex)` pair.
+- The today card in `TodayPage` already uses both. The upcoming cards did not.
+
+### Implementation
+
+Added `upcomingSessionCounts` `useMemo` in TodayPage:
+
+```typescript
+const upcomingSessionCounts = useMemo(() => {
+  if (!plan) return {} as Record<string, number>
+  return Object.fromEntries(
+    upcoming.map(rd => [
+      rd.calendarDate,
+      countPlanDayCompletions(plan.id, rd.planDayIndex, planEntries),
+    ]),
+  )
+}, [plan, upcoming, planEntries])
+```
+
+Passed `sessionCount={upcomingSessionCounts[rd.calendarDate]}` to each upcoming `WorkoutDayCard`.
+
+### Trade-offs
+
+- **No new dependencies** — pure wiring of existing logic.
+- **No new tests needed** — `countPlanDayCompletions` is already tested; the memo is a straight delegation.
+- **Visual impact** — badge only appears when count > 0. New plans and single-pass workouts show no badge (no visual noise).
+- **Memo complexity** — `upcomingSessionCounts` depends on `[plan, upcoming, planEntries]` — the same deps already used by nearby memos.
+
+### Rollback
+
+Remove `upcomingSessionCounts` memo. Remove `sessionCount={upcomingSessionCounts[rd.calendarDate]}` from the upcoming `WorkoutDayCard` JSX. No data changes.
