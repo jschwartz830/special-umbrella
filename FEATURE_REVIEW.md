@@ -1036,3 +1036,42 @@ iterations), this is below any perceptible threshold. Batching into a single
 
 **Keep** — the feature is minimal, correct, and directly addresses the UX gap
 identified during the stall nudge audit. Risk is low; rollback is trivial.
+
+---
+
+## Pass 35 Feature Review — Session count on upcoming workout cards
+
+**Date:** 2026-05-21  
+**Branch:** `claude/dreamy-mccarthy-w8aCb`  
+**Proposal in:** FEATURE_PROPOSAL.md (pass 35 entry)
+
+### Summary
+
+Wires `countPlanDayCompletions` to the upcoming `WorkoutDayCard` instances on TodayPage by adding a single `useMemo`. The `sessionCount` prop and the helper function both pre-existed; this change connects them.
+
+### Review
+
+**Correctness:** The memo computes `countPlanDayCompletions` for each upcoming day, keyed by `calendarDate`. This is correct because each `ResolvedDay` in `upcoming` has a unique `calendarDate`, so the key is unambiguous. The helper itself is deterministic and fully tested.
+
+**Performance:** The memo has appropriate deps `[plan, upcoming, planEntries]`. `countPlanDayCompletions` is O(n) over `planEntries`. For a typical user with ≤1000 history entries, this is negligible. The memo re-runs only when the plan, upcoming list, or entries change — not on every keystroke or timer tick.
+
+**UI:** The "×N done" badge already existed and was shown on the today card. Extending it to upcoming cards is UX-consistent. The badge is muted/secondary styling, so it does not compete visually with the workout name.
+
+**Tests:** No new tests needed. The added code is a composition of two already-tested pieces (`countPlanDayCompletions` and `WorkoutDayCard.sessionCount`). Adding integration tests for this would be disproportionate to the change size.
+
+**Prior art gap:** The Pass 21 feature proposal noted "The upcoming cards are not yet wired up" as a carry-over item. This pass closes it.
+
+### Risks
+
+**Incorrect count if planDayIndex is undefined** — `countPlanDayCompletions` receives `planDayIndex` which can be undefined for `day_off` plan days. The helper handles this correctly: `undefined` planDayIndex entries are not counted (the filter `e.planDayIndex === planDayIndex` is always false for undefined). Upcoming day_off slots will show no badge, which is correct.
+
+**No explicit risk from stale memo** — All three dependencies (`plan`, `upcoming`, `planEntries`) are derived from store subscriptions and will update reactively. No risk of showing stale counts.
+
+### What was not built
+
+- Badge on CalendarPage's `WorkoutDayCard` instances — a separate concern, out of scope.
+- Animated entry for the badge — not warranted for informational display.
+
+### Verdict
+
+**Keep** — minimal code change (~10 lines), no new dependencies, closes a known feature gap, backed by existing tests on both sides of the wire.

@@ -3321,3 +3321,53 @@ branches on `unloggedDates.length === 1` for grammatical correctness.
 ### Dependencies added
 
 None.
+
+---
+
+## Pass 35 — 2026-05-21 — Branch `claude/dreamy-mccarthy-w8aCb`
+
+### Executive summary
+
+Three improvements shipped: two bug fixes targeting silent data corruption, and one feature wiring an existing prop that was always available but never passed. All changes are minimal, targeted, and fully backward-compatible.
+
+### Bugs found and fixed
+
+**Bug 1 — Fragile `workoutInstanceId` parsing** *(HIGH severity, HIGH confidence)*
+
+Root cause: `split('_')[0]` assumed planIds contain no underscores. nanoid's default alphabet includes `_`, so planIds can and do contain underscores. The symptom: exercise history records for any plan with an underscore in its ID would be stored under the wrong `planId`, producing silently corrupt PRs and broken progression state lookups.
+
+The bug had been present since the exercise history store was introduced. A prior implementation plan note (Pass 34) had incorrectly marked this as "safe" — this pass corrects that assessment.
+
+Fix: New `parseWorkoutInstanceId` utility in `src/lib/workoutInstanceId.ts`. Regex-based date extraction avoids any splitting ambiguity. Placed in `src/lib/` to avoid circular imports between `outcomeStore` and `exerciseHistoryStore`.
+
+**Bug 2 — `markDaysAsOff` N-rerender batch** *(LOW severity, HIGH confidence)*
+
+Root cause: Loop of `get().addEntry()` calls produced N Zustand `set()` notifications. For the 7-day catch-up window this was sub-perceptible, but it also caused each entry in the batch to potentially have a different `createdAt` timestamp depending on millisecond boundaries.
+
+Fix: Single `set()` call with pre-built entries, shared `now` timestamp, and a `Set<string>` for O(1) dedup. The `FEATURE_REVIEW.md` for Pass 34 noted this as "below perceptible threshold" — that was accurate for performance, but the timestamp skew was a subtle data quality issue worth fixing.
+
+### Feature shipped
+
+**Session count on upcoming workout cards** *(LOW risk)*
+
+`WorkoutDayCard.sessionCount` and `countPlanDayCompletions` both existed. The today-card already used them (added in Pass 21). The upcoming-cards section was overlooked. A `useMemo` computing counts for all upcoming days wires the two together.
+
+### Items reviewed but not changed
+
+- `moveOutcome` no-op guard — still no unit tests. Carry-over from Pass 33–34.
+- `importOutcomes` — still untested. Carry-over.
+- `removeProgressionStates` — still untested. Carry-over.
+- `computePlanStreak` — still not wired to UI. Carry-over.
+
+### Remaining open items
+
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX)
+- Narrow Zustand selectors in CalendarPage (performance, not urgent)
+- Document progression system migration path
+- Expression evaluator should surface errors to UI for malformed progression rules
+- `moveOutcome` / `importOutcomes` / `removeProgressionStates` — missing unit tests
+- Wire `computePlanStreak` into TodayPage or HistoryPage stat display
+
+### Dependencies added
+
+None.

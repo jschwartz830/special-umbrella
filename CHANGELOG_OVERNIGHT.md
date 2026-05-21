@@ -2910,3 +2910,60 @@ New action `markDaysAsOff(planId: string, dates: string[])` batch-logs a
 **Files changed**:
 - `src/lib/__tests__/historyStats.test.ts` — +6 tests
 - `src/store/__tests__/historyStore.test.ts` — +4 tests
+
+---
+
+## 2026-05-21 (thirty-fifth pass) — branch `claude/dreamy-mccarthy-w8aCb`
+
+Baseline on entry: **715 passing, 0 failing**. Exit state: **726 passing, 0 failing** (+11 tests).
+
+---
+
+### Change 1 — fix: robust `workoutInstanceId` parsing
+
+**Commit:** `07ad979`  
+**Files:** `src/lib/workoutInstanceId.ts` (new), `src/lib/__tests__/workoutInstanceId.test.ts` (new), `src/store/outcomeStore.ts`, `src/store/exerciseHistoryStore.ts`
+
+**Problem:** Both `outcomeStore.ts` (two call sites: `syncExerciseHistory` and `logOutcomeWithProgression`) and `exerciseHistoryStore.ts` parsed `workoutInstanceId` strings by splitting on `_` and taking index 0 as `planId`, index 1 as `calendarDate`. The nanoid default alphabet includes `_` (A–Z a–z 0–9 `_` `-`), so a plan whose ID contains an underscore (e.g. `abc_def_gh`) would be parsed as `planId="abc"` and `calendarDate="def"` — silently corrupting exercise history records and blocking progression state lookups.
+
+**Fix:** Created `src/lib/workoutInstanceId.ts` with a `parseWorkoutInstanceId` function that uses a regex match on `\d{4}-\d{2}-\d{2}` to find the date, then takes everything before `_date` as the planId. Returns `null` for malformed input. Replaced all three `split('_')` call sites.
+
+**Tests added:** 9 new tests in `src/lib/__tests__/workoutInstanceId.test.ts` covering: simple IDs, planIds with underscores, extra workout IDs, extra IDs with underscore planIds, no-date strings, empty strings, date-at-position-0, multiple date-like substrings, and real nanoid-style IDs.
+
+**Risk:** Low. The new parser produces the same results as the old one for planIds without underscores (all existing data). For planIds with underscores (latent bug), behavior changes from silently wrong to correct.
+
+**Rollback:** `git revert 07ad979`
+
+---
+
+### Change 2 — fix: batch `markDaysAsOff` into a single `set()` call
+
+**Commit:** `851032e`  
+**Files:** `src/store/historyStore.ts`, `src/store/__tests__/historyStore.test.ts`
+
+**Problem:** `markDaysAsOff(planId, dates)` looped over dates calling `get().addEntry()` for each one. Each `addEntry` call invokes Zustand `set()`, triggering a subscriber notification, a React re-render, and a localStorage write. A 7-day catch-up batch fired 7 re-renders. Additionally, entries built in different iterations of the loop could get different `createdAt` timestamps if the loop straddled a millisecond boundary.
+
+**Fix:** Rewrote `markDaysAsOff` to build all new `HistoryEntry` objects with a single shared `now` timestamp, then issue one `set()` call that atomically filters out stale entries for the same `(planId, date)` pairs and appends the batch. Uses a `Set<string>` for O(1) date membership checks.
+
+**Tests added:** 2 new tests:
+- All batch entries share the same `createdAt` timestamp
+- Cross-plan isolation and replacement semantics under a single `set()` call
+
+**Risk:** Low. Behavior is identical to before except: (1) all entries get the same timestamp, (2) only one re-render fires. Both are improvements.
+
+**Rollback:** `git revert 851032e`
+
+---
+
+### Change 3 — feat: session count on upcoming workout cards
+
+**Commit:** `922464d`  
+**Files:** `src/pages/TodayPage.tsx`
+
+**Problem:** `WorkoutDayCard` already supported a `sessionCount` prop that renders an "×N done" badge indicating how many times a plan day has been completed. The upcoming-day cards in TodayPage always passed `sessionCount={undefined}`, so users never saw the badge for repeat workout days in the upcoming section.
+
+**Fix:** Added a `useMemo` (`upcomingSessionCounts`) that calls `countPlanDayCompletions(planId, planDayIndex, planEntries)` for each upcoming day and passes the result as `sessionCount` to each `WorkoutDayCard`. The helper and the prop both already existed; this change wires them together.
+
+**Risk:** Very low. `countPlanDayCompletions` is a pure function with existing tests. The badge shows 0 for new plans (no visual noise) and only becomes meaningful after the first completion of any rotation day.
+
+**Rollback:** `git revert 922464d`
