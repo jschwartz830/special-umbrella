@@ -1,5 +1,45 @@
 # Test Results
 
+## 2026-05-22 (thirty-sixth pass) — branch `claude/dreamy-mccarthy-9sH8T`
+
+**Result: 732 passing, 0 failing** (+6 new tests; 0 previously-failing tests)
+
+### Tests reviewed
+
+All 19 test files reviewed on entry. No failures. Baseline: 726 passing.
+
+### Tests added / updated
+
+**`src/store/__tests__/outcomeStore.test.ts`** — new `importOutcomes` describe block (+6 tests):
+- `stores all incoming outcomes keyed by workoutInstanceId`
+- `is a no-op for an empty array`
+- `overwrites an existing outcome for the same instanceId`
+- `does not affect unrelated existing outcomes`
+- `syncs exercise history records for outcomes that include weights data`
+- `does not create exercise history for outcomes without weights data`
+
+Also added `useExerciseHistoryStore` import and `beforeEach` reset for the exercise store.
+
+### Results
+
+| File | Before | After | Change |
+|------|--------|-------|--------|
+| outcomeStore.test.ts | 19 tests | 25 tests | +6 |
+| **All files** | **726** | **732** | **+6** |
+
+### Important areas still untested
+
+- **TodayPage catch-up confirmation modal** — React component testing is out of scope
+  for this project. Manual verification required.
+- **`outcomeStore.importOutcomes` with non-empty plan store** — The new tests run with
+  an empty plan store (so `planName` is null). The context-lookup path when a matching
+  plan exists is tested indirectly by the live logging path (`logOutcomeWithProgression` →
+  `syncExerciseHistory`), which the existing tests cover.
+- **`CalendarPage` and `HistoryPage` UI flows** — No React component tests exist for
+  these pages. Engine and store logic are well-covered; page-level integration is not.
+
+---
+
 ## 2026-05-20 (thirty-fourth pass) — branch `claude/dreamy-mccarthy-zGJFa`
 
 **Result: 715 passing, 0 failing** (+7 new tests; 0 previously-failing tests)
