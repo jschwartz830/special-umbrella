@@ -1291,6 +1291,64 @@ reviewability. Bug fix first (item 1), feature additive on top (item 2).
 
 ---
 
+## Pass 36 — 2026-05-22 (branch `claude/dreamy-mccarthy-9sH8T`)
+
+### Observations on entry
+
+- Baseline: **726 passing, 0 failing** — clean baseline inherited from pass 35.
+- **`outcomeStore.importOutcomes` drops exercise history context** (DATA QUALITY BUG).
+  When outcomes are imported via CSV, `upsertFromOutcome` was called without the
+  `{ planName, workoutName }` context. Resulting exercise history records had
+  `planName: null` and `workoutName: null`. The live logging path (`syncExerciseHistory`)
+  correctly resolves these from store state. Import should do the same.
+- **"Mark N as Day Off" bulk action has no confirmation** (UX RISK).
+  The quick catch-up button added in pass 33 immediately applies a batch action
+  across up to 7 past days on a single tap. No prior pass added a confirmation step.
+  A user who taps it accidentally has no undo mechanism short of individually editing
+  each date in the Calendar page.
+- No new regressions found. All 726 prior tests remain green.
+
+### Decisions
+
+1. **Fix `outcomeStore.importOutcomes` context** — route through `syncExerciseHistory`
+   instead of calling `upsertFromOutcome` directly. One-line change. Add 6 tests.
+2. **Feature: catch-up confirmation modal** — intercept the "Mark N as Day Off" button
+   with a modal that lists the affected dates and requires explicit confirmation. No
+   schema changes, no new stores, easy to revert.
+
+### Architecture summary (unchanged)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores.
+Rotation logic is a pure function in `rotationEngine.ts`. All previous PRs merged.
+
+### Key strengths (unchanged)
+
+- 732-test suite stable across 36 passes; no regressions.
+- Pure-function rotation engine with comprehensive coverage.
+- Consistent `removeOutcome` → `moveOutcome` pattern across all three pages.
+
+### Key risks (carried forward)
+
+- Streak display is "strict" (0 until today is logged); product decision needed.
+- Plan builder UI should validate `duration.value > 0` (no crash, just bad UX).
+- Narrow Zustand selectors in CalendarPage (performance, not urgent).
+- Expression evaluator should surface errors to UI for malformed rules.
+- `computePlanStreak` computed but not yet wired into any UI.
+
+### Prioritized plan (executed)
+
+| Priority | Item | Risk | Status |
+|----------|------|------|--------|
+| P0 Fix | `outcomeStore.importOutcomes` drops exercise context | Very low | ✅ Done |
+| P0 Test | 6 tests for importOutcomes | None | ✅ Done |
+| P1 Feature | Catch-up confirmation modal | Low | ✅ Done |
+
+### Exit state
+
+**732 passing, 0 failing** (+6 tests from baseline).
+
+---
+
 ## Pass 33 — 2026-05-19 (branch `claude/dreamy-mccarthy-I8ssV`)
 
 ### Observations on entry

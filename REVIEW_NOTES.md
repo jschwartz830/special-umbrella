@@ -1,5 +1,105 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-22 (thirty-sixth pass) — branch `claude/dreamy-mccarthy-9sH8T`
+
+### Executive summary
+
+1. **What changed:** Fixed a data quality gap in CSV import (`outcomeStore.importOutcomes`
+   now carries plan/workout context to exercise history records). Added a confirmation
+   modal before the "Mark N as Day Off" bulk action in TodayPage.
+2. **Highest confidence:** The `importOutcomes` fix is a one-line change that routes
+   through the existing `syncExerciseHistory` helper — the same path used by live
+   logging. Zero risk of regression.
+3. **Slightly riskier:** The confirmation modal adds a state variable and a new Modal
+   render to TodayPage. The logic is simple but the page is already large; test manually.
+4. **Review first:** The catch-up confirmation modal UX — verify the date list renders
+   correctly, the confirmation fires `markDaysAsOff` as expected, and cancel leaves no
+   state changes.
+
+---
+
+### Biggest issues found
+
+1. **`outcomeStore.importOutcomes` dropped exercise history context** — All prior passes
+   missed this. After CSV import, exercise records in `exerciseHistoryStore` had
+   `planName: null` and `workoutName: null`. Not a crash, but affects any UI that
+   tries to filter or display records by plan/workout name.
+
+2. **"Mark N as Day Off" had no confirmation** — Pass 33 added this quick-action
+   button; no prior pass added a safety gate. A single accidental tap on a scrolling
+   mobile screen would batch-mark up to 7 past days without warning.
+
+---
+
+### Improvements completed
+
+| Change | File(s) | Tests |
+|--------|---------|-------|
+| Fix `importOutcomes` exercise history context | `outcomeStore.ts` | +6 in outcomeStore.test.ts |
+| Catch-up confirmation modal | `TodayPage.tsx` | (visual — no unit tests) |
+
+---
+
+### Definitely keep
+
+- **`importOutcomes` context fix** — No behavioral change for the common path. Strictly
+  better data quality for imported outcomes. Risk is near-zero.
+
+### Probably keep but tweak
+
+- **Catch-up confirmation modal** — The UX choice is good; the implementation is minimal.
+  You may want to adjust the date format (currently "Wednesday, May 20") or the modal
+  copy if the tone feels too formal. The confirm button color (amber) matches the action
+  type but you might prefer a different style.
+
+### Do not keep
+
+Nothing this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+- **Wire `computePlanStreak` into TodayPage stats bar** — The function was added in
+  pass 25 and is tested but never displayed. Could replace or supplement the global
+  streak with a plan-scoped one.
+- **Validate `duration.value > 0` in Plan Builder** — Setting `value: 0` silently
+  creates a plan that expires immediately. A validation warning at create/edit time
+  would prevent user confusion.
+- **Surface expression evaluator errors in UI** — Malformed YAML progression rules
+  fail silently. A visible error message in ProgramImportPage would help debugging.
+- **Narrow Zustand selectors in CalendarPage** — The page subscribes to entire store
+  slices; narrowing to only the needed fields would reduce unnecessary re-renders.
+
+---
+
+### Open questions for you
+
+1. Should the catch-up modal list dates oldest-first or newest-first? Currently it
+   matches `unloggedDates` order (newest-first). Oldest-first might read more naturally
+   as a chronological list.
+2. Should "Day Off" also be available as an individual action per-date in the
+   confirmation modal, rather than all-or-nothing? (Out of scope for this pass, but
+   worth considering for users who want to log some as "Skip" instead.)
+3. The `computePlanStreak` function has been sitting unused since pass 25. Should it
+   be wired in, or is the global streak stat sufficient?
+
+---
+
+### Known issues / incomplete work
+
+- No unit tests for the confirmation modal behavior (React component testing is out
+  of scope per project conventions; manual verification recommended).
+- `importOutcomes` context fix applies only from this pass forward — previously
+  imported records already in localStorage will have `null` context. A migration
+  is not implemented (low priority; the data is cosmetic).
+
+### Any new dependencies
+
+None.
+
+---
+
 ## 2026-05-20 (thirty-fourth pass) — branch `claude/dreamy-mccarthy-zGJFa`
 
 ### Executive summary

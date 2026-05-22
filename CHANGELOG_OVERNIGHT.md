@@ -1,5 +1,61 @@
 # Overnight Changelog
 
+## 2026-05-22 (thirty-sixth pass) — branch `claude/dreamy-mccarthy-9sH8T`
+
+Baseline on entry: **726 passing, 0 failing**. Exit state: **732 passing, 0 failing** (+6 tests).
+
+---
+
+### Change 1 — fix: importOutcomes syncs exercise history with plan/workout context
+
+**Summary:** `outcomeStore.importOutcomes` now calls `syncExerciseHistory` for each
+incoming outcome rather than calling `upsertFromOutcome` directly. This gives imported
+exercise records the same `planName` and `workoutName` metadata that live-logged records carry.
+
+**Why it matters:** After CSV import, the exercise history store receives weight data
+but no plan or workout context (both fields are `null`). This affects how exercise records
+appear in the history page stats and any future per-plan filtering. The live logging
+path already resolved this context correctly — import was the only gap.
+
+**Files changed:**
+- `src/store/outcomeStore.ts` — one-line fix in `importOutcomes`
+- `src/store/__tests__/outcomeStore.test.ts` — 6 new tests
+
+**Risks / tradeoffs:** `syncExerciseHistory` looks up plan and workout name from the
+current store state. If the plan has been deleted since the outcome was originally
+created, `planName` will be `null` — same as today's behavior. No behavior change
+for non-weights outcomes (no-op since the function returns early if there's no
+`weightsActual.exercises`).
+
+**Rollback:** Revert the single-line change back to `exStore.upsertFromOutcome(o)`.
+
+---
+
+### Change 2 — feat: confirm before bulk-marking unlogged days as Day Off
+
+**Summary:** Added a confirmation modal before the "Mark N as Day Off" batch action
+fires in TodayPage. The modal lists each affected date in a human-readable format
+and requires an explicit "Confirm" tap. Cancelling closes with no changes.
+
+**Why it matters:** The quick catch-up button (added in pass 33) applied a batch
+action across up to 7 past days with a single tap. This is effective but irreversible
+without manually editing each date in the Calendar page. A user who taps it while
+scrolling or who misunderstands its scope loses their chance to log those workouts
+as anything other than "Day Off". A one-tap confirmation with a clear date list
+preserves safety without meaningfully slowing down the intentional use case.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — `showCatchupConfirm` state, button wiring, new Modal
+
+**Risks / tradeoffs:** Adds one extra tap for all uses of this feature, including
+intentional ones. The confirmation is lightweight (no complex UI, no new network calls).
+The dates list is scrollable for edge cases with many unlogged days.
+
+**Rollback:** Remove the `showCatchupConfirm` state, revert the button `onClick` to call
+`markDaysAsOff` directly, and remove the new modal block.
+
+---
+
 ## 2026-05-20 (thirty-fourth pass) — branch `claude/dreamy-mccarthy-zGJFa`
 
 Baseline on entry: **708 passing, 0 failing**. Exit state: **715 passing, 0 failing** (+7 tests).
