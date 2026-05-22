@@ -201,8 +201,9 @@ export const useOutcomeStore = create<OutcomeState>()(
           for (const o of incoming) next[o.workoutInstanceId] = o
           return { outcomes: next }
         })
-        const exStore = useExerciseHistoryStore.getState()
-        for (const o of incoming) exStore.upsertFromOutcome(o)
+        // Use syncExerciseHistory so imported outcomes carry the same
+        // planName/workoutName context that live-logged outcomes do.
+        for (const o of incoming) syncExerciseHistory(o)
       },
 
       moveOutcome(oldInstanceId, newInstanceId) {

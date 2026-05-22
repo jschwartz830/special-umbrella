@@ -12,6 +12,7 @@ vi.mock('zustand/middleware', () => ({
 
 // eslint-disable-next-line import/first
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../outcomeStore'
+import { useExerciseHistoryStore } from '../exerciseHistoryStore'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import type { WorkoutSlot } from '../../types'
 
@@ -71,6 +72,7 @@ function getState() {
 
 beforeEach(() => {
   useOutcomeStore.setState({ outcomes: {}, progressionStates: {} })
+  useExerciseHistoryStore.setState({ records: [] })
 })
 
 // ── makeWorkoutInstanceId ─────────────────────────────────────────────────────
@@ -316,5 +318,70 @@ describe('primary and extra outcomes for the same (planId, date)', () => {
     getState().setOutcome({ ...makeOutcome('plan-1', '2026-01-01'), workoutInstanceId: extraId })
     getState().clearPlanOutcomes('plan-1')
     expect(getState().outcomes).toEqual({})
+  })
+})
+
+// ── importOutcomes ────────────────────────────────────────────────────────────
+
+describe('importOutcomes', () => {
+  it('stores all incoming outcomes keyed by workoutInstanceId', () => {
+    const a = makeOutcome('plan-1', '2026-01-01')
+    const b = makeOutcome('plan-1', '2026-01-02')
+    getState().importOutcomes([a, b])
+    expect(getState().getOutcome(a.workoutInstanceId)).toMatchObject(a)
+    expect(getState().getOutcome(b.workoutInstanceId)).toMatchObject(b)
+    expect(Object.keys(getState().outcomes)).toHaveLength(2)
+  })
+
+  it('is a no-op for an empty array', () => {
+    getState().importOutcomes([])
+    expect(Object.keys(getState().outcomes)).toHaveLength(0)
+  })
+
+  it('overwrites an existing outcome for the same instanceId', () => {
+    const original = makeOutcome('plan-1', '2026-01-01', { perceivedEffort: 2 })
+    getState().setOutcome(original)
+    const updated = makeOutcome('plan-1', '2026-01-01', { perceivedEffort: 5 })
+    getState().importOutcomes([updated])
+    expect(getState().getOutcome(original.workoutInstanceId)!.perceivedEffort).toBe(5)
+    expect(Object.keys(getState().outcomes)).toHaveLength(1)
+  })
+
+  it('does not affect unrelated existing outcomes', () => {
+    const existing = makeOutcome('plan-2', '2026-03-01')
+    getState().setOutcome(existing)
+    const imported = makeOutcome('plan-1', '2026-01-01')
+    getState().importOutcomes([imported])
+    expect(getState().getOutcome(existing.workoutInstanceId)).toMatchObject(existing)
+    expect(Object.keys(getState().outcomes)).toHaveLength(2)
+  })
+
+  it('syncs exercise history records for outcomes that include weights data', () => {
+    const outcome: WorkoutOutcome = {
+      ...makeOutcome('plan-1', '2026-01-15'),
+      weightsActual: {
+        exercises: [
+          {
+            exercise: 'Squat',
+            sets: [
+              { targetReps: 5, actualReps: 5, actualLoad: 135, completed: true },
+              { targetReps: 5, actualReps: 5, actualLoad: 135, completed: true },
+            ],
+          },
+        ],
+      },
+    }
+    getState().importOutcomes([outcome])
+    const records = useExerciseHistoryStore.getState().records
+    expect(records).toHaveLength(1)
+    expect(records[0].exerciseName).toBe('Squat')
+    expect(records[0].calendarDate).toBe('2026-01-15')
+    expect(records[0].maxLoad).toBe(135)
+  })
+
+  it('does not create exercise history for outcomes without weights data', () => {
+    const outcome = makeOutcome('plan-1', '2026-01-01', { runActual: { actualDistanceMiles: 5, actualDurationMin: 45, completedAsPlanned: true } })
+    getState().importOutcomes([outcome])
+    expect(useExerciseHistoryStore.getState().records).toHaveLength(0)
   })
 })
