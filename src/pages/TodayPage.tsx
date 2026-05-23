@@ -35,7 +35,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
@@ -58,7 +58,10 @@ function WeeklyActivityStrip({
     const todayParsed = parseISO(today)
     for (let i = 6; i >= 0; i--) {
       const date = format(addDays(todayParsed, -i), 'yyyy-MM-dd')
-      const entry = planEntries.find(e => e.calendarDate === date)
+      const dateEntries = planEntries.filter(e => e.calendarDate === date)
+      const entry = dateEntries.length > 1
+        ? dateEntries.reduce((best, e) => (e.createdAt > best.createdAt ? e : best))
+        : dateEntries[0]
       const hasExtra = planExtras.some(e => e.calendarDate === date)
       const dayLetter = new Date(date + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)
 
@@ -272,6 +275,8 @@ export function TodayPage() {
 
   // Stats for the compact stats bar (scoped to the active plan's history)
   const stats = computeHistoryStats(planEntries, planExtras, today)
+  // Plan-scoped streak (only counts days active for this plan)
+  const planStreak = computePlanStreak(plan.id, planEntries, planExtras, today)
 
   // Collect recent past days with no entry — used to show the stall nudge and quick catch-up.
   const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today)
@@ -513,10 +518,10 @@ export function TodayPage() {
           <div>
             <p className="text-xs text-slate-500 leading-none mb-0.5">Streak</p>
             <p className="text-sm font-bold text-white leading-none">
-              {stats.currentStreak}
-              <span className="text-xs font-normal text-slate-400 ml-1">day{stats.currentStreak !== 1 ? 's' : ''}</span>
+              {planStreak}
+              <span className="text-xs font-normal text-slate-400 ml-1">day{planStreak !== 1 ? 's' : ''}</span>
             </p>
-            {stats.longestStreak > stats.currentStreak && (
+            {stats.longestStreak > planStreak && (
               <p className="text-xs text-slate-600 leading-none mt-0.5">Best: {stats.longestStreak}</p>
             )}
           </div>
