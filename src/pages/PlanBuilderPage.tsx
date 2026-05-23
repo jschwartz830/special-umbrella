@@ -948,6 +948,7 @@ export function PlanBuilderPage() {
 
   function handleSave() {
     if (!name.trim()) return
+    if (durationValue < 1) return
     const payload: Omit<Plan, 'id' | 'createdAt' | 'updatedAt'> = {
       name: name.trim(),
       description: description.trim() || undefined,
@@ -1034,7 +1035,7 @@ export function PlanBuilderPage() {
         >
           Edit YAML
         </button>
-        <button onClick={handleSave} disabled={!name.trim()}
+        <button onClick={handleSave} disabled={!name.trim() || durationValue < 1}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
             saved ? 'bg-emerald-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40'
           }`}>
@@ -1092,7 +1093,7 @@ export function PlanBuilderPage() {
             <div className="flex gap-2">
               <input type="number" min="1" max="52" value={durationValue}
                 onChange={e => { setDurationValue(parseInt(e.target.value) || 1); markDirty() }}
-                className="w-20 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500" />
+                className={`w-20 bg-slate-800 border rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500 ${durationValue < 1 ? 'border-red-500' : 'border-slate-700'}`} />
               <div className="flex rounded-xl bg-slate-800 border border-slate-700 overflow-hidden">
                 {(['rotations', 'weeks'] as const).map(t => (
                   <button key={t} type="button" onClick={() => { setDurationType(t); markDirty() }}
@@ -1104,6 +1105,9 @@ export function PlanBuilderPage() {
                 ))}
               </div>
             </div>
+            {durationValue < 1 && (
+              <p className="mt-1.5 text-xs text-red-400">Duration must be at least 1.</p>
+            )}
           </div>
         </div>
 
@@ -1139,7 +1143,7 @@ export function PlanBuilderPage() {
         </div>
 
         {/* Save button (bottom) */}
-        <button onClick={handleSave} disabled={!name.trim()}
+        <button onClick={handleSave} disabled={!name.trim() || durationValue < 1}
           className={`w-full py-3 rounded-xl text-base font-semibold transition-all active:scale-[0.98] ${
             saved ? 'bg-emerald-500 text-white' : 'bg-sky-500 hover:bg-sky-600 text-white disabled:opacity-40'
           }`}>

@@ -297,4 +297,69 @@ describe('duplicatePlan', () => {
     expect(origSlot.segments).not.toBe(copySlot.segments)
     expect(copySlot.segments).toEqual(origSlot.segments)
   })
+
+  it('deep-clones SetSpec[] within exercises so per-set edits do not cross plans', () => {
+    const planWithSetSpecs: Plan = {
+      ...makePlan('plan-1'),
+      days: [{
+        id: 'd1',
+        label: 'Day 1',
+        slots: [{
+          id: 's1',
+          type: 'weights',
+          name: 'Weights',
+          exercises: [{
+            exercise: 'Squat',
+            // sets is an array of SetSpec objects (not a plain number)
+            sets: [
+              { reps: 5, load: '135lb', rest: '3m' },
+              { reps: 5, load: '135lb', rest: '3m' },
+            ],
+          }],
+        }],
+      }],
+    }
+    usePlanStore.setState({ plans: { 'plan-1': planWithSetSpecs } })
+    const newId = getState().duplicatePlan('plan-1')
+
+    const origSets = (getState().plans['plan-1'].days[0].slots[0].exercises as import('../../types/program').ExerciseSpec[])[0].sets as import('../../types/program').SetSpec[]
+    const copySets = (getState().plans[newId].days[0].slots[0].exercises as import('../../types/program').ExerciseSpec[])[0].sets as import('../../types/program').SetSpec[]
+
+    // The sets arrays must be different objects (not shared references)
+    expect(origSets).not.toBe(copySets)
+    // But the individual SetSpec objects must also be different (cloned)
+    expect(origSets[0]).not.toBe(copySets[0])
+    // Content must be equal
+    expect(copySets).toEqual(origSets)
+  })
+
+  it('deep-clones SetSpec[] within warmup exercises', () => {
+    const planWithWarmupSets: Plan = {
+      ...makePlan('plan-1'),
+      days: [{
+        id: 'd1',
+        label: 'Day 1',
+        slots: [{
+          id: 's1',
+          type: 'weights',
+          name: 'Weights',
+          warmup: [{
+            exercise: 'Warmup Row',
+            sets: [
+              { reps: 10, load: 'bodyweight' },
+            ],
+          }],
+        }],
+      }],
+    }
+    usePlanStore.setState({ plans: { 'plan-1': planWithWarmupSets } })
+    const newId = getState().duplicatePlan('plan-1')
+
+    const origWarmupSets = (getState().plans['plan-1'].days[0].slots[0].warmup as import('../../types/program').ExerciseSpec[])[0].sets as import('../../types/program').SetSpec[]
+    const copyWarmupSets = (getState().plans[newId].days[0].slots[0].warmup as import('../../types/program').ExerciseSpec[])[0].sets as import('../../types/program').SetSpec[]
+
+    expect(origWarmupSets).not.toBe(copyWarmupSets)
+    expect(origWarmupSets[0]).not.toBe(copyWarmupSets[0])
+    expect(copyWarmupSets).toEqual(origWarmupSets)
+  })
 })

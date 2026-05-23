@@ -21,6 +21,15 @@ interface PlanState {
   importPlans: (plans: Plan[]) => void
 }
 
+function deepCloneExerciseSpec(ex: import('../types/program').ExerciseSpec): import('../types/program').ExerciseSpec {
+  return {
+    ...ex,
+    // sets may be a SetSpec[] — clone each element so edits to one plan's sets
+    // don't mutate the other after duplication.
+    ...(Array.isArray(ex.sets) ? { sets: ex.sets.map(s => ({ ...s })) } : {}),
+  }
+}
+
 function deepCloneWorkoutSlot(slot: WorkoutSlot): WorkoutSlot {
   return {
     ...slot,
@@ -28,9 +37,9 @@ function deepCloneWorkoutSlot(slot: WorkoutSlot): WorkoutSlot {
     // Deep-clone nested arrays so duplicated plans don't share exercise/segment references.
     // These fields are only present on YAML-imported slots; the spread above copies them by
     // reference without this guard, which would make both plans mutate the same objects.
-    ...(slot.warmup    ? { warmup:    slot.warmup.map(e => ({ ...e })) }    : {}),
-    ...(slot.exercises ? { exercises: slot.exercises.map(e => ({ ...e })) } : {}),
-    ...(slot.segments  ? { segments:  slot.segments.map(s => ({ ...s })) }  : {}),
+    ...(slot.warmup    ? { warmup:    slot.warmup.map(deepCloneExerciseSpec) }    : {}),
+    ...(slot.exercises ? { exercises: slot.exercises.map(deepCloneExerciseSpec) } : {}),
+    ...(slot.segments  ? { segments:  slot.segments.map(s => ({ ...s })) }        : {}),
   }
 }
 
