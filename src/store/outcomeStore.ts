@@ -143,8 +143,11 @@ export const useOutcomeStore = create<OutcomeState>()(
         const ctxBase = {
           effort: outcome.perceivedEffort ?? null,
           all_reps: outcome.completionState === 'completed',
+          // deferred maps to day_off (no workout performed) — exclude alongside skipped/planned
           session_complete:
-            outcome.completionState !== 'skipped' && outcome.completionState !== 'planned',
+            outcome.completionState !== 'skipped' &&
+            outcome.completionState !== 'planned' &&
+            outcome.completionState !== 'deferred',
         }
 
         // 3a. Slot-level progression (run slots)

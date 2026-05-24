@@ -39,7 +39,12 @@ function deepCloneWorkoutSlot(slot: WorkoutSlot): WorkoutSlot {
     // reference without this guard, which would make both plans mutate the same objects.
     ...(slot.warmup    ? { warmup:    slot.warmup.map(deepCloneExerciseSpec) }    : {}),
     ...(slot.exercises ? { exercises: slot.exercises.map(deepCloneExerciseSpec) } : {}),
-    ...(slot.segments  ? { segments:  slot.segments.map(s => ({ ...s })) }        : {}),
+    ...(slot.segments  ? { segments:  slot.segments.map(s => ({
+        ...s,
+        // drills is a DrillSpec[] — clone each element so edits on one plan
+        // don't affect the duplicated plan's drill specs.
+        ...(s.drills ? { drills: s.drills.map(d => ({ ...d })) } : {}),
+      })) } : {}),
   }
 }
 

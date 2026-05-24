@@ -13,6 +13,7 @@ vi.mock('zustand/middleware', () => ({
 // eslint-disable-next-line import/first
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../outcomeStore'
 import { useExerciseHistoryStore } from '../exerciseHistoryStore'
+import { useProgramStore } from '../programStore'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import type { WorkoutSlot } from '../../types'
 
@@ -73,6 +74,7 @@ function getState() {
 beforeEach(() => {
   useOutcomeStore.setState({ outcomes: {}, progressionStates: {} })
   useExerciseHistoryStore.setState({ records: [] })
+  useProgramStore.setState({ vars: {} })
 })
 
 // ── makeWorkoutInstanceId ─────────────────────────────────────────────────────
@@ -212,6 +214,48 @@ describe('logOutcomeWithProgression', () => {
     // We mainly verify no error is thrown.
     // Just verify it doesn't throw
     expect(true).toBe(true)
+  })
+
+  it('does NOT fire YAML progression rules for deferred outcomes (session_complete=false)', () => {
+    // Set up a program plan with a var and a rule that triggers on session_complete
+    useProgramStore.setState({ vars: { 'plan-1': { myvar: 0 } } })
+    const slot: WorkoutSlot = {
+      id: 'slot-1',
+      type: 'run',
+      name: 'Easy Run',
+      slotProgress: { if: 'session_complete', then: 'myvar += 1' },
+    }
+    const outcome = makeOutcome('plan-1', '2026-01-01', { completionState: 'deferred' })
+    getState().logOutcomeWithProgression(outcome, slot)
+    // deferred = not session_complete → rule must NOT fire → myvar stays 0
+    expect(useProgramStore.getState().vars['plan-1'].myvar).toBe(0)
+  })
+
+  it('fires YAML progression rules for completed outcomes (session_complete=true)', () => {
+    useProgramStore.setState({ vars: { 'plan-1': { myvar: 0 } } })
+    const slot: WorkoutSlot = {
+      id: 'slot-1',
+      type: 'run',
+      name: 'Easy Run',
+      slotProgress: { if: 'session_complete', then: 'myvar += 1' },
+    }
+    const outcome = makeOutcome('plan-1', '2026-01-01', { completionState: 'completed' })
+    getState().logOutcomeWithProgression(outcome, slot)
+    // completed = session_complete → rule fires → myvar becomes 1
+    expect(useProgramStore.getState().vars['plan-1'].myvar).toBe(1)
+  })
+
+  it('does NOT fire YAML progression rules for skipped outcomes (session_complete=false)', () => {
+    useProgramStore.setState({ vars: { 'plan-1': { myvar: 0 } } })
+    const slot: WorkoutSlot = {
+      id: 'slot-1',
+      type: 'run',
+      name: 'Easy Run',
+      slotProgress: { if: 'session_complete', then: 'myvar += 1' },
+    }
+    const outcome = makeOutcome('plan-1', '2026-01-01', { completionState: 'skipped' })
+    getState().logOutcomeWithProgression(outcome, slot)
+    expect(useProgramStore.getState().vars['plan-1'].myvar).toBe(0)
   })
 })
 
