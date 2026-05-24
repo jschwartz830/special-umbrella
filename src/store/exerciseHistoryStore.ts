@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { nanoid } from '../engine/rotationEngine'
+import { nanoid } from '../lib/utils'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 

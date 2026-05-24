@@ -1,5 +1,120 @@
 # Overnight Changelog
 
+## 2026-05-24 (thirty-eighth pass) — branch `claude/dreamy-mccarthy-oaS1e`
+
+Baseline on entry: **734 passing, 0 failing**. Exit state: **738 passing, 0 failing** (+4 tests).
+
+---
+
+### Change 1 — fix: deferred outcomes no longer fire YAML progression rules
+
+**Summary:** `logOutcomeWithProgression` in `outcomeStore.ts` now excludes
+`deferred` from the `session_complete` context variable alongside `skipped` and
+`planned`. Previously, deferring a workout (which the history engine maps to a
+`day_off` action — no workout performed) would still evaluate progression rules
+that check `if: session_complete`, causing variable increments (e.g., `load += 5`)
+to fire without any actual workout being completed.
+
+**Why it matters:** YAML-imported plans use progression rules such as
+`if: session_complete then load += 2.5` to auto-advance per-exercise load across
+sessions. If a `deferred` outcome fires those rules, the user's program variables
+drift forward without any work being done — the next session would start with a
+higher target weight than warranted. This is a silent data corruption bug with no
+runtime error or user-visible warning.
+
+**Files changed:**
+- `src/store/outcomeStore.ts` — one-line fix adding `!== 'deferred'` guard
+- `src/store/__tests__/outcomeStore.test.ts` — 3 new tests (deferred, completed, skipped)
+
+**Risks / tradeoffs:** The only behavior change is that deferred outcomes no longer
+advance YAML progression variables. Users who have already had deferred outcomes
+fire their progression rules will not see a rollback of those variables (persisted
+state is not retroactively corrected — that would require a migration). New defer
+events after this commit are correctly excluded.
+
+**Rollback:** Remove `outcome.completionState !== 'deferred'` from the `session_complete`
+expression in `logOutcomeWithProgression`.
+
+---
+
+### Change 2 — fix: deep-clone DrillSpec[] within RunSegment.drills on plan duplication
+
+**Summary:** `deepCloneWorkoutSlot` in `planStore.ts` now maps `s.drills` within
+each run segment so that drill objects are independent between the original and
+the duplicated plan. Previously `segments.map(s => ({ ...s }))` shallow-cloned
+each segment, leaving the `drills` array (and its `DrillSpec` objects) shared.
+
+**Why it matters:** Pass 37's REVIEW_NOTES explicitly called this out as a remaining
+recommendation. The same category of bug was fixed for `SetSpec[]` in pass 37 (for
+`exercises`/`warmup`) and for top-level `exercises`/`warmup`/`segments` arrays in
+pass 34. `RunSegment.drills` was the last remaining shallow-clone gap in the
+`duplicatePlan` path. Editing drill names, reps, or sets in one plan after duplication
+would silently mutate the other plan's drill specs.
+
+**Files changed:**
+- `src/store/planStore.ts` — 4 lines changed in `deepCloneWorkoutSlot` segment mapper
+- `src/store/__tests__/planStore.test.ts` — 1 new test for DrillSpec[] isolation
+
+**Risks / tradeoffs:** The only behavior change is that `duplicatePlan` for plans with
+run segments containing drills now does an extra `map` over `s.drills`. Drill arrays are
+small (typically 2–8 entries) so the performance impact is negligible. Plans without run
+drills are unaffected by the `s.drills ?` guard.
+
+**Rollback:** Revert the segment mapper in `deepCloneWorkoutSlot` back to
+`segments: slot.segments.map(s => ({ ...s }))`.
+
+---
+
+### Change 3 — fix: nanoid import path in exerciseHistoryStore
+
+**Summary:** `exerciseHistoryStore.ts` imported `nanoid` from
+`../engine/rotationEngine` (which re-exports it). Changed to import directly
+from `../lib/utils` where `nanoid` is defined.
+
+**Why it matters:** The transitive import creates an unnecessary dependency between
+`exerciseHistoryStore` and the rotation engine. If `rotationEngine.ts` ever stops
+re-exporting `nanoid` (e.g., during a future refactor), `exerciseHistoryStore` would
+silently break. The direct import is self-documenting and correct.
+
+**Files changed:**
+- `src/store/exerciseHistoryStore.ts` — 1 import line changed
+
+**Risks / tradeoffs:** Zero behavior change. Same function, same module — different
+import path.
+
+**Rollback:** Revert the single import line.
+
+---
+
+### Change 4 — feat: surface progressionRecommendation.note in TodayPage pending hint
+
+**Summary:** The previous-session hint block on TodayPage now shows a `↗ [note]`
+line when the prior session's outcome carries a `progressionRecommendation.note`
+(e.g., "add 2.5 lb next session"). This is shown only for non-run slots — run slots
+already have `todayAdaptationNote` from the run progression state machine and
+showing both would be redundant. Only visible when the today card is pending
+(`prevSessionOutcome` is computed only when `isPending`).
+
+**Why it matters:** `progressionRecommendation.note` was being computed and stored
+in outcomes (by `buildProgressionRecommendation` in the weights progression module)
+but never surfaced at decision time. Users who had logged a session that generated a
+progression recommendation had to open the outcome modal to see it. Surfacing it
+inline at the moment the user is about to start their workout closes the loop —
+the guidance appears exactly when it's actionable.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — 4 lines added: conditional in the `&&` guard, new `<p>` element
+
+**Risks / tradeoffs:** Purely additive. `prevSessionOutcome` is already computed and
+`progressionRecommendation` is an optional field — if absent, the guard short-circuits.
+No new store subscriptions, no new computation, no risk to users without outcomes.
+The `!todayRunSlot` guard ensures run days are unaffected.
+
+**Rollback:** Remove the `!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.note`
+condition from the outer `&&` and remove the `<p>` element inside the hint block.
+
+---
+
 ## 2026-05-23 (thirty-seventh pass) — branch `claude/dreamy-mccarthy-79X8Y`
 
 Baseline on entry: **732 passing, 0 failing**. Exit state: **734 passing, 0 failing** (+2 tests).

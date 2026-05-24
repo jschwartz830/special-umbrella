@@ -333,6 +333,40 @@ describe('duplicatePlan', () => {
     expect(copySets).toEqual(origSets)
   })
 
+  it('deep-clones DrillSpec[] within RunSegment.drills so drill edits do not cross plans', () => {
+    const planWithDrills: Plan = {
+      ...makePlan('plan-1'),
+      days: [{
+        id: 'd1',
+        label: 'Day 1',
+        slots: [{
+          id: 's1',
+          type: 'run',
+          name: 'Run',
+          segments: [{
+            type: 'drills',
+            drills: [
+              { name: 'High Knees', sets: 2, reps: 20 },
+              { name: 'A-Skips', sets: 2, duration: '30s' },
+            ],
+          }],
+        }],
+      }],
+    }
+    usePlanStore.setState({ plans: { 'plan-1': planWithDrills } })
+    const newId = getState().duplicatePlan('plan-1')
+
+    const origDrills = getState().plans['plan-1'].days[0].slots[0].segments![0].drills!
+    const copyDrills = getState().plans[newId].days[0].slots[0].segments![0].drills!
+
+    // The drills arrays must be different objects
+    expect(origDrills).not.toBe(copyDrills)
+    // Each DrillSpec must also be a distinct clone
+    expect(origDrills[0]).not.toBe(copyDrills[0])
+    // Content must be equal
+    expect(copyDrills).toEqual(origDrills)
+  })
+
   it('deep-clones SetSpec[] within warmup exercises', () => {
     const planWithWarmupSets: Plan = {
       ...makePlan('plan-1'),
