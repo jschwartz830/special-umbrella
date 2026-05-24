@@ -1,5 +1,120 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-24 (thirty-eighth pass) — branch `claude/dreamy-mccarthy-oaS1e`
+
+### Executive summary
+
+1. **What changed:** Fixed `deferred` outcomes firing YAML progression rules (silent data
+   corruption). Fixed `RunSegment.drills` shallow-clone in plan duplication (last remaining
+   gap after passes 34 and 37). Fixed `nanoid` import path coupling in `exerciseHistoryStore`.
+   Updated a misleading comment in `workoutInstanceId.ts`. Added a `↗ [note]` progression
+   hint to TodayPage's pending workout card.
+2. **Highest confidence:** The `deferred` fix and the `nanoid` import fix are both tiny and
+   unambiguous. The `RunSegment.drills` fix closes the last known shallow-clone gap — it has
+   a test and follows the exact same pattern as the passes 34 and 37 fixes.
+3. **Feature confidence:** The TodayPage `progressionRecommendation.note` feature is minimal
+   — 4 lines, no new computation, reuses already-computed data. The `!todayRunSlot` guard
+   correctly prevents double-surfacing for run days.
+4. **Review first:** Verify the `↗ note` appears on a weights pending card that has a prior
+   session with a progression recommendation. Also verify it does not appear on a run day
+   (even if `prevSessionOutcome.progressionRecommendation.note` is set).
+
+---
+
+### Biggest issues found
+
+1. **`deferred` completion state fired YAML progression rules** — `logOutcomeWithProgression`
+   excluded `skipped` and `planned` from `session_complete` but not `deferred`. Since
+   `deferred` maps to `day_off` (no workout done), any progression rule guarded by
+   `session_complete` would fire on a defer. For load-progression rules (`load += 2.5`), this
+   advances the per-exercise target weight without any actual workout, silently corrupting the
+   program's state machine.
+
+2. **`RunSegment.drills` shallow-clone in `duplicatePlan`** — The final nesting level
+   unfixed after passes 34 and 37: `DrillSpec` objects inside `RunSegment.drills` were
+   shared between original and copy. Drill edits on one plan would silently affect the other.
+   This was documented in pass 37's REVIEW_NOTES as an open recommendation.
+
+3. **Transitive `nanoid` import** — `exerciseHistoryStore` imported from `rotationEngine`
+   instead of the source `lib/utils`. Minor coupling issue with silent breakage risk.
+
+---
+
+### Improvements completed
+
+| Change | File(s) | Tests |
+|--------|---------|-------|
+| Fix `deferred` in `session_complete` | `outcomeStore.ts`, `outcomeStore.test.ts` | +3 |
+| Fix `RunSegment.drills` deep-clone | `planStore.ts`, `planStore.test.ts` | +1 |
+| Fix `nanoid` import path | `exerciseHistoryStore.ts` | (refactor) |
+| Fix misleading comment | `workoutInstanceId.ts` | (docs) |
+| Surface `progressionRecommendation.note` hint | `TodayPage.tsx` | (visual) |
+
+---
+
+### Definitely keep
+
+- **`deferred` `session_complete` fix** — Correct semantic. Zero risk. Stops silent variable
+  drift for YAML program users who defer workouts.
+- **`RunSegment.drills` deep-clone fix** — Closes the last known shallow-clone gap. Has a test.
+  The pattern is identical to passes 34 and 37 and is unambiguously correct.
+- **`nanoid` import fix** — Strictly better coupling. Zero behavior change.
+
+### Probably keep but tweak
+
+- **`progressionRecommendation.note` hint** — The feature is correct and minimal. You may
+  want to adjust the `↗` prefix character or color (`text-sky-700`) to match your visual
+  preferences. Currently uses `truncate` — if the note is long, you may want to allow a
+  second line or add a tooltip.
+
+### Do not keep
+
+Nothing this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+- **Error boundary around the app root** — No `React.ErrorBoundary` wraps the router or
+  any page. A thrown error in any component crashes the entire UI with no recovery path.
+  A top-level boundary with a "Reload the app" message would provide a graceful fallback.
+- **Narrow Zustand selectors in CalendarPage** — The page subscribes to entire store slices.
+  Narrowing selectors to only the fields each section needs would reduce unnecessary
+  re-renders on any store update.
+- **Surface expression evaluator errors in ProgramImportPage** — Malformed YAML progression
+  rules fail silently (evaluator returns 0). A visible parse error in the import wizard
+  would help debugging.
+- **Retroactive correction for already-fired `deferred` progressions** — The `deferred`
+  fix is forward-only. Users who already had deferred outcomes fire their YAML progression
+  variables will not see a rollback. A migration utility to recompute `programStore.vars` from
+  the logged outcome history would fix historical drift, but is complex and risky.
+
+---
+
+### Open questions for you
+
+1. Should the `↗ note` line be hidden when `lastSessionSummary` is null but notes exist?
+   Currently it renders in either case (same `||` condition as notes). This is consistent
+   behavior but the `↗` hint without a summary line above it might feel detached.
+2. Should the progression note color (`text-sky-700`) be more muted (e.g., `text-slate-500`)
+   to match the summary line, or more prominent to stand out as actionable guidance?
+
+---
+
+### Known issues or incomplete work
+
+- The `deferred` fix is forward-only — historical progressions that fired incorrectly are
+  not corrected. Acceptable for now; a retroactive fix requires a full outcomes-to-vars
+  recomputation.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-23 (thirty-seventh pass) — branch `claude/dreamy-mccarthy-79X8Y`
 
 ### Executive summary

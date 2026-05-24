@@ -1,3 +1,69 @@
+# Feature Review — progressionRecommendation.note on TodayPage
+
+Date: 2026-05-24
+Branch: `claude/dreamy-mccarthy-oaS1e`
+Classification: **Keep**
+
+## What was actually built
+
+A `↗ [note]` line in the pending-workout hint block on TodayPage. Rendered when
+`!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.note` is truthy.
+Uses `text-sky-700` and `truncate` to match the hint block's existing style patterns.
+The outer condition (`||`) was extended so the hint block shows even when
+`lastSessionSummary` and `prevSessionOutcome.notes` are both null but a progression
+note exists.
+
+## What assumptions were encoded
+
+- `progressionRecommendation.note` is always a user-readable string — no formatting
+  is applied here.
+- `!todayRunSlot` (first run-type slot in today's resolved plan day) is the right
+  discriminator for suppressing the hint on run days. A pure weights day has
+  `todayRunSlot = null`, which passes the guard.
+- `prevSessionOutcome` is already null-checked via the existing visibility conditions
+  (`isPending` → computed only when today is pending).
+
+## What worked well
+
+- Zero new computation — reuses `prevSessionOutcome` (already computed), `todayRunSlot`
+  (already computed).
+- The guard is tight: three independent conditions must all be true simultaneously
+  (no run slot + pending + previous outcome has a note).
+- Visually distinct from `lastSessionSummary` (slate-500) and `prevSessionOutcome.notes`
+  (slate-600 italic). Sky-700 is used for action-oriented text elsewhere in the app.
+
+## What feels risky or incomplete
+
+- The sky-700 color may stand out more than intended if most users don't have
+  progression recommendations generated yet (only YAML-imported plans with `slotProgress`
+  rules produce them). Consider switching to `text-slate-400` if it feels too prominent.
+- Per-exercise progression notes are not shown — only the slot-level note. If a user
+  has an outcome where progression fired on exercise 2 but not exercise 1, only the
+  slot-level note appears (which reflects overall session progress, not per-exercise).
+
+## What I should evaluate tomorrow
+
+- Manually trigger a `progressionRecommendation.note` by completing a YAML-imported
+  weights session and verifying the note appears on the next pending occurrence of
+  that plan day.
+- Verify the note does NOT appear on a run day, even if the previous run outcome
+  carries a `progressionRecommendation.note`.
+
+## Recommended next steps
+
+- Evaluate the color choice after seeing it in context. If sky-700 is too bold, dial
+  back to `text-slate-400` for a subtler hint treatment.
+- Consider adding a `TrendingUp` icon (already imported in TodayPage for other uses)
+  instead of the `↗` text character for visual consistency with the icon set.
+
+## Keep / revise / prototype only / reject
+
+**Keep** — minimal implementation, zero new computation, correctly gated by
+existing state. The feature surfaces data that was already computed and stored but
+never visible at the moment users need it most.
+
+---
+
 # Feature Review — Gap Weeks in Weekly Activity Panel
 
 Date: 2026-05-20

@@ -1,5 +1,48 @@
 # Test Results
 
+## 2026-05-24 (thirty-eighth pass) — branch `claude/dreamy-mccarthy-oaS1e`
+
+**Result: 738 passing, 0 failing** (+4 new tests; 0 previously-failing tests)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 734 |
+| Tests added | 4 |
+| Tests on exit | 738 |
+| Failures | 0 |
+
+All tests pass. No existing tests were modified.
+
+### Tests added
+
+**`src/store/__tests__/outcomeStore.test.ts` (+3 tests)**
+- `does NOT fire YAML progression rules for deferred outcomes (session_complete=false)` —
+  sets `myvar: 0`, creates a `deferred` outcome with `slotProgress: { if: 'session_complete', then: 'myvar += 1' }`,
+  calls `logOutcomeWithProgression`, asserts `myvar` remains 0.
+- `fires YAML progression rules for completed outcomes (session_complete=true)` —
+  same setup with `completionState: 'completed'`, asserts `myvar` becomes 1.
+- `does NOT fire YAML progression rules for skipped outcomes (session_complete=false)` —
+  same setup with `completionState: 'skipped'`, asserts `myvar` remains 0.
+
+**`src/store/__tests__/planStore.test.ts` (+1 test)**
+- `deep-clones DrillSpec[] within RunSegment.drills so drill edits do not cross plans` —
+  creates a plan with a run slot containing a segment with `drills: [{ name: 'High Knees', … }, { name: 'A-Skips', … }]`,
+  duplicates it, asserts the drill array and each drill object have independent references
+  while values are equal.
+
+### Important areas still untested
+
+- **Component rendering** — No tests for TodayPage. The `progressionRecommendation.note`
+  hint is verified manually only.
+- **`progressionRecommendation` generation** — `buildProgressionRecommendation` in
+  `modules/workout-outcomes/progression.ts` has its own coverage; the TodayPage display
+  path is not unit-tested.
+- **YAML editor → zero-duration save path** — Validated manually; a unit test for
+  `PlanBuilderPage.handleSave` with `durationValue = 0` would anchor this permanently.
+
+---
+
 ## 2026-05-23 (thirty-seventh pass) — branch `claude/dreamy-mccarthy-79X8Y`
 
 **Result: 734 passing, 0 failing** (+2 new tests; 0 previously-failing tests)

@@ -1,5 +1,71 @@
 # Implementation Plan
 
+## Pass 38 — 2026-05-24 (branch `claude/dreamy-mccarthy-oaS1e`)
+
+### Observations on entry
+
+- Baseline: **734 passing, 0 failing** — clean baseline inherited from pass 37.
+- **`deferred` completion state fired YAML progression rules**: `logOutcomeWithProgression`
+  computes `session_complete` as `!== 'skipped' && !== 'planned'`. The `deferred` state
+  maps to `day_off` in the history engine (no workout performed), but was not excluded from
+  `session_complete`, so YAML progression rules with `if: 'session_complete'` would fire when
+  a workout was deferred. This is a silent data corruption issue: variable increments (e.g.
+  load progression) would apply incorrectly on defer rather than only on completion.
+- **`RunSegment.drills` still shallow-cloned after pass 37**: Pass 37's REVIEW_NOTES
+  documented `drills` within `RunSegment` as a remaining recommendation. Pass 37's fix
+  addressed `SetSpec[]` inside `ExerciseSpec.sets`; the `DrillSpec[]` in `RunSegment.drills`
+  was still only spread-cloned at the segment level, meaning drill objects were shared between
+  the original and duplicated plan.
+- **`nanoid` import path in `exerciseHistoryStore`**: The store imported `nanoid` from
+  `../engine/rotationEngine` (which re-exports it from `lib/utils`). The import should come
+  directly from `lib/utils` to reduce transitive coupling.
+- **`progressionRecommendation.note` not surfaced before starting workout**: Outcome records
+  carry a `progressionRecommendation.note` field (e.g., "add 2.5 lb next session") from the
+  previous session. TodayPage already shows `lastSessionSummary` and `prevSessionOutcome.notes`
+  for pending workouts, but the structured progression guidance was not surfaced at decision time.
+
+### Decisions
+
+- **Fix `deferred` in `session_complete`** (BUG): Add `outcome.completionState !== 'deferred'`
+  to the `session_complete` guard in `logOutcomeWithProgression`. Three new tests confirm
+  the behavior for deferred (no rule fire), completed (rule fires), and skipped (no rule fire).
+- **Fix `RunSegment.drills` shallow clone** (DATA INTEGRITY): Extend `deepCloneWorkoutSlot`
+  to map `s.drills` inside each segment mapper. Guard matches the existing patterns for
+  `warmup`/`exercises`. One new test confirms drill object isolation after `duplicatePlan`.
+- **Fix `nanoid` import path** (COUPLING): Change import source from `../engine/rotationEngine`
+  to `../lib/utils` in `exerciseHistoryStore.ts`.
+- **Fix misleading comment in `workoutInstanceId.ts`** (DOCS): Update the comment to reflect
+  that the custom nanoid uses base-36 (no underscores) — the old comment incorrectly described
+  nanoid's default alphabet.
+- **Surface `progressionRecommendation.note` on TodayPage** (FEATURE): Add a `↗ [note]` line
+  to the previous-session hint block for non-run slots. Guard: `!todayRunSlot` prevents
+  double-surfacing run progression (which already has `todayAdaptationNote`). Visible only
+  when `prevSessionOutcome?.progressionRecommendation?.note` is truthy.
+
+### Architecture summary (unchanged from pass 37)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`.
+Rotation logic is a pure function in `rotationEngine.ts`. Stats are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function engine with 738 tests across 19 files on exit.
+- All store mutations are well-guarded and tested.
+- Clean separation between engine, store, and UI layers.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,115 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `workoutInstanceId` parsing relies on `nanoid` never generating `_` — holds for
+  the custom charset in `lib/utils.ts` but would silently break if the charset changes.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`. Not broken,
+  but the coupling makes unit-testing the outcome store harder (requires mock setup for
+  `useProgramStore`).
+
+---
+
 ## Pass 37 — 2026-05-23 (branch `claude/dreamy-mccarthy-79X8Y`)
 
 ### Observations on entry

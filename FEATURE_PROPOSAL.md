@@ -1,3 +1,94 @@
+# Feature Proposal — Surface progressionRecommendation.note on TodayPage
+
+Date: 2026-05-24
+Branch: `claude/dreamy-mccarthy-oaS1e`
+Status: **Implemented this run**
+
+## Feature selected
+
+Show the previous session's `progressionRecommendation.note` as a `↗ [note]` line
+in the pre-workout hint block on TodayPage, alongside the existing `lastSessionSummary`
+and `prevSessionOutcome.notes` lines.
+
+## Why it was selected
+
+`buildProgressionRecommendation` in `modules/workout-outcomes/progression.ts` produces
+structured progression guidance for weights outcomes (e.g., "add 2.5 lb next session",
+"maintain current load") and stores it in `WorkoutOutcome.progressionRecommendation`.
+This field was computed and persisted but never surfaced at decision time — users had to
+open the outcome modal to see it. Surfacing it inline on TodayPage closes the loop: the
+guidance appears exactly when the user is deciding how to approach their next session.
+
+## Why it was not selected for run slots
+
+Run progression is already handled separately through the `todayAdaptationNote` pathway
+(using `generateRunAdaptationNote` + `RunProgressionState` from the progression state
+machine). Run days that have a progression note in `prevSessionOutcome` would show it
+alongside `todayAdaptationNote`, creating redundant and potentially conflicting guidance.
+The `!todayRunSlot` guard prevents this overlap.
+
+## Expected user value
+
+- Weights users who trigger auto-progression see "↗ add 2.5 lb next session" directly
+  on the pending card before tapping "Start Workout" — no modal navigation required.
+- Users without progression rules or outcomes see no change (the guard short-circuits).
+- Consistent with existing `prevSessionOutcome.notes` display (same hint block, same visibility conditions).
+
+## Implementation scope for this run
+
+Minimal: 4 lines in `TodayPage.tsx`:
+1. Added `!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.note` to the
+   outer `&&` condition that shows the hint block.
+2. Added a `<p className="text-xs text-sky-700 truncate">↗ {note}</p>` element inside
+   the block, rendered only when `!todayRunSlot` and the note exists.
+
+## Assumptions being made
+
+- `progressionRecommendation.note` is a user-readable string already formatted by
+  `buildProgressionRecommendation` — no additional formatting is needed here.
+- The `!todayRunSlot` guard is the right discriminator. A day can have multiple slots
+  (e.g., run + weights double-day), but `todayRunSlot` is the first run-type slot in
+  `todayResolved.planDay.slots`. If any run slot is present, the hint is suppressed.
+- `truncate` CSS is acceptable for long notes (full note accessible in outcome modal).
+
+## Open product / UX decisions
+
+1. Should the `↗` arrow prefix be something else (e.g., a `TrendingUp` icon)?
+2. Should the color be `text-sky-700` or a more muted `text-slate-500` / `text-slate-400`
+   to match the existing summary line style? Sky-colored text may feel out of place in
+   the otherwise slate-toned hint block.
+3. Should this be shown even when `lastSessionSummary` is null (just notes or just the
+   progression hint)? Currently yes — the `||` condition allows any one of the three
+   to trigger the hint block.
+
+## Architecture / schema impact
+
+None. `progressionRecommendation` is already on `WorkoutOutcome`; `prevSessionOutcome`
+is already computed in TodayPage. No new store subscriptions, no new computation.
+
+## Risks
+
+- Minimal. Purely additive conditional rendering — the guard ensures no regression for
+  run slots or slots without prior outcomes.
+- If `progressionRecommendation.note` is unexpectedly long, it truncates at the container
+  width. Acceptable given the existing truncation pattern for `prevSessionOutcome.notes`.
+
+## Rollback strategy
+
+Remove the `!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.note`
+condition from the outer `&&` and remove the `<p>` element inside the hint block.
+No data migration. No store changes.
+
+## What is intentionally not being built yet
+
+- Showing the note for run slots in a way that doesn't conflict with `todayAdaptationNote`.
+- Per-exercise progression notes (only the slot-level note is shown; exercise-level notes
+  in `ex.progressionRecommendation` are not surfaced on TodayPage).
+- Expansion / tooltip for the full progression context object (just the `note` string).
+- Writing the recommendation back from TodayPage (read-only display only).
+
+---
+
 # Feature Proposal — Gap Weeks in Weekly Activity Panel
 
 Date: 2026-05-20
