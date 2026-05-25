@@ -19,7 +19,7 @@ import type {
   WorkoutCompletionState,
   PerceivedEffort,
 } from '../types'
-import { nanoid } from '../engine/rotationEngine'
+import { nanoid } from './utils'
 import { makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 
 // ── Core encode/decode ────────────────────────────────────────────────────────

@@ -209,6 +209,105 @@ describe('buildLastSessionSummary', () => {
     expect(buildLastSessionSummary(outcome, maxLoadByExercise)).toBe('Last: 3×8 @ 95 lb OHP')
   })
 
+  it('shows "N sets" (not "×undefined") when both actualReps and targetReps are absent', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T12:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      weightsActual: {
+        exercises: [{
+          exercise: 'Squat',
+          sets: [
+            { actualReps: null, actualLoad: 135, completed: true },
+            { actualReps: null, actualLoad: 135, completed: true },
+          ],
+        }],
+      },
+    }
+    const result = buildLastSessionSummary(outcome)
+    expect(result).not.toContain('undefined')
+    expect(result).toBe('Last: 2 sets @ 135 lb Squat')
+  })
+
+  it('falls back to targetReps when actualReps is null', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T12:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      weightsActual: {
+        exercises: [{
+          exercise: 'Bench Press',
+          sets: [{ targetReps: 8, actualReps: null, actualLoad: 135, completed: true }],
+        }],
+      },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 1×8 @ 135 lb Bench Press')
+  })
+
+  it('appends "+N more" when multiple exercises have actual data', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T12:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      weightsActual: {
+        exercises: [
+          { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 185, completed: true }] },
+          { exercise: 'Bench Press', sets: [{ actualReps: 5, actualLoad: 135, completed: true }] },
+          { exercise: 'Deadlift', sets: [{ actualReps: 5, actualLoad: 225, completed: true }] },
+        ],
+      },
+    }
+    const result = buildLastSessionSummary(outcome)
+    expect(result).toContain('+2 more')
+    expect(result).toContain('Squat')
+    expect(result).toBe('Last: 1×5 @ 185 lb Squat (+2 more)')
+  })
+
+  it('does not append "+N more" for a single-exercise workout', () => {
+    const outcome = weightsOutcome('2026-05-01', 'Bench Press', 135)
+    const result = buildLastSessionSummary(outcome)
+    expect(result).not.toContain('+')
+    expect(result).toBe('Last: 3×8 @ 135 lb Bench Press')
+  })
+
+  it('counts only exercises with actual data when computing moreCount', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T12:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      weightsActual: {
+        exercises: [
+          { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 185, completed: true }] },
+          // second exercise has no actual data — should not count toward "+N more"
+          { exercise: 'Bench Press', sets: [{ actualReps: null, actualLoad: null, completed: false }] },
+        ],
+      },
+    }
+    const result = buildLastSessionSummary(outcome)
+    expect(result).not.toContain('+')
+    expect(result).toBe('Last: 1×5 @ 185 lb Squat')
+  })
+
   it('formats run with distance, duration, and auto-derived pace', () => {
     // 3.1 mi in 28 min ≈ 9:02 /mi — pace is derived when not stored
     const outcome = runOutcome('2026-05-01', 3.1, 28)
