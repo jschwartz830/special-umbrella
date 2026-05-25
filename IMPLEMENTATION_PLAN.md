@@ -1,5 +1,47 @@
 # Implementation Plan
 
+## Pass 39 — 2026-05-25 (branch `claude/dreamy-mccarthy-0z9MJ`)
+
+### Observations on entry
+
+- Baseline: **738 passing, 0 failing** — clean baseline inherited from pass 38.
+- **`nanoid` import coupling still present in `csv.ts` and `PlanBuilderPage.tsx`**: Pass 37
+  fixed this in `exerciseHistoryStore.ts`, but two more files still imported `nanoid` via the
+  rotationEngine re-export instead of directly from `lib/utils`. This is a coupling issue:
+  a change to rotationEngine's public API could silently break these utilities.
+- **`buildLastSessionSummary` "×undefined" display bug**: When a weights set has `actualReps = null`
+  and no `targetReps` value (i.e., `targetReps` is `undefined`), the old ternary
+  (`s.actualReps != null ? s.actualReps : s.targetReps`) passed `undefined` directly into the
+  template string, producing "Last: 2×undefined @ 135 lb Squat". This surface-level display
+  bug would appear for sets with load recorded but no rep count — a real data pattern when
+  users log load-only (e.g. timed holds, isometric exercises).
+- **No multi-exercise context in session hint**: `buildLastSessionSummary` only shows the first
+  exercise from a multi-exercise workout. For programs with 3-6 lifts per session, the user only
+  sees e.g. "Last: 3×5 @ 185 lb Squat" with no indication that Bench Press, Deadlift, and rows
+  were also logged. Adding "+N more" provides context without changing the single-exercise case.
+
+### Decisions
+
+- **Fix `nanoid` import path in `csv.ts` and `PlanBuilderPage.tsx`** (COUPLING): Change both
+  from `'../engine/rotationEngine'` to the canonical source. No behavior change — rotationEngine
+  re-exports the same function.
+- **Fix `buildLastSessionSummary` "×undefined"** (BUG): Replace the `!= null` ternary with
+  nullish coalescing (`s.actualReps ?? s.targetReps ?? null`); when null, fall back to display
+  format "N sets" rather than "N×undefined". New tests verify the null and fallback cases.
+- **Add "+N more" multi-exercise context** (FEATURE): When more than one exercise in a workout
+  has actual data logged, append "(+N more)" to the hint line. Only exercises with at least one
+  actual reps or load value are counted, so placeholder/unlogged exercises are excluded.
+  Single-exercise workouts are unchanged. New tests verify count, exclusion, and single-ex case.
+
+### Architecture summary (unchanged from pass 38)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`.
+Rotation logic is a pure function in `rotationEngine.ts`. Stats are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+---
+
 ## Pass 38 — 2026-05-24 (branch `claude/dreamy-mccarthy-oaS1e`)
 
 ### Observations on entry

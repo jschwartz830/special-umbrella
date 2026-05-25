@@ -1,5 +1,95 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-25 (thirty-ninth pass) — branch `claude/dreamy-mccarthy-0z9MJ`
+
+### Executive summary
+
+1. **What changed:** Fixed two more stale `nanoid` import paths (csv.ts, PlanBuilderPage.tsx).
+   Fixed `buildLastSessionSummary` producing "×undefined" when a set has no rep data. Added
+   "+N more" exercise count hint for multi-exercise workouts.
+2. **Highest confidence:** The `nanoid` import fix is purely mechanical — no behavior change.
+   The "×undefined" fix is a clear display bug with a minimal, well-tested correction.
+3. **Risks:** None significant. The "+N more" feature adds text to an existing hint string and
+   is entirely additive — single-exercise workouts are unchanged.
+4. **Review first:** Check TodayPage's pending workout hint for a weights day that logged
+   multiple exercises in the prior session. Should now show "(+N more)". Verify the hint
+   still looks correct for a single-exercise workout (no suffix expected).
+
+---
+
+### Biggest issues found
+
+1. **`buildLastSessionSummary` "×undefined" display bug** — When a set records load but not
+   reps (e.g. timed holds, isometric work, or load-only entries), `actualReps` is null and
+   `targetReps` may be undefined. The old `!= null` ternary passed `undefined` directly into
+   the template string, producing "Last: 2×undefined @ 135 lb Squat". Fixed.
+2. **`nanoid` import coupling in csv.ts and PlanBuilderPage.tsx** — Pass 37 fixed this in
+   exerciseHistoryStore but these two files were missed. Both now import directly from
+   `lib/utils`. No behavior change, cleaner dependency graph.
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Files |
+|---|------|-------------|-------|
+| 1 | fix (coupling) | `nanoid` imports from canonical `lib/utils` in csv.ts + PlanBuilderPage | 2 |
+| 2 | fix (bug) | "×undefined" → "N sets" fallback in `buildLastSessionSummary` | 1 |
+| 3 | feat | "+N more" exercise count suffix for multi-exercise workout hints | 1 (+1 test) |
+
+---
+
+### Definitely keep
+
+- All three changes. The `nanoid` fix is mechanical with no risk. The "×undefined" fix is
+  clearly correct. The "+N more" feature is small, reversible, and improves UX for complex
+  programs.
+
+### Probably keep but tweak
+
+- Nothing in this pass.
+
+### Do not keep
+
+- Nothing in this pass.
+
+### Recommendations only (not implemented)
+
+- **`computeWorkoutTypeBreakdown` avgEffort not surfaced**: The `computeWorkoutTypeBreakdown`
+  function in `historyStats.ts` computes `avgEffort` per workout type and is well-tested, but
+  this data is not used in HistoryPage (which uses a manually-computed `typeCountMap` instead).
+  Replacing `typeCountMap` with `computeWorkoutTypeBreakdown` and showing avg effort alongside
+  each type in the stats summary would be a natural next step.
+- **`computeCurrentDayIndex` targetDate < startDate edge case**: When `targetDate` is before
+  `plan.startDate`, `differenceInCalendarDays` returns a negative number and the loop body
+  never executes — the function returns `startDayIndex`. This is reasonable behavior but
+  has no dedicated test. Low risk to add a guard test.
+- **HistoryPage `typeCountMap` vs `computeWorkoutTypeBreakdown`**: The HistoryPage computes
+  a manual type count inline rather than using the shared `computeWorkoutTypeBreakdown` utility.
+  Consolidating these would reduce duplication and expose `skipped` / `avgEffort` data.
+
+---
+
+### Open questions for me
+
+- Is "N sets" (vs "N×undefined") the right fallback label for load-only sets? An alternative
+  would be to omit the sets/reps segment entirely when no rep count is available, showing
+  just "@ 135 lb Squat". Both are better than "×undefined"; this is a UX preference call.
+- Is "+N more" the right level of verbosity for the session hint, or would you prefer just
+  showing the number of exercises without the qualifier (e.g. "3 exercises" as the prefix)?
+
+---
+
+### Known issues or incomplete work
+
+- None from this pass.
+
+### Dependencies added
+
+- None.
+
+---
+
 ## 2026-05-24 (thirty-eighth pass) — branch `claude/dreamy-mccarthy-oaS1e`
 
 ### Executive summary

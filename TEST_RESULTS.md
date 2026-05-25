@@ -1,5 +1,39 @@
 # Test Results
 
+## 2026-05-25 (thirty-ninth pass) — branch `claude/dreamy-mccarthy-0z9MJ`
+
+**Result: 743 passing, 0 failing** (+5 new tests; 0 previously-failing tests)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 738 |
+| Tests on exit | 743 |
+| New tests | +5 |
+| Failures | 0 |
+
+### New tests added
+
+**`src/lib/__tests__/sessionSummary.test.ts`** (+5 tests in `buildLastSessionSummary` describe block):
+
+| Test | Covers |
+|------|--------|
+| shows "N sets" (not "×undefined") when both actualReps and targetReps absent | Bug fix: null reps fallback |
+| falls back to targetReps when actualReps is null | Reps resolution chain |
+| appends "+N more" when multiple exercises have actual data | Multi-exercise feature |
+| does not append "+N more" for a single-exercise workout | Single-exercise unchanged |
+| counts only exercises with actual data when computing moreCount | Exclusion of empty exercises |
+
+### Important areas still untested
+
+- `computeCurrentDayIndex` with `targetDate` before `plan.startDate` (negative dayCount path)
+- `HistoryPage` component-level integration (no component tests in the suite)
+- `PlanBuilderPage` component-level integration
+- `computeWorkoutTypeBreakdown` is tested but its HistoryPage integration path uses a separate
+  manual `typeCountMap` — the two implementations are not cross-checked in tests
+
+---
+
 ## 2026-05-24 (thirty-eighth pass) — branch `claude/dreamy-mccarthy-oaS1e`
 
 **Result: 738 passing, 0 failing** (+4 new tests; 0 previously-failing tests)

@@ -1,5 +1,68 @@
 # Overnight Changelog
 
+## 2026-05-25 (thirty-ninth pass) — branch `claude/dreamy-mccarthy-0z9MJ`
+
+Baseline on entry: **738 passing, 0 failing**. Exit state: **743 passing, 0 failing** (+5 tests).
+
+---
+
+### Change 1 — fix: nanoid import path in csv.ts and PlanBuilderPage.tsx
+
+**Summary:** Both `src/lib/csv.ts` and `src/pages/PlanBuilderPage.tsx` imported `nanoid`
+from `'../engine/rotationEngine'` (or `'../../engine/rotationEngine'`). rotationEngine.ts
+re-exports `nanoid` from `lib/utils` — the re-export works, but couples these utilities to
+the rotation engine's public surface. The same issue was fixed in `exerciseHistoryStore.ts`
+in pass 37, but these two files were missed.
+
+**Why it matters:** Import coupling at this level is low-risk but creates a confusing
+dependency graph: changing rotationEngine's exports could silently break CSV parsing and
+plan editing. Importing from the canonical source removes the indirection.
+
+**Files changed:**
+- `src/lib/csv.ts` — `from '../engine/rotationEngine'` → `from './utils'`
+- `src/pages/PlanBuilderPage.tsx` — `from '../engine/rotationEngine'` → `from '../lib/utils'`
+
+**Risks / tradeoffs:** No behavior change. Both imports resolve to the same function.
+
+**Rollback:** `git revert` the commit — no state affected, purely an import change.
+
+---
+
+### Change 2 — fix + feat: buildLastSessionSummary avoids ×undefined; shows +N more
+
+**Summary (fix):** `buildLastSessionSummary` in `sessionSummary.ts` used
+`s.actualReps != null ? s.actualReps : s.targetReps` to determine the rep count to display.
+When `actualReps` is null and `targetReps` is `undefined` (no target was set), this passed
+`undefined` directly into the template string — producing "Last: 2×undefined @ 135 lb Squat".
+Fixed by using nullish coalescing: `s.actualReps ?? s.targetReps ?? null`. When the result
+is null, the format falls back to "N sets" (e.g. "Last: 2 sets @ 135 lb Squat").
+
+**Summary (feature):** For workouts with multiple exercises that have actual logged data,
+appends "(+N more)" to the session hint. For example, a 3-exercise session now shows
+"Last: 1×5 @ 185 lb Squat (+2 more)" instead of only the first exercise. Only exercises
+with at least one non-null reps or load value are counted, so placeholder/unlogged exercises
+don't inflate the count. Single-exercise workouts are unchanged.
+
+**Why it matters (fix):** The bug affects any set where load was recorded but reps were not —
+a real pattern for timed holds, isometric exercises, or when a user logs weight only. The
+corrupted output "×undefined" is immediately visible and confusing.
+
+**Why it matters (feature):** TodayPage's pending workout hint now reflects the scope of the
+last session at a glance. Users with 4–6 lift programs see more useful context for planning
+their next session weight selections.
+
+**Files changed:**
+- `src/lib/sessionSummary.ts` — reps assignment + repsStr + moreStr (7 lines)
+- `src/lib/__tests__/sessionSummary.test.ts` — 5 new tests
+
+**Risks / tradeoffs:** The bug fix changes the display format for the undefined case from
+"×undefined" to " sets". This is strictly better UX. The multi-exercise feature appends text
+to an existing string — single-exercise output is bit-for-bit identical to before.
+
+**Rollback:** `git revert` the commit — pure display-layer change, no store or schema impact.
+
+---
+
 ## 2026-05-24 (thirty-eighth pass) — branch `claude/dreamy-mccarthy-oaS1e`
 
 Baseline on entry: **734 passing, 0 failing**. Exit state: **738 passing, 0 failing** (+4 tests).
