@@ -67,13 +67,22 @@ export function buildLastSessionSummary(
         ? setsWithLoad.reduce((best, cur) => (cur.actualLoad! > best.actualLoad! ? cur : best))
         : activeSets[0]
       const sets = activeSets.length
-      const reps = s.actualReps != null ? s.actualReps : s.targetReps
+      // ?? chain: prefer actual reps, fall back to target, then null.
+      // The old `!= null` ternary passed s.targetReps directly, which could
+      // be undefined when no target was set — producing "×undefined" in the
+      // output. Nullish coalescing ensures null is the terminal fallback.
+      const reps = s.actualReps ?? s.targetReps ?? null
+      const repsStr = reps != null ? `×${reps}` : ' sets'
       const load = s.actualLoad != null ? `@ ${s.actualLoad} lb` : ''
       const isPB =
         maxLoadByExercise != null &&
         s.actualLoad != null &&
         maxLoadByExercise[ex.exercise] === s.actualLoad
-      return `Last: ${sets}×${reps}${load ? ' ' + load : ''} ${ex.exercise}${isPB ? ' · PB' : ''}`
+      const activeExerciseCount = (outcome.weightsActual?.exercises ?? []).filter(
+        e => e.sets.some(s2 => s2.actualReps != null || s2.actualLoad != null),
+      ).length
+      const moreStr = activeExerciseCount > 1 ? ` (+${activeExerciseCount - 1} more)` : ''
+      return `Last: ${sets}${repsStr}${load ? ' ' + load : ''} ${ex.exercise}${isPB ? ' · PB' : ''}${moreStr}`
     }
   }
   // Run: distance, duration, and pace when available
