@@ -14,7 +14,7 @@ import {
 import { usePlanStore, makeDay, makeSlot } from '../store/planStore'
 import { WORKOUT_META, WORKOUT_TYPES } from '../lib/constants'
 import { Modal } from '../components/shared/Modal'
-import { nanoid } from '../engine/rotationEngine'
+import { nanoid } from '../lib/utils'
 import type { Plan, PlanDay, WorkoutSlot } from '../types'
 import type { ExerciseSpec, ProgressionType } from '../types/program'
 import { EXERCISE_LIBRARY, findExerciseByName } from '../lib/exerciseLibrary'
