@@ -1,3 +1,42 @@
+# Feature Proposal — Swim Actuals in History CSV (Pass 40)
+
+Date: 2026-05-26
+Branch: `claude/dreamy-mccarthy-8Sa0s`
+Status: **Implemented this run**
+
+## Feature selected
+
+Include swim workout actual data in the history CSV export and import.
+
+## Why it was selected
+
+The history CSV is the app's primary backup and migration path. `historyToCsv` already
+exports run actuals (distance, duration, pace, heart rate, completedAsPlanned). Swim
+actuals (`actualDistanceMeters`, `actualDurationMin`, `averagePaceSecondsPer100m`,
+`completedAsPlanned`) were silently omitted — not a silent failure but a silent data loss.
+Any user who swims and exports for backup will lose all swim performance data on re-import.
+This is a correctness gap with zero design ambiguity: the data model already has `swimActual`
+on `WorkoutOutcome`, the import path already handles run actuals via the same column-lookup
+pattern, and the change is purely additive.
+
+## What was proposed
+
+1. Append four new header columns (`swimActualDistanceMeters`, `swimActualDurationMin`,
+   `swimAveragePaceSecondsPer100m`, `swimCompletedAsPlanned`) to `HISTORY_HEADERS`
+   after the existing run columns.
+2. Write `outcome.swimActual` fields into both rotation and extra row builders.
+3. Add a `swimActual` reconstruction block to `buildOutcomeFromRow`.
+4. Add round-trip tests.
+
+## What was not proposed
+
+- No UI changes — swim data export is transparent to users.
+- No schema version bump — column additions are backward compatible with header-based parsing.
+- No merging of `completedAsPlanned` into a shared column — the run and swim interpretations
+  are distinct enough to warrant separate columns and separate reconstruction paths.
+
+---
+
 # Feature Proposal — Surface progressionRecommendation.note on TodayPage
 
 Date: 2026-05-24

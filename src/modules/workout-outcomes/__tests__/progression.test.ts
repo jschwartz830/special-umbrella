@@ -489,4 +489,16 @@ describe('buildProgressionRecommendation — swim slot', () => {
     )
     expect(result?.action).toBe('hold')
   })
+
+  it('returns progress when effort is null (defaults to 3)', () => {
+    const result = buildProgressionRecommendation(
+      makeSlot('swim'),
+      makeOutcome({
+        completionState: 'completed',
+        perceivedEffort: null,
+        swimActual: { actualDistanceMeters: 1000 },
+      }),
+    )
+    expect(result?.action).toBe('progress')
+  })
 })

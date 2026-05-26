@@ -461,6 +461,82 @@ describe('historyToCsv + historyFromCsv', () => {
     expect(warnings.some(w => w.includes('invalid workoutType'))).toBe(true)
   })
 
+  // ── Swim actuals round-trip ────────────────────────────────────────────────
+
+  it('round-trips swim actuals on a rotation entry', () => {
+    const swimEntries: HistoryEntry[] = [
+      {
+        id: 'es1',
+        planId: plan.id,
+        calendarDate: '2026-04-15',
+        planDayIndex: 0,
+        action: 'complete',
+        createdAt: '2026-04-15T08:00:00Z',
+      },
+    ]
+    const swimOutcomes: Record<string, WorkoutOutcome> = {
+      [`${plan.id}_2026-04-15`]: {
+        workoutInstanceId: `${plan.id}_2026-04-15`,
+        completionState: 'completed',
+        swimActual: {
+          actualDistanceMeters: 1500,
+          actualDurationMin: 35,
+          averagePaceSecondsPer100m: 140,
+          completedAsPlanned: true,
+        },
+      },
+    }
+    const csv = historyToCsv(swimEntries, [], plans, swimOutcomes)
+    const { outcomes: parsedOutcomes, warnings } = historyFromCsv(csv, planIds)
+    expect(warnings).toEqual([])
+    expect(parsedOutcomes).toHaveLength(1)
+    const o = parsedOutcomes[0]
+    expect(o.swimActual?.actualDistanceMeters).toBe(1500)
+    expect(o.swimActual?.actualDurationMin).toBe(35)
+    expect(o.swimActual?.averagePaceSecondsPer100m).toBe(140)
+    expect(o.swimActual?.completedAsPlanned).toBe(true)
+    expect(o.runActual).toBeUndefined()
+  })
+
+  it('round-trips swim actuals on an extra entry', () => {
+    const swimExtra: ExtraWorkoutEntry[] = [
+      {
+        id: 'sx1',
+        planId: plan.id,
+        calendarDate: '2026-04-15',
+        workoutType: 'swim',
+        workoutName: 'Evening Swim',
+        createdAt: '2026-04-15T18:00:00Z',
+      },
+    ]
+    const swimExtraOutcomes: Record<string, WorkoutOutcome> = {
+      [`${plan.id}_2026-04-15_extra_sx1`]: {
+        workoutInstanceId: `${plan.id}_2026-04-15_extra_sx1`,
+        completionState: 'completed',
+        swimActual: {
+          actualDistanceMeters: 800,
+          actualDurationMin: 20,
+          averagePaceSecondsPer100m: 150,
+          completedAsPlanned: false,
+        },
+      },
+    }
+    const csv = historyToCsv(entries, swimExtra, plans, swimExtraOutcomes)
+    const { extras: parsedExtras, outcomes: parsedOutcomes, warnings } = historyFromCsv(csv, planIds)
+    expect(warnings).toEqual([])
+    const swimOut = parsedOutcomes.find(o => o.workoutInstanceId.includes('extra_sx1'))
+    expect(swimOut?.swimActual?.actualDistanceMeters).toBe(800)
+    expect(swimOut?.swimActual?.completedAsPlanned).toBe(false)
+    expect(parsedExtras.find(x => x.id === 'sx1')).toBeDefined()
+  })
+
+  it('does not set swimActual when all swim columns are empty', () => {
+    const csv = historyToCsv(entries, [], plans, outcomes)
+    const { outcomes: parsedOutcomes } = historyFromCsv(csv, planIds)
+    const o = parsedOutcomes[0]
+    expect(o.swimActual).toBeUndefined()
+  })
+
   // ── Backward compatibility ─────────────────────────────────────────────────
 
   it('treats pre-2026-04-21 CSVs (no entryKind column) as all-rotation', () => {
