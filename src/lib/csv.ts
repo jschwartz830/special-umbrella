@@ -471,6 +471,10 @@ const HISTORY_HEADERS = [
   'averagePaceSecondsPerMile',
   'averageHeartRate',
   'completedAsPlanned',
+  'swimActualDistanceMeters',
+  'swimActualDurationMin',
+  'swimAveragePaceSecondsPer100m',
+  'swimCompletedAsPlanned',
   'completedAt',
   'notes',
   'createdAt',
@@ -508,6 +512,7 @@ export function historyToCsv(
         e.planDayIndex !== undefined ? plan?.days[e.planDayIndex] : undefined
       const outcome = outcomes[makeWorkoutInstanceId(e.planId, e.calendarDate)]
       const runActual = outcome?.runActual ?? null
+      const swimActual = outcome?.swimActual ?? null
       rows.push([
         'rotation',
         '',  // extraId — rotation rows don't have one
@@ -529,6 +534,10 @@ export function historyToCsv(
         runActual?.averagePaceSecondsPerMile ?? '',
         runActual?.averageHeartRate ?? '',
         runActual?.completedAsPlanned ?? '',
+        swimActual?.actualDistanceMeters ?? '',
+        swimActual?.actualDurationMin ?? '',
+        swimActual?.averagePaceSecondsPer100m ?? '',
+        swimActual?.completedAsPlanned ?? '',
         outcome?.completedAt ?? '',
         e.notes ?? outcome?.notes ?? '',
         e.createdAt,
@@ -538,6 +547,7 @@ export function historyToCsv(
       const plan = plans[x.planId]
       const outcome = outcomes[makeExtraWorkoutInstanceId(x.planId, x.calendarDate, x.id)]
       const runActual = outcome?.runActual ?? null
+      const swimActual = outcome?.swimActual ?? null
       rows.push([
         'extra',
         x.id,           // extraId — used for idempotent re-import
@@ -559,6 +569,10 @@ export function historyToCsv(
         runActual?.averagePaceSecondsPerMile ?? '',
         runActual?.averageHeartRate ?? '',
         runActual?.completedAsPlanned ?? '',
+        swimActual?.actualDistanceMeters ?? '',
+        swimActual?.actualDurationMin ?? '',
+        swimActual?.averagePaceSecondsPer100m ?? '',
+        swimActual?.completedAsPlanned ?? '',
         outcome?.completedAt ?? '',
         x.notes ?? outcome?.notes ?? '',
         x.createdAt,
@@ -734,5 +748,24 @@ function buildOutcomeFromRow(
       completedAsPlanned,
     }
   }
+
+  const swimDistance = toNum(row.swimActualDistanceMeters)
+  const swimDuration = toNum(row.swimActualDurationMin)
+  const swimPace = toNum(row.swimAveragePaceSecondsPer100m)
+  const swimCompletedAsPlanned = toBool(row.swimCompletedAsPlanned)
+  if (
+    swimDistance !== undefined ||
+    swimDuration !== undefined ||
+    swimPace !== undefined ||
+    swimCompletedAsPlanned !== undefined
+  ) {
+    outcome.swimActual = {
+      actualDistanceMeters: swimDistance,
+      actualDurationMin: swimDuration,
+      averagePaceSecondsPer100m: swimPace,
+      completedAsPlanned: swimCompletedAsPlanned,
+    }
+  }
+
   return outcome
 }
