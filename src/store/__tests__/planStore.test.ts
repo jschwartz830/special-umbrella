@@ -127,6 +127,13 @@ describe('setActivePlan', () => {
     // Should be a YYYY-MM-DD string matching today
     expect(getState().plans['plan-1'].startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
+
+  it('is a no-op when the plan id does not exist', () => {
+    usePlanStore.setState({ plans: {}, activePlanId: null })
+    getState().setActivePlan('nonexistent-id')
+    expect(getState().plans['nonexistent-id']).toBeUndefined()
+    expect(getState().activePlanId).toBeNull()
+  })
 })
 
 // ── deactivatePlan ────────────────────────────────────────────────────────────
