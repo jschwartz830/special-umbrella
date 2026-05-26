@@ -1,5 +1,46 @@
 # Test Results
 
+## 2026-05-26 (fortieth pass) — branch `claude/dreamy-mccarthy-8Sa0s`
+
+**Result: 748 passing, 0 failing** (+5 new tests; 0 previously-failing tests)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 743 |
+| Tests on exit | 748 |
+| New tests | +5 |
+| Failures | 0 |
+
+### New tests added
+
+**`src/store/__tests__/planStore.test.ts`** (+1 test in `setActivePlan` describe):
+
+| Test | Covers |
+|------|--------|
+| is a no-op when the plan id does not exist | Guard prevents state corruption on invalid ID |
+
+**`src/modules/workout-outcomes/__tests__/progression.test.ts`** (+1 test in swim describe):
+
+| Test | Covers |
+|------|--------|
+| returns progress when effort is null (defaults to 3) | Null effort `?? 3` default for swim |
+
+**`src/lib/__tests__/csv.test.ts`** (+3 tests in swim actuals section):
+
+| Test | Covers |
+|------|--------|
+| round-trips swim actuals on a rotation entry | Full swim field export + import |
+| round-trips swim actuals on an extra entry | Swim on extra workout entries |
+| does not set swimActual when all swim columns are empty | Backward compat — unset when absent |
+
+### Important areas still untested
+
+- `computeCurrentDayIndex` with `targetDate` before `plan.startDate` (negative dayCount path)
+- `HistoryPage` component-level integration (no component tests in the suite)
+
+---
+
 ## 2026-05-25 (thirty-ninth pass) — branch `claude/dreamy-mccarthy-0z9MJ`
 
 **Result: 743 passing, 0 failing** (+5 new tests; 0 previously-failing tests)

@@ -1,5 +1,50 @@
 # Implementation Plan
 
+## Pass 40 — 2026-05-26 (branch `claude/dreamy-mccarthy-8Sa0s`)
+
+### Observations on entry
+
+- Baseline: **743 passing, 0 failing** — clean baseline inherited from pass 39.
+- **`planStore.setActivePlan` missing guard for non-existent ID**: If called with a plan ID
+  not present in `state.plans`, the function would iterate all existing plans deactivating
+  them, then write `updated[id] = { ...undefined, status: 'active', ... }` — spreading
+  undefined produces an empty-ish object missing all required Plan fields. `activePlanId`
+  would also be set to the invalid ID. This is a silent data corruption path reachable from
+  any UI component that passes an unvalidated ID.
+- **`buildProgressionRecommendation` null effort swim test missing**: Pass 39 had a run test
+  for null `perceivedEffort` defaulting to 3 (progress threshold), but no symmetric swim test.
+  The swim branch uses the identical `?? 3` pattern and was untested for this path.
+- **History CSV export silently drops swim actuals**: `historyToCsv` only wrote run actuals
+  (`actualDistanceMiles`, `actualDurationMin`, `averagePaceSecondsPerMile`, `averageHeartRate`,
+  `completedAsPlanned`) to the CSV. The four swim fields (`actualDistanceMeters`,
+  `actualDurationMin`, `averagePaceSecondsPer100m`, `completedAsPlanned`) were never exported.
+  Users who swim and export/import CSV lose all swim actual data. The import parser also had
+  no path to reconstruct `swimActual` from a row.
+
+### Decisions
+
+- **Fix `setActivePlan` guard** (BUG): Add `if (!(id in s.plans)) return s` at the top of
+  the setter. No observable change for valid IDs. Prevents state corruption for invalid IDs.
+  Risk: zero — strictly a guard on the existing code path.
+- **Add swim null effort test** (TEST): One new test for the swim slot: `perceivedEffort: null`
+  should resolve to `progress`. Mirrors the existing run test. No code change.
+- **Add swim actuals to CSV** (FEATURE): Append four new columns to `HISTORY_HEADERS` after
+  the existing run columns. Update both the rotation and extra row builders in `historyToCsv`.
+  Update `buildOutcomeFromRow` to parse these columns into `swimActual`. Old CSVs without
+  these columns parse as undefined → `swimActual` stays unset (backward compatible).
+
+### Files changed
+
+| File | Change type | Description |
+|------|-------------|-------------|
+| `src/store/planStore.ts` | fix | Guard `setActivePlan` against non-existent plan ID |
+| `src/store/__tests__/planStore.test.ts` | test | Verify guard with `'nonexistent-id'` |
+| `src/modules/workout-outcomes/__tests__/progression.test.ts` | test | Swim null effort → progress |
+| `src/lib/csv.ts` | feat | Export + import swim actuals in history CSV |
+| `src/lib/__tests__/csv.test.ts` | test | Swim actuals round-trip (rotation, extra, empty) |
+
+---
+
 ## Pass 39 — 2026-05-25 (branch `claude/dreamy-mccarthy-0z9MJ`)
 
 ### Observations on entry

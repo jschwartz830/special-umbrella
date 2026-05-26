@@ -1,3 +1,45 @@
+# Feature Review — Swim Actuals in History CSV (Pass 40)
+
+Date: 2026-05-26
+Branch: `claude/dreamy-mccarthy-8Sa0s`
+Classification: **Keep**
+
+## What was actually built
+
+Four new columns appended to `HISTORY_HEADERS` in `src/lib/csv.ts`:
+`swimActualDistanceMeters`, `swimActualDurationMin`, `swimAveragePaceSecondsPer100m`,
+`swimCompletedAsPlanned`. Both the rotation and extra row builders in `historyToCsv`
+now read `outcome?.swimActual` and emit these fields. `buildOutcomeFromRow` reconstructs
+`outcome.swimActual` from these columns when at least one is non-empty.
+
+## What assumptions were encoded
+
+- Column-based parsing in `parseCsvToRecords` ensures backward compatibility — old exports
+  without swim columns yield `row.swimActualDistanceMeters === undefined`, which `toNum`
+  returns `undefined` for, keeping `swimActual` unset on import.
+- `completedAsPlanned` for run and `swimCompletedAsPlanned` for swim are kept separate to
+  avoid ambiguity. There's currently no workout type that is both run and swim, but the
+  separation makes each row unambiguous regardless of `workoutType`.
+- An outcome with only `swimActual` (no `runActual`) imported from the new CSV will not
+  spuriously set `runActual` — the run-actual block only fires when run columns are present.
+
+## Confidence
+
+High. The change is entirely within the CSV serialization layer, with no store or engine
+changes. The pattern mirrors exactly the existing run-actual export/import. Three tests
+cover the full round-trip for both rotation entries, extra entries, and the empty-column
+(backward compat) case. All 748 tests pass.
+
+## Open questions
+
+- Should `averagePaceSecondsPer100m` be derived on import if distance and duration are
+  both present but pace is absent? Currently not derived — the import is faithful to what
+  was exported. Derivation could be added later without breaking anything.
+- Should the CSV header order be documented in a comment? It's implicit in the
+  `HISTORY_HEADERS` array, which is the source of truth.
+
+---
+
 # Feature Review — progressionRecommendation.note on TodayPage
 
 Date: 2026-05-24

@@ -1,5 +1,101 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-26 (fortieth pass) — branch `claude/dreamy-mccarthy-8Sa0s`
+
+### Executive summary
+
+1. **What changed:** Fixed `setActivePlan` spreading `undefined` onto unknown plan IDs
+   (silent data corruption). Added swim actuals export/import to history CSV (data loss fix
+   for swim users). Added test coverage for the swim null-effort progression path.
+2. **Highest confidence:** The `setActivePlan` guard is a one-line early return — no behavior
+   change for valid IDs, unambiguously correct for invalid ones. The CSV swim columns are
+   purely additive; backward compatibility is guaranteed by the existing header-based parser.
+3. **Risks:** Near zero. All three changes are additive or protective. The CSV change extends
+   the column count of every future export, which is invisible to users.
+4. **Review first:** Export a history CSV for a plan with at least one logged swim workout.
+   Verify that `swimActualDistanceMeters` (and the other swim columns) appear in the file with
+   the correct values. Re-import that CSV and confirm `swimActual` is restored on the outcome.
+
+---
+
+### Biggest issues found
+
+1. **`setActivePlan` silent corruption on unknown ID** — If called with a plan ID not in
+   `state.plans`, the function would deactivate all existing active plans and then write
+   `updated[id] = { ...undefined, status: 'active', ... }`. Spreading `undefined` is a no-op
+   in JS, so the resulting object has only the four explicitly-assigned fields and none of the
+   required Plan fields (`name`, `days`, `duration`, etc.). `activePlanId` is also set to the
+   invalid ID. This is reachable from any component that calls `setActivePlan` without first
+   validating that the ID exists (e.g., after a plan was deleted in another tab).
+
+2. **Swim actuals silently dropped in CSV export** — `historyToCsv` only wrote run actuals
+   to the CSV. The four swim fields were never included. `buildOutcomeFromRow` had no swim
+   parsing path. Any swim user who exports CSV for backup and re-imports loses all swim
+   performance data. This was a structural gap — the data model had `swimActual` since the
+   swim feature was added, but the CSV layer never caught up.
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Files |
+|---|------|-------------|-------|
+| 1 | fix (correctness) | Guard `setActivePlan` against non-existent plan IDs | planStore.ts + test |
+| 2 | test | Swim null `perceivedEffort` → `progress` in `buildProgressionRecommendation` | progression.test.ts |
+| 3 | feat (data integrity) | Swim actuals in history CSV export + import | csv.ts + csv.test.ts |
+
+---
+
+### Definitely keep
+
+- **`setActivePlan` guard** — Silent data corruption path closed. Zero risk. One-line fix.
+- **Swim CSV actuals** — Correctness fix for swim users. Backward compatible. Well-tested.
+- **Swim null effort test** — Symmetric coverage with the existing run test. No risk.
+
+### Probably keep but tweak
+
+- Nothing in this pass.
+
+### Do not keep
+
+- Nothing in this pass.
+
+### Recommendations only (not implemented)
+
+- **`computeCurrentDayIndex` targetDate < startDate edge case**: When `targetDate` is before
+  `plan.startDate`, `differenceInCalendarDays` returns a negative number and the loop body
+  never executes — the function returns `startDayIndex`. Reasonable behavior but has no
+  dedicated test. Low risk to add a guard test.
+- **`computeWorkoutTypeBreakdown` avgEffort not surfaced**: The function computes `avgEffort`
+  per workout type and is well-tested, but HistoryPage uses a manually-computed `typeCountMap`
+  instead. Replacing with `computeWorkoutTypeBreakdown` would reduce duplication and expose
+  effort data per type.
+- **CSV swim pace derivation on import**: If a swim row has distance + duration but no pace
+  column, the pace is currently left undefined. Could derive `averagePaceSecondsPer100m` from
+  the two present values, matching what the app does for run actuals.
+
+---
+
+### Open questions for me
+
+- Is separating `completedAsPlanned` (run) and `swimCompletedAsPlanned` (swim) the right
+  design? Could merge into a single `completedAsPlanned` column shared by both types, since
+  each row has a single workout type. The current approach is more explicit and avoids any
+  future ambiguity; the merged approach reduces columns. Either works — current choice is the
+  more conservative one.
+
+---
+
+### Known issues or incomplete work
+
+- None from this pass.
+
+### Dependencies added
+
+- None.
+
+---
+
 ## 2026-05-25 (thirty-ninth pass) — branch `claude/dreamy-mccarthy-0z9MJ`
 
 ### Executive summary

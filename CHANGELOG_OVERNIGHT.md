@@ -1,5 +1,79 @@
 # Overnight Changelog
 
+## 2026-05-26 (fortieth pass) — branch `claude/dreamy-mccarthy-8Sa0s`
+
+Baseline on entry: **743 passing, 0 failing**. Exit state: **748 passing, 0 failing** (+5 tests).
+
+---
+
+### Change 1 — fix: guard setActivePlan against non-existent plan ID
+
+**Summary:** `planStore.setActivePlan(id)` previously had no early-return guard for
+the case where `id` is not present in `state.plans`. The function would iterate all
+existing plans and deactivate them, then write `updated[id] = { ...updated[id], ... }`
+where `updated[id]` was `undefined` — spreading undefined is a no-op in JS, so the
+result was a plan record with only the explicitly-assigned fields (`status`, `startDate`,
+`startDayIndex`, `updatedAt`) and no required plan properties. `activePlanId` would also
+be set to the invalid ID, pointing to a malformed entry on every render.
+
+**Fix:** Added `if (!(id in s.plans)) return s` before the deactivation loop.
+
+**Why it matters:** Any UI component calling `setActivePlan` with an unvalidated ID
+(e.g., after a plan was deleted from a different tab/window) would silently corrupt the
+store. The guard makes the behavior deterministic and safe.
+
+**Files changed:**
+- `src/store/planStore.ts` — added guard
+- `src/store/__tests__/planStore.test.ts` — added test `'is a no-op when the plan id does not exist'`
+
+**Risks / tradeoffs:** None. Guard is only hit for IDs not in the store — a condition
+that should never arise in normal use, so no observable change for valid calls.
+
+---
+
+### Change 2 — test: null perceivedEffort coverage for swim buildProgressionRecommendation
+
+**Summary:** The run slot already had a test verifying that `perceivedEffort: null`
+defaults to 3 (the progress threshold) and returns `action: 'progress'`. The swim branch
+uses the identical `(outcome.perceivedEffort ?? 3) <= 3` expression but had no dedicated
+test. Added one test for the swim case.
+
+**Files changed:**
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` — +1 test
+
+**Risks / tradeoffs:** Test-only. No production code change.
+
+---
+
+### Change 3 — feat: include swim actuals in history CSV export and import
+
+**Summary:** `historyToCsv` only exported run actuals. Swim workout data
+(`actualDistanceMeters`, `actualDurationMin`, `averagePaceSecondsPer100m`,
+`completedAsPlanned`) was silently dropped — users who export CSV for backup or migration
+lose all swim workout performance data.
+
+**Fix:** Added four new columns to `HISTORY_HEADERS` (`swimActualDistanceMeters`,
+`swimActualDurationMin`, `swimAveragePaceSecondsPer100m`, `swimCompletedAsPlanned`).
+Both the rotation and extra row builders now populate these columns from
+`outcome.swimActual`. The `buildOutcomeFromRow` importer reconstructs `swimActual` when
+any swim column is present. Columns are appended after the existing run columns so all
+prior CSV exports remain valid (missing columns parse as undefined → `swimActual` unset).
+
+**Files changed:**
+- `src/lib/csv.ts` — HISTORY_HEADERS, rotation row, extra row, buildOutcomeFromRow
+- `src/lib/__tests__/csv.test.ts` — +3 tests: rotation round-trip, extra round-trip, empty columns
+
+**Risks / tradeoffs:** The four new columns extend every CSV export going forward. Old
+exports are fully backward compatible. `completedAsPlanned` now has two representations
+(`completedAsPlanned` for run, `swimCompletedAsPlanned` for swim) — this is intentional
+to avoid ambiguity when a row contains both.
+
+**Rollback:** `git revert` the commit. CSVs exported before the revert would re-import
+correctly (no swim columns → `swimActual` undefined). CSVs exported after this feature
+and before a revert would lose swim data on re-import, but no data is corrupted in the store.
+
+---
+
 ## 2026-05-25 (thirty-ninth pass) — branch `claude/dreamy-mccarthy-0z9MJ`
 
 Baseline on entry: **738 passing, 0 failing**. Exit state: **743 passing, 0 failing** (+5 tests).
