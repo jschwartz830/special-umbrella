@@ -1,5 +1,42 @@
 # Implementation Plan
 
+## Pass 41 — 2026-05-27 (branch `claude/dreamy-mccarthy-9NxZ6`)
+
+### Observations on entry
+
+- Baseline: **748 passing, 0 failing** — clean baseline from pass 40.
+- **No React Error Boundary exists in the component tree**: Any uncaught render or
+  hook error causes the full UI to go blank (React 18 unmounts the tree). This has
+  been a recurring recommendation across passes 36–40 but was never implemented.
+- **`HistoryPage.saveAndClose` does not validate empty date**: When the user clears
+  the date input and clicks Save, `editingEntryDate` is `''`. The empty string passes
+  the conflict check (`'' !== oldDate` is true, but no existing entry has
+  `calendarDate === ''`), so `updateEntryDate(id, '')` is called — corrupting the
+  entry's `calendarDate` to `''`. Subsequent renders or lookups that use
+  `calendarDate` as a key silently fail. Same structural gap in `saveAndCloseExtra`.
+- **`computeCurrentDayIndex` targetDate < startDate has a test**: Test at line 203 of
+  rotationEngine.test.ts was added in a prior pass — this item is already covered.
+
+### Decisions
+
+- **Add ErrorBoundary component** (IMPROVEMENT): Create
+  `src/components/shared/ErrorBoundary.tsx` as a class component wrapping the full
+  `<Routes>` tree in `App.tsx`. Renders a recovery UI with a "Try again" button that
+  resets state. No behavior change on the happy path; prevents blank-screen crashes on
+  errors. Risk: zero — purely additive.
+- **Fix empty date guard in saveAndClose** (BUG): Add `if (!newDate) return` (with
+  `setDateConflict(true)`) before the conflict check in `saveAndClose`. Mirror the
+  same guard in `saveAndCloseExtra`. The error message shown when `dateConflict` is
+  true now distinguishes empty vs. conflict. Risk: near-zero — only adds an early-exit
+  guard before logic that was already unreachable safely.
+
+### Risks
+
+- ErrorBoundary: zero risk on happy path. Slight visual change on crash path (recovery
+  UI instead of blank screen).
+- Empty date guard: no behavior change for valid dates. Only affects the edge case
+  where the user explicitly clears the date input before clicking Save.
+
 ## Pass 40 — 2026-05-26 (branch `claude/dreamy-mccarthy-8Sa0s`)
 
 ### Observations on entry

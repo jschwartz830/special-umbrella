@@ -7,9 +7,11 @@ import { PlansPage } from './pages/PlansPage'
 import { PlanBuilderPage } from './pages/PlanBuilderPage'
 import { ProgramImportPage } from './pages/ProgramImportPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { ErrorBoundary } from './components/shared/ErrorBoundary'
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <Routes>
       <Route path="/" element={<AppShell />}>
         <Route index element={<Navigate to="/today" replace />} />
@@ -23,5 +25,6 @@ export default function App() {
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
+    </ErrorBoundary>
   )
 }

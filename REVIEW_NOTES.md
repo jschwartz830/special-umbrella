@@ -1,5 +1,90 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-27 (forty-first pass) — branch `claude/dreamy-mccarthy-9NxZ6`
+
+### Executive summary
+
+1. **What changed:** Added a React ErrorBoundary to prevent blank-screen crashes
+   (recommended 5 consecutive passes, now implemented). Fixed a silent data
+   corruption bug in `HistoryPage`: clearing the date input and clicking Save
+   would corrupt `calendarDate` to `''`.
+2. **Highest confidence:** ErrorBoundary is purely additive — no behavior on
+   the happy path. Empty date guard is a one-liner early exit.
+3. **Risks:** Near zero. Both changes are strictly protective.
+4. **Review first:** Try editing a history entry, clearing the date field, and
+   clicking Save — confirm the inline "Date is required." error appears and no
+   data is written. To test ErrorBoundary: it can be exercised by temporarily
+   throwing in a component, but the normal happy path is unaffected.
+
+---
+
+### Biggest issues found
+
+1. **Missing ErrorBoundary** — recommended in passes 36–40, now implemented.
+   React 18 unmounts the full tree on any uncaught render error, leaving a
+   completely blank screen with no recovery path. The ErrorBoundary wraps
+   `<Routes>` in `App.tsx` and renders a minimal recovery UI.
+
+2. **`HistoryPage.saveAndClose` silent corruption on empty date** — If the user
+   cleared the date input and clicked Save, `editingEntryDate` was `''`. The
+   conflict check (`'' !== oldDate`) evaluated to true, `moveOutcome` was called
+   with a malformed key, and `updateEntryDate(id, '')` set `calendarDate = ''`.
+   Any subsequent lookup using `calendarDate` as a key would silently return
+   nothing. The same gap existed in `saveAndCloseExtra` (silent no-op there due
+   to absence of a conflict check, but `moveOutcome` + `updateExtraEntryDate`
+   would be called with `''`).
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Files |
+|---|------|-------------|-------|
+| 1 | improvement | Add ErrorBoundary wrapping app root | ErrorBoundary.tsx (new), App.tsx |
+| 2 | fix (correctness) | Guard empty date in HistoryPage edit modal | HistoryPage.tsx |
+
+---
+
+### Definitely keep
+
+- **ErrorBoundary** — Purely additive. Prevents blank-screen UX on any future
+  uncaught error. Zero risk.
+- **Empty date guard** — Closes a silent data corruption path. Minimal change.
+  Error message is user-visible and informative.
+
+### Probably keep but tweak
+
+- Nothing in this pass.
+
+### Do not keep
+
+- Nothing in this pass.
+
+### Recommendations only (not implemented)
+
+- **`typeCountMap` in HistoryPage vs `computeWorkoutTypeBreakdown`**: HistoryPage
+  maintains a manually-computed `typeCountMap` useMemo that duplicates logic in
+  `computeWorkoutTypeBreakdown`. The two differ in detail (typeCountMap uses
+  flatItems; `computeWorkoutTypeBreakdown` takes raw entries + planDaysById Map).
+  Unifying is medium complexity with moderate refactor risk — deferred to a future
+  pass.
+- **Surface expression evaluator errors in ProgramImportPage**: Malformed YAML
+  progression rules fail silently (errors caught and swallowed in
+  `evaluateExpression`/`evaluateCondition`). Surfacing these at import time would
+  aid debugging of YAML programs. Medium complexity.
+
+---
+
+### Known issues or incomplete work
+
+- None from this pass.
+
+### Dependencies added
+
+- None.
+
+---
+
 ## 2026-05-26 (fortieth pass) — branch `claude/dreamy-mccarthy-8Sa0s`
 
 ### Executive summary

@@ -196,6 +196,7 @@ export function HistoryPage() {
     if (!editingEntry) return
     const oldDate = editingEntry.calendarDate
     const newDate = editingEntryDate
+    if (!newDate) { setDateConflict(true); return }
     if (newDate !== oldDate) {
       const conflict = entries.some(
         e => e.id !== editingEntry.id && e.planId === editingEntry.planId && e.calendarDate === newDate,
@@ -309,6 +310,7 @@ export function HistoryPage() {
     if (!editingExtra) return
     const oldDate = editingExtra.calendarDate
     const newDate = editingExtraDate
+    if (!newDate) return
     if (newDate !== oldDate) {
       moveOutcome(
         makeExtraWorkoutInstanceId(editingExtra.planId, oldDate, editingExtra.id),
@@ -685,7 +687,9 @@ export function HistoryPage() {
                 className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
               {dateConflict && (
-                <p className="text-xs text-red-400 mt-1">A workout is already logged for that date.</p>
+                <p className="text-xs text-red-400 mt-1">
+                  {!editingEntryDate ? 'Date is required.' : 'A workout is already logged for that date.'}
+                </p>
               )}
             </div>
             <div>

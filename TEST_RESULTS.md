@@ -1,5 +1,29 @@
 # Test Results
 
+## 2026-05-27 (forty-first pass) — branch `claude/dreamy-mccarthy-9NxZ6`
+
+**Result: 748 passing, 0 failing** (+0 new tests; no new logic paths — all changes are guards or additive components)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 748 |
+| Tests on exit | 748 |
+| New tests | 0 |
+| Failures | 0 |
+
+### New tests added
+
+None. Both changes in this pass are additive or protective:
+
+- **ErrorBoundary**: Class component with no pure-function logic to unit-test.
+  Behavior (renders recovery UI on error) is verifiable in a browser.
+- **Empty date guard**: The guard is a one-liner early return; the meaningful behavior
+  change is a UI guard — not a pure function with extractable test surface. The
+  existing 748 tests continue to pass and confirm no regressions.
+
+---
+
 ## 2026-05-26 (fortieth pass) — branch `claude/dreamy-mccarthy-8Sa0s`
 
 **Result: 748 passing, 0 failing** (+5 new tests; 0 previously-failing tests)

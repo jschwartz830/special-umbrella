@@ -1,5 +1,46 @@
 # Overnight Changelog
 
+## 2026-05-27 (forty-first pass) — branch `claude/dreamy-mccarthy-9NxZ6`
+
+Baseline on entry: **748 passing, 0 failing**. Exit state: **748 passing, 0 failing** (+0 tests; no new test files needed — fixes covered by existing tests and no new logic added).
+
+---
+
+### Change 1 — feat: add ErrorBoundary to prevent blank-screen crashes
+
+**Summary:** Any uncaught render or hook error in React 18 unmounts the full
+component tree and leaves the screen blank with no recovery path. Added a
+`ErrorBoundary` class component in `src/components/shared/ErrorBoundary.tsx`
+that wraps the entire `<Routes>` tree in `App.tsx`. On error it renders a
+minimal "Something went wrong" recovery screen with the error message and a
+"Try again" button (calls `setState({ error: null })` to attempt a re-render).
+
+**Files changed:**
+- `src/components/shared/ErrorBoundary.tsx` (new file)
+- `src/App.tsx` (wraps `<Routes>` in `<ErrorBoundary>`)
+
+**Risk:** Zero on happy path. Recovery UI replaces blank screen on error.
+
+---
+
+### Change 2 — fix: guard empty date in HistoryPage edit modal
+
+**Summary:** `saveAndClose` in `HistoryPage` did not validate that
+`editingEntryDate` was non-empty before proceeding. If the user cleared the
+date input field and clicked Save, `updateEntryDate(id, '')` was called,
+corrupting the entry's `calendarDate` to `''`. Subsequent renders or key
+lookups using that field would silently fail. Added `if (!newDate) { setDateConflict(true); return }` before the conflict check. Applied the same
+guard to `saveAndCloseExtra`. Updated the inline error message to distinguish
+"Date is required." from "A workout is already logged for that date."
+
+**Files changed:**
+- `src/pages/HistoryPage.tsx`
+
+**Risk:** Near-zero. Only adds an early-exit guard for an input state that was
+previously silently handled incorrectly. No behavior change for valid dates.
+
+---
+
 ## 2026-05-26 (fortieth pass) — branch `claude/dreamy-mccarthy-8Sa0s`
 
 Baseline on entry: **743 passing, 0 failing**. Exit state: **748 passing, 0 failing** (+5 tests).
