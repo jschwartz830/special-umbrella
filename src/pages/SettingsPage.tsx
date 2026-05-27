@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { Modal } from '../components/shared/Modal'
+import { useSettingsStore } from '../store/settingsStore'
 
 const REFRESH_TIMEOUT_MS = 3000
 
@@ -76,9 +77,18 @@ async function forceRefreshApp() {
   window.location.assign(url.toString())
 }
 
+const DELAY_OPTIONS = [
+  { label: 'Off', value: 0 },
+  { label: '5s', value: 5 },
+  { label: '10s', value: 10 },
+  { label: '15s', value: 15 },
+  { label: '30s', value: 30 },
+]
+
 export function SettingsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
+  const { startDelaySeconds, setStartDelay } = useSettingsStore()
 
   const latestCommitDate =
     __LATEST_COMMIT_ISO_DATE__ !== 'unknown' ? new Date(__LATEST_COMMIT_ISO_DATE__) : null
@@ -129,6 +139,29 @@ export function SettingsPage() {
           {versionLabel}
         </button>
       </header>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
+        <h2 className="font-medium">Workout start delay</h2>
+        <p className="text-sm text-slate-400">
+          Countdown before the workout timer starts — gives you time to get from your phone to the weights.
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          {DELAY_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setStartDelay(opt.value)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                startDelaySeconds === opt.value
+                  ? 'bg-sky-500 border-sky-500 text-slate-950'
+                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
         <h2 className="font-medium">App version refresh</h2>

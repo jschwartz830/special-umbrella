@@ -6,6 +6,7 @@ import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../.
 import { resolveLoad, type EvalContext } from '../../lib/expressionEval'
 import { EXERCISE_LIBRARY } from '../../lib/exerciseLibrary'
 import { usePlanStore } from '../../store/planStore'
+import { useSettingsStore } from '../../store/settingsStore'
 
 interface SetTrackState {
   setElapsedSeconds: number
@@ -153,16 +154,16 @@ function TimerCol({
       {expanded && (
         <div className="flex gap-1">
           <button
-            onClick={e => onAdjust(15, e)}
-            className="px-2 py-0.5 rounded border border-slate-600 bg-slate-700 text-slate-300 text-[10px] hover:bg-slate-600 transition-colors"
-          >
-            +15
-          </button>
-          <button
             onClick={e => onAdjust(-15, e)}
             className="px-2 py-0.5 rounded border border-slate-600 bg-slate-700 text-slate-300 text-[10px] hover:bg-slate-600 transition-colors"
           >
             −15
+          </button>
+          <button
+            onClick={e => onAdjust(15, e)}
+            className="px-2 py-0.5 rounded border border-slate-600 bg-slate-700 text-slate-300 text-[10px] hover:bg-slate-600 transition-colors"
+          >
+            +15
           </button>
         </div>
       )}
@@ -340,6 +341,7 @@ export function ActiveWorkoutTracker({
   onComplete,
 }: Props) {
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
+  const { startDelaySeconds } = useSettingsStore()
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [exercisePicker, setExercisePicker] = useState<ExercisePickerMode | null>(null)
   const workoutStartRef = useRef(new Date().toISOString())
@@ -360,9 +362,14 @@ export function ActiveWorkoutTracker({
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
   const workoutWallBaseRef = useRef<{ elapsed: number; time: number }>({ elapsed: 0, time: Date.now() })
   const restWallBaseRef = useRef<{ elapsed: number; time: number } | null>(null)
+  const swipeRowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const activeDragRef = useRef<{ key: string; startX: number; startY: number; startOffset: number; committed: boolean } | null>(null)
 
   const [workoutElapsed, setWorkoutElapsed] = useState(0)
-  const [workoutRunning, setWorkoutRunning] = useState(true)
+  const [workoutRunning, setWorkoutRunning] = useState(() => {
+    const hasDraft = !!window.localStorage.getItem(draftStorageKey)
+    return startDelaySeconds === 0 || hasDraft
+  })
   const [activeSetTimer, setActiveSetTimer] = useState<{ exIdx: number; setIdx: number } | null>(null)
   const [restElapsed, setRestElapsed] = useState<number | null>(null)
   const [restTarget, setRestTarget] = useState<number | null>(null)
@@ -371,6 +378,16 @@ export function ActiveWorkoutTracker({
   const [focusedField, setFocusedField] = useState<{ exIdx: number; setIdx: number; type: 'reps' | 'weight' } | null>(null)
   const [keyboardBottom, setKeyboardBottom] = useState(0)
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [countdownRemaining, setCountdownRemaining] = useState<number | null>(() => {
+    const hasDraft = !!window.localStorage.getItem(draftStorageKey)
+    if (startDelaySeconds > 0 && !hasDraft) {
+      workoutRunRef.current = false
+      return startDelaySeconds
+    }
+    return null
+  })
+  const [suppressedExercises, setSuppressedExercises] = useState<Set<number>>(() => new Set())
+  const [revealedSets, setRevealedSets] = useState<Set<string>>(() => new Set())
 
   const hasVars = Object.keys(programVars).length > 0
   const evalCtx: EvalContext = { vars: programVars }
@@ -389,6 +406,23 @@ export function ActiveWorkoutTracker({
       vv.removeEventListener('scroll', update)
     }
   }, [])
+
+  // Countdown tick: decrement once per second; when it hits null, start the workout timer
+  useEffect(() => {
+    if (countdownRemaining == null) {
+      if (!workoutRunRef.current) {
+        workoutRunRef.current = true
+        setWorkoutRunning(true)
+        workoutWallBaseRef.current = { elapsed: 0, time: Date.now() }
+      }
+      return
+    }
+    const id = setTimeout(
+      () => setCountdownRemaining(prev => (prev == null || prev <= 1) ? null : prev - 1),
+      1000,
+    )
+    return () => clearTimeout(id)
+  }, [countdownRemaining])
 
   const handleFieldFocus = useCallback((exIdx: number, setIdx: number, type: 'reps' | 'weight') => {
     if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current)
@@ -507,6 +541,7 @@ export function ActiveWorkoutTracker({
       if (resumeOutcome?.durationActualMin && resumeOutcome.durationActualMin > 0) {
         const secs = Math.round(resumeOutcome.durationActualMin * 60)
         setWorkoutElapsed(secs)
+        workoutWallBaseRef.current = { elapsed: secs, time: Date.now() }
       }
       return
     }
@@ -762,11 +797,9 @@ export function ActiveWorkoutTracker({
   useEffect(() => {
     const id = setInterval(() => {
       if (workoutRunRef.current) {
-        setWorkoutElapsed(s => {
-          const next = s + 1
-          workoutWallBaseRef.current = { elapsed: next, time: Date.now() }
-          return next
-        })
+        // Compute from wall-clock base so missed ticks (backgrounded browser) self-correct
+        const { elapsed: baseElapsed, time: baseTime } = workoutWallBaseRef.current
+        setWorkoutElapsed(baseElapsed + Math.floor((Date.now() - baseTime) / 1000))
       }
 
       const activeSet = activeSetRef.current
@@ -781,15 +814,12 @@ export function ActiveWorkoutTracker({
         )))
       }
 
-      if (workoutRunRef.current && restRunRef.current) {
-        const cur = restElapsedRef.current
-        if (cur != null) {
-          const next = cur + 1
-          restElapsedRef.current = next
-          restWallBaseRef.current = { elapsed: next, time: Date.now() }
-          setRestElapsed(next)
-          maybeAlertForRest(next)
-        }
+      if (workoutRunRef.current && restRunRef.current && restWallBaseRef.current) {
+        const { elapsed: baseElapsed, time: baseTime } = restWallBaseRef.current
+        const next = baseElapsed + Math.floor((Date.now() - baseTime) / 1000)
+        restElapsedRef.current = next
+        setRestElapsed(next)
+        maybeAlertForRest(next)
       }
     }, 1000)
     return () => clearInterval(id)
@@ -803,11 +833,18 @@ export function ActiveWorkoutTracker({
     const onVisibility = () => {
       if (document.hidden) {
         if (restRunRef.current) {
-          restWarningAlertedRef.current = false
-          restAlertedRef.current = false
+          // Only reset alert flags if we haven't yet reached those thresholds — avoids
+          // double-firing when the pre-scheduled AudioContext tone already played in background
+          const elapsed = restElapsedRef.current ?? 0
+          const target = restTargetRef.current ?? 0
+          if (elapsed < target - 15) restWarningAlertedRef.current = false
+          if (elapsed < target) restAlertedRef.current = false
         }
         return
       }
+      reconcileTimers()
+    }
+    const reconcileTimers = () => {
       if (workoutRunRef.current) {
         const { elapsed, time } = workoutWallBaseRef.current
         const actual = elapsed + Math.floor((Date.now() - time) / 1000)
@@ -825,7 +862,11 @@ export function ActiveWorkoutTracker({
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
-    return () => document.removeEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', reconcileTimers)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', reconcileTimers)
+    }
   }, [])
 
   // Release wake lock + tear down keepalive oscillator on unmount.
@@ -940,19 +981,16 @@ export function ActiveWorkoutTracker({
       return
     }
 
-    if (restElapsedRef.current == null) return
-
-    const cur = restElapsedRef.current
-    const next = Math.max(0, cur + delta)
-    restElapsedRef.current = next
-    setRestElapsed(next)
-    maybeAlertForRest(next)
-    recordRestElapsed()
-    if (restRunRef.current && restTargetRef.current != null) {
-      restWallBaseRef.current = { elapsed: next, time: Date.now() }
+    // Rest timer: adjust the TARGET duration, not elapsed time
+    if (restTargetRef.current == null) return
+    const next = Math.max(15, restTargetRef.current + delta)
+    restTargetRef.current = next
+    setRestTarget(next)
+    if (restRunRef.current) {
       const ctx = getAudioContext()
-      if (ctx) scheduleRestAudio(ctx, restTargetRef.current, next)
+      if (ctx) scheduleRestAudio(ctx, next, restElapsedRef.current ?? 0)
     }
+    recordRestElapsed()
   }
 
   function handleSetTimerToggle(exIdx: number, setIdx: number) {
@@ -1036,6 +1074,84 @@ export function ActiveWorkoutTracker({
       }
       return { ...ex, sets: [...ex.sets, newSet] }
     }))
+  }
+
+  function deleteSet(exIdx: number, setIdx: number) {
+    const key = `${exIdx}-${setIdx}`
+    setRevealedSets(prev => { const n = new Set(prev); n.delete(key); return n })
+    setExercises(prev => prev.map((ex, ei) => {
+      if (ei !== exIdx) return ex
+      const newSets = ex.sets.filter((_, si) => si !== setIdx)
+      return { ...ex, sets: newSets }
+    }))
+  }
+
+  function progressionStep(loadLbs: number | null): number {
+    return (loadLbs == null || loadLbs < 45) ? 2.5 : 5
+  }
+
+  function getProgressionPreview(ex: ExerciseTrackState): string[] | null {
+    if (ex.isWarmup) return null
+    const workingSets = ex.sets.filter(s => !s.isWarmup)
+    if (workingSets.length === 0 || !workingSets.every(s => s.completed)) return null
+    return workingSets.map((s, i) => {
+      const load = s.resolvedLoadLbs ?? s.actualLoad
+      const step = progressionStep(load)
+      return `weights[${i + 1}]: +${step}lb`
+    })
+  }
+
+  function handleSwipeStart(e: React.PointerEvent<HTMLDivElement>, key: string, exIdx: number, setIdx: number) {
+    if (exercises[exIdx]?.sets[setIdx]?.completed) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const startOffset = revealedSets.has(key) ? 60 : 0
+    activeDragRef.current = { key, startX: e.clientX, startY: e.clientY, startOffset, committed: false }
+  }
+
+  function handleSwipeMove(e: React.PointerEvent<HTMLDivElement>, key: string) {
+    const drag = activeDragRef.current
+    if (!drag || drag.key !== key) return
+    const dx = drag.startX - e.clientX
+    const dy = drag.startY - e.clientY
+    if (!drag.committed) {
+      if (Math.abs(dx) < 8) return
+      if (Math.abs(dy) > Math.abs(dx)) { activeDragRef.current = null; return }
+      drag.committed = true
+    }
+    const offset = Math.max(0, Math.min(70, drag.startOffset + dx))
+    const el = swipeRowRefs.current.get(key)
+    if (el) el.style.transform = `translateX(-${offset}px)`
+  }
+
+  function handleSwipeEnd(e: React.PointerEvent<HTMLDivElement>, key: string) {
+    const drag = activeDragRef.current
+    activeDragRef.current = null
+    if (!drag || drag.key !== key) return
+    const dx = drag.startX - e.clientX
+    const offset = Math.max(0, Math.min(70, drag.startOffset + dx))
+    const shouldReveal = offset > 30
+    const el = swipeRowRefs.current.get(key)
+    if (el) {
+      el.style.transition = 'transform 0.2s ease-out'
+      el.style.transform = shouldReveal ? 'translateX(-60px)' : 'translateX(0px)'
+      setTimeout(() => { if (el) el.style.transition = '' }, 220)
+    }
+    setRevealedSets(prev => {
+      const n = new Set(prev)
+      if (shouldReveal) n.add(key); else n.delete(key)
+      return n
+    })
+  }
+
+  function handleSwipeCancel(key: string) {
+    activeDragRef.current = null
+    const el = swipeRowRefs.current.get(key)
+    if (el) {
+      el.style.transition = 'transform 0.2s ease-out'
+      el.style.transform = 'translateX(0px)'
+      setTimeout(() => { if (el) el.style.transition = '' }, 220)
+    }
+    setRevealedSets(prev => { const n = new Set(prev); n.delete(key); return n })
   }
 
   function addExercise(name: string, insertAt: number) {
@@ -1185,7 +1301,7 @@ export function ActiveWorkoutTracker({
       })),
     }))
 
-    const result: LoggedExerciseActual[] = finalExercises.map(ex => ({
+    const result: LoggedExerciseActual[] = finalExercises.map((ex, exIdx) => ({
       exercise: ex.exercise,
       progressionMode: 'single',
       sets: ex.sets.map(s => ({
@@ -1193,7 +1309,8 @@ export function ActiveWorkoutTracker({
         targetLoad: s.targetLoad,
         actualReps: resolveActualReps(s.actualReps, s.targetReps),
         actualLoad: s.actualLoad,
-        completed: s.completed,
+        // Suppressed exercises report sets as not-completed so progression is not applied
+        completed: suppressedExercises.has(exIdx) ? false : s.completed,
         restSeconds: s.restSeconds,
         actualRestSeconds: s.actualRestSeconds,
       })),
@@ -1229,6 +1346,18 @@ export function ActiveWorkoutTracker({
 
   return (
     <>
+    {countdownRemaining != null && (
+      <div className="fixed inset-0 z-[60] bg-slate-900/95 flex flex-col items-center justify-center gap-6">
+        <p className="text-slate-400 text-sm uppercase tracking-widest font-semibold">Starting in</p>
+        <p className="text-8xl font-mono font-bold text-sky-300">{countdownRemaining}</p>
+        <button
+          onClick={() => setCountdownRemaining(null)}
+          className="mt-4 px-6 py-2.5 rounded-xl border border-slate-600 bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors"
+        >
+          Skip
+        </button>
+      </div>
+    )}
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
       <div className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 border-b border-slate-800" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
         <button
@@ -1338,11 +1467,27 @@ export function ActiveWorkoutTracker({
               {ex.sets.map((s, setIdx) => {
                 const active = isActiveSet(exIdx, setIdx)
                 const timerRunning = activeSetTimer?.exIdx === exIdx && activeSetTimer?.setIdx === setIdx
+                const swipeKey = `${exIdx}-${setIdx}`
                 return (
-                  <div
-                    key={setIdx}
-                    className={`grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 items-center transition-opacity ${s.completed ? 'opacity-60' : ''}`}
-                  >
+                  <div key={setIdx} className="relative overflow-hidden rounded" style={{ touchAction: 'pan-y' }}>
+                    {/* Trash button revealed by swipe */}
+                    <div className="absolute inset-y-0 right-0 flex items-center justify-center w-14 bg-red-500/20">
+                      <button
+                        onClick={() => deleteSet(exIdx, setIdx)}
+                        className="flex items-center justify-center w-10 h-7 rounded bg-red-500/80 text-white hover:bg-red-500 transition-colors"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    {/* Swipeable row */}
+                    <div
+                      ref={el => { if (el) swipeRowRefs.current.set(swipeKey, el); else swipeRowRefs.current.delete(swipeKey) }}
+                      className={`grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 items-center transition-opacity bg-slate-800/60 ${s.completed ? 'opacity-60' : ''}`}
+                      onPointerDown={e => handleSwipeStart(e, swipeKey, exIdx, setIdx)}
+                      onPointerMove={e => handleSwipeMove(e, swipeKey)}
+                      onPointerUp={e => handleSwipeEnd(e, swipeKey)}
+                      onPointerCancel={() => handleSwipeCancel(swipeKey)}
+                    >
                     <span className="col-span-1 text-center text-slate-400 text-xs font-medium">
                       {ex.isWarmup || s.isWarmup ? (
                         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/20 text-orange-300 font-bold">W</span>
@@ -1403,9 +1548,30 @@ export function ActiveWorkoutTracker({
                     >
                       <Check size={11} />
                     </button>
+                    </div>
                   </div>
                 )
               })}
+
+              {/* Progression preview banner */}
+              {(() => {
+                const preview = getProgressionPreview(ex)
+                if (!preview || suppressedExercises.has(exIdx)) return null
+                return (
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 space-y-1">
+                    <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">Exercise Changes</p>
+                    {preview.map((line, i) => (
+                      <p key={i} className="text-xs text-emerald-300 font-mono">{line}</p>
+                    ))}
+                    <button
+                      onClick={() => setSuppressedExercises(prev => { const n = new Set(prev); n.add(exIdx); return n })}
+                      className="mt-1 text-[10px] text-slate-400 underline underline-offset-2 hover:text-slate-200 transition-colors"
+                    >
+                      Suppress
+                    </button>
+                  </div>
+                )
+              })()}
 
               <button
                 onClick={() => addSet(exIdx)}
