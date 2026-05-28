@@ -141,9 +141,9 @@ export function SettingsPage() {
       </header>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
-        <h2 className="font-medium">Workout start delay</h2>
+        <h2 className="font-medium">Set timer start delay</h2>
         <p className="text-sm text-slate-400">
-          Countdown before the workout timer starts — gives you time to get from your phone to the weights.
+          Countdown before the set timer starts — tap play, then get to your weights before the clock starts.
         </p>
         <div className="flex gap-2 flex-wrap">
           {DELAY_OPTIONS.map(opt => (

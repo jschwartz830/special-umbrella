@@ -366,10 +366,7 @@ export function ActiveWorkoutTracker({
   const activeDragRef = useRef<{ key: string; startX: number; startY: number; startOffset: number; committed: boolean } | null>(null)
 
   const [workoutElapsed, setWorkoutElapsed] = useState(0)
-  const [workoutRunning, setWorkoutRunning] = useState(() => {
-    const hasDraft = !!window.localStorage.getItem(draftStorageKey)
-    return startDelaySeconds === 0 || hasDraft
-  })
+  const [workoutRunning, setWorkoutRunning] = useState(true)
   const [activeSetTimer, setActiveSetTimer] = useState<{ exIdx: number; setIdx: number } | null>(null)
   const [restElapsed, setRestElapsed] = useState<number | null>(null)
   const [restTarget, setRestTarget] = useState<number | null>(null)
@@ -378,14 +375,7 @@ export function ActiveWorkoutTracker({
   const [focusedField, setFocusedField] = useState<{ exIdx: number; setIdx: number; type: 'reps' | 'weight' } | null>(null)
   const [keyboardBottom, setKeyboardBottom] = useState(0)
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [countdownRemaining, setCountdownRemaining] = useState<number | null>(() => {
-    const hasDraft = !!window.localStorage.getItem(draftStorageKey)
-    if (startDelaySeconds > 0 && !hasDraft) {
-      workoutRunRef.current = false
-      return startDelaySeconds
-    }
-    return null
-  })
+  const [setTimerCountdown, setSetTimerCountdown] = useState<{ exIdx: number; setIdx: number; remaining: number } | null>(null)
   const [suppressedExercises, setSuppressedExercises] = useState<Set<number>>(() => new Set())
   const [revealedSets, setRevealedSets] = useState<Set<string>>(() => new Set())
 
@@ -407,22 +397,21 @@ export function ActiveWorkoutTracker({
     }
   }, [])
 
-  // Countdown tick: decrement once per second; when it hits null, start the workout timer
+  // Set timer countdown tick: decrement once per second; when it hits 0, start the set timer
   useEffect(() => {
-    if (countdownRemaining == null) {
-      if (!workoutRunRef.current) {
-        workoutRunRef.current = true
-        setWorkoutRunning(true)
-        workoutWallBaseRef.current = { elapsed: 0, time: Date.now() }
-      }
+    if (!setTimerCountdown) return
+    if (setTimerCountdown.remaining <= 0) {
+      const { exIdx, setIdx } = setTimerCountdown
+      setSetTimerCountdown(null)
+      activeSetRef.current = { exIdx, setIdx }
+      setActiveSetTimer({ exIdx, setIdx })
       return
     }
-    const id = setTimeout(
-      () => setCountdownRemaining(prev => (prev == null || prev <= 1) ? null : prev - 1),
-      1000,
-    )
+    const id = setTimeout(() => {
+      setSetTimerCountdown(prev => prev ? { ...prev, remaining: prev.remaining - 1 } : null)
+    }, 1000)
     return () => clearTimeout(id)
-  }, [countdownRemaining])
+  }, [setTimerCountdown])
 
   const handleFieldFocus = useCallback((exIdx: number, setIdx: number, type: 'reps' | 'weight') => {
     if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current)
@@ -1002,6 +991,12 @@ export function ActiveWorkoutTracker({
       stopRest()
     }
 
+    // Tap again during countdown → cancel it
+    if (setTimerCountdown?.exIdx === exIdx && setTimerCountdown?.setIdx === setIdx) {
+      setSetTimerCountdown(null)
+      return
+    }
+
     const current = activeSetRef.current
     if (current && current.exIdx === exIdx && current.setIdx === setIdx) {
       activeSetRef.current = null
@@ -1009,8 +1004,15 @@ export function ActiveWorkoutTracker({
       return
     }
 
-    activeSetRef.current = { exIdx, setIdx }
-    setActiveSetTimer({ exIdx, setIdx })
+    // Clear any countdown for a different set
+    setSetTimerCountdown(null)
+
+    if (startDelaySeconds > 0) {
+      setSetTimerCountdown({ exIdx, setIdx, remaining: startDelaySeconds })
+    } else {
+      activeSetRef.current = { exIdx, setIdx }
+      setActiveSetTimer({ exIdx, setIdx })
+    }
   }
 
   function handleSetComplete(exIdx: number, setIdx: number) {
@@ -1037,6 +1039,10 @@ export function ActiveWorkoutTracker({
     if (activeSetRef.current?.exIdx === exIdx && activeSetRef.current?.setIdx === setIdx) {
       activeSetRef.current = null
       setActiveSetTimer(null)
+    }
+
+    if (setTimerCountdown?.exIdx === exIdx && setTimerCountdown?.setIdx === setIdx) {
+      setSetTimerCountdown(null)
     }
 
     if (!completing && restOwnerRef.current?.exIdx === exIdx && restOwnerRef.current?.setIdx === setIdx) {
@@ -1360,18 +1366,6 @@ export function ActiveWorkoutTracker({
 
   return (
     <>
-    {countdownRemaining != null && (
-      <div className="fixed inset-0 z-[60] bg-slate-900/95 flex flex-col items-center justify-center gap-6">
-        <p className="text-slate-400 text-sm uppercase tracking-widest font-semibold">Starting in</p>
-        <p className="text-8xl font-mono font-bold text-sky-300">{countdownRemaining}</p>
-        <button
-          onClick={() => setCountdownRemaining(null)}
-          className="mt-4 px-6 py-2.5 rounded-xl border border-slate-600 bg-slate-800 text-slate-300 text-sm font-medium hover:bg-slate-700 transition-colors"
-        >
-          Skip
-        </button>
-      </div>
-    )}
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
       <div className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 border-b border-slate-800" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
         <button
@@ -1481,21 +1475,24 @@ export function ActiveWorkoutTracker({
               {ex.sets.map((s, setIdx) => {
                 const active = isActiveSet(exIdx, setIdx)
                 const timerRunning = activeSetTimer?.exIdx === exIdx && activeSetTimer?.setIdx === setIdx
+                const isCountingDown = setTimerCountdown?.exIdx === exIdx && setTimerCountdown?.setIdx === setIdx
                 const swipeKey = `${exIdx}-${setIdx}`
                 // Number working sets relative to other working sets only (exclude warmups from count)
                 const workingSetNumber = s.isWarmup ? null
                   : ex.sets.slice(0, setIdx + 1).filter(ps => !ps.isWarmup).length
                 return (
                   <div key={setIdx} className="relative overflow-hidden rounded" style={{ touchAction: 'pan-y' }}>
-                    {/* Trash button revealed by swipe */}
-                    <div className="absolute inset-y-0 right-0 flex items-center justify-center w-14 bg-red-500/20">
-                      <button
-                        onClick={() => deleteSet(exIdx, setIdx)}
-                        className="flex items-center justify-center w-10 h-7 rounded bg-red-500/80 text-white hover:bg-red-500 transition-colors"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
+                    {/* Trash button revealed only when swiped */}
+                    {revealedSets.has(swipeKey) && (
+                      <div className="absolute inset-y-0 right-0 flex items-center justify-center w-14 bg-red-500/20">
+                        <button
+                          onClick={() => deleteSet(exIdx, setIdx)}
+                          className="flex items-center justify-center w-10 h-7 rounded bg-red-500/80 text-white hover:bg-red-500 transition-colors"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    )}
                     {/* Swipeable row */}
                     <div
                       ref={el => { if (el) swipeRowRefs.current.set(swipeKey, el); else swipeRowRefs.current.delete(swipeKey) }}
@@ -1547,13 +1544,17 @@ export function ActiveWorkoutTracker({
                       onClick={() => handleSetTimerToggle(exIdx, setIdx)}
                       disabled={!active || s.completed || !workoutRunning}
                       className={`col-span-2 h-7 flex items-center justify-center gap-1 rounded border font-mono text-[10px] transition-colors ${
-                        timerRunning
-                          ? 'bg-amber-500/20 border-amber-500/50 text-amber-200'
-                          : 'bg-slate-700 border-slate-600 text-slate-300'
+                        isCountingDown
+                          ? 'bg-sky-500/20 border-sky-500/50 text-sky-200'
+                          : timerRunning
+                            ? 'bg-amber-500/20 border-amber-500/50 text-amber-200'
+                            : 'bg-slate-700 border-slate-600 text-slate-300'
                       } disabled:opacity-40 disabled:cursor-not-allowed`}
                     >
-                      {timerRunning ? <Pause size={10} /> : <Play size={10} />}
-                      <span>{setTimerDisplay(exIdx, setIdx)}</span>
+                      {isCountingDown
+                        ? <span className="font-bold">{setTimerCountdown!.remaining}</span>
+                        : <>{timerRunning ? <Pause size={10} /> : <Play size={10} />}<span>{setTimerDisplay(exIdx, setIdx)}</span></>
+                      }
                     </button>
                     <button
                       onClick={() => handleSetComplete(exIdx, setIdx)}
