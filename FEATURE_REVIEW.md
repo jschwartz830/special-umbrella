@@ -1,4 +1,12 @@
-# Feature Review — Swim Actuals in History CSV (Pass 40)
+# Feature Reviews
+
+## Pass 42 — 2026-05-28 (branch `claude/dreamy-mccarthy-HtWcw`)
+
+No medium-complexity feature was attempted this pass. See FEATURE_PROPOSAL.md for rationale.
+
+---
+
+## Pass 40 — Feature Review — Swim Actuals in History CSV
 
 Date: 2026-05-26
 Branch: `claude/dreamy-mccarthy-8Sa0s`

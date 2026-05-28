@@ -1,4 +1,17 @@
-# Feature Proposal — Swim Actuals in History CSV (Pass 40)
+# Feature Proposals
+
+## Pass 42 — 2026-05-28 (branch `claude/dreamy-mccarthy-HtWcw`)
+
+**No medium-complexity feature attempted this pass.**
+
+The user-feedback commit added substantial new features (swipe delete, countdown timer, rest
+timer improvements, progression preview). Stabilizing and correcting those features was the
+right priority. The audit found four low-risk, high-value fixes that were all implemented.
+No new feature was selected to avoid scope creep on a code base that was recently extended.
+
+---
+
+## Pass 40 — Feature Proposal — Swim Actuals in History CSV
 
 Date: 2026-05-26
 Branch: `claude/dreamy-mccarthy-8Sa0s`

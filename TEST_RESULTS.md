@@ -1,5 +1,35 @@
 # Test Results
 
+## 2026-05-28 (forty-second pass) — branch `claude/dreamy-mccarthy-HtWcw`
+
+**Result: 758 passing, 0 failing** (+10 new tests)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 748 |
+| Tests on exit | 758 |
+| New tests | +10 |
+| Failures | 0 |
+
+### Tests added
+
+| File | Tests added | Description |
+|------|-------------|-------------|
+| `src/lib/__tests__/historyStats.test.ts` | 7 | 6 direct `isoWeekStart` cases (Mon/Wed/Sat/Sun/month-boundary/year-boundary) + 1 `longestStreak` future-date regression |
+| `src/store/__tests__/planStore.test.ts` | 3 | `duplicatePlan` suffix stripping, numeric counter, and `(copy N)` stripping |
+
+### Areas still untested
+
+- `ActiveWorkoutTracker` component (React component tests are not present for any component).
+  The three fixes in this pass (deleteSet timer guard, set numbering, progression preview) are
+  logic-in-render changes that cannot be covered by the current pure-function test suite
+  without adding `@testing-library/react`. Documenting for a future pass.
+- `computePlanStreak` with future-dated extras (analogous to the `longestStreak` fix — not
+  currently filtered).
+
+---
+
 ## 2026-05-27 (forty-first pass) — branch `claude/dreamy-mccarthy-9NxZ6`
 
 **Result: 748 passing, 0 failing** (+0 new tests; no new logic paths — all changes are guards or additive components)
