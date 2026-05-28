@@ -403,4 +403,30 @@ describe('duplicatePlan', () => {
     expect(origWarmupSets[0]).not.toBe(copyWarmupSets[0])
     expect(copyWarmupSets).toEqual(origWarmupSets)
   })
+
+  it('strips existing "(copy)" suffix before appending, avoiding accumulation', () => {
+    // Source is "My Plan (copy)"; "(copy)" is already taken so copy is "(copy 2)".
+    // The key guarantee: it is NOT "My Plan (copy) (copy)".
+    const plan: Plan = { ...makePlan('plan-1'), name: 'My Plan (copy)' }
+    usePlanStore.setState({ plans: { 'plan-1': plan } })
+    const newId = getState().duplicatePlan('plan-1')
+    expect(getState().plans[newId].name).toBe('My Plan (copy 2)')
+    expect(getState().plans[newId].name).not.toContain('(copy) (copy)')
+  })
+
+  it('uses a numeric counter "(copy 2)" when "(copy)" name is already taken', () => {
+    const plan: Plan = { ...makePlan('plan-1'), name: 'My Plan' }
+    const existing: Plan = { ...makePlan('plan-2'), name: 'My Plan (copy)' }
+    usePlanStore.setState({ plans: { 'plan-1': plan, 'plan-2': existing } })
+    const newId = getState().duplicatePlan('plan-1')
+    expect(getState().plans[newId].name).toBe('My Plan (copy 2)')
+  })
+
+  it('strips "(copy N)" suffix before appending to avoid further accumulation', () => {
+    const plan: Plan = { ...makePlan('plan-1'), name: 'Workout A (copy 3)' }
+    usePlanStore.setState({ plans: { 'plan-1': plan } })
+    const newId = getState().duplicatePlan('plan-1')
+    // Base is "Workout A"; first available copy name is "Workout A (copy)"
+    expect(getState().plans[newId].name).toBe('Workout A (copy)')
+  })
 })
