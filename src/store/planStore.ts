@@ -97,10 +97,20 @@ export const usePlanStore = create<PlanState>()(
         if (!source) return ''
         const newId = nanoid()
         const now = new Date().toISOString()
+        // Strip any existing " (copy)" or " (copy N)" suffix so repeated
+        // duplication produces "Name (copy 2)" rather than "Name (copy) (copy)".
+        const baseName = source.name.replace(/ \(copy(?: \d+)?\)$/, '')
+        const existingNames = new Set(Object.values(get().plans).map(p => p.name))
+        const simpleName = `${baseName} (copy)`
+        let copyName = simpleName
+        let n = 2
+        while (existingNames.has(copyName)) {
+          copyName = `${baseName} (copy ${n++})`
+        }
         const copy: Plan = {
           ...source,
           id: newId,
-          name: `${source.name} (copy)`,
+          name: copyName,
           status: 'inactive',
           startDate: format(new Date(), 'yyyy-MM-dd'),
           startDayIndex: 0,

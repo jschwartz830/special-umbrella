@@ -1,5 +1,69 @@
 # Implementation Plan
 
+## Pass 42 — 2026-05-28 (branch `claude/dreamy-mccarthy-HtWcw`)
+
+### Observations on entry
+
+- Baseline: **748 passing, 0 failing** — clean baseline from pass 41 + user feedback merge.
+- Pass 41 closed the ErrorBoundary and empty-date-save gaps. User feedback commit added swipe
+  delete, start delay, timer drift fixes, rest timer +/-15 adjustment, and inline progression
+  preview to `ActiveWorkoutTracker`.
+
+**New issues found in user-feedback commit:**
+
+1. **`deleteSet` stale active set timer**: Deleting a set while it was the active timer left
+   `activeSetRef` and `activeSetTimer` pointing at a now-invalid index. The per-second interval
+   would attempt to increment the deleted set's `setElapsedSeconds`, which may point to a
+   different set after deletion (indices shift). Also, the active-set ref was never cleared when
+   deleting a higher-indexed set that was after the active one (no index shift, but the UI could
+   still show a stale timer state).
+
+2. **Working set numbers included warmup indices**: With warmup sets at indices 0–N,
+   working sets were labeled N+1, N+2, … instead of 1, 2, 3. This was a display bug in the
+   set-number column that showed "3", "4", "5" for what should be "1", "2", "3".
+
+3. **`getProgressionPreview` opaque labels**: "weights[1]: +5lb" doesn't tell the user what
+   load the set is moving from or to. "135 → 140 lb" is far more informative.
+
+**Pre-existing issues (not from the feedback commit):**
+
+4. **`longestStreak` included future-dated entries**: `computeHistoryStats` built the streakable
+   set from all entries without filtering to `<= today`. A CSV import with future dates would
+   silently inflate the longest streak stat.
+
+5. **`duplicatePlan` name accumulation**: Successive duplications produced "Plan (copy) (copy)
+   (copy)". The fix strips any existing copy suffix and uses a numeric counter for collisions.
+
+6. **`isoWeekStart` not directly tested**: The function was only exercised through
+   `computeWeeklyBreakdown`. Direct cases (Monday, Sunday boundary, year boundary) were untested.
+
+### Decisions
+
+- **Fix `deleteSet` stale timer** (BUG): After filtering the sets array, also clear
+  `activeSetRef` and `activeSetTimer` when the deleted set was active or had an index ≤ the
+  active one. Risk: zero — purely protective.
+- **Fix working set numbers** (CORRECTNESS): Compute `workingSetNumber` as the count of
+  non-warmup sets up to and including `setIdx`, so warmup-present exercises show 1/2/3 not
+  3/4/5 for working sets.
+- **Improve `getProgressionPreview`** (UX): Replace "weights[N]: +Xlb" with "Set N: A → B lb"
+  or collapse to "All sets: A → B lb" when all transitions are the same.
+- **Fix `longestStreak`** (CORRECTNESS): Filter `sortedDates` to `<= today` before the
+  longest-streak walk. One regression test added.
+- **Fix `duplicatePlan` naming** (UX): Strip existing copy suffix, use numeric counter for
+  collisions. Three new tests cover the new behavior.
+- **Add `isoWeekStart` direct tests** (TEST): Six tests covering Monday, Wednesday, Saturday,
+  Sunday, month boundary, and year boundary.
+
+### Risks
+
+- `deleteSet` fix: zero risk — only adds a guard on an already-broken path.
+- Working set numbers: purely cosmetic; no data change.
+- Progression preview: purely cosmetic display change.
+- `longestStreak` filter: change in stat value only for users with future-dated entries (edge case).
+- `duplicatePlan` naming: users with "(copy)" plans will see different copy names going forward.
+
+---
+
 ## Pass 41 — 2026-05-27 (branch `claude/dreamy-mccarthy-9NxZ6`)
 
 ### Observations on entry

@@ -1,5 +1,128 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-28 (forty-second pass) — branch `claude/dreamy-mccarthy-HtWcw`
+
+### Executive summary
+
+1. **What changed:** Four targeted fixes across `ActiveWorkoutTracker`, `historyStats`,
+   and `planStore`. No new features — the user-feedback commit was recent enough that
+   stabilizing it was higher priority than adding new capabilities.
+2. **Highest confidence:** All four changes are strictly additive guards or one-line corrections.
+   The `deleteSet` timer fix and the working set numbering fix address observable bugs in the
+   active workout UI. The `longestStreak` filter and `duplicatePlan` naming fix address
+   statistical and UX annoyances respectively.
+3. **Risks:** Near zero across all four changes. The `longestStreak` change could reduce a
+   displayed stat for users with future-dated entries; all others are invisible on the happy path.
+4. **Review first:** Trigger the `deleteSet` path in the workout tracker with an active timer
+   running, then swipe-delete that set — the timer should stop. Check a plan with warmup sets
+   to confirm working set numbers show 1/2/3 not 3/4/5. Duplicate the same plan twice and
+   verify the second copy gets "(copy 2)" not "(copy) (copy)".
+
+---
+
+### Biggest issues found
+
+1. **`deleteSet` stale active set timer** — Deleting a set while its timer was running left
+   `activeSetRef` pointing at an invalid index. The per-second interval would attempt to update
+   a non-existent (or wrong) set on the next tick. Fixed by clearing `activeSetRef` and
+   `activeSetTimer` whenever `deleteSet` is called for the active set or any set with a
+   lower index.
+
+2. **Working set numbers included warmup positions** — The set index column used raw `setIdx + 1`
+   regardless of warmup rows. With 2 warmup sets, the first working set showed "3" instead of "1".
+   Fixed by counting working-set position among working sets only.
+
+3. **`getProgressionPreview` opaque format** — "weights[1]: +5lb" gives no context about current
+   load or next target. Replaced with "Set 1: 135 → 140 lb" and "All sets: 135 → 140 lb"
+   (collapsed when all sets share the same transition).
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Files |
+|---|------|-------------|-------|
+| 1 | fix (correctness) | `deleteSet` clears stale active set timer + working set numbering | ActiveWorkoutTracker.tsx |
+| 2 | improvement (UX) | Progression preview shows load transition "X → Y lb" | ActiveWorkoutTracker.tsx |
+| 3 | fix (correctness) | `longestStreak` excludes future-dated entries | historyStats.ts |
+| 4 | fix (UX) | `duplicatePlan` avoids name accumulation, adds numeric counter | planStore.ts |
+| 5 | test | Direct `isoWeekStart` test cases (6 new tests) | historyStats.test.ts |
+| 6 | test | `longestStreak` future-date regression test | historyStats.test.ts |
+| 7 | test | `duplicatePlan` naming behavior (3 new tests) | planStore.test.ts |
+
+Test count: **748 → 758** (+10).
+
+---
+
+### Definitely keep
+
+- **`deleteSet` stale timer fix** — Closes a real bug path. Zero risk.
+- **Working set numbering** — Cosmetic correctness; no behavior change.
+- **`longestStreak` future-date filter** — One line; makes the stat correct.
+- **`duplicatePlan` naming** — Strictly more useful; existing "(copy)" plans unaffected.
+- **`isoWeekStart` tests** — Direct coverage for a function used throughout weekly stats.
+
+### Probably keep but tweak
+
+- **Progression preview format** — "All sets: 135 → 140 lb" is much better than
+  "weights[1]: +5lb". Could consider showing the exercise name in the header rather than
+  per-set, but the current format is a clear improvement.
+
+### Do not keep
+
+- Nothing in this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+1. **`computeHistoryStats` future-date filtering for `totalLogged` / `last30`**: The same
+   `<= today` filter should arguably apply to `last7Completed` and `last30Completed` windows —
+   currently a future-dated entry would appear in those windows if the calendarDate falls in
+   the window. Low likelihood; document for a future pass.
+
+2. **`ExtraWorkoutEntry.source` migration**: Pre-migration extras with `source: undefined` are
+   treated as `'double_day'` (removed on Undo). Users who added extras via History/Calendar
+   before this field was introduced could have their extras removed by Undo. Consider a migration
+   that sets `source: 'history'` on all extras with `source === undefined`. No urgency — only
+   affects Undo behavior for old extras.
+
+3. **CSV import post-parse validation**: Complex nested structures (exercises, segments)
+   serialized as JSON within CSV cells have no structural validation after parse. A malformed
+   import could persist invalid shapes. Low practical risk but worth noting.
+
+4. **`ActiveWorkoutTracker` set-index stability after exercise deletion**: Deleting an exercise
+   (not a set) doesn't clear `activeSetRef` either. If `activeSetRef.exIdx` pointed at the
+   deleted exercise, the ticker could mismatch. Same pattern as the deleteSet fix, worth
+   addressing in a future pass.
+
+---
+
+### Open questions
+
+1. Should the progression preview show the **exercise name** (not "Set N") when an exercise
+   has a single working set? E.g. "Squat: 135 → 140 lb" instead of "Set 1: 135 → 140 lb".
+
+2. Should `longestStreak` be capped at today for `computePlanStreak` too? Currently only
+   `computeHistoryStats.longestStreak` is fixed; `computePlanStreak` still includes future-dated
+   extras if they exist.
+
+---
+
+### Known issues / incomplete work
+
+- `deleteExercise` (not yet implemented — users can only replace exercises, not delete whole
+  exercises from the tracker) would have the same stale-ref issue as `deleteSet`. If it's ever
+  added, the same guard pattern applies.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-27 (forty-first pass) — branch `claude/dreamy-mccarthy-9NxZ6`
 
 ### Executive summary

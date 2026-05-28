@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -238,6 +238,20 @@ describe('computeHistoryStats', () => {
     // 3-day run: 4/10, 4/11, 4/12 — currentStreak is 0 (no activity on 4/15)
     expect(s.longestStreak).toBe(3)
     expect(s.currentStreak).toBe(0)
+  })
+
+  it('longestStreak excludes future-dated entries (e.g. from a bad CSV import)', () => {
+    // A past run of 3 days plus a future-dated entry that would extend the
+    // apparent streak if not filtered. longestStreak must remain 3.
+    const entries = [
+      entry('2026-04-10', 'complete'),
+      entry('2026-04-11', 'complete'),
+      entry('2026-04-12', 'complete'),
+      entry('2026-04-13', 'complete'), // future relative to today=2026-04-12
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-12')
+    expect(s.longestStreak).toBe(3)
+    expect(s.currentStreak).toBe(3)
   })
 })
 
@@ -1456,5 +1470,39 @@ describe('padWeekGaps', () => {
     expect(gap.extras).toBe(0)
     expect(gap.totalLogged).toBe(0)
     expect(gap.isEmpty).toBe(true)
+  })
+})
+
+// ── isoWeekStart ──────────────────────────────────────────────────────────────
+
+describe('isoWeekStart', () => {
+  it('returns the date itself for a Monday (identity case)', () => {
+    // 2026-01-05 is a Monday
+    expect(isoWeekStart('2026-01-05')).toBe('2026-01-05')
+  })
+
+  it('returns the preceding Monday for a Wednesday', () => {
+    // 2026-01-07 is a Wednesday → Monday is 2026-01-05
+    expect(isoWeekStart('2026-01-07')).toBe('2026-01-05')
+  })
+
+  it('returns the preceding Monday for a Saturday', () => {
+    // 2026-01-10 is a Saturday → Monday is 2026-01-05
+    expect(isoWeekStart('2026-01-10')).toBe('2026-01-05')
+  })
+
+  it('returns the preceding Monday for a Sunday (ISO: Sunday is end of week)', () => {
+    // 2026-01-11 is a Sunday → ISO Monday is 2026-01-05 (same week)
+    expect(isoWeekStart('2026-01-11')).toBe('2026-01-05')
+  })
+
+  it('crosses a month boundary correctly (Sunday at month end)', () => {
+    // 2026-02-01 is a Sunday → the ISO Monday of that week is 2026-01-26
+    expect(isoWeekStart('2026-02-01')).toBe('2026-01-26')
+  })
+
+  it('crosses a year boundary correctly', () => {
+    // 2026-01-01 is a Thursday → Monday is 2025-12-29
+    expect(isoWeekStart('2026-01-01')).toBe('2025-12-29')
   })
 })

@@ -60,7 +60,9 @@ export function computeHistoryStats(
     cursor = shiftDay(cursor, -1)
   }
 
-  const sortedDates = [...streakable].sort()
+  // Only dates on or before today count toward longest streak — future-dated
+  // entries (e.g. from a bad CSV import) would otherwise inflate the stat.
+  const sortedDates = [...streakable].filter(d => d <= today).sort()
   let longestStreak = 0
   let runLen = 0
   for (let i = 0; i < sortedDates.length; i++) {

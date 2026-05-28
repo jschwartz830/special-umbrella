@@ -1,5 +1,83 @@
 # Overnight Changelog
 
+## 2026-05-28 (forty-second pass) — branch `claude/dreamy-mccarthy-HtWcw`
+
+Baseline on entry: **748 passing, 0 failing**. Exit state: **758 passing, 0 failing** (+10 tests).
+
+---
+
+### Change 1 — fix: clear active set timer on deleteSet, fix working set numbering, improve progression preview
+
+**Summary:**
+
+Three issues in `ActiveWorkoutTracker`:
+
+1. **Stale active set timer after `deleteSet`**: When a set was deleted while it was the
+   active timer (or when a higher-indexed set was deleted, shifting indices), `activeSetRef`
+   and `activeSetTimer` were not cleared. The per-second interval would update a stale or
+   wrong-position set. Added a guard that clears the active set timer whenever the deleted
+   set's `setIdx ≥ activeSetRef.current.setIdx` for the same exercise.
+
+2. **Working set numbers included warmup indices**: Sets were numbered with their raw
+   `setIdx + 1`, so a 2-warmup + 3-working-set exercise showed "3", "4", "5" for working
+   sets instead of "1", "2", "3". Fixed by computing the position among working sets only.
+
+3. **Opaque progression preview labels**: "weights[1]: +5lb" replaced with "Set 1: 135 → 140 lb".
+   When all working sets share the same transition, collapsed to a single "All sets: X → Y lb"
+   line. No load data falls back to "Set N: +Xlb".
+
+**Files changed:**
+- `src/components/workout/ActiveWorkoutTracker.tsx`
+
+**Risk:** Zero on data path. All three are display/correctness fixes with no state mutation changes.
+
+---
+
+### Change 2 — test: add direct isoWeekStart test cases
+
+**Summary:** `isoWeekStart` was only exercised indirectly through `computeWeeklyBreakdown`.
+Added 6 direct tests covering Monday (identity), Wednesday, Saturday, Sunday (end of ISO week),
+month-boundary crossing (Feb 1 → Jan 26), and year-boundary crossing (Jan 1 → Dec 29 prior year).
+
+**Files changed:**
+- `src/lib/__tests__/historyStats.test.ts` (+6 tests, import updated)
+
+**Risk:** None — test-only change.
+
+---
+
+### Change 3 — fix: exclude future-dated entries from longestStreak
+
+**Summary:** `computeHistoryStats` built the `streakable` set from all entries without
+filtering to `<= today`. CSV imports with future dates would inflate `longestStreak`.
+Added a filter before the consecutive-run walk. Added a regression test with a 3-day past
+run and a future entry on day 4 — verifies `longestStreak = 3`, not 4.
+
+**Files changed:**
+- `src/lib/historyStats.ts` (one-line filter added)
+- `src/lib/__tests__/historyStats.test.ts` (+1 test)
+
+**Risk:** Low. Only affects users who have future-dated entries (unusual scenario, typically
+from bad imports). Those users would see `longestStreak` decrease to the correct value.
+
+---
+
+### Change 4 — fix: avoid name accumulation in duplicatePlan
+
+**Summary:** Successive duplication produced "Name (copy) (copy) (copy)". Now strips any
+trailing " (copy)" or " (copy N)" suffix from the source name before appending, then uses
+a numeric counter (" (copy 2)", " (copy 3)", …) when the simple "(copy)" name is already
+taken by an existing plan.
+
+**Files changed:**
+- `src/store/planStore.ts`
+- `src/store/__tests__/planStore.test.ts` (+3 tests)
+
+**Risk:** Low. Users with "(copy)" plans will see different copy names on next duplication.
+The behavior is strictly more useful and non-destructive.
+
+---
+
 ## 2026-05-27 (forty-first pass) — branch `claude/dreamy-mccarthy-9NxZ6`
 
 Baseline on entry: **748 passing, 0 failing**. Exit state: **748 passing, 0 failing** (+0 tests; no new test files needed — fixes covered by existing tests and no new logic added).
