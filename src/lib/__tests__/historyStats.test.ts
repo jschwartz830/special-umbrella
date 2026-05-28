@@ -239,6 +239,20 @@ describe('computeHistoryStats', () => {
     expect(s.longestStreak).toBe(3)
     expect(s.currentStreak).toBe(0)
   })
+
+  it('longestStreak excludes future-dated entries (e.g. from a bad CSV import)', () => {
+    // A past run of 3 days plus a future-dated entry that would extend the
+    // apparent streak if not filtered. longestStreak must remain 3.
+    const entries = [
+      entry('2026-04-10', 'complete'),
+      entry('2026-04-11', 'complete'),
+      entry('2026-04-12', 'complete'),
+      entry('2026-04-13', 'complete'), // future relative to today=2026-04-12
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-12')
+    expect(s.longestStreak).toBe(3)
+    expect(s.currentStreak).toBe(3)
+  })
 })
 
 // ── computePlanProgress ───────────────────────────────────────────────────────
