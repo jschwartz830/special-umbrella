@@ -1079,6 +1079,12 @@ export function ActiveWorkoutTracker({
   function deleteSet(exIdx: number, setIdx: number) {
     const key = `${exIdx}-${setIdx}`
     setRevealedSets(prev => { const n = new Set(prev); n.delete(key); return n })
+    // Clear active set timer if it pointed at or after the deleted index
+    const active = activeSetRef.current
+    if (active && active.exIdx === exIdx && active.setIdx >= setIdx) {
+      activeSetRef.current = null
+      setActiveSetTimer(null)
+    }
     setExercises(prev => prev.map((ex, ei) => {
       if (ei !== exIdx) return ex
       const newSets = ex.sets.filter((_, si) => si !== setIdx)
@@ -1094,11 +1100,19 @@ export function ActiveWorkoutTracker({
     if (ex.isWarmup) return null
     const workingSets = ex.sets.filter(s => !s.isWarmup)
     if (workingSets.length === 0 || !workingSets.every(s => s.completed)) return null
-    return workingSets.map((s, i) => {
+    const lines = workingSets.map((s, i) => {
       const load = s.resolvedLoadLbs ?? s.actualLoad
       const step = progressionStep(load)
-      return `weights[${i + 1}]: +${step}lb`
+      const nextLoad = load != null ? load + step : null
+      if (load != null && nextLoad != null) return `Set ${i + 1}: ${load} → ${nextLoad} lb`
+      return `Set ${i + 1}: +${step} lb`
     })
+    // Collapse to a single summary line when all sets have the same transition
+    if (lines.length > 1 && new Set(lines.map(l => l.replace(/^Set \d+: /, ''))).size === 1) {
+      const summary = lines[0].replace(/^Set \d+: /, 'All sets: ')
+      return [summary]
+    }
+    return lines
   }
 
   function handleSwipeStart(e: React.PointerEvent<HTMLDivElement>, key: string, exIdx: number, setIdx: number) {
@@ -1468,6 +1482,9 @@ export function ActiveWorkoutTracker({
                 const active = isActiveSet(exIdx, setIdx)
                 const timerRunning = activeSetTimer?.exIdx === exIdx && activeSetTimer?.setIdx === setIdx
                 const swipeKey = `${exIdx}-${setIdx}`
+                // Number working sets relative to other working sets only (exclude warmups from count)
+                const workingSetNumber = s.isWarmup ? null
+                  : ex.sets.slice(0, setIdx + 1).filter(ps => !ps.isWarmup).length
                 return (
                   <div key={setIdx} className="relative overflow-hidden rounded" style={{ touchAction: 'pan-y' }}>
                     {/* Trash button revealed by swipe */}
@@ -1492,7 +1509,7 @@ export function ActiveWorkoutTracker({
                       {ex.isWarmup || s.isWarmup ? (
                         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/20 text-orange-300 font-bold">W</span>
                       ) : (
-                        setIdx + 1
+                        workingSetNumber
                       )}
                     </span>
                     <span className="col-span-3 text-center text-slate-500 text-[10px]">
