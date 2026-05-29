@@ -52,6 +52,18 @@ function resolveDisplayLoad(
   return null
 }
 
+function resolveRepsDisplay(
+  reps: number | string | undefined,
+  vars: Record<string, number>,
+): number | string | undefined {
+  if (reps == null) return undefined
+  if (typeof reps === 'number') return reps
+  const trimmed = reps.trim()
+  // Resolve bare var-name identifiers only — not ranges ("6-10"), AMRAP ("5+"), or numeric literals
+  if (/^[a-zA-Z_]\w*$/.test(trimmed) && trimmed in vars) return vars[trimmed]
+  return reps
+}
+
 function formatExercisePrescription(
   slot: WorkoutSlot,
   vars: Record<string, number>,
@@ -61,7 +73,8 @@ function formatExercisePrescription(
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
       const setText = ex.sets
         .map((set, idx) => {
-          const repOrDur = set.reps ?? set.duration ?? ex.reps ?? ex.duration
+          const rawRep = set.reps ?? ex.reps
+          const repOrDur = resolveRepsDisplay(rawRep, vars) ?? set.duration ?? ex.duration
           const rawLoad = set.load ?? ex.load
           const load = resolveDisplayLoad(rawLoad, vars)
           const rest = set.rest ?? ex.rest
@@ -74,7 +87,7 @@ function formatExercisePrescription(
     }
 
     const setCount = typeof ex.sets === 'number' ? ex.sets : null
-    const repOrDur = ex.reps ?? ex.duration
+    const repOrDur = resolveRepsDisplay(ex.reps, vars) ?? ex.duration
     const load = resolveDisplayLoad(ex.load, vars)
     const base = [
       setCount != null ? `${setCount} sets` : null,

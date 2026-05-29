@@ -59,7 +59,7 @@ export function OutcomeMetrics({ outcome }: { outcome: WorkoutOutcome }) {
         </div>
       )}
 
-      {outcome.progressionRecommendation && (
+      {outcome.progressionRecommendation?.action === 'progress' && (
         <p className="text-xs text-sky-300">↗ {outcome.progressionRecommendation.note}</p>
       )}
 
