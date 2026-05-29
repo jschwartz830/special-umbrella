@@ -83,6 +83,22 @@ function deduplicateByDate(entries: HistoryEntry[]): HistoryEntry[] {
   return Array.from(map.values())
 }
 
+/** @internal Exported only for unit testing. */
+export function migrateHistoryState(persisted: unknown, fromVersion: number): HistoryState {
+  const s = (persisted ?? {}) as Partial<HistoryState>
+  let extraEntries = s.extraEntries ?? []
+  if (fromVersion < 1) {
+    // v0 → v1: extras without a source field were created before the
+    // 'source' field was introduced. Treat them as 'history' (user-added
+    // via Calendar/History) rather than the undefined-fallback of
+    // 'double_day', which would cause Undo to silently delete them.
+    extraEntries = extraEntries.map(e =>
+      e.source === undefined ? { ...e, source: 'history' as const } : e,
+    )
+  }
+  return { ...s, extraEntries } as HistoryState
+}
+
 export const useHistoryStore = create<HistoryState>()(
   persist(
     (set, get) => ({
@@ -262,6 +278,10 @@ export const useHistoryStore = create<HistoryState>()(
         })
       },
     }),
-    { name: 'wpt_history' },
+    {
+      name: 'wpt_history',
+      version: 1,
+      migrate: migrateHistoryState,
+    },
   ),
 )
