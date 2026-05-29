@@ -1,174 +1,170 @@
 # IOS_IMPLEMENTATION_SPEC
 
+> Plan for rebuilding the workout-plan tracker **natively in SwiftUI**. This is not a line-by-line port of the React/Zustand code — it specifies how to reproduce the **product behavior** captured in `WEB_APP_INVENTORY.md` using native iOS idioms, while guaranteeing functional parity. Where the web app's behavior is web-specific (service workers, CSV-as-only-transport), the native adaptation is called out explicitly.
+>
+> Target: iOS 17+ (so `@Observable`, `NavigationStack`, SwiftData/Observation are available). Swift concurrency (`async/await`) throughout.
+
 ## Architecture (SwiftUI-first)
-- **Goal**: Build a native iOS training-tracker app that preserves product behavior, not React/Zustand implementation details.
-- **Proposed module boundaries**
-  - `Domain`: entities/value objects, invariants, business rules.
-  - `Services`: rotation projection, calendar projection, stats, progression engines.
-  - `Persistence`: repositories, schema/migrations, import/export adapters.
-  - `Features`: Today, Calendar, History, Plans, Program Import, Settings.
-  - `AppCore`: dependency container, logging, date/time providers, feature flags.
+
+- **Goal**: A native training tracker that preserves all product behavior in the inventory, expressed through native data, navigation, and interaction patterns.
+- **Module boundaries**
+  - `Domain`: entities/value objects + invariants (Plan, PlanDay, WorkoutSlot, HistoryEntry, ExtraWorkoutEntry, OverrideEntry, WorkoutOutcome, RunProgressionState, ProgramVars, ExerciseSessionRecord, ResolvedDay).
+  - `Services`: deterministic engines — rotation projection, calendar projection, history stats, run-adaptation, recommendation, expression evaluation, YAML import, CSV import/export.
+  - `Persistence`: repositories + schema/migrations + import/export adapters; storage engine swappable behind protocols.
+  - `Features`: Today, Calendar, History, Plans, Plan Builder, Program Import, Settings, Active Workout.
+  - `AppCore`: dependency container, `Clock`/`CalendarProvider`/`TimezonePolicy`, `UUIDGenerator`, logging/telemetry, feature flags.
 - **Layering rules**
   1. SwiftUI views are declarative UI only.
-  2. Feature view models own user intents + async workflows.
-  3. Domain services are deterministic/pure where possible.
-  4. Persistence is behind protocols; storage engine is swappable.
-- **Cross-cutting dependencies**
-  - `Clock`, `CalendarProvider`, `TimezonePolicy`, `UUIDGenerator`, `ImportExportService`, `Telemetry`.
+  2. Feature view models (`@Observable`) own user intents + async workflows; they call domain use-cases, never persistence directly.
+  3. Domain services are pure/deterministic where possible (mirror the web engines, which are already pure) so they are unit-testable in isolation.
+  4. Persistence is behind protocols; the concrete store is swappable.
+- **Determinism**: the web rotation/projection/stats/progression engines are already pure functions over their inputs. Reproduce them as pure Swift `struct`/free functions with identical decision tables (e.g. "all logged actions advance the pointer by +1"; run-progression thresholds 95% / effort≤3 / effort=5 / <80%). Port the test suites (`src/**/__tests__`) as Swift unit tests to lock parity.
 
 ## Navigation Structure
-- Root `TabView`: Today / Calendar / History / Plans / Settings.
-- Separate `NavigationStack` per tab.
-- Route destinations:
-  - Plan create/edit flow.
-  - Program import flow.
-  - Outcome edit/capture sheets.
-  - Optional direct calendar-date deep link.
-- Presentation style
-  - Sheets for outcome and detail editors.
-  - Full-screen cover for Active Workout session.
-  - Confirmation dialogs for destructive/conflict actions.
+
+- Root `TabView`: **Today / Calendar / History / Plans / Settings** (mirror `BottomNav`). Each tab owns its own `NavigationStack`.
+- Stack destinations:
+  - Plans → Plan Builder (new/edit), Program Import.
+  - History → entry/extra detail editors.
+- Presentation:
+  - **Sheets (detented)** for outcome capture/edit and the calendar day-detail drill-down.
+  - **Full-screen cover** for the Active Workout session.
+  - **Confirmation dialogs** for destructive/conflict actions (delete plan, clear day, discard unsaved session, date-move collision).
+  - Optional deep link to a specific calendar date.
 
 ## Data Models
-- **Core entities**
-  - `Plan`, `PlanDay`, `WorkoutSlot`, `PlanDuration`, `PlanStatus`.
-  - `HistoryEntry`, `ExtraWorkoutEntry`, `OverrideEntry`.
-  - `WorkoutOutcome`, `RunProgressionState`, `ProgramVariables`.
-  - `ExerciseHistoryEntry` (derived, query-optimized).
+
+Model these as Swift `Codable` value types in `Domain` (and `@Model` SwiftData classes in `Persistence` if SwiftData is chosen — keep the two layers mapped, don't leak SwiftData into Domain).
+
+- **Core entities**: `Plan`, `PlanDay`, `WorkoutSlot`, `PlanDuration` (`enum DurationType { rotations, weeks }` + value), `PlanStatus` (`active/inactive/archived`).
+  - `WorkoutType` enum with the canonical cases `weights/run/swim/yoga/other` plus the legacy cases `weightlifting/long_run/recovery_run/rest` decoded for import compatibility and **normalized on load** (replicate `migrateSlot`).
+  - `WorkoutSlot` retains the full optional surface (simple targets, metadata, `runConfig`, and the program/DSL fields `warmup`/`exercises`/`segments`/`slotProgress`).
+- **Logging entities**: `HistoryEntry` (one per plan+date), `ExtraWorkoutEntry` (with `source: ExtraSource? { history, doubleDay }`), `OverrideEntry` (`advance/goBack/jump/swapSlot`).
+- **Outcome entities**: `WorkoutOutcome` (completionState, completedAt, durationActualMin, perceivedEffort 1–5, notes, `runActual`/`weightsActual`/`swimActual`, `progressionRecommendation`), `RunProgressionState`, `ProgramVariables` (`[planId: [varName: Double]]`).
+- **Derived**: `ExerciseSessionRecord` (per-exercise PR/volume index with `planName`/`workoutName` snapshots), `ResolvedDay` (computed, never persisted).
+- **Program/DSL**: `ExerciseSpec`, `SetSpec` (reps may be `Int` or `String` for "5+"/ranges — model as an enum `RepTarget { count(Int), expression(String) }`), `RunSegment`, `DrillSpec`, `ProgressionRule` (`if?`/`then`/`else?`), `ProgressionType`.
 - **Identifiers**
-  - Stable string IDs (UUID-backed) for plans/days/slots/extras/entries.
-  - Introduce typed `WorkoutInstanceKey` with planned/extra cases.
+  - Use a stable `String` id type (UUID-backed) for all entities.
+  - Introduce a typed `WorkoutInstanceKey` enum with `.planned(planId, date)` and `.extra(planId, date, extraId)` cases that serialize **to and from** the web string format (`planId_date`, `planId_date_extra_extraId`) so CSV import/export and any shared data stay compatible. Centralize parsing (replicate `parseWorkoutInstanceId`'s regex-based date locator).
 - **Date modeling**
-  - Use explicit date-only type (`LocalDate`) for `calendarDate`.
-  - Store jump-anchor effective date explicitly (avoid parsing local time from arbitrary ISO strings).
-- **Compatibility constraints**
-  - Preserve semantics of planned vs extra outcomes.
-  - Preserve nullable metrics fields and modality-specific actual payloads.
+  - Introduce a `LocalDate` value type (year/month/day) for `calendarDate` to avoid time-of-day/timezone bugs; all date math goes through it.
+  - Store the jump-anchor's **effective local date explicitly** on the override rather than re-deriving it from an arbitrary ISO timestamp (fixes the web's `new Date(appliedAt)` ambiguity while preserving the "noon anchor" intent).
+- **Compatibility constraints**: preserve planned vs. extra outcome semantics, nullable metric fields, and modality-specific actual payloads so CSV round-trips with the web app are lossless.
 
 ## State Management Approach
-- Feature-specific `@Observable` view models (or equivalent) with explicit intent methods.
-- Domain actions should be use-case oriented:
-  - `logPlannedAction`, `logExtraWorkout`, `saveOutcome`, `moveOutcomeDate`, `clearDate`, `activatePlan`, `archivePlan`, etc.
-- Use a transaction coordinator at repository layer for cross-entity writes:
-  - Planned date move (history + outcome + downstream indexes).
-  - Extra date move (extra + outcome + downstream indexes).
-  - Retro jump replacement (remove stale + add new).
-- Derived UI state should be computed from repositories/services, not persisted as extra flags.
+
+- Feature-scoped `@Observable` view models exposing explicit intent methods (use-case oriented), e.g. `logPlannedAction`, `logExtraWorkout`, `saveOutcome`, `moveOutcomeDate`, `clearDate`, `activatePlan`, `archivePlan`, `deletePlan`, `applyOverride`.
+- A **transaction coordinator** at the repository layer wraps cross-entity writes that the web app currently does non-atomically:
+  - Planned date move (history + outcome + exercise-history re-key).
+  - Extra date move (extra + outcome + exercise-history re-key).
+  - Retro jump replacement (remove stale jump + add new + write entry).
+  - Plan delete/archive cascade (see Persistence + Open Questions #7).
+  - Outcome log → progression pipeline (recommendation + run progression + program-var rules + exercise-history sync) committed as one unit.
+- Derived UI state (resolved days, stats, projections) is **computed** from repositories/services, never persisted as extra flags. Cache with `@Observable` derived properties or memoized services keyed by store revision.
 
 ## Persistence Strategy (local first, extensible to cloud)
-- **v1 local store**: SQLite-backed persistence (SwiftData acceptable if migration controls are proven; GRDB preferred for explicit transactions/migrations).
-- **Repository protocols**
-  - `PlanRepository`, `HistoryRepository`, `OutcomeRepository`, `ProgramVarsRepository`, `ExerciseHistoryRepository`, `ImportExportRepository`.
+
+- **v1 local store**: SQLite-backed. **GRDB preferred** for explicit transactions + migrations; SwiftData acceptable only if its migration story is proven for this schema. Either way, expose repository protocols:
+  - `PlanRepository`, `HistoryRepository` (entries + overrides + extras), `OutcomeRepository` (outcomes + progression states), `ProgramVarsRepository`, `ExerciseHistoryRepository`, `SettingsRepository`, `ImportExportRepository`.
+- **Mapping from web persistence**: the six Zustand stores (`wpt_plans`, `wpt_history`, `wpt_outcomes`, `wpt_program_vars`, `wpt_exercise_history`, `wpt_settings`) map to repositories above. The per-plan expiry-dismissal flags (`wpt_expiry_dismissed_v1_*`) and the active-workout draft (`wpt_active_draft_*`) map to lightweight key-value storage (`UserDefaults`/a `DraftStore`).
 - **Migration requirements**
-  - Slot-type legacy normalization parity.
-  - Tag-derived metadata mapping parity.
-  - Schema version table + migration tests.
-- **Atomicity requirements**
-  - Multi-entity updates must be transactional.
-  - Import should be staged/validated before commit with rollback on failure.
-- **Cloud-ready extension points**
-  - Include `updatedAt`, `deletedAt/tombstone`, `sourceDeviceId`, conflict metadata, and monotonic sync versions.
+  - Legacy slot-type normalization parity (`weightlifting`→`weights`, `long_run`/`recovery_run`→`run`+subtype, `rest`→`other`+subtype, tag-derived `location`/`focus`). Run this on import and as a one-time data migration.
+  - Schema version table + migration tests; mirror the web `version: 2` plan migration as the starting baseline.
+- **Atomicity requirements**: all multi-entity updates run in a single transaction; imports are staged/validated then committed atomically with rollback on failure.
+- **Cloud-ready extension points**: include `updatedAt`, `deletedAt`/tombstone, `sourceDeviceId`, and a monotonic sync version on every record so CloudKit/iCloud sync can be added without a schema rewrite. (Web has only `createdAt`/`updatedAt`; add the rest now.)
+- **Settings store**: persist `startDelaySeconds` (set-timer countdown) — see Open Questions #10 for scope.
 
 ## Screen-by-Screen Mapping (web → iOS adaptation)
-- **Today**
-  - Native card stack: current workout, upcoming preview, progress insights.
-  - Quick actions for complete/skip/day off; separate CTA for additional workout.
-  - Active workout entry point with minimized dock-like affordance.
-  - Adaptation notes/cautions in collapsible “Coach Insights” section.
-- **Calendar**
-  - Pageable month with accessible day cells and status markers.
-  - Day detail sheet: log actions, adjust plan-day selection for retro entries, manage extras, edit outcomes.
-<<<<<<< codex/update-web_app_inventory.md-and-ios_implementation_spec.md-in1hbo
-  - Treat plan as guidance: allow multiple logged workouts/day, and defer displaced planned workout to following day by default.
-=======
-  - Explicit UX for date-move collisions (do not silently hide overwrite effects).
->>>>>>> main
-- **History**
-  - Timeline with filter chips/scope picker and summary cards.
-  - Notes editing and read-friendly workout detail drill-in.
-  - Share-sheet driven CSV export; file-import flow for CSV ingest with pre-commit summary.
-- **Plans**
-  - Sectioned list (active/inactive/archived), contextual swipe actions.
-  - Native form-based plan builder (metadata, day templates, slot details).
-  - Import entry point co-located with plan creation actions.
-- **Program Import**
-  - Document picker, parse results, schema errors/warnings list, import preview.
-- **Settings**
-  - Native diagnostics + data tools.
-<<<<<<< codex/update-web_app_inventory.md-and-ios_implementation_spec.md-in1hbo
-  - Version/build metadata screen.
-  - No web-style force-refresh control in v1 iOS (web service-worker concern does not apply).
-=======
-  - “App refresh recovery” adapted from web force-refresh intent (clear app caches/local DB only when user confirms).
-  - Version/build metadata screen.
->>>>>>> main
+
+- **Today** (`TodayPage` → `TodayView`)
+  - Native card stack: today's workout card, completed-today section, optional rest-day card, double-day bonus card, upcoming preview.
+  - Header with date, plan name, and a progress line (rotation day, cycle progress, week progress).
+  - A compact stats row (streak / 7-day / total) and a 7-day activity strip.
+  - "Coach Insights" collapsible section for run adaptation note, difficulty-spacing warning, and last-session summary.
+  - Quick actions: Complete (opens outcome sheet) / Skip / Day Off; separate CTA for an additional workout; Override menu (advance / go back / jump-to-day picker).
+  - Unlogged-day nudge with a batch "Mark as Day Off" action.
+  - Active-workout entry point with a **minimized dock/Live-Activity-style affordance** while a session is running.
+  - Treat plan as guidance: logging a non-planned workout defers the displaced planned workout to the next day by default (per product direction #2).
+- **Calendar** (`CalendarPage` → `CalendarView`)
+  - Pageable month grid with accessible day cells, color-independent status markers, slot/extra indicators, and a legend.
+  - Day-detail **detented sheet** with the 3-level structure (overview → rotation detail / extra detail): log actions, adjust the plan-day for retro entries (drives the jump-anchor override), manage extras, edit outcomes, clear day, resume a historical session.
+  - Explicit, non-silent UX for date-move collisions (confirm or merge — never the web's silent overwrite).
+- **History** (`HistoryPage` → `HistoryView`)
+  - Timeline list (sections by date, rotation before extras), filter by plan (segmented control or menu), summary cards (streak/7/30/total + training mix).
+  - Expandable Personal Records and Weekly Activity sections.
+  - Entry editor (date move with conflict check, action change, notes), extra editor, per-date "Add workout".
+  - **Native data transport**: keep CSV import/export (share sheet + Files importer) for parity/portability, but treat CSV as one adapter — the primary store is the local DB. Consider adding JSON export later.
+- **Plans** (`PlansPage` → `PlansView`)
+  - Sectioned list (active/inactive/archived) with swipe actions and a context menu (activate/deactivate, duplicate, archive, delete).
+  - Activate flow as a sheet (start date + start-day picker, mirroring `setActivePlan` semantics including demoting the prior active plan).
+  - Delete confirmation must respect the **retention policy** (do not destroy completed workouts — see Open Questions #7).
+- **Plan Builder** (`PlanBuilderPage` → `PlanBuilderView`)
+  - Native `Form`-based editor: metadata, draggable day list, per-day slot list (1–2 slots), type-specific fields, run config, difficulty, weights exercise editor (library autocomplete from the bundled exercise library, sets/reps/load/rest, per-exercise progression type + if/then/else with templates), notes.
+  - Keep the YAML round-trip as an "advanced" editor (text editor sheet) that re-parses through the same import service.
+  - Unsaved-changes guard via `.interactiveDismissDisabled` + confirmation dialog.
+- **Program Import** (`ProgramImportPage` → `ProgramImportView`)
+  - Paste/Files-import YAML, template picker (bundle the `programs/*.yaml` templates as resources), parse-result preview with errors/warnings, and import (creates plan + initializes program vars).
+  - A native YAML text editor is sufficient; syntax highlighting is optional polish, not required for parity.
+- **Settings** (`SettingsPage` → `SettingsView`)
+  - Native diagnostics + data tools, set-timer start-delay control, and a Version/build-metadata screen.
+  - **No web-style force-refresh control** in v1 (service-worker concern doesn't apply). Provide a separate, clearly-labeled "reset local data" only if desired (debug/destructive), distinct from the web's cache-refresh.
 
 ## Native iOS UI/UX adaptations (not web parity)
-- Prefer iOS interaction idioms: swipe actions, menus, segmented controls, and detented sheets.
-- Haptics for success, caution, and destructive confirmations.
-- Accessibility-first:
-  - Dynamic Type, VoiceOver rotor-friendly labels, reduced motion support.
-  - Color-independent status indicators in calendar/history.
-- Distinguish planned vs extra workouts with native visual hierarchy instead of string key conventions.
-- Use non-blocking banners/toasts for secondary confirmations (e.g., “Outcome moved to Apr 10”).
+
+- Prefer iOS idioms: swipe actions, context menus, segmented controls, `Menu`, and **detented sheets** instead of custom modals.
+- Haptics for success / caution / destructive confirmations (`UINotificationFeedbackGenerator`).
+- Accessibility-first: Dynamic Type, VoiceOver labels (rotor-friendly), Reduce Motion, and **color-independent** status indicators in calendar/history (icons/shapes, not color alone).
+- Distinguish planned vs. extra workouts with native visual hierarchy (badges/section grouping), not string-key conventions.
+- Non-blocking toasts/banners for secondary confirmations ("Outcome moved to Apr 10").
+- **Active Workout session** native equivalents (the most iOS-specific surface):
+  - Replace web AudioContext pre-scheduling with **scheduled local notifications and/or `AVAudioEngine`** for the −15s warning and end-of-rest chord, so alerts fire when the app is backgrounded/locked.
+  - Use `UIApplication.isIdleTimerDisabled` (or a wake assertion) during rest instead of the Web Wake Lock API.
+  - Consider a **Live Activity / Dynamic Island** for the running workout + rest timer.
+  - Timers must reconcile against wall-clock on `scenePhase` changes (replicate the web's visibility reconciliation) so backgrounding never loses elapsed time.
+  - Crash-safe **session draft** persisted continuously (equivalent to `wpt_active_draft_*`) so an interrupted session can be resumed.
+  - Numeric entry uses native keyboards with `±` stepper accessories rather than the web's custom keypad.
 
 ## Build Phases / Implementation Plan
-1. **Domain/Persistence Foundation**
-   - Implement entities, repositories, migrations, date/time policy, transaction coordinator.
-2. **Core Services**
-   - Rotation resolver, month projection, stats, progression/recommendation engines.
-3. **Plans Feature**
-   - CRUD + activate/deactivate + archive/delete + import entry integration.
-4. **Today Feature**
-   - Projection/UI, quick actions, outcome editor, additional workouts, active session shell.
-5. **Calendar Feature**
-   - Month/day interactions, retro jumps, clear-day flow, planned/extra outcome edits.
-6. **History Feature**
-   - Timeline, filters, notes, stats, CSV import/export.
-7. **Program Import & Vars**
-   - YAML mapping pipeline, vars init/update, validation UX.
-8. **Settings + Hardening**
-   - Diagnostics, data recovery/reset, performance tuning, accessibility and QA gates.
+
+1. **Domain + Persistence foundation**: entities, `LocalDate`/`WorkoutInstanceKey`, repositories, schema + migrations (incl. legacy slot normalization), transaction coordinator, dependency container, clock/timezone providers.
+2. **Core services (pure)**: rotation resolver, month projection, history stats, run-adaptation engine + selectors, recommendation builder, expression evaluator, YAML import, CSV import/export. Port the web unit tests first (TDD parity).
+3. **Plans feature**: list + sections, CRUD, activate/deactivate (with prior-active demotion), duplicate (deep clone), archive, delete (retention-aware), CSV import/export entry points.
+4. **Today feature**: projection + insights, quick actions, outcome sheet, additional workouts/double-day, Active Workout shell (minimized affordance).
+5. **Active Workout session**: full tracker — set/rest/workout timers, wall-clock reconciliation, notifications/audio, wake assertion, draft persistence, progression preview, add/replace exercise.
+6. **Calendar feature**: month grid, day-detail sheet, retro jump anchor, clear-day, planned/extra outcome edits, collision UX, historical resume.
+7. **History feature**: timeline, filters, notes, stats, PRs, weekly breakdown, CSV import/export.
+8. **Plan Builder + Program Import + Vars**: form builder, YAML round-trip, template loading, program-var init/update, validation UX.
+9. **Settings + hardening**: set-timer delay, version/build screen, diagnostics, performance tuning (large history), accessibility + QA gates, optional cloud-sync scaffolding.
 
 ## Testing Considerations
-- **Unit tests**
-  - Rotation/day projection, retro jump behavior, stats computations.
-  - Progression recommendation + run progression + program variable rule updates.
-  - Instance-key parser/formatter correctness (planned vs extra).
-- **Repository integration tests**
-  - Transactional date moves and clear-day operations.
-  - Migration tests for legacy slot normalization.
-  - Import dedupe and overwrite policies.
-  - Exercise-history synchronization from outcomes.
-- **UI tests**
-  - End-to-end: create plan → activate → log outcome → edit in calendar → verify history.
-  - Collision prompts and destructive confirmation flows.
-  - Additional workout and historical resume paths.
-- **Non-functional tests**
-  - Timezone/DST simulations.
-  - Large history dataset scrolling/performance.
-  - Accessibility snapshots and VoiceOver navigation.
 
-<<<<<<< codex/update-web_app_inventory.md-and-ios_implementation_spec.md-in1hbo
-## Open Questions / Ambiguities (Resolved + Remaining)
-1. **Workout identity strategy** (still open): decide whether persistence uses web-compatible string keys directly or internal relational IDs with adapter translation.
-2. **Collision policy** (resolved): allow multiple logs/day; if a non-planned workout is logged, default behavior defers displaced planned workout to the next day (excluding day-off semantics).
-3. **Retro recompute** (resolved): progression state, program variables, and exercise-history indexes must recompute from latest corrected history/outcomes.
-4. **Rotation-order controls** (resolved intent): expose user-visible controls to adjust rotation order (including semantics currently represented by `swap_slot`).
-5. **Timezone policy** (resolved): local device timezone is canonical for date-only logging and jump anchoring.
-6. **Archive/delete retention** (resolved): plan archive/delete does not remove completed workouts; historical workouts remain visible but excluded from active-plan rotation metrics.
-7. **Extra import dedupe** (resolved direction): use semantic dedupe keys rather than ID-only dedupe.
-8. **Historical resume outcome saves** (resolved): must allow outcome creation even when no matching planned/extra row exists.
-9. **Settings recovery** (resolved): do not ship a user-facing iOS equivalent of web force-refresh in v1.
-=======
+- **Unit tests (parity-critical)** — port from the web suites:
+  - Rotation/day projection incl. override ordering and the "all actions advance +1 / past-unlogged stalls" rule (`rotationEngine.test.ts`).
+  - Calendar month projection + pre-start clamping (`calendarProjection.test.ts`).
+  - History stats: streaks, plan/cycle progress, weekly breakdown, type breakdown, PRs (`historyStats.test.ts`).
+  - Run progression decision table (`run-adaptation/engine.test.ts`) and recommendation copy (`workout-outcomes`, `recommendation`).
+  - Expression evaluator: arithmetic/comparison/logical/functions, update statements with paren-aware comma splitting, `resolveLoad`/`resolveQuantityString` (`expressionEval.test.ts`).
+  - `WorkoutInstanceKey` round-trip (planned vs extra) (`workoutInstanceId.test.ts`).
+  - CSV encode/decode + import dedupe/overwrite (`csv.test.ts`).
+  - Last-session summary formatting (`sessionSummary.test.ts`).
+- **Repository integration tests**: transactional date moves, clear-day, plan delete/archive cascade per retention policy, legacy slot migration, exercise-history sync, import staging/rollback.
+- **UI tests**: create plan → activate → log outcome → edit in calendar → verify in history; collision confirmation; additional-workout + historical resume; double-day.
+- **Non-functional**: timezone/DST + travel simulations (`LocalDate` + jump anchor), large-history scrolling, accessibility snapshots + VoiceOver navigation, and **Active Workout backgrounding** (timer reconciliation, notification delivery, draft recovery after force-quit).
+
 ## Open Questions / Ambiguities
-1. Should iOS persist web-compatible outcome key strings directly, or use internal relational IDs with a compatibility adapter at import/export boundaries?
-2. What exact collision policy is required when moving planned outcomes to dates that already contain planned entries?
-3. Are progression state, program variables, and exercise-history indexes required to recompute on retro edits/deletes?
-4. Should `swap_slot` be exposed in iOS v1 UX, or deferred to model-only support?
-5. What is the canonical timezone policy for date-only logging across travel and DST transitions?
-6. What archive/delete retention policy is desired for linked history, extras, outcomes, overrides, and program vars?
-7. Should extra-workout import dedupe remain ID-based or become semantic?
-8. Is historical Active Workout resume mandatory for v1, including cases where matching history rows are missing?
-9. What is the iOS equivalent of web “force refresh” (cache/service-worker reset), and should it be end-user visible or debug-only?
->>>>>>> main
+
+Product direction is resolved for several of these; remaining decisions are flagged. These mirror `WEB_APP_INVENTORY.md` → Open Questions.
+
+1. **Workout identity strategy** (open): persist web-compatible string keys directly, or internal relational IDs with a `WorkoutInstanceKey` adapter only at CSV import/export boundaries? (Recommendation: internal IDs + adapter.)
+2. **Collision policy** (resolved): allow multiple logs/day; logging a non-planned workout defers the displaced planned workout to the next day (excluding day-off). Replaces the web's silent overwrite — needs explicit collision UX.
+3. **Retro recompute** (resolved): progression state, program variables, and exercise-history indexes must recompute from the latest corrected history/outcomes. The web app only progresses forward per-log; iOS must replay/recompute after retro edits — confirm the recompute trigger boundaries (per edit vs. batched).
+4. **Rotation-order controls** (resolved intent): expose user-visible controls to adjust rotation order (the semantics behind `swap_slot`).
+5. **Timezone policy** (resolved): device-local timezone is canonical for date-only logging and jump anchoring; implement via `LocalDate` + explicit effective-date on overrides.
+6. **Archive/delete retention** (resolved, contradicts current web): archive/delete must **not** remove completed workouts; historical workouts stay visible but are excluded from active-plan rotation metrics. ⚠ The web app currently cascade-deletes everything on plan delete (`PlansPage.tsx:332-337`) — confirm the exact iOS retention model (orphan history to a "no plan" bucket? keep `planName` snapshot only?).
+7. **Extra import dedupe** (resolved direction): semantic dedupe keys (date + type + name/source + tie-break) instead of ID-only.
+8. **Historical resume outcome saves** (resolved): allow outcome creation even when no matching planned/extra row exists — outcomes are first-class.
+9. **Settings recovery** (resolved): no user-facing iOS equivalent of web force-refresh in v1.
+10. **Set-timer start delay** (open): keep as a single global setting (web behavior) or move to per-plan/per-workout configuration?
+11. **Second-slot attribution** (open): should stats/summaries account for both slots of a 2-slot day, where the web app counts only `slots[0]`?
+12. **Active-session background guarantees** (open): must rest/workout timers and alerts survive app termination (not just backgrounding)? This determines whether to use scheduled local notifications + Live Activities vs. in-process timers only, and how aggressively to persist the draft.
+13. **Storage engine** (open): GRDB vs. SwiftData — gate on a migration-safety spike before phase 1 lands.
