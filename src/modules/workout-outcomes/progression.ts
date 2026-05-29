@@ -72,6 +72,21 @@ export function buildProgressionRecommendation(
   return null
 }
 
+function allSetsHitTarget(
+  allSets: LoggedExerciseActual['sets'],
+  completedSets: LoggedExerciseActual['sets'],
+): boolean {
+  if (!allSets.every(s => s.completed === true)) return false
+  return completedSets.every(s => {
+    if (typeof s.targetReps === 'number') {
+      // Require actual reps to be recorded and meet the target.
+      return s.actualReps != null && s.actualReps >= s.targetReps
+    }
+    // String target (rep range like "6-10", AMRAP "5+") or no target — completing suffices.
+    return true
+  })
+}
+
 function buildWeightsRecommendation(
   exercises: LoggedExerciseActual[],
   effort: number | null,
@@ -81,6 +96,9 @@ function buildWeightsRecommendation(
   const allSets = exercises.flatMap(ex => ex.sets)
   const completedSets = allSets.filter(s => s.completed)
   if (completedSets.length === 0) return null
+
+  // Only generate a recommendation when progression logic is explicitly configured.
+  if (!exercises.some(ex => ex.progressionMode != null)) return null
 
   const mode = exercises[0].progressionMode ?? 'single'
 
@@ -94,12 +112,7 @@ function buildWeightsRecommendation(
   }
 
   if (mode === 'double') {
-    // Require every set to be completed AND every completed set to hit its rep target.
-    // Checking only completedSets would give a false 'progress' on partial workouts.
-    const allSetsCompleted = allSets.every(s => s.completed === true)
-    const allHit = allSetsCompleted && completedSets.every(s =>
-      s.actualReps != null && typeof s.targetReps === 'number' ? s.actualReps >= s.targetReps : true,
-    )
+    const allHit = allSetsHitTarget(allSets, completedSets)
     return {
       discipline: 'weights',
       mode,
@@ -111,23 +124,25 @@ function buildWeightsRecommendation(
   }
 
   if (mode === 'volume') {
+    const allHit = allSetsHitTarget(allSets, completedSets)
     return {
       discipline: 'weights',
       mode,
-      action: 'hold',
-      note: 'Volume progression: add one set or small rep bump while keeping form sharp.',
+      action: allHit ? 'progress' : 'hold',
+      note: allHit
+        ? 'Volume progression: add one set or a small rep bump next session.'
+        : 'Volume progression: hit all target reps before adding volume.',
     }
   }
 
-  // allCompleted uses allSets so that partially-done workouts (some sets not
-  // completed) correctly receive the 'hold' recommendation rather than 'progress'.
-  const allCompleted = allSets.every(s => s.completed === true)
+  // Single (and maintenance fallback)
+  const allHit = allSetsHitTarget(allSets, completedSets)
   return {
     discipline: 'weights',
     mode: 'single',
-    action: allCompleted ? 'progress' : 'hold',
-    note: allCompleted
+    action: allHit ? 'progress' : 'hold',
+    note: allHit
       ? 'Single progression: add 2.5-5 lb next session on this lift.'
-      : 'Repeat current load next session until all sets are completed cleanly.',
+      : 'Repeat current load next session until all sets and target reps are completed.',
   }
 }

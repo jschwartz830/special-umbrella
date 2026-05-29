@@ -670,7 +670,7 @@ export function TodayPage() {
       )}
 
       {/* Previous-session hint — visible only when pending, not in double-day mode */}
-      {(lastSessionSummary || prevSessionOutcome?.notes || (!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.note)) && !doubleDay && (
+      {(lastSessionSummary || prevSessionOutcome?.notes || (!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.action === 'progress')) && !doubleDay && (
         <div className="-mt-2 ml-1 space-y-0.5">
           {lastSessionSummary && (
             <p className="text-xs text-slate-500 truncate">
@@ -682,7 +682,7 @@ export function TodayPage() {
           {prevSessionOutcome?.notes && (
             <p className="text-xs text-slate-600 italic truncate">"{prevSessionOutcome.notes}"</p>
           )}
-          {!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.note && (
+          {!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.action === 'progress' && (
             <p className="text-xs text-sky-700 truncate">↗ {prevSessionOutcome.progressionRecommendation.note}</p>
           )}
         </div>

@@ -30,6 +30,7 @@ import {
 } from '../../modules/workout-outcomes/types'
 import { isRunType } from '../../modules/workout-metadata/types'
 import { makeWorkoutInstanceId } from '../../store/outcomeStore'
+import { useProgramStore } from '../../store/programStore'
 
 interface Props {
   planId: string
@@ -82,6 +83,29 @@ function getSwimSlot(planDay: PlanDay): WorkoutSlot | null {
   return planDay.slots.find(s => s.type === 'swim') ?? null
 }
 
+function deriveProgressionMode(
+  progressionType: string | undefined,
+  hasProgressRule: boolean,
+): LoggedExerciseActual['progressionMode'] | undefined {
+  if (!progressionType && !hasProgressRule) return undefined
+  if (progressionType === 'double' || progressionType === 'dynamic_double') return 'double'
+  if (progressionType === 'triple') return 'volume'
+  if (progressionType === 'step_loading') return 'maintenance'
+  return 'single'
+}
+
+function resolveRepsFromVars(
+  reps: number | string | undefined,
+  vars: Record<string, number>,
+): number | string | undefined {
+  if (reps == null) return undefined
+  if (typeof reps === 'number') return reps
+  const trimmed = reps.trim()
+  // Only resolve pure identifiers — not ranges ("6-10"), AMRAP ("5+"), or literals ("8")
+  if (/^[a-zA-Z_]\w*$/.test(trimmed) && trimmed in vars) return vars[trimmed]
+  return reps
+}
+
 function parseNumericLoad(load?: string): number | null {
   if (!load) return null
   const match = load.match(/(\d+(\.\d+)?)/)
@@ -97,19 +121,25 @@ function parseRestToSeconds(rest?: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function buildInitialWeightActuals(planDay: PlanDay, existing?: WorkoutOutcome | null): LoggedExerciseActual[] {
+function buildInitialWeightActuals(
+  planDay: PlanDay,
+  vars: Record<string, number>,
+  existing?: WorkoutOutcome | null,
+): LoggedExerciseActual[] {
   if (existing?.weightsActual?.exercises?.length) return existing.weightsActual.exercises
   const weightsSlot = getWeightsSlot(planDay)
   if (!weightsSlot?.exercises?.length) return []
 
   return weightsSlot.exercises.map(ex => {
+    const progressionMode = deriveProgressionMode(ex.progressionType, ex.progress != null)
     const sets: LoggedSetActual[] = []
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
       for (const s of ex.sets) {
+        const resolvedReps = resolveRepsFromVars(s.reps ?? ex.reps, vars)
         sets.push({
-          targetReps: s.reps ?? ex.reps ?? null,
+          targetReps: resolvedReps ?? null,
           targetLoad: s.load ?? ex.load ?? null,
-          actualReps: typeof s.reps === 'number' ? s.reps : null,
+          actualReps: typeof resolvedReps === 'number' ? resolvedReps : null,
           actualLoad: parseNumericLoad(s.load ?? ex.load),
           completed: false,
           restSeconds: parseRestToSeconds(s.rest ?? ex.rest),
@@ -117,18 +147,19 @@ function buildInitialWeightActuals(planDay: PlanDay, existing?: WorkoutOutcome |
       }
     } else {
       const setCount = typeof ex.sets === 'number' ? ex.sets : 3
+      const resolvedReps = resolveRepsFromVars(ex.reps, vars)
       for (let i = 0; i < setCount; i += 1) {
         sets.push({
-          targetReps: ex.reps ?? null,
+          targetReps: resolvedReps ?? null,
           targetLoad: ex.load ?? null,
-          actualReps: typeof ex.reps === 'number' ? ex.reps : null,
+          actualReps: typeof resolvedReps === 'number' ? resolvedReps : null,
           actualLoad: parseNumericLoad(ex.load),
           completed: false,
           restSeconds: parseRestToSeconds(ex.rest),
         })
       }
     }
-    return { exercise: ex.exercise, progressionMode: 'single', sets }
+    return { exercise: ex.exercise, progressionMode, sets }
   })
 }
 
@@ -156,6 +187,8 @@ export function OutcomeModal({
   onConfirm,
   onClose,
 }: Props) {
+  const vars = useProgramStore(s => s.vars[planId] ?? {})
+
   const runSlot = getRunSlot(planDay)
   const weightsSlot = getWeightsSlot(planDay)
   const swimSlot = getSwimSlot(planDay)
@@ -179,7 +212,7 @@ export function OutcomeModal({
   const [completedAsPlanned, setCompletedAsPlanned] = useState<boolean | null>(existingOutcome?.runActual?.completedAsPlanned ?? null)
 
   const [weightExercises, setWeightExercises] = useState<LoggedExerciseActual[]>(
-    buildInitialWeightActuals(planDay, existingOutcome),
+    () => buildInitialWeightActuals(planDay, vars, existingOutcome),
   )
 
   const [swimDistanceMeters, setSwimDistanceMeters] = useState<string>(
