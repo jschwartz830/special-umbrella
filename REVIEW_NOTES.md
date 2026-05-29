@@ -1,5 +1,130 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-29 (forty-third pass) — branch `claude/dreamy-mccarthy-4tAQK`
+
+### Executive summary
+
+1. **What changed:** Two targeted changes. (1) Fixed 6 failing tests in
+   `progression.test.ts` that were left behind by PR #121 (workout progression
+   logic improvements merged after pass 42). (2) Fixed a long-documented data
+   risk: pre-existing `ExtraWorkoutEntry` records with `source: undefined` can
+   be silently deleted by TodayPage's Undo — migrated them to `source: 'history'`.
+2. **Highest confidence:** Both changes are purely protective. The test fixes are
+   mechanical (add `progressionMode`, update expectations to match new behavior).
+   The migration is a one-time store fix that only changes `undefined` → `'history'`
+   — it cannot regress any existing functionality.
+3. **Risks:** Near zero. The migration adds `version: 1` to `wpt_history` persist
+   config; Zustand will re-run it on first load for all users. The migration is
+   idempotent and handles all data shapes including missing fields.
+4. **Review first:** The test changes confirm PR #121 behavior. Check that the new
+   volume mode test (`progress` when all sets hit target) matches what you see in the
+   app. Verify the null guard test ("returns null when no progressionMode") is
+   intentional — if you want exercises without `progressionMode` to still generate a
+   recommendation, that guard should be removed and the tests reverted accordingly.
+
+---
+
+### Biggest issues found
+
+1. **6 failing tests in `progression.test.ts`** — PR #121 changed two behaviors:
+   (a) `buildWeightsRecommendation` now returns `null` when no exercise has
+   `progressionMode` set; (b) volume mode now uses `allSetsHitTarget` instead of
+   always returning `hold`. Six tests written against the old behavior were failing.
+   Fixed by adding `progressionMode: 'single'` where needed and updating volume mode
+   expectations.
+
+2. **`ExtraWorkoutEntry.source` migration gap** — Extras created before the `source`
+   field was introduced have `source: undefined`. TodayPage's Undo handler treats
+   `undefined` the same as `'double_day'`, silently removing manually-added extras.
+   Recommended in REVIEW_NOTES across passes 38–42. Implemented as a v0→v1 migration
+   in `historyStore`'s persist config.
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Files |
+|---|------|-------------|-------|
+| 1 | fix (tests) | Sync 6 failing progression tests with new behavior | progression.test.ts |
+| 2 | fix (data safety) | Migrate `source: undefined` extras to `source: 'history'` | historyStore.ts + test |
+| 3 | test | New null-guard test for `progressionMode` requirement | progression.test.ts |
+| 4 | test | 6 direct `migrateHistoryState` tests | historyStore.test.ts |
+
+Test count: **758 → 766** (+8).
+
+---
+
+### Definitely keep
+
+- **Progression test fixes** — The 6 tests were genuinely wrong after PR #121. The
+  fixes document the current intended behavior. Zero risk.
+- **`source` migration** — Closes a known data-safety gap. The migration is idempotent,
+  well-tested, and the correct semantic (old extras should not be Undo-deleted).
+
+### Probably keep but tweak
+
+- **`progressionMode` null-guard test** — This test documents that exercises without
+  `progressionMode` produce no recommendation. If you decide the guard is too strict
+  (you want a default 'single' recommendation even without explicit configuration),
+  remove the guard from `progression.ts` and this test together.
+
+### Do not keep
+
+- Nothing in this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+1. **`computeHistoryStats` `totalLogged` future-date filtering**: `totalLogged` counts
+   ALL entries regardless of date. A future-dated entry (e.g., from a bad CSV import)
+   inflates this stat. Low priority since `last7Completed`/`last30Completed` already
+   bound by `<= today` in their `inWindow` check, and `currentStreak` starts from `today`
+   going backward.
+
+2. **`ActiveWorkoutTracker` exercise-deletion stale ref**: Deleting an exercise (not a
+   set) doesn't clear `activeSetRef` if it was pointing at the deleted exercise. The
+   same pattern as the `deleteSet` fix in pass 42 applies here. Low urgency since the
+   exercise-deletion path is not yet in the UI.
+
+3. **Surface expression evaluator errors in ProgramImportPage** — Malformed YAML
+   progression rules fail silently. Repeated recommendation; still unimplemented.
+
+4. **`HistoryPage typeCountMap` vs `computeWorkoutTypeBreakdown`** — Duplication
+   between HistoryPage's inline type-count logic and the shared utility. The shared
+   utility also provides `avgEffort` per type, which is not surfaced anywhere.
+
+---
+
+### Open questions
+
+1. **Is the `progressionMode` guard the intended behavior?** PR #121 says "Exercises
+   with no progressionType/progress rule produce no indicator." Is this the right
+   design? If you want a fallback recommendation even for exercises without explicit
+   progression config, remove the guard in `buildWeightsRecommendation` line ~101.
+
+2. **Should the volume mode test expectation (`progress` when all sets hit target)
+   match your experience in the app?** With the new `allSetsHitTarget`, logging 3 sets
+   all hitting their rep targets in volume mode should now show "↗ add volume next
+   session" on the pending card.
+
+---
+
+### Known issues / incomplete work
+
+- The `deferred` progression fix from pass 38 is forward-only. Historical progressions
+  that fired while `deferred` are not corrected — still no retroactive recomputation.
+- Pre-migration extras already on users' devices with `source: undefined` will be
+  correctly migrated on first load after this deploy.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-28 (forty-second pass) — branch `claude/dreamy-mccarthy-HtWcw`
 
 ### Executive summary

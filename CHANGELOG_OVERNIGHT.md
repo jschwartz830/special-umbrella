@@ -1,5 +1,73 @@
 # Overnight Changelog
 
+## 2026-05-29 (forty-third pass) — branch `claude/dreamy-mccarthy-4tAQK`
+
+Baseline on entry: **758 passing, 0 failing**. Exit state: **766 passing, 0 failing** (+8 tests).
+
+---
+
+### Change 1 — test: sync progression tests with progressionMode guard and volume mode fix
+
+**Summary:**
+
+PR #121 merged since pass 42 added two intentional behavior changes to
+`buildWeightsRecommendation` in `progression.ts`:
+
+1. A new guard at line 101 returns `null` when no exercise has `progressionMode` set.
+   This was intentional: the commit message states "Exercises with no progressionType/progress
+   rule produce no indicator."
+2. Volume mode now uses `allSetsHitTarget` (same logic as single/double modes), so
+   completing all sets to their target reps now returns `progress` instead of always `hold`.
+
+Six tests were written against the old behavior and were failing as a result. Fixes:
+
+- Added `progressionMode: 'single'` to exercises in four single-mode tests (progress/hold/
+  hold-undefined/regress) that had no `progressionMode` and were hitting the new null guard.
+- Split the volume mode "always returns hold" test into two: `progress` (all sets hit target,
+  the correct behavior) and `hold` (sets below target). The old description was wrong.
+- Added `progressionMode: 'single'` to the legacy `weightlifting` type test.
+- Added a new null-path test: "returns null when no exercise has progressionMode configured"
+  — documents the new guard behavior and prevents regression if the guard is ever loosened.
+
+**Files changed:**
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` (+52 lines, 6 fixed, 1 split into 2, 1 new)
+
+**Risk:** Zero — test-only change. No production code modified.
+
+---
+
+### Change 2 — fix: migrate pre-existing extras with undefined source to 'history'
+
+**Summary:**
+
+`ExtraWorkoutEntry` gained a `source` field to distinguish user-added extras ('history')
+from double-day bonus extras ('double_day'). TodayPage's Undo handler removes extras where
+`source !== 'history'`. Pre-existing extras created before this field was introduced have
+`source === undefined`, which Undo treats as `'double_day'` — silently deleting manually-added
+extras on Undo. This was documented as a known risk across passes 38–42.
+
+Fix: added `version: 1` and a `migrate` function to `historyStore`'s persist config. The
+migration runs once on first load for all users (v0 → v1) and sets `source: 'history'` on
+any extra with `source === undefined`. Extras with explicit source values are unchanged.
+
+The migration function is extracted as a named export (`migrateHistoryState`) for direct
+unit testing.
+
+**Files changed:**
+- `src/store/historyStore.ts` — added `version: 1`, `migrateHistoryState` exported function
+- `src/store/__tests__/historyStore.test.ts` — 6 new tests (undefined→history, preserved
+  double_day, preserved history, skip at v1+, empty array, missing field)
+
+**Risk:** Very low. The migration is idempotent and only touches `extraEntries`. Adding
+`version: 1` causes Zustand to re-run the migration on first load — safe because the
+storage key (`wpt_history`) is unchanged and the migration handles all data shapes.
+
+**Rollback:** Remove `version` and `migrate` from the persist config. Users who already
+ran the migration will keep `source: 'history'` on their old extras (no revert on their
+data); the Undo behavior will remain correct (extras stay 'history' on Undo).
+
+---
+
 ## 2026-05-28 (forty-second pass) — branch `claude/dreamy-mccarthy-HtWcw`
 
 Baseline on entry: **748 passing, 0 failing**. Exit state: **758 passing, 0 failing** (+10 tests).

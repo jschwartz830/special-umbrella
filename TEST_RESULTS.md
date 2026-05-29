@@ -1,5 +1,41 @@
 # Test Results
 
+## 2026-05-29 (forty-third pass) — branch `claude/dreamy-mccarthy-4tAQK`
+
+**Result: 766 passing, 0 failing** (+8 new tests)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 758 (of which 6 were failing) |
+| Tests on exit | 766 |
+| New tests added | +8 |
+| Tests fixed | 6 |
+| Failures | 0 |
+
+### Tests added
+
+| File | Tests added | Description |
+|------|-------------|-------------|
+| `src/modules/workout-outcomes/__tests__/progression.test.ts` | 2 | New null-guard test (no progressionMode → null); volume mode hold case (sets below target) |
+| `src/store/__tests__/historyStore.test.ts` | 6 | `migrateHistoryState` direct tests: undefined→history, preserved double_day, preserved history, skip at v1+, empty array, missing field |
+
+### Tests fixed (were failing on entry)
+
+| File | Tests fixed | Root cause |
+|------|-------------|-----------|
+| `src/modules/workout-outcomes/__tests__/progression.test.ts` | 6 | PR #121 added a progressionMode guard + changed volume mode logic; tests were written against old behavior |
+
+### Areas still untested
+
+- `ActiveWorkoutTracker` component — React component tests not present. Timer guard,
+  set numbering, progression preview (fixed in pass 42) remain untested at unit level.
+- `computePlanStreak` with future-dated extras — current streak starts from today and
+  walks backward, so future extras don't inflate it. But analogous coverage to the
+  `longestStreak` fix is theoretically possible.
+
+---
+
 ## 2026-05-28 (forty-second pass) — branch `claude/dreamy-mccarthy-HtWcw`
 
 **Result: 758 passing, 0 failing** (+10 new tests)
