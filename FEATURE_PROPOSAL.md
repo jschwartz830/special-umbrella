@@ -1,5 +1,78 @@
 # Feature Proposals
 
+## Pass 43 — 2026-05-29 (branch `claude/dreamy-mccarthy-4tAQK`)
+
+### Feature selected
+
+`ExtraWorkoutEntry.source` store migration — set `source: 'history'` on all
+pre-existing extra entries that have `source === undefined`.
+
+### Why it was selected
+
+This has been a documented risk since the `source` field was introduced (passes 38–42).
+TodayPage's Undo handler removes extras where `source !== 'history'`. Pre-existing extras
+with `source: undefined` fall into this bucket and would be silently deleted on Undo —
+even if the user explicitly added them via Calendar or History.
+
+The migration is:
+1. **Clearly adjacent** — directly fixes an existing store field's migration gap.
+2. **Low risk** — only changes `undefined` → `'history'`; no other fields touched.
+3. **Narrowly scoped** — one store file, one migration function, 6 unit tests.
+4. **Easy to review and revert** — remove `version` + `migrate` from persist config.
+
+### Expected user value
+
+Users who have extras logged before the `source` field was introduced (i.e., any user
+who used the app before pass N where `source` was added) will no longer risk having those
+extras silently removed when they press Undo. This is a correctness fix disguised as a
+feature — the user-facing change is "Undo no longer deletes your old manually-added extras."
+
+### Implementation scope for this run
+
+- `migrateHistoryState(persisted, fromVersion)` exported function in `historyStore.ts`
+- `version: 1` in persist config (Zustand runs migration on first load)
+- 6 direct unit tests for the migration function
+
+### Assumptions being made
+
+- Pre-existing extras (before `source` was introduced) were added via History/Calendar,
+  not via the double-day flow. This is true because the double-day flow was introduced
+  at the same time as the `source` field, so no double-day extras exist without a source.
+- `undefined` → `'history'` is the safe default. If we're wrong and some `undefined`
+  extras ARE double-day extras, the worst outcome is they survive an Undo instead of
+  being removed. This is less bad than silently deleting a user-added extra.
+
+### Open product / UX decisions
+
+- None. The migration is purely protective and has no visible UX change except that
+  Undo no longer removes old extras.
+
+### Architecture or schema impact
+
+- `historyStore` persist config gains `version: 1` and `migrate` — consistent with
+  `planStore` which already has `version: 2` and a migration.
+- No localStorage key change. Zustand handles the version check internally.
+
+### Risks
+
+- Very low. The migration runs once on first load. If the migration function throws
+  (it shouldn't — it handles all data shapes), Zustand falls back to its reset
+  behavior. The function is guarded against null/undefined data.
+
+### Rollback strategy
+
+Remove `version` and `migrate` from `historyStore`'s persist config. Users who already
+ran the migration will keep `source: 'history'` on their migrated extras — this is the
+correct state, so no rollback of data is needed.
+
+### What is intentionally not being built yet
+
+- Retroactive double-day source detection (identifying which old undefined-source extras
+  were created by the double-day flow). This is theoretically possible by cross-referencing
+  with history entries, but the risk is too high and the benefit too low.
+
+---
+
 ## Pass 42 — 2026-05-28 (branch `claude/dreamy-mccarthy-HtWcw`)
 
 **No medium-complexity feature attempted this pass.**

@@ -13,8 +13,8 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { useHistoryStore } from '../historyStore'
-import type { HistoryEntry, OverrideEntry } from '../../types'
+import { useHistoryStore, migrateHistoryState } from '../historyStore'
+import type { HistoryEntry, OverrideEntry, ExtraWorkoutEntry } from '../../types'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -798,5 +798,56 @@ describe('markDaysAsOff', () => {
     const plan2 = getState().entries.filter(e => e.planId === 'plan-2')
     expect(plan2).toHaveLength(1)
     expect(plan2[0].action).toBe('complete')
+  })
+})
+
+// ── migrateHistoryState ───────────────────────────────────────────────────────
+
+describe('migrateHistoryState', () => {
+  function makeExtra(id: string, overrides: Partial<ExtraWorkoutEntry> = {}): ExtraWorkoutEntry {
+    return {
+      id,
+      planId: 'plan-1',
+      calendarDate: '2026-01-01',
+      workoutType: 'weights',
+      workoutName: 'Weights',
+      createdAt: '2026-01-01T12:00:00Z',
+      ...overrides,
+    }
+  }
+
+  it('v0 → v1: sets source to history on extras with undefined source', () => {
+    const extra = makeExtra('e1') // no source field
+    const result = migrateHistoryState({ extraEntries: [extra] }, 0)
+    expect(result.extraEntries[0].source).toBe('history')
+  })
+
+  it('v0 → v1: preserves source=double_day on extras that already have it', () => {
+    const extra = makeExtra('e2', { source: 'double_day' })
+    const result = migrateHistoryState({ extraEntries: [extra] }, 0)
+    expect(result.extraEntries[0].source).toBe('double_day')
+  })
+
+  it('v0 → v1: preserves source=history on extras that already have it', () => {
+    const extra = makeExtra('e3', { source: 'history' })
+    const result = migrateHistoryState({ extraEntries: [extra] }, 0)
+    expect(result.extraEntries[0].source).toBe('history')
+  })
+
+  it('v1+: skips migration when fromVersion >= 1', () => {
+    // Already-migrated store: undefined source should NOT be changed.
+    const extra = makeExtra('e4') // no source
+    const result = migrateHistoryState({ extraEntries: [extra] }, 1)
+    expect(result.extraEntries[0].source).toBeUndefined()
+  })
+
+  it('handles empty extraEntries gracefully', () => {
+    const result = migrateHistoryState({ extraEntries: [] }, 0)
+    expect(result.extraEntries).toEqual([])
+  })
+
+  it('handles missing extraEntries field gracefully', () => {
+    const result = migrateHistoryState({}, 0)
+    expect(result.extraEntries).toEqual([])
   })
 })

@@ -77,6 +77,25 @@ describe('buildProgressionRecommendation — weights: null paths', () => {
     )
     expect(result).toBeNull()
   })
+
+  it('returns null when no exercise has progressionMode configured', () => {
+    // Guard added in d16b917: only generate a recommendation when progression
+    // logic is explicitly configured via progressionMode on at least one exercise.
+    // Exercises without any progressionMode set produce no recommendation.
+    const result = buildProgressionRecommendation(
+      makeSlot('weights'),
+      makeOutcome({
+        weightsActual: {
+          exercises: [{
+            exercise: 'Squat',
+            sets: [completedSet(), completedSet()],
+            // no progressionMode — guard returns null
+          }],
+        },
+      }),
+    )
+    expect(result).toBeNull()
+  })
 })
 
 // ── Weights: single mode ──────────────────────────────────────────────────────
@@ -90,6 +109,7 @@ describe('buildProgressionRecommendation — weights: single mode (default)', ()
         weightsActual: {
           exercises: [{
             exercise: 'Bench Press',
+            progressionMode: 'single',
             sets: [completedSet(), completedSet(), completedSet()],
           }],
         },
@@ -101,8 +121,8 @@ describe('buildProgressionRecommendation — weights: single mode (default)', ()
   })
 
   it('returns hold when not all sets are completed (partial workout)', () => {
-    // This test previously failed before the bug fix: allCompleted was trivially
-    // true because it was checked against the already-filtered completedSets array.
+    // Regression guard: allCompleted must check allSets, not just completedSets,
+    // so a partial workout (some sets not done) correctly returns 'hold'.
     const result = buildProgressionRecommendation(
       makeSlot('weights'),
       makeOutcome({
@@ -110,6 +130,7 @@ describe('buildProgressionRecommendation — weights: single mode (default)', ()
         weightsActual: {
           exercises: [{
             exercise: 'Bench Press',
+            progressionMode: 'single',
             sets: [completedSet(), completedSet(), incompleteSet()],
           }],
         },
@@ -126,6 +147,7 @@ describe('buildProgressionRecommendation — weights: single mode (default)', ()
         weightsActual: {
           exercises: [{
             exercise: 'Squat',
+            progressionMode: 'single',
             sets: [completedSet(), { targetReps: 8 }],
           }],
         },
@@ -142,6 +164,7 @@ describe('buildProgressionRecommendation — weights: single mode (default)', ()
         weightsActual: {
           exercises: [{
             exercise: 'Deadlift',
+            progressionMode: 'single',
             sets: [completedSet(), completedSet()],
           }],
         },
@@ -275,7 +298,10 @@ describe('buildProgressionRecommendation — weights: double mode', () => {
 // ── Weights: volume mode ──────────────────────────────────────────────────────
 
 describe('buildProgressionRecommendation — weights: volume mode', () => {
-  it('always returns hold for volume mode (regardless of completions)', () => {
+  it('returns progress when all sets hit their target reps', () => {
+    // Volume mode now uses allSetsHitTarget (same as single/double). When all
+    // sets are completed and actual reps >= targetReps, the recommendation is
+    // to add volume next session.
     const result = buildProgressionRecommendation(
       makeSlot('weights'),
       makeOutcome({
@@ -288,8 +314,29 @@ describe('buildProgressionRecommendation — weights: volume mode', () => {
         },
       }),
     )
-    expect(result?.action).toBe('hold')
+    expect(result?.action).toBe('progress')
     expect(result?.mode).toBe('volume')
+    expect(result?.note).toMatch(/volume progression/i)
+  })
+
+  it('returns hold when not all sets hit their target reps', () => {
+    const result = buildProgressionRecommendation(
+      makeSlot('weights'),
+      makeOutcome({
+        weightsActual: {
+          exercises: [{
+            exercise: 'Row',
+            progressionMode: 'volume',
+            sets: [
+              completedSet({ actualReps: 6 }), // below targetReps: 8
+              completedSet(),
+              completedSet(),
+            ],
+          }],
+        },
+      }),
+    )
+    expect(result?.action).toBe('hold')
     expect(result?.note).toMatch(/volume progression/i)
   })
 })
@@ -304,6 +351,7 @@ describe('buildProgressionRecommendation — legacy weightlifting slot type', ()
         weightsActual: {
           exercises: [{
             exercise: 'Press',
+            progressionMode: 'single',
             sets: [completedSet(), completedSet()],
           }],
         },

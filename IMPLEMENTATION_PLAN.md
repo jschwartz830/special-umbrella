@@ -1,5 +1,68 @@
 # Implementation Plan
 
+## Pass 43 — 2026-05-29 (branch `claude/dreamy-mccarthy-4tAQK`)
+
+### Observations on entry
+
+- Baseline on entry: **758 passing, 0 failing** — clean exit state from pass 42.
+- **6 failing tests in `progression.test.ts`**: PR #121 (`workout-progression-logic`)
+  merged since pass 42 added two intentional behavior changes to
+  `buildWeightsRecommendation`:
+  1. A new guard returns `null` when no exercise has `progressionMode` set.
+  2. Volume mode now uses `allSetsHitTarget` instead of always returning `hold`.
+  Six tests were written against the old behavior and were failing as a result.
+  These are test-correctness issues, not production bugs.
+- **`ExtraWorkoutEntry.source` pre-migration risk**: Extras created before the
+  `source` field was introduced have `source === undefined`. TodayPage's Undo
+  handler treats `undefined` as `'double_day'`, which would silently remove
+  manually-added extras on Undo. Recommended across passes 38–42; never
+  implemented.
+
+### Decisions
+
+- **Fix 6 failing tests** (CORRECTNESS): Update `progression.test.ts` to match the
+  new behavior. Add `progressionMode: 'single'` to exercises in four single-mode tests.
+  Fix the volume mode test: update description and split into `progress` (all sets hit
+  target) and `hold` (below target). Add `progressionMode: 'single'` to the weightlifting
+  legacy type test. Add a new null-path test documenting the `progressionMode` guard.
+  Net: 6 fixed + 2 new tests = 760.
+- **Fix `ExtraWorkoutEntry.source` migration** (BUG): Add `version: 1` and a
+  `migrate` function to `historyStore`'s persist config. Migration sets
+  `source: 'history'` on all extras with `source === undefined` (v0 → v1). Extract as
+  a named export `migrateHistoryState` so it can be unit-tested directly. 6 new tests.
+
+### Risks
+
+- Test fixes: zero risk — no production code changes.
+- `source` migration: very low risk. The migration only touches `extraEntries` and
+  only changes `undefined` → `'history'`. Existing extras with explicit source values
+  are unchanged. Adding `version: 1` causes Zustand to re-run the migration for all
+  existing users on first load — this is safe because the migration is idempotent and
+  the persist key (`wpt_history`) is unchanged.
+
+### Architecture summary (unchanged from pass 42)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`.
+Rotation logic is a pure function in `rotationEngine.ts`. Stats are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function engine with 766 tests across 19 files on exit.
+- All store mutations are well-guarded and tested.
+- Clean separation between engine, store, and UI layers.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,115 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `workoutInstanceId` parsing relies on `nanoid` never generating `_` — holds for
+  the custom charset in `lib/utils.ts` but would silently break if the charset changes.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`. Not broken,
+  but the coupling makes unit-testing harder.
+
+---
+
 ## Pass 42 — 2026-05-28 (branch `claude/dreamy-mccarthy-HtWcw`)
 
 ### Observations on entry
