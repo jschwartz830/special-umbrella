@@ -782,6 +782,14 @@ export function TodayPage() {
             <SkipForward size={13} /> Skip
           </button>
         )}
+        {isPending && (
+          <button
+            onClick={() => actions.dayOff()}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-amber-400 text-xs font-medium transition-colors"
+          >
+            <Coffee size={13} /> Day Off
+          </button>
+        )}
       </div>
 
       {/* Upcoming */}
