@@ -822,6 +822,23 @@ describe('computeRotationCycleProgress', () => {
     expect(result!.doneInCycle).toBe(0)
     expect(result!.justCompletedRotation).toBe(false)
   })
+
+  it('handles a 1-day rotation: any completed entry sets justCompletedRotation=true', () => {
+    // A 1-day rotation completes with every single entry.
+    // doneInCycle is always 0 (N % 1 === 0), so justCompletedRotation is
+    // true whenever totalDone > 0.
+    const oneDayPlan = makePlan({
+      days: [{ id: 'd0', label: 'Day A', slots: [{ id: 's0', type: 'weights', name: 'Lift' }] }],
+      duration: { type: 'rotations', value: 5 },
+    })
+    const entries = [entry('2026-01-01', 'complete')]
+    const result = computeRotationCycleProgress(oneDayPlan, entries)
+    expect(result).not.toBeNull()
+    expect(result!.rotationLength).toBe(1)
+    expect(result!.doneInCycle).toBe(0)
+    expect(result!.remaining).toBe(1)
+    expect(result!.justCompletedRotation).toBe(true)
+  })
 })
 
 // ── countPlanDayCompletions ───────────────────────────────────────────────────

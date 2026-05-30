@@ -189,6 +189,34 @@ describe('buildProgressionRecommendation — weights: single mode (default)', ()
     )
     expect(result?.mode).toBe('single')
   })
+
+  it('reads mode from the first exercise that has progressionMode, not always exercises[0]', () => {
+    // Bug fix: when exercises[0] has no progressionMode (e.g. a warmup-only entry)
+    // but a later exercise has progressionMode:'double', the mode should be 'double',
+    // not the 'single' fallback from exercises[0].progressionMode ?? 'single'.
+    const result = buildProgressionRecommendation(
+      makeSlot('weights'),
+      makeOutcome({
+        weightsActual: {
+          exercises: [
+            {
+              // warmup — no progressionMode
+              exercise: 'Warmup',
+              sets: [completedSet({ actualLoad: 65, targetReps: 10, actualReps: 10 })],
+            },
+            {
+              // main lift — has progressionMode
+              exercise: 'Squat',
+              progressionMode: 'double',
+              sets: [completedSet(), completedSet(), completedSet()],
+            },
+          ],
+        },
+      }),
+    )
+    expect(result?.mode).toBe('double')
+    expect(result?.action).toBe('progress')
+  })
 })
 
 // ── Weights: double mode ──────────────────────────────────────────────────────
