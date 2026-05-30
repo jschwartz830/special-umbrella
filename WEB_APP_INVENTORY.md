@@ -45,7 +45,8 @@ Routing is defined in `src/App.tsx` and wrapped in `ErrorBoundary` + `AppShell` 
   - "Edit YAML" round-trip: dumps current plan to YAML and re-parses via `parseYamlProgram` to apply edits.
   - Dirty tracking with unsaved-changes guard on navigation.
 - **`/plans/import`** (`ProgramImportPage`)
-  - YAML intake with syntax-highlighted editor (expandable to fullscreen), template loader (raw YAML files imported from `programs/`, e.g. gzclp-5k, upper-lower-12w), Preview (`parseYamlProgram`) with error/warning list, and Import (`createPlan` + `initVars` when `programMeta.vars` present).
+  - YAML intake with an inline syntax-highlighted editor (`highlightYamlLine`/`highlightYamlValue`, expandable to fullscreen overlay), template loader (raw YAML files bundled at `src/programs/`: `gzclp-5k.yaml`, `upper-lower-hybrid-12w.yaml`), Preview (`parseYamlProgram` → `PlanPreview`/`SlotPreview`/`ExerciseRow`/`SegmentRow`) with an error/warning list, and Import (`createPlan` + `initVars` when `programMeta.vars` present, then a success banner linking to Plans).
+  - Collapsible **Format reference** section documenting the YAML schema (weights/run/progression-expression syntax) — this is in-app authoring documentation an iOS build must reproduce or replace.
 - **`/settings`** (`SettingsPage`)
   - Set-timer start-delay control (Off / 5s / 10s / 15s / 30s) persisted in `settingsStore` (`startDelaySeconds`).
   - PWA/web-cache recovery: "Force refresh app" updates + unregisters service workers, clears Cache Storage, reloads with a cache-busting `?refresh=<ts>` query param.
@@ -115,6 +116,31 @@ Types live in `src/types/index.ts`, `src/types/program.ts`, and the `src/modules
 - **`ExerciseSessionRecord`** (`store/exerciseHistoryStore.ts`, derived): per-exercise-per-workout record with `sets[]` (`ExerciseSetRecord`: reps/load/volume/completed) and precomputed `totalVolume`/`maxLoad`/`maxReps`, plus `planName`/`workoutName` snapshots that survive plan deletion.
 - **Program/DSL types** (`types/program.ts`): `ExerciseSpec`, `SetSpec`, `WarmupRampSpec`, `RunSegment`, `DrillSpec`, `ProgressionRule` (`if`/`then`/`else`), `ProgressionType` (`single`/`double`/`dynamic_double`/`triple`/`step_loading`), `ProgramMeta`, and the `Yaml*` source-document shapes the parser reads.
 
+### Controlled vocabularies / enums
+
+These are the exact case sets a faithful rebuild must reproduce (source: `src/modules/workout-metadata/types.ts`, `workout-outcomes/types.ts`, `types/program.ts`). They drive Plan Builder pickers, badges, and serialization.
+
+- **`WorkoutType`** (canonical): `weights` | `run` | `swim` | `yoga` | `other`. **Legacy (decode-only, normalized on load):** `weightlifting` | `long_run` | `recovery_run` | `rest`.
+- **`WorkoutDifficulty`**: `easy` | `moderate` | `hard` (also the spacing-warning input).
+- **`WorkoutTag`** (18 values): `easy`, `moderate`, `hard`, `recovery`, `long`, `short`, `upper`, `lower`, `full_body`, `run`, `lift`, `yoga`, `swim`, `rest`, `indoor`, `outdoor`, `home`, `gym` (legacy authoring surface; `migrateSlot` derives `location`/`weightsFocusArea` from these then drops the field).
+- **`WorkoutLocation`**: `home` | `gym` | `indoor` | `outdoor` | `self_directed` | `class`.
+- **`WeightsFocusArea`**: `upper` | `lower` | `full_body` | `push` | `pull` | `legs` | `core`.
+- **`WeightsTrainingIntent`**: `strength` | `hypertrophy` | `power` | `conditioning` | `technique` | `deload` | `recovery_mobility`.
+- **`RunWorkoutSubtype`**: `easy` | `recovery` | `long` | `tempo` | `intervals` | `custom` (+ legacy `easy_run`/`recovery_run`/`long_run`/`race_pace`/`walk_run`/`other`). `defaultRunSubtype()`/`isRunType()` map legacy run types.
+- **`SwimWorkoutSubtype`**: `easy` | `endurance` | `intervals` | `technique` | `recovery`.
+- **`YogaWorkoutSubtype`**: `mobility` | `flow` | `recovery` | `strength` | `stretch`.
+- **`OtherWorkoutSubtype`**: `rest` | `walk` | `sport` | `pt_rehab` | `mobility` | `custom`.
+- **`WorkoutCompletionState`**: `planned` | `completed` | `partially_completed` | `skipped` | `deferred` | `swapped`. `completionStateToAction` maps these to `HistoryEntry.action` (`completed`/`partially_completed`/`swapped`→`complete`, `skipped`→`skip`, `deferred`→`day_off`).
+- **`PerceivedEffort`**: integer 1–5.
+- **`LoggedExerciseActual.progressionMode`** (per-exercise, set at log time): `single` | `double` | `volume` | `maintenance`.
+- **`ProgressionRecommendation`**: `{ discipline: weights|run|swim, mode: single|double|volume|endurance|speed|maintenance, action: progress|hold|regress, note }`.
+- **`OverrideType`**: `advance` | `go_back` | `jump` | `swap_slot`. **`DayStatus`** (9 values): `past_unlogged`/`past_complete`/`past_skip`/`past_day_off`/`today_pending`/`today_complete`/`today_skip`/`today_day_off`/`future`.
+
+### Bundled data assets (must be ported as resources)
+
+- **Exercise library** (`src/lib/exerciseLibrary.ts`): ~336 curated `{ name, type[], target[], synergist[] }` entries. Powers Plan Builder autocomplete and exercise classification. `findExerciseByName` is a case-insensitive lookup.
+- **Program templates** (`src/programs/*.yaml`): `gzclp-5k.yaml`, `upper-lower-hybrid-12w.yaml`, loaded as raw text on the Program Import screen.
+
 ## Business Logic / Calculations
 
 - **Rotation / day resolution** (`engine/rotationEngine.ts`):
@@ -136,21 +162,29 @@ Types live in `src/types/index.ts`, `src/types/program.ts`, and the `src/modules
 - **Plan migration/defaulting** (`planStore`): `migratePlanState` (persist version 2) normalizes slot types via `migrateSlot` (`weightlifting`→`weights`, `long_run`/`recovery_run`→`run`+subtype, `rest`→`other`+subtype, derives `location`/`weightsFocusArea` from legacy `tags`, then drops `tags`). `makeSlot`/`makeDay` provide type-specific defaults.
 - **YAML program import** (`engine/programParser.ts`): `parseYamlProgram` (js-yaml) coerces workout types/focus/intent/difficulty, parses weights `warmup`/`exercises` and run `segments`/`drills`, builds a `structureDescription` summary, collects numeric `vars` into `programMeta`, validates required fields (`name`, `duration`, non-empty `days`) and returns `{ plan, errors }`; on parse failure returns a fallback plan.
 - **Workout instance id** (`lib/workoutInstanceId.ts`): `parseWorkoutInstanceId` locates the date via regex and derives `planId` from the separator position (robust to underscores). Keys: `${planId}_${calendarDate}` (planned), `${planId}_${calendarDate}_extra_${extraId}` (extra).
+- **Extra → slot bridge** (`lib/planDayUtils.ts`): `extraToPlanDay` synthesizes a single-slot `PlanDay` from an `ExtraWorkoutEntry` so extras render and log through the same slot-based surfaces (`OutcomeModal`, `WorkoutSlotDetails`, `ActiveWorkoutTracker`) as rotation days. The iOS app needs an equivalent so additional/ad-hoc workouts get the full outcome + active-tracking treatment, not a reduced form.
+- **History scoping** (`lib/historyScope.ts`): `getPlansWithHistory` / `hasPlanHistory` determine which plans have any entries/extras — gate the History plan filter and per-plan UI. Relevant to the retention direction (history visible independent of a plan's active/archived state).
+- **Last-session lookup** (`lib/sessionSummary.ts`): `findPreviousSessionForPlanDay` finds the most recent **`complete`** outcome for a given `planDayIndex` (excluding today), feeding `buildLastSessionSummary` (weights/run/swim one-liner with derived pace and PB detection via `maxLoadByExercise`).
+- **Plan Builder authoring helpers** (`pages/PlanBuilderPage.tsx`): `PROGRESSION_TYPE_META` supplies default `if`/`then`/`else` rule templates per `ProgressionType`; `toVarName` slugifies an exercise name into a program-var key (e.g. "Bench Press" → `bench_press`). Days are capped at **2 slots** (UI-enforced), and the YAML round-trip builds a source doc from the live form and re-parses through `parseYamlProgram`.
 
 ## Persistence / API Behavior
 
 - **Local-first only**; no backend/network API in core product flows.
 - **Persisted Zustand stores** (localStorage via `persist`):
-  - `wpt_plans` (`planStore`, versioned migration at v2; `plans` + `activePlanId`).
-  - `wpt_history` (`historyStore`: `entries` + `overrides` + `extraEntries`).
-  - `wpt_outcomes` (`outcomeStore`: `outcomes` + `progressionStates`).
-  - `wpt_program_vars` (`programStore`: `vars`).
-  - `wpt_exercise_history` (`exerciseHistoryStore`: `records`, derived from weights outcomes).
-  - `wpt_settings` (`settingsStore`: `startDelaySeconds`).
+  - `wpt_plans` (`planStore`, **persist version 2**; `migratePlanState`/`migrateSlot` runs every load and is idempotent; `plans` + `activePlanId`).
+  - `wpt_history` (`historyStore`, **persist version 1**; `migrateHistoryState` v0→v1 backfills extras with `source === undefined` to **`'history'`** so Undo never silently deletes them; `entries` + `overrides` + `extraEntries`).
+  - `wpt_outcomes` (`outcomeStore`, unversioned: `outcomes` + `progressionStates`).
+  - `wpt_program_vars` (`programStore`, unversioned: `vars`).
+  - `wpt_exercise_history` (`exerciseHistoryStore`, unversioned: `records`, derived from weights outcomes).
+  - `wpt_settings` (`settingsStore`, unversioned: `startDelaySeconds`).
 - **Additional localStorage usage**:
   - Per-plan expiry-banner dismissal: key prefix `wpt_expiry_dismissed_v1_` (`useExpiryDismiss`).
   - Active workout draft: key `wpt_active_draft_${workoutInstanceId}` (`ActiveWorkoutTracker`).
-- **Import/export** and YAML parse are fully client-side. CSV schemas (`lib/csv.ts`) are versioned by added columns (`entryKind`, `extraId`, `extraSource`) with documented backward-compatible defaults; BOM-aware, RFC-4180-ish quoting.
+- **Import/export** and YAML parse are fully client-side. CSV schemas (`lib/csv.ts`) are versioned by additive columns with documented backward-compatible defaults; BOM-aware, RFC-4180-ish quoting (`encodeCsv`/`parseCsv`/`parseCsvToRecords`). Column cutovers:
+  - `entryKind` (rows pre-cutover default to `rotation`),
+  - `extraId` (missing → a fresh id is generated, so re-import is **not** idempotent for those rows),
+  - `extraSource` (missing/empty → `undefined`, which downstream Undo logic treats as `double_day`).
+  - History import validates `planId` against existing plans, requires a valid `YYYY-MM-DD` `calendarDate`, validates `action`/`workoutType` (legacy types accepted) and effort 1–5; rotation rows always get a fresh id (UI-level dedupe expected). Plan CSV import preserves original `planId`, never imports as `active`, and rejects plans with invalid/empty slots.
 - **Cross-store mutations** are orchestrated from UI/store methods and are **not transactionally guaranteed** (e.g. plan delete cascade, outcome date move).
 - **PWA / service worker**: app caches assets offline; Settings "Force refresh" performs SW update/unregister + Cache Storage clear + cache-busted reload. Build metadata is injected at build time via `__LATEST_COMMIT_ISO_DATE__` / `__LATEST_COMMIT_TITLE__`.
 
@@ -180,6 +214,8 @@ Types live in `src/types/index.ts`, `src/types/program.ts`, and the `src/modules
 - Several flows treat `planDay.slots[0]` as canonical, under-representing the second slot (type breakdown, some summaries).
 - `swap_slot` exists in the model and `usePlanActions` but has no first-class user-facing control.
 - Settings "Force refresh" is destructive for offline cache and may surprise users if not clearly messaged (web-specific behavior).
+- **`ExtraWorkoutEntry.source` has two conflicting "safe" defaults.** The store migration backfills `undefined → 'history'` (so Undo *keeps* legacy extras), but the type doc-comment and the CSV `extraSource` cutover treat `undefined → 'double_day'` (so Undo *removes* them). Persisted records are migrated, so the conflict only surfaces on freshly imported/unmigrated rows — but the two code paths encode opposite intentions and should be reconciled (see Open Questions #13).
+- `calendarProjection.getFutureProjection` exists but is effectively unused — `TodayPage` calls `getUpcomingDays` directly. Harmless drift, but a second projection entry point to keep in sync.
 
 ## Open Questions / Ambiguities (Updated with Product Direction)
 
@@ -195,3 +231,5 @@ Types live in `src/types/index.ts`, `src/types/program.ts`, and the `src/modules
 10. **Set-timer start delay (`settingsStore.startDelaySeconds`)**: Should this remain a single global setting in iOS, or move to per-plan / per-workout configuration?
 11. **Second-slot attribution**: Should stats/summaries that currently use `slots[0]` account for both slots of a 2-slot day (e.g. weights + run on the same day)? Confirm desired counting.
 12. **Active-session audio/wake-lock parity**: The web tracker pre-schedules rest tones, holds a wake lock, and persists a draft. Confirm the iOS equivalents (local notifications/`AVAudioEngine`, idle-timer disabling, crash-safe draft) and whether background timers must survive app termination.
+13. **`ExtraWorkoutEntry.source` default reconciliation**: The store migration treats a missing `source` as `'history'` (keep on Undo); the type comment and CSV `extraSource` cutover treat it as `'double_day'` (remove on Undo). Which is canonical? (Affects imported/legacy extras only, but the two must agree — see Known Bugs.)
+14. **Bundled data ownership**: The exercise library (~336 entries) and program templates are bundled code assets today. Should they be user-editable/extensible, and how are they versioned/updated post-release?

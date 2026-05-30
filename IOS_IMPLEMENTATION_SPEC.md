@@ -43,6 +43,12 @@ Model these as Swift `Codable` value types in `Domain` (and `@Model` SwiftData c
 - **Outcome entities**: `WorkoutOutcome` (completionState, completedAt, durationActualMin, perceivedEffort 1–5, notes, `runActual`/`weightsActual`/`swimActual`, `progressionRecommendation`), `RunProgressionState`, `ProgramVariables` (`[planId: [varName: Double]]`).
 - **Derived**: `ExerciseSessionRecord` (per-exercise PR/volume index with `planName`/`workoutName` snapshots), `ResolvedDay` (computed, never persisted).
 - **Program/DSL**: `ExerciseSpec`, `SetSpec` (reps may be `Int` or `String` for "5+"/ranges — model as an enum `RepTarget { count(Int), expression(String) }`), `RunSegment`, `DrillSpec`, `ProgressionRule` (`if?`/`then`/`else?`), `ProgressionType`.
+- **Enumerations** (port the exact case sets from `WEB_APP_INVENTORY.md` → "Controlled vocabularies / enums" — these are not optional; Plan Builder pickers, badges, recommendation logic, and CSV round-trips all depend on them):
+  - `WorkoutType` (canonical `weights/run/swim/yoga/other`) + a separate decode-only `LegacyWorkoutType` (`weightlifting/long_run/recovery_run/rest`) normalized into the canonical enum + a subtype on load (replicate `migrateSlot`). Do **not** surface legacy cases in new UI.
+  - `WorkoutDifficulty`, `WorkoutTag` (18 cases), `WorkoutLocation`, `WeightsFocusArea`, `WeightsTrainingIntent`, `RunWorkoutSubtype` (+ legacy aliases), `SwimWorkoutSubtype`, `YogaWorkoutSubtype`, `OtherWorkoutSubtype`.
+  - `WorkoutCompletionState` (6 cases) with a `toAction()` mapping to `ActionType` (mirror `completionStateToAction`), `PerceivedEffort` (1–5, model as a validated `Int` or a 5-case enum), `LoggedExerciseActual.progressionMode` (`single/double/volume/maintenance`), `ProgressionRecommendation` (`discipline`/`mode`/`action`/`note`), `OverrideType`, `DayStatus` (9 cases).
+  - Decode unknown/legacy raw strings leniently (Codable with a fallback) so importing older CSV/YAML never throws.
+- **Extra → slot bridge**: replicate `planDayUtils.extraToPlanDay` — additional/ad-hoc workouts (`ExtraWorkoutEntry`) must project into a synthetic single-slot `PlanDay` so the **same** outcome-capture and Active-Workout surfaces drive them. Don't build a reduced "extra" editor; reuse the slot-driven views (this is what gives extras full set/rest tracking on the web).
 - **Identifiers**
   - Use a stable `String` id type (UUID-backed) for all entities.
   - Introduce a typed `WorkoutInstanceKey` enum with `.planned(planId, date)` and `.extra(planId, date, extraId)` cases that serialize **to and from** the web string format (`planId_date`, `planId_date_extra_extraId`) so CSV import/export and any shared data stay compatible. Centralize parsing (replicate `parseWorkoutInstanceId`'s regex-based date locator).
@@ -73,6 +79,10 @@ Model these as Swift `Codable` value types in `Domain` (and `@Model` SwiftData c
 - **Atomicity requirements**: all multi-entity updates run in a single transaction; imports are staged/validated then committed atomically with rollback on failure.
 - **Cloud-ready extension points**: include `updatedAt`, `deletedAt`/tombstone, `sourceDeviceId`, and a monotonic sync version on every record so CloudKit/iCloud sync can be added without a schema rewrite. (Web has only `createdAt`/`updatedAt`; add the rest now.)
 - **Settings store**: persist `startDelaySeconds` (set-timer countdown) — see Open Questions #10 for scope.
+- **Bundled resources** (ship as app resources, not user data):
+  - **Exercise library** (~336 entries from `src/lib/exerciseLibrary.ts`) — convert to a bundled JSON and load into an `ExerciseLibraryService` (case-insensitive lookup + autocomplete; keep `type`/`target`/`synergist` for classification). Versioned so it can be updated independently of user data.
+  - **Program templates** (`src/programs/*.yaml`: `gzclp-5k.yaml`, `upper-lower-hybrid-12w.yaml`) — bundle the raw YAML as resources for the Program Import template picker, parsed through the same import service as user-pasted YAML.
+- **CSV schema-version compatibility**: the import adapter must honor the web's additive-column cutovers (`entryKind` default `rotation`; missing `extraId` → fresh id, non-idempotent; missing `extraSource` → `undefined`). Decide the `undefined` `source` policy once (see Open Questions #14) and apply it consistently across import and Undo — the web currently disagrees with itself.
 
 ## Screen-by-Screen Mapping (web → iOS adaptation)
 
@@ -99,12 +109,13 @@ Model these as Swift `Codable` value types in `Domain` (and `@Model` SwiftData c
   - Activate flow as a sheet (start date + start-day picker, mirroring `setActivePlan` semantics including demoting the prior active plan).
   - Delete confirmation must respect the **retention policy** (do not destroy completed workouts — see Open Questions #7).
 - **Plan Builder** (`PlanBuilderPage` → `PlanBuilderView`)
-  - Native `Form`-based editor: metadata, draggable day list, per-day slot list (1–2 slots), type-specific fields, run config, difficulty, weights exercise editor (library autocomplete from the bundled exercise library, sets/reps/load/rest, per-exercise progression type + if/then/else with templates), notes.
+  - Native `Form`-based editor: metadata, draggable day list, per-day slot list (1–2 slots, **UI-capped at 2** as on the web), type-specific fields, run config, difficulty, weights exercise editor (library autocomplete from the bundled exercise library, sets/reps/load/rest, per-exercise progression type + if/then/else with templates from a `PROGRESSION_TYPE_META` equivalent, and an exercise-name → program-var slugifier mirroring `toVarName`), notes.
   - Keep the YAML round-trip as an "advanced" editor (text editor sheet) that re-parses through the same import service.
   - Unsaved-changes guard via `.interactiveDismissDisabled` + confirmation dialog.
 - **Program Import** (`ProgramImportPage` → `ProgramImportView`)
-  - Paste/Files-import YAML, template picker (bundle the `programs/*.yaml` templates as resources), parse-result preview with errors/warnings, and import (creates plan + initializes program vars).
+  - Paste/Files-import YAML, template picker (bundle the `src/programs/*.yaml` templates as resources), parse-result preview with errors/warnings (mirror `PlanPreview`/`SlotPreview`/`ExerciseRow`/`SegmentRow`), and import (creates plan + initializes program vars).
   - A native YAML text editor is sufficient; syntax highlighting is optional polish, not required for parity.
+  - Reproduce the in-app **Format reference** (the YAML schema/expression docs) as a static help screen so users can author programs without leaving the app.
 - **Settings** (`SettingsPage` → `SettingsView`)
   - Native diagnostics + data tools, set-timer start-delay control, and a Version/build-metadata screen.
   - **No web-style force-refresh control** in v1 (service-worker concern doesn't apply). Provide a separate, clearly-labeled "reset local data" only if desired (debug/destructive), distinct from the web's cache-refresh.
@@ -126,7 +137,7 @@ Model these as Swift `Codable` value types in `Domain` (and `@Model` SwiftData c
 
 ## Build Phases / Implementation Plan
 
-1. **Domain + Persistence foundation**: entities, `LocalDate`/`WorkoutInstanceKey`, repositories, schema + migrations (incl. legacy slot normalization), transaction coordinator, dependency container, clock/timezone providers.
+1. **Domain + Persistence foundation**: entities, all controlled-vocabulary enums (lenient Codable), `LocalDate`/`WorkoutInstanceKey`, the extra→slot bridge, repositories, schema + migrations (incl. legacy slot normalization), bundled-resource loaders (exercise library JSON, program templates), transaction coordinator, dependency container, clock/timezone providers.
 2. **Core services (pure)**: rotation resolver, month projection, history stats, run-adaptation engine + selectors, recommendation builder, expression evaluator, YAML import, CSV import/export. Port the web unit tests first (TDD parity).
 3. **Plans feature**: list + sections, CRUD, activate/deactivate (with prior-active demotion), duplicate (deep clone), archive, delete (retention-aware), CSV import/export entry points.
 4. **Today feature**: projection + insights, quick actions, outcome sheet, additional workouts/double-day, Active Workout shell (minimized affordance).
@@ -168,3 +179,5 @@ Product direction is resolved for several of these; remaining decisions are flag
 11. **Second-slot attribution** (open): should stats/summaries account for both slots of a 2-slot day, where the web app counts only `slots[0]`?
 12. **Active-session background guarantees** (open): must rest/workout timers and alerts survive app termination (not just backgrounding)? This determines whether to use scheduled local notifications + Live Activities vs. in-process timers only, and how aggressively to persist the draft.
 13. **Storage engine** (open): GRDB vs. SwiftData — gate on a migration-safety spike before phase 1 lands.
+14. **`ExtraWorkoutEntry.source` default** (open, needs decision): the web is internally inconsistent — the store migration backfills `undefined → 'history'` (keep on Undo) while the type comment and CSV `extraSource` cutover treat `undefined → 'double_day'` (remove on Undo). iOS must pick **one** canonical default and apply it to both import and Undo. (Recommendation: `'history'` for any record not created by the live double-day flow, so imports are never auto-deleted.)
+15. **Bundled-resource update cadence** (open): how are the exercise library and program templates updated after ship — app-update only, or remotely refreshable? Affects whether they live in the bundle vs. a downloadable pack.
