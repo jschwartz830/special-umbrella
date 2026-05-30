@@ -1,5 +1,37 @@
 # Test Results
 
+## 2026-05-30 (forty-fifth pass) — branch `claude/dreamy-mccarthy-mxssu`
+
+**Result: 770 passing, 0 failing** (+3 new tests)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 767 |
+| Tests on exit | 770 |
+| New tests added | +3 |
+| Failures | 0 |
+
+### Tests added
+
+| File | Tests added | Description |
+|------|-------------|-------------|
+| `src/lib/__tests__/historyStats.test.ts` | 3 | `computeHistoryStats` — future-dated entries excluded from `totalLogged`, `totalCompleted`, and both simultaneously |
+
+### Tests reviewed
+
+- `src/lib/__tests__/historyStats.test.ts` — All pass. Three new tests cover future-dated rotation entries, future-dated extras, and the `totalCompleted` path specifically.
+- `src/engine/__tests__/rotationEngine.test.ts` — All 240+ tests pass (no engine changes in this pass; `computeCurrentDayIndex` targetDate < startDate test already exists from a prior pass).
+- `src/pages/TodayPage.tsx` changes — No direct unit tests added for `outcomeSortKey` (the function is module-private) or `useToday` (time-dependent). Both verified by code review; behavior is straightforward.
+
+### Important areas still untested
+
+- **`outcomeSortKey` helper** — Module-private; cannot be unit-tested without extraction. Indirect testing path: create two outcomes without `completedAt`, log them via `logOutcomeWithProgression`, confirm the "Last session" hint shows the more recent one.
+- **`useToday` hook** — Requires `vi.useFakeTimers()` to advance system time in a test. The timer/cleanup logic is minimal and could be verified with a short test suite in a future pass.
+- **TodayPage render behavior** — No React Testing Library tests exist for TodayPage; this is a known gap across all passes.
+
+---
+
 ## 2026-05-30 (forty-fourth pass) — branch `claude/dreamy-mccarthy-uCF1X`
 
 **Result: 767 passing, 0 failing** (+1 new test)

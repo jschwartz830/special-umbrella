@@ -1,5 +1,62 @@
 # Feature Proposals
 
+## Pass 45 — 2026-05-30 (branch `claude/dreamy-mccarthy-mxssu`)
+
+### Feature selected
+
+`useToday` hook with midnight date refresh for TodayPage.
+
+### Why it was selected
+
+This has been documented as a known staleness risk since pass 44 and earlier. It is the single cleanest, most self-contained feature available:
+
+- Identified risk: if the app stays open past midnight, `today` is stale. On TodayPage this means wrong date on the Today card, wrong stats, wrong "upcoming" projections, and a stale "days ago" hint.
+- The fix requires only a new 20-line hook and a one-line change in TodayPage.
+- No architectural decisions, no ambiguous product choices, no store schema changes.
+- Other feature candidates (avg effort in training mix, `programVarsMap` selector) are higher-effort or higher-risk.
+
+The bug fixes in this pass were high-confidence and left room for one small feature. The audit found no major instability requiring stabilization first (all 767 tests passed on entry).
+
+### Expected user value
+
+Users who pin the app as a PWA or leave it open on a tablet overnight will see the correct date immediately when they return, without needing to navigate away and back. The "Today" card, stats bar, and upcoming section all update atomically at midnight.
+
+### Implementation scope for this run
+
+- New file: `src/hooks/useToday.ts` (one `useState` + one `useEffect`, 25 lines)
+- Updated: `src/pages/TodayPage.tsx` — import + one-line replacement of `format(new Date(), 'yyyy-MM-dd')`
+- Not changed: CalendarPage, HistoryPage (deferred; same fix applies but one page at a time)
+
+### Assumptions being made
+
+- A single `setTimeout` per day is acceptable overhead in a mobile PWA context.
+- Users care about the date being correct at midnight (not just on first load).
+- The `[today]` dependency correctly re-arms the timer on each midnight crossing.
+
+### Open product / UX decisions
+
+None. The date display is a factual value with no ambiguity.
+
+### Architecture or schema impact
+
+None. No store changes. No new imports beyond `useState`/`useEffect` from React and `format` from `date-fns` (already available in the project).
+
+### Risks
+
+- If the device clock is wrong, the timeout may fire too early or too late. This is inherent to relying on system time and not specific to this fix.
+- If TodayPage is unmounted and remounted across midnight (e.g., the user navigates away and back), the new mount recalculates the timeout correctly. No issue.
+
+### Rollback strategy
+
+`git revert 91f5d26` — reverts the hook file creation and TodayPage import/usage. The hook has no state in any store or localStorage, so there is no migration risk on rollback.
+
+### What is intentionally not being built yet
+
+- CalendarPage / HistoryPage `useToday` wiring — deferred to a future pass.
+- Tests with fake timers for the hook — documented as missing; straightforward to add with `vi.useFakeTimers()` if desired.
+
+---
+
 ## Pass 43 — 2026-05-29 (branch `claude/dreamy-mccarthy-4tAQK`)
 
 ### Feature selected

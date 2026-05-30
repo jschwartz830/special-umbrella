@@ -1,5 +1,103 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-30 (forty-fifth pass) — branch `claude/dreamy-mccarthy-mxssu`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Bug fix: `findPreviousWeightsOutcome` and `findPreviousSetsByExercise` now use the calendarDate from `workoutInstanceId` as a fallback sort key instead of `''`, so outcomes without `completedAt` are correctly ordered. (2) Correctness fix + 3 tests: `computeHistoryStats.totalLogged`/`totalCompleted` now filter to `<= today`, consistent with the rest of the function. (3) Feature: `useToday` hook refreshes the date at midnight in TodayPage, preventing stale date display when the app stays open past midnight.
+
+2. **Highest confidence:** The `totalLogged` filter is unambiguous — the rest of the function has always filtered by date, and this was explicitly documented as an open gap. The `useToday` hook is well-contained: one new file, one changed line in TodayPage, and correct cleanup on unmount.
+
+3. **Risks:** Near zero. The sort stability fix only changes behavior for outcomes without `completedAt` (moves from arbitrary order to date order). The `totalLogged` fix only changes displayed counts for users with future-dated entries. The `useToday` hook has no side effects beyond advancing a string state value once per day.
+
+4. **Review first:** Check TodayPage behavior when the sort fix matters — log multiple weights sessions for the same plan day without setting a `completedAt`, then verify the "Last session" hint shows the most recent one. The `useToday` hook cannot be easily tested without time-mocking, so manual verification is the path (or trust the code review).
+
+---
+
+### Biggest issues found
+
+1. **`findPreviousWeightsOutcome`/`findPreviousSetsByExercise` unstable sort** (BUG — fixed): When `completedAt` is absent, sort key is `''` for all outcomes, making comparison results indeterminate. `findPreviousWeightsOutcome` silently returned the first matching outcome from `Object.values()` iteration order. Pre-filled OutcomeModal weights and the "Last session" hint could show stale or wrong data for active users with many sessions.
+
+2. **`totalLogged`/`totalCompleted` not date-bounded** (CORRECTNESS — fixed): The last two un-filtered stats in `computeHistoryStats`. A bad CSV import with future dates inflated these permanently.
+
+3. **Midnight staleness in TodayPage** (FEATURE — fixed): `today` computed once at render, never refreshed. Any session that crosses midnight shows wrong dates. Now fixed via `useToday` hook.
+
+4. **`CalendarPage`/`HistoryPage` midnight staleness** (NOT FIXED — follow-up): Both use inline `format(new Date(), ...)` and could benefit from `useToday`. Deferred to keep this pass reviewable.
+
+5. **`programVarsMap` over-subscription** (NOT FIXED — low priority): Carried from pass 44.
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Commit |
+|---|------|-------------|--------|
+| 1 | fix (correctness) | Stable sort key for `findPrevious*` helpers in TodayPage | `49839b8` |
+| 2 | fix + test | `totalLogged`/`totalCompleted` exclude future-dated entries | `b342a01` |
+| 3 | feat | `useToday` hook with midnight refresh; wire into TodayPage | `91f5d26` |
+
+Test count: **767 → 770** (+3).
+
+---
+
+### Small features added
+
+None beyond the medium-complexity feature below.
+
+### Medium-complexity feature explored
+
+**`useToday` hook with midnight refresh** — classified as **Keep**.
+
+See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md for full analysis.
+
+---
+
+### Definitely keep
+
+- **Sort stability fix** — Correctness bug with no tradeoffs. The fix is a 12-line helper with no architectural impact.
+- **`totalLogged`/`totalCompleted` filter** — Consistent with the rest of the function. Well-tested.
+- **`useToday` hook** — Contained in one file, clean teardown, no dependencies added.
+
+### Probably keep but tweak
+
+- Nothing from this pass.
+
+### Do not keep
+
+- Nothing from this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+1. **`CalendarPage` and `HistoryPage` midnight refresh** — Both compute `today` inline. Wire `useToday()` into each as a follow-up pass. Low complexity; straightforward.
+
+2. **`isPlanExpired` future-date guard** — The `rotations` path counts all `complete`/`skip` entries including future-dated ones. A bad import could mark the plan as expired. Low severity; add a `e.calendarDate <= today` filter inside `isPlanExpired`.
+
+3. **`computeWorkoutTypeBreakdown` avg effort surfacing in HistoryPage** — The function computes `avgEffort` per workout type and is tested, but `HistoryPage` uses a manual `typeCountMap` instead. Replacing with `computeWorkoutTypeBreakdown` would reduce duplication and expose effort context in the training-mix row.
+
+4. **`logForDate` day_off + jump interaction** (CalendarPage) — Carried from pass 44. Needs product judgment.
+
+5. **`programVarsMap` selector narrowing** — Carried from pass 44. Low impact.
+
+---
+
+### Open questions for me
+
+- Should `CalendarPage` and `HistoryPage` also get `useToday`? The staleness window there is the same — any session open past midnight shows stale dates. If you use the app on a tablet or as a pinned PWA that stays open, all three pages benefit.
+- Should `isPlanExpired` filter future-dated entries? It would prevent a mistaken "Plan complete!" banner from a bad import. The fix is one line.
+
+### Known issues / incomplete work
+
+- No unit tests for `useToday` (timeout-dependent; would require fake timers). The hook logic is simple enough that code review is sufficient, but a test with `vi.useFakeTimers()` could be added.
+- Sort stability fix has no unit tests (functions are module-private; indirect testing via OutcomeModal is the recommended path if you want explicit coverage).
+
+### Any dependencies added
+
+None.
+
+---
+
 ## 2026-05-30 (forty-fourth pass) — branch `claude/dreamy-mccarthy-uCF1X`
 
 ### Executive summary
