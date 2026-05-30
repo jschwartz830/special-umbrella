@@ -253,6 +253,42 @@ describe('computeHistoryStats', () => {
     expect(s.longestStreak).toBe(3)
     expect(s.currentStreak).toBe(3)
   })
+
+  // ── totalLogged / totalCompleted future-date filtering ─────────────────────
+
+  it('totalLogged excludes future-dated rotation entries', () => {
+    const entries = [
+      entry('2026-04-15', 'complete'), // past
+      entry('2026-04-17', 'complete'), // today
+      entry('2026-04-18', 'complete'), // future
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.totalLogged).toBe(2)
+    expect(s.totalCompleted).toBe(2)
+  })
+
+  it('totalLogged excludes future-dated extra entries', () => {
+    const entries: HistoryEntry[] = []
+    const extras = [
+      extra('2026-04-17'), // today
+      extra('2026-04-18'), // future
+      extra('2026-04-19'), // future
+    ]
+    const s = computeHistoryStats(entries, extras, '2026-04-17')
+    expect(s.totalLogged).toBe(1)
+    expect(s.totalCompleted).toBe(1)
+  })
+
+  it('totalCompleted excludes future-dated complete entries', () => {
+    const entries = [
+      entry('2026-04-16', 'complete'), // past
+      entry('2026-04-17', 'skip'),     // today — skip doesn't count as complete
+      entry('2026-04-18', 'complete'), // future — must be excluded
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.totalLogged).toBe(2)
+    expect(s.totalCompleted).toBe(1)
+  })
 })
 
 // ── computePlanProgress ───────────────────────────────────────────────────────

@@ -30,9 +30,16 @@ export function computeHistoryStats(
   extras: ExtraWorkoutEntry[],
   today: string,
 ): HistoryStats {
-  const totalLogged = entries.length + extras.length
+  // Exclude future-dated entries from all-time counts — a bad CSV import can
+  // create entries with calendarDate > today, which would otherwise inflate
+  // the stats shown on the History page (same guard applied to longestStreak
+  // in pass 42 and to last7/last30 via the inWindow predicate below).
+  const totalLogged =
+    entries.filter(e => e.calendarDate <= today).length +
+    extras.filter(e => e.calendarDate <= today).length
   const totalCompleted =
-    entries.filter(e => e.action === 'complete').length + extras.length
+    entries.filter(e => e.action === 'complete' && e.calendarDate <= today).length +
+    extras.filter(e => e.calendarDate <= today).length
 
   const d7 = shiftDay(today, -6)   // window of 7 days inclusive of today
   const d30 = shiftDay(today, -29) // window of 30 days inclusive of today
