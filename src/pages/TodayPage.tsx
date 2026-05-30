@@ -21,6 +21,7 @@ import {
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
 import { useExpiryDismiss } from '../hooks/useExpiryDismiss'
+import { useToday } from '../hooks/useToday'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { useProgramStore } from '../store/programStore'
@@ -103,6 +104,17 @@ function WeeklyActivityStrip({
   )
 }
 
+/**
+ * Stable sort key for an outcome: prefer completedAt (a full ISO datetime) when
+ * present; fall back to the calendarDate embedded in workoutInstanceId so that
+ * outcomes logged without explicit completedAt are still sorted by workout date.
+ * Using '' as the fallback would make all non-completedAt outcomes compare as
+ * equal, returning whichever Object.values() iteration order happened to be first.
+ */
+function outcomeSortKey(outcome: WorkoutOutcome): string {
+  return outcome.completedAt ?? parseWorkoutInstanceId(outcome.workoutInstanceId)?.calendarDate ?? ''
+}
+
 /** Find the most recent outcome with weights data for this plan (excluding today). */
 function findPreviousWeightsOutcome(
   planId: string,
@@ -116,7 +128,7 @@ function findPreviousWeightsOutcome(
     const rest = outcome.workoutInstanceId.slice(prefix.length)
     if (rest.startsWith(currentDate)) continue
     if (!outcome.weightsActual?.exercises?.length) continue
-    if (!best || (outcome.completedAt ?? '') > (best.completedAt ?? '')) best = outcome
+    if (!best || outcomeSortKey(outcome) > outcomeSortKey(best)) best = outcome
   }
   return best
 }
@@ -135,7 +147,7 @@ function findPreviousSetsByExercise(
       if (rest.startsWith(currentDate)) return false
       return Boolean(outcome.weightsActual?.exercises?.length)
     })
-    .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
+    .sort((a, b) => outcomeSortKey(b).localeCompare(outcomeSortKey(a)))
 
   const previousByExercise: Record<string, LoggedSetActual[]> = {}
   for (const outcome of sortedOutcomes) {
@@ -166,7 +178,7 @@ export function TodayPage() {
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const moveOutcome = useOutcomeStore(s => s.moveOutcome)
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = useToday()
   const { isDismissed: expiryBannerDismissed, dismiss: dismissExpiryBanner } = useExpiryDismiss(plan?.id ?? null)
 
   const allOutcomes = useOutcomeStore(s => s.outcomes)
