@@ -1,5 +1,46 @@
 # Overnight Changelog
 
+## 2026-05-30 (forty-fourth pass) — branch `claude/dreamy-mccarthy-uCF1X`
+
+Baseline on entry: **766 passing, 0 failing**. Exit state: **767 passing, 0 failing** (+1 test).
+
+---
+
+### Change 1 — fix: `moveByWorkoutInstance` propagates `calendarDate`
+
+**Summary:** When a workout entry is moved to a different calendar date, `exerciseHistoryStore.moveByWorkoutInstance` now updates `calendarDate` on every affected `ExerciseSessionRecord` in addition to `workoutInstanceId`. Previously only the instance key was updated, leaving `calendarDate` pointing to the original date.
+
+**Why it matters:** `calendarDate` is the sort key for `getByExerciseName` and the date field for `computePersonalRecords` (`maxLoadDate`, `maxRepsDate`). A stale date caused PR achievements to be attributed to the wrong day and disrupted chronological ordering in exercise history views.
+
+**Files changed:**
+- `src/store/exerciseHistoryStore.ts` — parse new instanceId to extract `calendarDate`; update both fields together
+- `src/store/__tests__/exerciseHistoryStore.test.ts` — new test: `'updates calendarDate to the date embedded in the new instanceId'`
+
+**Risks/tradeoffs:** None. The fix is purely additive: the previous implementation always left `calendarDate` unchanged; the new one updates it when the instanceId contains a valid date. All existing tests still pass.
+
+**Rollback:** `git revert b5a87b9`
+
+---
+
+### Change 2 — perf+ux: memoize `planExtras` and show session date in TodayPage
+
+**Summary:** Two improvements to `TodayPage.tsx`:
+
+1. **`planExtras` memoization** — Moved `planExtras` from an inline `filter()` (run on every render) into a `useMemo` keyed on `extraEntries` and `activePlanId`. The inline version created a new array reference on every TodayPage re-render, defeating `WeeklyActivityStrip`'s own `useMemo` and causing unnecessary recomputation of the 7-day strip.
+
+2. **"X days ago" on last-session hint** — When the previous session summary is shown (e.g. "Last: 3×8 @ 135 lb Bench Press · PB"), the display now appends "· yesterday" or "· Xd ago" based on the calendarDate embedded in the previous session's `workoutInstanceId`. Uses no external imports beyond what was already present; no changes to `sessionSummary.ts`.
+
+**Why it matters:** (1) Fewer re-renders on the most-visited page, especially noticeable when the app has many extra entries. (2) Users recovering from a gap (injury, travel) or planning a PR attempt can immediately judge how fresh their reference session is, without navigating to History.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — `useMemo` for `planExtras`; session date derivation; JSX update for date hint
+
+**Risks/tradeoffs:** The `planExtras` memo is placed before the early `!plan` guard; it returns `[]` when the plan is null, which is correct behavior. The date display only shows when `prevSessionDaysAgo > 0`; it is invisible if the previous session was today (which cannot happen given the `currentDate` exclusion in `findPreviousSessionForPlanDay`). No user-visible regression risk.
+
+**Rollback:** `git revert 52a7ead`
+
+---
+
 ## 2026-05-29 (forty-third pass) — branch `claude/dreamy-mccarthy-4tAQK`
 
 Baseline on entry: **758 passing, 0 failing**. Exit state: **766 passing, 0 failing** (+8 tests).

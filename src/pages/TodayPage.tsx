@@ -41,6 +41,7 @@ import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../m
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
+import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 
 type ActivityFill = 'complete' | 'day_off' | 'skip' | 'extra' | 'empty'
 
@@ -197,6 +198,14 @@ export function TodayPage() {
     return map
   }, [exerciseRecords])
 
+  // Memoize plan-scoped extras so WeeklyActivityStrip's internal useMemo
+  // only re-runs when extraEntries or the active plan actually changes.
+  const activePlanId = plan?.id ?? null
+  const planExtras = useMemo(
+    () => extraEntries.filter(e => e.planId === activePlanId),
+    [extraEntries, activePlanId],
+  )
+
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
   const [showJump, setShowJump] = useState(false)
@@ -241,7 +250,6 @@ export function TodayPage() {
   const isPending = todayResolved.status === 'today_pending'
   const isResolved = !isPending
   const planExpired = isPlanExpired(plan, planEntries, today)
-  const planExtras = extraEntries.filter(e => e.planId === plan.id)
   const todayExtras = planExtras
     .filter(e => e.calendarDate === today)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
@@ -301,6 +309,18 @@ export function TodayPage() {
     ? findPreviousSessionForPlanDay(plan.id, primaryPlanDayIndex, today, planEntries, allOutcomes)
     : null
   const lastSessionSummary = prevSessionOutcome ? buildLastSessionSummary(prevSessionOutcome, maxLoadByExercise) : null
+
+  // Derive how many calendar days ago the previous session was, for the hint display.
+  const prevSessionDate = prevSessionOutcome
+    ? parseWorkoutInstanceId(prevSessionOutcome.workoutInstanceId)?.calendarDate ?? null
+    : null
+  const prevSessionDaysAgo: number | null = (() => {
+    if (!prevSessionDate) return null
+    const [ty, tm, td] = today.split('-').map(Number)
+    const [dy, dm, dd] = prevSessionDate.split('-').map(Number)
+    const d = Math.floor((Date.UTC(ty, tm - 1, td) - Date.UTC(dy, dm - 1, dd)) / 86_400_000)
+    return d > 0 ? d : null
+  })()
 
   // How many times this specific plan day has been completed before today.
   // Shown on the card as "×N done" to give session-over-session context.
@@ -677,6 +697,11 @@ export function TodayPage() {
               {lastSessionSummary.endsWith(' · PB')
                 ? <>{lastSessionSummary.slice(0, -5)}<span className="text-amber-400 font-medium"> · PB</span></>
                 : lastSessionSummary}
+              {prevSessionDaysAgo !== null && (
+                <span className="text-slate-600 ml-1">
+                  · {prevSessionDaysAgo === 1 ? 'yesterday' : `${prevSessionDaysAgo}d ago`}
+                </span>
+              )}
             </p>
           )}
           {prevSessionOutcome?.notes && (

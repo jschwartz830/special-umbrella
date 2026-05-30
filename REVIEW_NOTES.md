@@ -1,5 +1,92 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-30 (forty-fourth pass) — branch `claude/dreamy-mccarthy-uCF1X`
+
+### Executive summary
+
+1. **What changed:** Two commits. (1) Bug fix: `exerciseHistoryStore.moveByWorkoutInstance` now updates `calendarDate` alongside `workoutInstanceId` when entries are date-moved, fixing incorrect PR dates and exercise history sort order. (2) Performance + UX: `planExtras` in TodayPage is memoized (fixes unnecessary WeeklyActivityStrip re-renders); previous session hint now shows "· Xd ago" / "· yesterday".
+
+2. **Highest confidence:** The `moveByWorkoutInstance` fix is unambiguous — the bug is that `calendarDate` was never updated on a move, and the fix is two lines. The `planExtras` memo is purely additive (returns `[]` when no plan is active). The date display is purely additive (nothing is removed; the span only appears when `prevSessionDaysAgo > 0`).
+
+3. **Risks:** Near zero. The `moveByWorkoutInstance` fix only affects exercise history records for entries that have been moved to a different date (a path available via CalendarPage and TodayPage's completedAt backfill). The memoization is an internal React concern. The date display reads from an already-computed value with no side effects.
+
+4. **Review first:** Verify the "Xd ago" display in TodayPage feels right — specifically that "yesterday" is used for 1-day-ago and "Xd ago" for everything else. If you prefer a longer format ("5 days ago") or no date at all, the change is trivially reverted.
+
+---
+
+### Biggest issues found
+
+1. **`moveByWorkoutInstance` missing `calendarDate` update** (BUG — fixed): Any workout moved to a new date had stale `calendarDate` in exercise history, causing wrong PR dates and wrong sort order. Medium severity — affects users who log workouts on a different date than scheduled.
+
+2. **`planExtras` inline array in TodayPage** (PERF — fixed): Created a new array on every render, defeating `WeeklyActivityStrip`'s memoization. Low severity — visible as wasted CPU on each parent re-render, not a user-visible regression.
+
+3. **`programVarsMap` over-subscription** (NOT FIXED — low priority): Both TodayPage and CalendarPage subscribe to the full `programVarsMap` object. A change to any plan's progression vars triggers a re-render of both pages, even when the active plan's vars didn't change. Recommend a per-plan selector when this becomes a hotspot.
+
+4. **Midnight staleness** (NOT FIXED — edge case): `today` is computed at render time and not refreshed if the app stays open past midnight. The user would see the wrong date on the Today card and stats until they navigate away and back. Low occurrence probability.
+
+5. **`CalendarPage.logForDate` day_off + existing jump** (NOT FIXED — edge case): Changing a past entry from complete/skip (with an anchoring jump override) to day_off removes the jump without re-adding it. The rotation pointer for subsequent days can silently shift. Documenting rather than fixing — the correct fix requires product judgment on what "day off for a previously-anchored day" should mean for the rotation.
+
+---
+
+### Improvements completed
+
+| # | Description | Commit |
+|---|-------------|--------|
+| 1 | Bug fix: `moveByWorkoutInstance` propagates `calendarDate` | `b5a87b9` |
+| 2 | Perf: Memoize `planExtras` in TodayPage | `52a7ead` |
+| 3 | UX: Show "Xd ago" / "yesterday" in last-session hint | `52a7ead` |
+
+### Small features added
+
+**Session date context in "Last session" hint** — Shows "· yesterday" or "· Xd ago" after the previous workout summary line on TodayPage. Derived from the `workoutInstanceId` embedded date; no changes to `sessionSummary.ts`. Example: `Last: 3×8 @ 135 lb Bench Press · PB · 5d ago`.
+
+### Medium-complexity features explored
+
+None. The audit found two bugs worth fixing and the UX improvement was low-complexity (reads from an already-available field). No medium-complexity feature was needed to add value to this pass; see Recommendations for candidates.
+
+---
+
+### Definitely keep
+
+- **`moveByWorkoutInstance` calendarDate fix** — Correctness bug; no tradeoffs.
+- **`planExtras` memoization** — No behavior change; strict improvement.
+
+### Probably keep but tweak
+
+- **"Xd ago" date display** — Check that the format feels right. If you want "5 days ago" instead of "5d ago", change the format string in TodayPage.tsx line ~328. Trivial edit.
+
+### Do not keep
+
+Nothing.
+
+### Recommendations only (not implemented)
+
+1. **Per-plan `programVarsMap` selector** — Replace `useProgramStore(s => s.vars)` in TodayPage and CalendarPage with `useProgramStore(s => s.vars[plan?.id ?? ''] ?? {})`. This scopes the subscription and avoids cross-plan re-renders.
+
+2. **Midnight date refresh** — Add a `useEffect` that computes the next midnight, sets a timeout, and force-updates `today` when it fires. Could live in `useActivePlan` or as a standalone `useToday` hook.
+
+3. **`logForDate` day_off + jump** — When changing a past entry with an anchoring jump to day_off, preserve the jump override (or require the user to explicitly clear it). Needs a product decision: "what rotation index should day_off inherit?"
+
+4. **Split TodayPage / CalendarPage** — Both exceed 900 lines. Extracting sub-components (UpcomingSection, StatsBar, OverrideModal) would reduce cognitive load and make the files testable in isolation.
+
+---
+
+### Open questions for me
+
+- Is the "Xd ago" label in the right place? It shares the same `<p>` element as the summary and PB badge. If you'd prefer it on its own line (smaller, below the summary), that's a 2-line CSS change.
+- Should `day_off` entries clear existing jump overrides for that date? Current behavior does; it might be safer to keep the jump to avoid rotation drift.
+
+### Known issues / incomplete work
+
+- No test added for the `planExtras` memoization or the "Xd ago" display (both are UI-layer changes and the existing test suite doesn't cover TodayPage render behavior).
+- The "Xd ago" date is derived from `workoutInstanceId`, not from `completedAt`. If a user backfilled a session and set `completedAt` to a different date than the `calendarDate`, the hint would show the calendar date's distance, not the actual workout date. This is intentional — the calendarDate is the authoritative date for rotation purposes; `completedAt` is user-editable context.
+
+### Any dependencies added
+
+None.
+
+---
+
 ## 2026-05-29 (forty-third pass) — branch `claude/dreamy-mccarthy-4tAQK`
 
 ### Executive summary

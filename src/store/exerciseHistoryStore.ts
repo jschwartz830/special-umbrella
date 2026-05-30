@@ -137,10 +137,12 @@ export const useExerciseHistoryStore = create<ExerciseHistoryState>()(
       },
 
       moveByWorkoutInstance(oldId, newId) {
+        const parsed = parseWorkoutInstanceId(newId)
+        const newDate = parsed?.calendarDate
         set(s => ({
           records: s.records.map(r =>
             r.workoutInstanceId === oldId
-              ? { ...r, workoutInstanceId: newId }
+              ? { ...r, workoutInstanceId: newId, ...(newDate ? { calendarDate: newDate } : {}) }
               : r,
           ),
         }))

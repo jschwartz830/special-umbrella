@@ -1,5 +1,36 @@
 # Test Results
 
+## 2026-05-30 (forty-fourth pass) — branch `claude/dreamy-mccarthy-uCF1X`
+
+**Result: 767 passing, 0 failing** (+1 new test)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 766 |
+| Tests on exit | 767 |
+| New tests added | +1 |
+| Failures | 0 |
+
+### Tests added
+
+| File | Tests added | Description |
+|------|-------------|-------------|
+| `src/store/__tests__/exerciseHistoryStore.test.ts` | 1 | `moveByWorkoutInstance` — verify `calendarDate` updates to the date in the new instanceId |
+
+### Tests reviewed
+
+- `src/store/__tests__/exerciseHistoryStore.test.ts` — All `moveByWorkoutInstance` tests pass. The new test covers the previously untested `calendarDate` propagation.
+- `src/lib/__tests__/sessionSummary.test.ts` — All pass. No changes to `sessionSummary.ts`; existing tests sufficient.
+- `src/engine/__tests__/rotationEngine.test.ts` — All 240+ tests pass. No rotation engine changes in this pass.
+
+### Important areas still untested
+
+- **TodayPage render behavior** — No tests cover the `planExtras` memoization or the "Xd ago" display. These are UI-layer changes that would require React Testing Library or equivalent. The logic itself (date diff computation) is simple enough that manual verification is sufficient.
+- **`CalendarPage.logForDate` day_off + jump interaction** — The documented edge case (rotation drift when changing a past day from complete to day_off when a jump override exists) is untested. Adding a test here would require a careful rotationEngine integration fixture.
+
+---
+
 ## 2026-05-29 (forty-third pass) — branch `claude/dreamy-mccarthy-4tAQK`
 
 **Result: 766 passing, 0 failing** (+8 new tests)
