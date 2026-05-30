@@ -1,5 +1,63 @@
 # Test Results
 
+## 2026-05-30 (forty-fourth pass) — branch `claude/dreamy-mccarthy-abkoz`
+
+**Result: 768 passing, 0 failing** (+2 new tests; baseline was 766)
+
+---
+
+### Tests reviewed
+
+All 19 test files reviewed during audit. Key focus areas:
+
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` — identified missing
+  multi-exercise mode-reading coverage.
+- `src/lib/__tests__/historyStats.test.ts` — identified missing 1-day rotation cycle
+  edge case.
+- `src/lib/__tests__/sessionSummary.test.ts` — confirmed comprehensive coverage, no gaps.
+- `src/engine/__tests__/rotationEngine.test.ts` — confirmed comprehensive coverage.
+- `src/store/__tests__/historyStore.test.ts` — confirmed `dayOff()` action is tested,
+  validating the new Day Off UI button's code path.
+
+---
+
+### Tests added
+
+| File | Test description |
+|------|-----------------|
+| `progression.test.ts` | Reads mode from first exercise with progressionMode, not always exercises[0] |
+| `historyStats.test.ts` | 1-day rotation: any completed entry sets justCompletedRotation=true |
+
+---
+
+### Results
+
+```
+Test Files  19 passed (19)
+     Tests  768 passed (768)
+  Duration  ~2.5s
+```
+
+---
+
+### Important areas still untested
+
+**`ActiveWorkoutTracker` component**: No unit tests for the live workout tracking UI.
+Timer logic, rest timer, set tracking, and progression preview are exercised only through
+manual testing.
+
+**UI component rendering**: No React component tests (React Testing Library or similar).
+Components are tested indirectly through the store/engine layer but not their render output.
+
+**`programParser.ts`**: The YAML → Plan parser has no dedicated test file. Parsing is
+tested implicitly through integration paths but edge cases (malformed YAML, missing fields,
+type coercion edge cases) are not systematically covered.
+
+**`calendarProjection.ts`**: Tested via `calendarProjection.test.ts` but the coverage of
+cross-month boundary behavior and DST edge cases is not confirmed deep.
+
+---
+
 ## 2026-05-29 (forty-third pass) — branch `claude/dreamy-mccarthy-4tAQK`
 
 **Result: 766 passing, 0 failing** (+8 new tests)

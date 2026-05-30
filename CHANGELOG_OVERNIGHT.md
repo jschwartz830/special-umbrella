@@ -1,5 +1,132 @@
 # Overnight Changelog
 
+## 2026-05-30 (forty-fourth pass) — branch `claude/dreamy-mccarthy-abkoz`
+
+Baseline on entry: **766 passing, 0 failing**. Exit state: **768 passing, 0 failing** (+2 tests).
+
+---
+
+### Change 1 — fix: progression mode read from wrong exercise in multi-exercise sessions
+
+**Summary:**
+
+`buildWeightsRecommendation` in `src/modules/workout-outcomes/progression.ts` had a
+guard at line 101 that returns `null` unless at least one exercise has `progressionMode`
+configured. However, the `mode` variable was then read from `exercises[0].progressionMode`
+unconditionally. When `exercises[0]` has no `progressionMode` (e.g. a warmup-only entry in
+a multi-exercise session) but a later exercise does, the mode fell back to `'single'` via
+the `?? 'single'` default instead of using the actual configured mode.
+
+Example: a session with warmup sets at `exercises[0]` (no progressionMode) and a main lift
+at `exercises[1]` with `progressionMode: 'double'` would incorrectly use single-progression
+rules, showing "add 2.5–5 lb" instead of the double-progression guidance.
+
+Fix: use `exercises.find(ex => ex.progressionMode != null)!` to locate the first exercise
+that actually has a progressionMode configured, then read mode from that exercise.
+
+**Why it matters:**
+
+Multi-exercise sessions where warmup sets are logged separately from working sets are a
+realistic use case for users with structured programs. The wrong mode would silently give
+the wrong progression recommendation without any error indicator.
+
+**Files changed:**
+- `src/modules/workout-outcomes/progression.ts` (+3 lines, -1 line)
+
+**Risk:** Very low. The guard above ensures the found exercise exists; the `!` assertion
+cannot panic. All existing tests continue to pass.
+
+**Rollback:** Revert the one-line change to restore the old `exercises[0].progressionMode ??
+'single'` read.
+
+---
+
+### Change 2 — fix: TYPE_MIX_LABEL missing long_run, recovery_run, weightlifting entries
+
+**Summary:**
+
+`HistoryPage.tsx` defines a `TYPE_MIX_LABEL` map used to format the training-mix summary
+row (e.g. "3 runs · 2 weights · 1 swims"). Three valid `WorkoutType` values were absent
+from the map: `long_run`, `recovery_run`, and `weightlifting`. When a user has workouts of
+these types in their history, `TYPE_MIX_LABEL[t] ?? t` fell back to the raw type string
+with underscores — producing "2 long_run" instead of "2 long runs" in the UI.
+
+Fix: add the three missing entries.
+
+**Why it matters:**
+
+Any user who runs `long_run` or `recovery_run` workouts (common for structured running plans
+imported via YAML) would see malformed labels in the History page training summary. This is
+a visible, production cosmetic bug.
+
+**Files changed:**
+- `src/pages/HistoryPage.tsx` (+3 lines)
+
+**Risk:** Zero. Additive-only change to a constant. No logic affected.
+
+**Rollback:** Remove the three added entries.
+
+---
+
+### Change 3 — feat: add "Day Off" quick button to TodayPage pending controls
+
+**Summary:**
+
+`usePlanActions` has always exposed a `dayOff()` function (logs today as `day_off`,
+advancing the rotation pointer). However, TodayPage had no UI button that called it.
+The only quick controls available when today is pending were "Start Workout", "Skip", and
+"Override" (which opens a modal). To mark today as a Day Off, the user had to navigate to
+the Calendar page and log from there — unnecessary friction for a very common action
+(scheduled rest day, travel, illness, etc.).
+
+Fix: add a "Day Off" button to the pending controls row, parallel to "Skip". Uses the
+`Coffee` icon already imported in TodayPage. Only shown when `isPending`, consistent with
+the Skip button guard.
+
+**Why it matters:**
+
+Rest days are a routine part of any training plan. Making them a one-tap action from
+TodayPage — instead of requiring a page navigation — meaningfully reduces friction for
+daily logging. The button is visually distinct from Skip (amber hover color vs grey) to
+communicate its different meaning.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` (+8 lines)
+
+**Risk:** Low. The `dayOff()` action path is already tested via `historyStore.test.ts`.
+UI change is purely additive and reversible. The button was intentionally omitted before —
+no historical design rationale was found in commit messages.
+
+**Rollback:** Remove the added `{isPending && (...Day Off button...)}` block.
+
+---
+
+### Change 4 — test: targeted tests for progression mode reading and 1-day rotation cycle
+
+**Summary:**
+
+Added two targeted tests to cover gaps identified during the audit:
+
+1. **`progression.test.ts`** — "reads mode from the first exercise that has progressionMode,
+   not always exercises[0]". Tests the scenario where a warmup exercise at index 0 has no
+   progressionMode but the main working-set exercise at index 1 has `progressionMode: 'double'`.
+   Verifies the returned recommendation uses `mode: 'double'`, not `'single'`. This test
+   would have caught the bug fixed in Change 1.
+
+2. **`historyStats.test.ts`** — "handles a 1-day rotation: any completed entry sets
+   justCompletedRotation=true". Documents the modular-arithmetic edge case where
+   `rotationLength === 1`. Since `N % 1 === 0` for any N, `doneInCycle` is always 0 and
+   `justCompletedRotation` is always `true` after any entry. This is correct behavior
+   (each workout completes a full rotation) but was previously only covered indirectly.
+
+**Files changed:**
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` (+23 lines)
+- `src/lib/__tests__/historyStats.test.ts` (+22 lines)
+
+**Risk:** Zero. Test-only additions.
+
+---
+
 ## 2026-05-29 (forty-third pass) — branch `claude/dreamy-mccarthy-4tAQK`
 
 Baseline on entry: **758 passing, 0 failing**. Exit state: **766 passing, 0 failing** (+8 tests).

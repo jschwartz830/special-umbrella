@@ -1,5 +1,129 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-30 (forty-fourth pass) — branch `claude/dreamy-mccarthy-abkoz`
+
+### Executive summary
+
+1. **What changed**: 3 bug fixes + 1 small feature + 2 new tests across 5 files.
+   Exit baseline: 768 passing, 0 failing (+2).
+2. **Highest confidence**: The `TYPE_MIX_LABEL` fix (zero-risk additive change) and the
+   `Day Off` button addition (proven code path, purely additive UI).
+3. **Riskiest**: The progression mode reading fix. It's a one-line change with very low
+   actual risk, but it changes behavior for multi-exercise sessions where the first exercise
+   lacks a progressionMode — any user with warmup-separated working sets is affected.
+4. **Review first**: The progression bug fix (Change 1) — validate the `find()` approach is
+   correct for your exercise structure, then the Day Off button UX placement (Change 3).
+
+---
+
+### Biggest issues found
+
+**BUG (MEDIUM) — Progression mode read from wrong exercise**
+`buildWeightsRecommendation` always read `exercises[0].progressionMode` even though the
+guard only requires *some* exercise to have a progressionMode. For multi-exercise sessions
+where the first exercise is a warmup (no progressionMode), the mode incorrectly defaulted
+to `'single'`.
+
+**BUG (MINOR) — TYPE_MIX_LABEL missing three workout types**
+`long_run`, `recovery_run`, and `weightlifting` were absent from the History page training
+mix label map, causing those workout types to display as raw enum strings (e.g. `"long_run"`
+instead of `"long runs"`).
+
+**UX GAP (MEDIUM) — No "Day Off" quick button on TodayPage**
+`usePlanActions.dayOff()` existed but was never wired to a UI button. Logging today as a Day
+Off required navigating to the Calendar — a friction point for a common daily action.
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Risk |
+|---|------|-------------|------|
+| 1 | Bug fix | Progression mode reads from first exercise WITH progressionMode | Very low |
+| 2 | Bug fix | TYPE_MIX_LABEL: add long_run, recovery_run, weightlifting labels | Zero |
+| 3 | Feature | Day Off quick button on TodayPage pending controls row | Low |
+| 4 | Tests | Multi-exercise progression mode + 1-day rotation cycle tests | Zero |
+
+---
+
+### Definitely keep
+
+- **Change 2** (`TYPE_MIX_LABEL` fix): pure cosmetic fix, zero downside.
+- **Change 4** (new tests): documents behavior, catches regressions.
+
+### Probably keep but review
+
+- **Change 1** (progression mode fix): correct fix, but verify the `find()` approach
+  matches your exercise structure expectations. If you intend `exercises[0]` to always be
+  the "authority" for progressionMode, revert and update the guard instead.
+- **Change 3** (Day Off button): UX addition that may not fit your product intent. The
+  button intentionally uses amber hover (matching the Day Off visual language elsewhere) but
+  appears in the "override controls" row rather than the primary action area. Consider
+  placement relative to the "Start Workout" button instead.
+
+### Do not keep
+
+Nothing marked for rejection.
+
+### Recommendations only (not implemented)
+
+**Extract `findPreviousSetsByExercise` to shared utility**
+Both `TodayPage.tsx` and `CalendarPage.tsx` contain their own copy of this function with
+slightly different signatures. TodayPage excludes by date prefix; CalendarPage also excludes
+by exact instanceId. A shared version with an optional `excludeInstanceId` parameter would
+eliminate the duplication. Deferred because the subtle API difference warrants careful review
+before merging.
+
+**`workoutInstanceId` charset assertion**
+`parseWorkoutInstanceId` relies on `planId` never containing `_`. The current nanoid charset
+(base-36: `0-9a-z`) is safe, but there's no guard if the charset changes. A one-line
+assertion in `lib/utils.ts` nanoid generator (or a comment) would prevent silent breakage.
+
+**`outcomeStore` cross-store coupling**
+`logOutcomeWithProgression` directly calls `useProgramStore.getState()`,
+`usePlanStore.getState()`, and `useHistoryStore.getState()` inside the action. This is
+functional but makes the store harder to unit-test in isolation. Consider passing program
+vars and plan context as parameters to `logOutcomeWithProgression`.
+
+**`TodayPage` / `CalendarPage` size**
+Both files exceed ~900 lines. Candidates for component extraction (e.g. extract
+`DayDetailModal` from CalendarPage into its own file — it's already a separate function).
+Low urgency but would improve maintainability.
+
+---
+
+### Open questions for me
+
+1. **Day Off placement**: should the Day Off button live in the pending controls row (current
+   placement, alongside Skip and Override) or in the primary action area (below "Start
+   Workout")? The current placement groups it with management actions rather than primary
+   workout actions.
+
+2. **Day Off vs Skip distinction**: the app currently treats Skip and Day Off differently in
+   streak logic (skip breaks the streak, day_off maintains it). Is this distinction visible
+   enough in the UI? The Skip label alone may not communicate that it will break a streak.
+
+3. **Progression mode per workout**: should `buildWeightsRecommendation` aggregate mode
+   across all exercises (e.g. majority vote) or always use the first configured exercise?
+   The current fix uses "first configured", which is probably correct for most single-mode
+   sessions but may behave unexpectedly in truly mixed-mode sessions.
+
+---
+
+### Known issues or incomplete work
+
+- The feature proposal and review files from earlier passes still describe pre-existing
+  feature work that may or may not have been fully integrated. Review
+  `FEATURE_PROPOSAL.md` and `FEATURE_REVIEW.md` to confirm status.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-29 (forty-third pass) — branch `claude/dreamy-mccarthy-4tAQK`
 
 ### Executive summary

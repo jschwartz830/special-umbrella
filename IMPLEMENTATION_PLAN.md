@@ -1,5 +1,121 @@
 # Implementation Plan
 
+## Pass 44 — 2026-05-30 (branch `claude/dreamy-mccarthy-abkoz`)
+
+### Observations on entry
+
+- Baseline on entry: **766 passing, 0 failing** — clean exit state from pass 43.
+- Pass 43 fixed 6 failing progression tests and the `ExtraWorkoutEntry.source` pre-migration bug.
+- Pass 42 fixed `deleteSet` stale timer, working set numbers, progression preview labels,
+  `longestStreak` future entry inflation, and `duplicatePlan` name accumulation.
+
+### New issues found this pass
+
+**BUG 1 — `buildWeightsRecommendation` reads `mode` from the wrong exercise (MEDIUM)**
+
+In `src/modules/workout-outcomes/progression.ts` line 103:
+```js
+const mode = exercises[0].progressionMode ?? 'single'
+```
+
+The guard at line 101 ensures at least one exercise has a non-null `progressionMode`, but
+the mode is then read unconditionally from `exercises[0]`. If the first exercise lacks a
+`progressionMode` (e.g. warmup sets, or a mixed multi-exercise session where only the main
+lifts have progressionMode configured), the mode falls back to `'single'` even though the
+actual progression mode is set on a later exercise.
+
+Fix: read `mode` from the first exercise that has a non-null `progressionMode`.
+
+**BUG 2 — `TYPE_MIX_LABEL` missing workout types in HistoryPage (MINOR)**
+
+In `src/pages/HistoryPage.tsx`, `TYPE_MIX_LABEL` is defined as:
+```js
+const TYPE_MIX_LABEL: Partial<Record<WorkoutType, string>> = {
+  weights: 'weights',
+  run: 'runs',
+  swim: 'swims',
+  yoga: 'yoga',
+  other: 'other',
+}
+```
+
+Three valid `WorkoutType` values are missing: `long_run`, `recovery_run`, and `weightlifting`.
+When users have workouts of these types, `TYPE_MIX_LABEL[t] ?? t` falls back to the raw type
+string with underscores (e.g. `"long_run"` instead of `"long runs"`). This makes the training-mix
+summary row display raw enum values in production.
+
+Fix: add the three missing entries.
+
+**UX GAP — No "Day Off" quick button on TodayPage (MEDIUM)**
+
+`usePlanActions` exposes a `dayOff()` function, but TodayPage has no UI button that calls it.
+The current quick controls are: "Start Workout", "Skip", and "Override" (which opens a modal
+with advance/go_back/jump). To log today as a Day Off, the user must navigate to the Calendar
+page and log from there — unnecessary friction for a common action (rest day, travel, etc.).
+
+Fix: add a "Day Off" button in the pending controls row, parallel to "Skip". Only shown when
+today is pending (same guard as Skip). Uses the existing `actions.dayOff()` and requires no
+new state.
+
+**TEST GAPS — Three untested edge cases**
+
+1. `buildWeightsRecommendation` multi-exercise mode: no test covers the case where
+   `exercises[0].progressionMode` is null but a later exercise has it — the bug scenario.
+2. `computePlanStreak` with extras only and no rotation entries: streak should be counted
+   from extras alone (this is in the spec but not directly tested).
+3. `computeRotationCycleProgress` with a 1-day plan: the modular arithmetic for a single-day
+   rotation is exercised only indirectly.
+
+### Decisions
+
+- **Fix Bug 1** (`progression.ts`): change `exercises[0].progressionMode ?? 'single'` to find
+  the first exercise with a non-null `progressionMode`. Safe — the guard above already ensures
+  at least one exists.
+- **Fix Bug 2** (`HistoryPage.tsx`): add `long_run`, `recovery_run`, `weightlifting` to
+  `TYPE_MIX_LABEL`. Pure cosmetic fix; no logic changes.
+- **Add Day Off button** (`TodayPage.tsx`): add a "Day Off" button in the pending controls
+  alongside "Skip". Calls `actions.dayOff()`. Uses existing `Coffee` icon already imported.
+  Only shown when `isPending`. No new state or store methods required.
+- **Add 3 targeted tests**: cover the above gaps in `progression.test.ts` and
+  `historyStats.test.ts`.
+
+### Risks
+
+- Bug 1 fix: very low. Changes one line in `progression.ts`; the guard above still holds.
+  Existing passing tests remain valid.
+- Bug 2 fix: zero. Purely additive label-map entries.
+- Day Off button: low. Mirrors the existing Skip button implementation exactly. The
+  `dayOff()` action is already tested via `historyStore.test.ts`. UI addition is reversible.
+- New tests: zero risk.
+
+### Architecture summary (unchanged from pass 43)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores:
+`planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`.
+Rotation logic is a pure function in `rotationEngine.ts`. Stats are pure utilities in
+`historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function engine with comprehensive test coverage.
+- All store mutations are well-guarded.
+- Clean separation between engine, store, and UI layers.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,115 lines) and `CalendarPage.tsx` (~950 lines) are large. Candidates
+  for component extraction but risk is too high to do in a single overnight pass.
+- `findPreviousSetsByExercise` is duplicated in both TodayPage and CalendarPage with slightly
+  different semantics. Should be extracted to `sessionSummary.ts` with a shared interface,
+  but the differences are subtle enough that this warrants careful review before merging.
+- `workoutInstanceId` parsing relies on the nanoid charset never including `_`. Currently safe
+  (base-36 charset), but would silently break if the charset changes. Consider an assertion
+  in the generator.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`. Functional but makes
+  isolated unit-testing harder.
+
+---
+
 ## Pass 43 — 2026-05-29 (branch `claude/dreamy-mccarthy-4tAQK`)
 
 ### Observations on entry
