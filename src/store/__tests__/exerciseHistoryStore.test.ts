@@ -288,6 +288,16 @@ describe('moveByWorkoutInstance', () => {
     expect(getState().records[0].workoutInstanceId).toBe('plan-1_2026-01-05')
   })
 
+  it('updates calendarDate to the date embedded in the new instanceId', () => {
+    const outcome = makeOutcome('plan-1', '2026-01-01', [
+      { name: 'Squat', sets: [{ reps: 5, load: 135 }] },
+    ])
+    getState().upsertFromOutcome(outcome)
+    getState().moveByWorkoutInstance('plan-1_2026-01-01', 'plan-1_2026-01-05')
+    expect(getState().records[0].calendarDate).toBe('2026-01-05')
+    expect(getState().records[0].workoutInstanceId).toBe('plan-1_2026-01-05')
+  })
+
   it('does not change other records', () => {
     const o1 = makeOutcome('plan-1', '2026-01-01', [
       { name: 'Squat', sets: [{ reps: 5, load: 135 }] },
