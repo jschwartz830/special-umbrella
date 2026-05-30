@@ -1,5 +1,54 @@
 # Feature Reviews
 
+## Pass 45 — 2026-05-30 (branch `claude/dreamy-mccarthy-mxssu`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+`src/hooks/useToday.ts` — a React hook that returns today's date as a `YYYY-MM-DD` string and automatically advances it at midnight. Implementation:
+
+- `useState` initialised from `format(new Date(), 'yyyy-MM-dd')`.
+- `useEffect` computes milliseconds until the next midnight (`setHours(24, 0, 0, 0)`) and sets a `setTimeout` to call `setToday(format(new Date(), ...))` when it fires.
+- The `[today]` dependency causes the effect to re-run after each midnight, re-scheduling for the next one. Cleanup returns `clearTimeout` so no timer leak occurs on unmount.
+
+`src/pages/TodayPage.tsx` — replaced `const today = format(new Date(), 'yyyy-MM-dd')` with `const today = useToday()` and added the import. One line changed in the 1,130-line file.
+
+### What assumptions were encoded
+
+- `setHours(24, 0, 0, 0)` correctly resolves to the next midnight in the device's local time. This is standard JS behavior for `Date` objects.
+- The `[today]` re-arm is sufficient; no additional interval needed.
+- TodayPage is the highest-priority surface. CalendarPage and HistoryPage use their own inline `today` values; deferred.
+
+### What worked well
+
+- The implementation is tiny and self-contained. The pattern (timeout to next event + [state] dependency to re-arm) is idiomatic for React and requires no external library.
+- Integrating into TodayPage was a one-line change — the hook's return type matches the existing string usage exactly.
+- The cleanup function prevents timer leaks if TodayPage unmounts mid-day.
+
+### What feels risky or incomplete
+
+- No unit tests. Testing requires `vi.useFakeTimers()`, which is straightforward but was not added in this pass to keep the change minimal. If the hook logic is changed in future, a test should be written then.
+- CalendarPage and HistoryPage still have the same staleness issue. A user who navigates to Calendar at 12:01 AM would see yesterday's date until they reload.
+
+### What I should evaluate tomorrow
+
+- Open TodayPage at 11:59 PM on a device and confirm the date updates at midnight without a page reload.
+- Confirm that navigating away from TodayPage and back still shows the correct date (new mount recomputes the initial state).
+- Check that the hook doesn't cause any visible re-render glitch at midnight (the `today` state change will trigger a re-render of TodayPage; all downstream computations should update atomically).
+
+### Recommended next steps
+
+1. Wire `useToday()` into CalendarPage and HistoryPage (one-line change each).
+2. Add a Vitest test using `vi.useFakeTimers()` to verify the hook advances the date at midnight.
+3. If a test environment that mocks timers is already set up elsewhere (e.g., `useExpiryDismiss.test.ts`), check if the same pattern applies.
+
+### Keep / revise / prototype only / reject recommendation
+
+**Keep** — The hook is minimal, correct, and solves a real UX problem for PWA users with no observable downside on the happy path.
+
+---
+
 ## Pass 43 — 2026-05-29 (branch `claude/dreamy-mccarthy-4tAQK`)
 
 ### Classification: **Keep**

@@ -1,5 +1,57 @@
 # Implementation Plan
 
+## Pass 45 — 2026-05-30 (branch `claude/dreamy-mccarthy-mxssu`)
+
+### Observations on entry
+
+- Baseline on entry: **767 passing, 0 failing** — clean exit state from pass 44.
+- Pass 44 fixed `moveByWorkoutInstance` calendarDate propagation, memoized `planExtras` in TodayPage, and added a "Xd ago" date hint to the last-session summary. No new issues introduced.
+- Deep audit revealed two correctness bugs and one long-documented staleness risk.
+
+### Key findings
+
+**Bug — `findPreviousWeightsOutcome` and `findPreviousSetsByExercise` use unstable sort key** (`TodayPage.tsx`):
+Both helpers compare outcomes using `completedAt ?? ''` as the sort key. When `completedAt` is absent (the typical state for outcomes recorded before `completedAt` became common), every comparison evaluates `'' > ''` (false). The max-scan in `findPreviousWeightsOutcome` returns whichever qualifying outcome happens to appear first in `Object.values()` iteration order — not the most recent. `findPreviousSetsByExercise` has the same issue in its `.sort()` call. For users who have recorded many sessions, the "previous session" hint and the pre-filled set weights in OutcomeModal may silently display data from an arbitrary past session.
+
+**Correctness gap — `totalLogged`/`totalCompleted` include future-dated entries** (`historyStats.ts`):
+`computeHistoryStats` computed `totalLogged` as `entries.length + extras.length` with no date filter. A CSV import with future-dated entries silently inflates both counters displayed on the History page. The rest of the function already guards against this: `last7Completed`/`last30Completed` use an `inWindow` predicate bounded by `<= today`, and `longestStreak` was fixed in pass 42. `totalLogged` and `totalCompleted` were the remaining gap.
+
+**Staleness risk — `today` computed once at render in TodayPage** (`TodayPage.tsx`):
+`const today = format(new Date(), 'yyyy-MM-dd')` is computed at render time and is not live. If the app stays open past midnight, the Today card, stats, and upcoming section show the previous day's date until the user navigates. Documented since pass 44; now fixed with a `useToday` hook.
+
+### Decisions
+
+- **Fix `findPreviousWeightsOutcome` / `findPreviousSetsByExercise` sort key** (BUG, high confidence) — Extract `outcomeSortKey()` that prefers `completedAt` when present and falls back to the date embedded in `workoutInstanceId`. `parseWorkoutInstanceId` is already imported in TodayPage. No tests added (functions are module-private and tested indirectly via OutcomeModal behavior). No behavior change for outcomes that have `completedAt`; correct ordering for those that don't.
+
+- **Fix `totalLogged`/`totalCompleted` future-date filtering** (CORRECTNESS, high confidence) — Add `calendarDate <= today` filter before counting. Three regression tests cover future-dated rotation entries, future-dated extras, and the `totalCompleted`-only path. No observable change for users without future-dated entries.
+
+- **Add `useToday` hook** (FEATURE, low risk) — New `src/hooks/useToday.ts` initialises from the current date, then schedules a timeout at the next midnight to advance the date and re-arm for subsequent midnights. TodayPage replaces `format(new Date(), ...)` with `useToday()`. No changes to other pages; `CalendarPage` and `HistoryPage` each call `format(new Date(), ...)` independently and can be updated in future passes.
+
+### Not implemented (recommendations only)
+
+- **`CalendarPage` and `HistoryPage` midnight staleness** — Both compute `today` inline and could use `useToday()`. Deferred to a future pass to keep changes reviewable one page at a time.
+- **`computePlanStreak` future-date guard** — The backward-walk starts from `today`, so future-dated extras can never extend `currentStreak` (they're never `streakable.has(cursor)` during the backward scan). No bug; no change needed.
+- **`isPlanExpired` rotations path counts future entries** — If a user imports future-dated `complete`/`skip` entries, the plan could appear expired. Edge case; documenting.
+- **`programVarsMap` subscription granularity** — Still open from pass 44. Low impact.
+- **`logForDate` day_off + jump** — Still open from pass 44.
+
+### Architecture summary (unchanged from pass 44)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores: `planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`. Rotation logic is pure functions in `rotationEngine.ts`. Stats are pure utilities in `historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function rotation engine with 770 tests across 19 files on exit.
+- All store mutations are well-guarded and tested.
+- Clean separation between engine, store, and UI layers.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,130 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`. Not broken, but the coupling makes unit-testing harder.
+
+---
+
 ## Pass 44 — 2026-05-30 (branch `claude/dreamy-mccarthy-uCF1X`)
 
 ### Observations on entry

@@ -1,5 +1,64 @@
 # Overnight Changelog
 
+## 2026-05-30 (forty-fifth pass) — branch `claude/dreamy-mccarthy-mxssu`
+
+Baseline on entry: **767 passing, 0 failing**. Exit state: **770 passing, 0 failing** (+3 tests).
+
+---
+
+### Change 1 — fix: stable sort key in `findPreviousWeightsOutcome` / `findPreviousSetsByExercise`
+
+**Summary:** Both helper functions in `TodayPage.tsx` compared outcomes using `completedAt ?? ''` as the sort key. When `completedAt` is absent, every comparison evaluates `'' > ''` (false). `findPreviousWeightsOutcome`'s linear max-scan returns the first qualifying outcome found in `Object.values()` iteration order rather than the most recent. `findPreviousSetsByExercise`'s `.sort()` produces an indeterminate order. Both results are used to pre-fill the OutcomeModal (set weights, rep targets) and to display the "Last: N×M @ W lb" hint on the Today card.
+
+**Fix:** Extract `outcomeSortKey(o)` that returns `o.completedAt` when present (a full ISO datetime) and falls back to the calendarDate embedded in `o.workoutInstanceId` via `parseWorkoutInstanceId`. The instanceId format is `planId_YYYY-MM-DD`, so the extracted date gives a stable, chronologically correct ordering for outcomes without an explicit `completedAt`.
+
+**Why it matters:** For users who have logged many sessions (especially before `completedAt` became the standard field), the "previous session" hint and pre-filled weights in OutcomeModal could display data from a non-recent session. The bug manifests silently — the UI shows stale reference weights without any error.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — `outcomeSortKey()` helper; updated both functions
+
+**Risks/tradeoffs:** No behavior change for outcomes that have `completedAt`. Outcomes without it now sort by calendar date, which is the correct intent.
+
+**Rollback:** `git revert 49839b8`
+
+---
+
+### Change 2 — fix+test: exclude future-dated entries from `totalLogged`/`totalCompleted`
+
+**Summary:** `computeHistoryStats` counted all entries regardless of `calendarDate` for `totalLogged` and `totalCompleted`. A CSV import with future-dated entries (e.g., a planning import or a bad export) silently inflated both counters shown on the History page. The rest of the function already guarded against future dates in `last7Completed`/`last30Completed` (via `inWindow` bounded by `<= today`) and in `longestStreak` (fixed in pass 42). `totalLogged` and `totalCompleted` were the remaining gap, documented as a recommendation in passes 42 and 43.
+
+**Fix:** Filter both `entries` and `extras` to `calendarDate <= today` before computing totals. Three regression tests added.
+
+**Why it matters:** Users who import a CSV with future-dated rows see inflated "total workouts logged" and "total completed" counts immediately after import, with no way to correct them without deleting the entries. The fix makes these stats consistent with all other date-bounded stats in the function.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — two-line filter added to `computeHistoryStats`
+- `src/lib/__tests__/historyStats.test.ts` — three regression tests
+
+**Risks/tradeoffs:** Only affects users who have future-dated entries. Those users will see `totalLogged` and `totalCompleted` decrease to the correct value on next render. No data is deleted; entries remain in the store.
+
+**Rollback:** `git revert b342a01`
+
+---
+
+### Change 3 — feat: `useToday` hook with midnight refresh; wire into TodayPage
+
+**Summary:** `TodayPage` computed `today` as `format(new Date(), 'yyyy-MM-dd')` at render time. If the app stays open past midnight — without the user navigating away and back — all date-dependent displays (Today card, stats bar, upcoming section, "days ago" hint) would show the previous calendar date until a navigation occurred. This was documented as a known staleness risk in passes 44 and earlier.
+
+**Fix:** Created `src/hooks/useToday.ts`. The hook initialises `today` from the current date, then schedules a `setTimeout` to fire at the next midnight and advance the state. The `[today]` dependency re-arms the timeout each time the date advances, handling subsequent midnights automatically. No external polling. TodayPage replaces the inline `format(new Date(), ...)` call with `const today = useToday()`.
+
+**Why it matters:** Users who leave the app open overnight (common on mobile as a pinned PWA) will now see the correct date immediately when they return, without needing to navigate away and back. The fix is targeted at TodayPage; CalendarPage and HistoryPage use their own inline `today` values and can be updated in future passes.
+
+**Files changed:**
+- `src/hooks/useToday.ts` — new file (hook implementation)
+- `src/pages/TodayPage.tsx` — import + replaces inline `format(new Date(), ...)`
+
+**Risks/tradeoffs:** The timeout fires once per day and is cleaned up on component unmount. Memory and timer overhead is negligible. No unit tests added (the hook behavior is time-dependent and the existing infrastructure doesn't mock timers for this module). A manual test can verify by temporarily setting `setTimeout(, 5000)` and confirming the date advances.
+
+**Rollback:** `git revert 91f5d26`
+
+---
+
 ## 2026-05-30 (forty-fourth pass) — branch `claude/dreamy-mccarthy-uCF1X`
 
 Baseline on entry: **766 passing, 0 failing**. Exit state: **767 passing, 0 failing** (+1 test).
