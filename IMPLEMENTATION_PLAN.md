@@ -1,5 +1,55 @@
 # Implementation Plan
 
+## Pass 44 — 2026-05-30 (branch `claude/dreamy-mccarthy-uCF1X`)
+
+### Observations on entry
+
+- Baseline on entry: **766 passing, 0 failing** — clean exit state from pass 43.
+- Pass 43 fixed 6 progression test failures and the `ExtraWorkoutEntry.source` migration. No new issues introduced.
+- Deep audit revealed one real bug and one performance defect, both safe to fix.
+
+### Key findings
+
+**Bug — `moveByWorkoutInstance` silently drops `calendarDate` update** (`exerciseHistoryStore.ts`):
+When a workout entry is moved to a new calendar date (e.g. via CalendarPage or TodayPage date backfill), `moveByWorkoutInstance` updated the `workoutInstanceId` on all `ExerciseSessionRecord` rows but left `calendarDate` unchanged. This caused PR date attribution (`maxLoadDate`, `maxRepsDate` in `computePersonalRecords`) to show the original date rather than the moved date. It also broke `getByExerciseName`'s chronological sort because that sort key is `calendarDate`. The fix is a two-line addition: parse the new instanceId to extract `calendarDate` and update it alongside the key.
+
+**Performance defect — `planExtras` computed inline in TodayPage** (`TodayPage.tsx`):
+`planExtras` was a plain `filter()` call placed after the early `!plan` guard, creating a new array reference on every TodayPage re-render (even when `extraEntries` didn't change). `WeeklyActivityStrip` declares `planExtras` as a `useMemo` dependency; a new reference on every parent render defeats that memo, causing the 7-day strip to recompute unnecessarily. Fixed by lifting `planExtras` into a `useMemo` placed before the early return.
+
+**UX gap — "Last session" hint missing date context** (`TodayPage.tsx`):
+The "Last: 3×8 @ 135 lb Bench Press" hint on the today card gave no indication of when the previous session occurred. A user resuming after a gap (injury, travel) or approaching a PR attempt benefits from knowing if their reference session was 3 days ago or 3 weeks ago. Fix: derive the calendarDate from the previous outcome's `workoutInstanceId` (already available) and append "· Xd ago" / "· yesterday" inline.
+
+### Decisions
+
+- **Fix `moveByWorkoutInstance`** (BUG, high confidence) — +1 test. No behavior change for normal flows; only affects users who have moved entries to a different date.
+- **Fix `planExtras` memoization** (PERF, high confidence) — No behavior change; pure re-render optimization. Correct after the early return guard because the memo returns `[]` when `activePlanId` is null.
+- **Add session date to last-session hint** (UX, low risk) — Purely additive; the display only appears when `prevSessionDaysAgo > 0`. Does not modify `sessionSummary.ts` or its public API; derives the date from the existing `workoutInstanceId`.
+
+### Not implemented (recommendations only)
+
+- **`programVarsMap` subscription granularity** — TodayPage and CalendarPage subscribe to the full `vars` object; changes to any plan's vars cause both pages to re-render even if the active plan's vars are unchanged. Requires a selector per plan or a store split. Low impact since vars only change when the user logs a workout with progression rules.
+- **Midnight staleness** — `today` is computed once at render and is not live. If the app stays open past midnight without navigation, dates shown will be stale until the user navigates or refreshes. Mitigation: a `useEffect` that force-updates at midnight, or a periodic revalidation. Documented; not implemented.
+- **`CalendarPage.logForDate` day_off + jump interaction** — When a user changes a retroactively-logged entry (that had a jump override) to day_off, the jump is removed without re-anchoring. This can silently shift the rotation pointer for subsequent days. Edge case; low occurrence probability; documenting rather than fixing to avoid unintended side effects.
+
+### Architecture summary (unchanged from pass 43)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores: `planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`. Rotation logic is pure functions in `rotationEngine.ts`. Stats are pure utilities in `historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function rotation engine with 240+ tests; highly reliable
+- Zustand persist migrations (versions 1 and 2) protect existing user data
+- Full-stack deduplication (history entries, extra entries, plan duplication naming) handles edge cases correctly
+- DSL expression evaluator for progression rules — no `eval()`, fully tested
+- Clear separation of concerns: engine / stores / hooks / pages
+
+### Risks (unchanged)
+
+- `TodayPage.tsx` (1100+ lines) and `CalendarPage.tsx` (920+ lines) are large; future refactors into smaller units would reduce cognitive load
+- `outcomeStore` and `historyStore` have ad-hoc cross-store calls (`useHistoryStore.getState()` inside outcomeStore) that bypass React's subscription model for occasional reads — safe but unconventional
+
+---
+
 ## Pass 43 — 2026-05-29 (branch `claude/dreamy-mccarthy-4tAQK`)
 
 ### Observations on entry
