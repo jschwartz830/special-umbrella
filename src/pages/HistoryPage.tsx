@@ -43,7 +43,10 @@ const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
 /** Plural display labels used in the training-mix summary row. */
 const TYPE_MIX_LABEL: Partial<Record<WorkoutType, string>> = {
   weights: 'weights',
+  weightlifting: 'weightlifting',
   run: 'runs',
+  long_run: 'long runs',
+  recovery_run: 'recovery runs',
   swim: 'swims',
   yoga: 'yoga',
   other: 'other',
