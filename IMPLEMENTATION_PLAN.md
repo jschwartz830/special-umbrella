@@ -1,5 +1,56 @@
 # Implementation Plan
 
+## Pass 46 — 2026-05-31 (branch `claude/dreamy-mccarthy-N2mc1`)
+
+### Observations on entry
+
+- Baseline on entry: **770 passing, 0 failing** — clean exit state from pass 45.
+- Pass 45 fixed two TodayPage bugs (unstable sort key, stale today date) and added the `useToday` hook. No new issues introduced.
+- Deep audit of CalendarPage revealed the same sort-key bug that pass 45 fixed in TodayPage was never ported, plus two other issues.
+
+### Key findings
+
+**Bug — `CalendarPage.findPreviousSetsByExercise` uses unstable sort key** (`CalendarPage.tsx:257`):
+Identical to the `findPreviousWeightsOutcome`/`findPreviousSetsByExercise` bug fixed in TodayPage (commit 18adf1f). CalendarPage's version sorts with `(b.completedAt ?? '').localeCompare(a.completedAt ?? '')`, producing non-deterministic ordering for outcomes without `completedAt`. Previous sets shown in CalendarPage's OutcomeModal may display data from an arbitrary session instead of the most recent one.
+
+**Bug — `CalendarPage` stale `now` past midnight** (`CalendarPage.tsx:50`):
+`const now = new Date()` is captured at component mount and never updated. If the user keeps CalendarPage open past midnight, `goToToday()` and the `isCurrentMonth` check use the stale date. Pass 45 added `useToday()` specifically to fix this class of issue; CalendarPage was not updated at the same time.
+
+**UX inconsistency — Day Off not available for past dates in Calendar** (`CalendarPage.tsx:566`):
+`canDayOff = isToday || isFuture` excluded past dates. TodayPage's "catch-up" flow can call `markDaysAsOff` for unlogged past days (confirmed by the DayDetailModal catch-up dialog). The Calendar's retroactive Day Off was the one entry point that couldn't do this, creating an inconsistency: users logging a missed day retroactively could only pick Complete or Skip, not Day Off.
+
+### Decisions
+
+- **Fix CalendarPage unstable sort** (BUG, high confidence): Port `outcomeSortKey` from TodayPage. Also add `parseWorkoutInstanceId` import needed by the helper.
+- **Fix CalendarPage stale `now`** (BUG, high confidence): Replace `const now = new Date()` with `useToday()`. Derive `nowYear`/`nowMonth` from the `YYYY-MM-DD` string to avoid Date object construction for display purposes.
+- **Allow Day Off on past dates in Calendar** (UX FIX, low risk): Change `canDayOff` from `isToday || isFuture` to `isPast || isToday || isFuture`. Both Complete/Skip and Day Off are now available for past dates, consistent with TodayPage.
+- **Feature: outcome summary preview in DayDetailModal Level 1** (FEATURE, low risk): For completed entries with rich outcomes, show perceived-effort dot indicators (● = 1, ●●●●● = 5) and a truncated italic notes line in the Level 1 overview. Users can scan workout quality at a glance without drilling into the OutcomeModal. Purely additive; no behavior change for workouts without outcome data.
+
+### Not implemented (recommendations only)
+
+- **Extract shared `outcomeSortKey` / `findPreviousSetsByExercise`** to a shared lib utility: The nearly-identical function exists in both TodayPage and CalendarPage. Extracting would reduce future drift but introduces cross-file coupling and is a medium-complexity change.
+- **Timezone audit for `parseISO` + `format` in rotation engine**: Potential off-by-one date in UTC-5 to UTC-12 timezones. 127+ PR history without a reported instance suggests most active users are in UTC+. Needs testing in a UTC-5 environment before any change.
+- **`logForDate` day_off + jump interaction** (carried from passes 44–45): When a retroactively-logged entry with a jump override is changed to day_off, the jump is removed without re-anchoring. Low occurrence probability; deferred.
+- **`programVarsMap` subscription granularity** (carried from passes 44–45): Low impact.
+
+### Architecture summary (unchanged from pass 45)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores: `planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`. Rotation logic is pure functions in `rotationEngine.ts`. Stats are pure utilities in `historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function rotation engine with 770 tests across 19 files on entry.
+- All store mutations are well-guarded and tested.
+- Clean separation between engine, store, and UI layers.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,150 lines) and `CalendarPage.tsx` (~520 lines post-trim) are large.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`. Not broken, but coupling makes unit-testing harder.
+- `workoutInstanceId` parsing relies on nanoid never generating `_`.
+
+---
+
 ## Pass 45 — 2026-05-30 (branch `claude/dreamy-mccarthy-mxssu`)
 
 ### Observations on entry
