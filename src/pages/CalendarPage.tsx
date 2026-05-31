@@ -590,6 +590,10 @@ function DayDetailModal({
   }
 
   // ─── Level 1: Overview ───────────────────────────────────────────────────
+  const rotOutcomeLevel1 = outcomes[makeWorkoutInstanceId(plan.id, calendarDate)] ?? null
+  const effortLabels = ['', '●', '●●', '●●●', '●●●●', '●●●●●'] as const
+  const effortColors = ['', 'text-emerald-400', 'text-emerald-400', 'text-yellow-400', 'text-orange-400', 'text-red-400'] as const
+
   if (!detailTarget) {
     const statusInfo = isDayOff
       ? { label: 'Day Off', cls: 'text-amber-400 bg-amber-400/10' }
@@ -626,6 +630,16 @@ function DayDetailModal({
               </span>
               <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
             </button>
+            {isCompleteForDirect && rotOutcomeLevel1?.perceivedEffort && (
+              <p className={`text-[10px] px-1 leading-none ${effortColors[rotOutcomeLevel1.perceivedEffort]}`}>
+                {effortLabels[rotOutcomeLevel1.perceivedEffort]}
+              </p>
+            )}
+            {isCompleteForDirect && rotOutcomeLevel1?.notes && (
+              <p className="text-[11px] text-slate-500 italic truncate px-1">
+                "{rotOutcomeLevel1.notes}"
+              </p>
+            )}
             {isCompleteForDirect && (
               <div className="flex items-center gap-3 px-1">
                 <button
