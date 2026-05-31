@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useActivePlan } from '../hooks/useActivePlan'
+import { useToday } from '../hooks/useToday'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { buildMonthGrid } from '../engine/calendarProjection'
@@ -47,9 +48,10 @@ const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
 ]
 
 export function CalendarPage() {
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth())
+  const todayStr = useToday()
+  const [nowYear, nowMonth] = todayStr.split('-').map(Number)
+  const [year, setYear] = useState(nowYear)
+  const [month, setMonth] = useState(nowMonth - 1)
   const [selected, setSelected] = useState<ResolvedDay | null>(null)
 
   // Outcome modal state — null = closed, otherwise the props to pass
@@ -109,11 +111,11 @@ export function CalendarPage() {
   }
 
   function goToToday() {
-    setYear(now.getFullYear())
-    setMonth(now.getMonth())
+    setYear(nowYear)
+    setMonth(nowMonth - 1)
   }
 
-  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
+  const isCurrentMonth = year === nowYear && month === nowMonth - 1
 
   function logForDate(rd: ResolvedDay, action: ActionType, selectedPlanDayIdx: number) {
     if (!plan) return
