@@ -1,5 +1,75 @@
 # Overnight Changelog
 
+## 2026-05-31 (forty-sixth pass) — branch `claude/dreamy-mccarthy-N2mc1`
+
+Baseline on entry: **770 passing, 0 failing**. Exit state: **770 passing, 0 failing** (no new tests; all changes are UI/logic only).
+
+---
+
+### 1 — fix(CalendarPage): stable sort key in `findPreviousSetsByExercise`
+
+**Summary:** CalendarPage's `findPreviousSetsByExercise` helper was sorting outcomes by `(b.completedAt ?? '').localeCompare(a.completedAt ?? '')`. When `completedAt` is absent, every comparison evaluates `'' vs ''` (equal), making the final sort order non-deterministic. Pre-filled "previous sets" weights in CalendarPage's OutcomeModal could show data from any arbitrary past session rather than the most recent one.
+
+**Why it matters:** Users counting on prior-session data to pace weights would get misleading reference data silently. Identical bug was fixed in TodayPage (commit 18adf1f); CalendarPage was missed.
+
+**Fix:** Port `outcomeSortKey()` from TodayPage — prefer `completedAt`, fall back to the calendarDate embedded in `workoutInstanceId` (via `parseWorkoutInstanceId`).
+
+**Files changed:** `src/pages/CalendarPage.tsx`
+
+**Risks / tradeoffs:** None. Behavioral change only when `completedAt` is null; correct ordering for those cases.
+
+**Rollback:** `git revert bf5f42d`
+
+---
+
+### 2 — fix(CalendarPage): refresh today via `useToday` hook
+
+**Summary:** `const now = new Date()` was computed once at CalendarPage mount and never refreshed. If the user left the Calendar open overnight, `goToToday()` would navigate to the previous month and `isCurrentMonth` would be `true` for the wrong month.
+
+**Why it matters:** "Today" button becomes a misleading no-op after midnight. TodayPage already uses `useToday()` (added in pass 45) for exactly this reason.
+
+**Fix:** Replace `const now = new Date()` with `useToday()` (returns a `YYYY-MM-DD` string, refreshed at midnight). Parse `nowYear` and `nowMonth` from the string directly.
+
+**Files changed:** `src/pages/CalendarPage.tsx`
+
+**Risks / tradeoffs:** None. `useToday` has a single responsibility and is already tested via TodayPage. The calendar's displayed month/year is initialized from `useState`, so this only affects future midnight refreshes and the "Today" button behavior.
+
+**Rollback:** `git revert fd6d31f`
+
+---
+
+### 3 — fix(CalendarPage): allow Day Off on past unlogged dates
+
+**Summary:** `canDayOff = isToday || isFuture` in `DayDetailModal` excluded past dates. Users retroactively logging unlogged past days in the Calendar could only choose Complete or Skip — Day Off was not an option. TodayPage's catch-up flow (`markDaysAsOff`) already marks past days as Day Off; the Calendar was inconsistent.
+
+**Why it matters:** A user returning from a vacation or illness who wants to log "Day Off" for several past days had to either use TodayPage's bulk catch-up (which marks ALL unlogged days) or skip them instead. The Calendar should support all three actions for past dates.
+
+**Fix:** Change `canDayOff` to `isPast || isToday || isFuture` (always available when there's a plan active). Past days now show Complete, Skip, and Day Off buttons side-by-side.
+
+**Files changed:** `src/pages/CalendarPage.tsx`
+
+**Risks / tradeoffs:** Product decision — is it valid to retroactively mark something as "Day Off"? Yes: the catch-up flow already does it. No rotation-pointer change needed; `day_off` entries advance the pointer the same as any other action.
+
+**Rollback:** `git revert 6378fc7`
+
+---
+
+### 4 — feat(CalendarPage): outcome summary preview in DayDetailModal Level 1
+
+**Summary:** Completed workouts in the calendar's DayDetailModal now show a compact outcome summary in the Level 1 overview: colored effort dots (● green=easy through ●●●●● red=hard) and a 1-line italic notes preview. Users can see workout quality at a glance without drilling into the full OutcomeModal.
+
+**Why it matters:** Previously a user would tap a completed calendar cell, see "Done" badge, and have to click through to Level 2 or the full OutcomeModal to see if they'd logged notes or how hard the session felt. For a monthly review, clicking into each day is high friction.
+
+**Implementation:** Added `rotOutcomeLevel1` lookup (already available via the `outcomes` prop), `effortLabels` and `effortColors` arrays. Two optional elements rendered below the main workout button when data exists; hidden when no outcome data is present.
+
+**Files changed:** `src/pages/CalendarPage.tsx`
+
+**Risks / tradeoffs:** Purely additive. No behavior change for workouts without outcome data. The effort display uses Unicode dots (●) rather than icons — compact, localization-neutral, no dependency added.
+
+**Rollback:** `git revert 7489e0f`
+
+---
+
 ## 2026-05-30 (forty-fifth pass) — branch `claude/dreamy-mccarthy-mxssu`
 
 Baseline on entry: **767 passing, 0 failing**. Exit state: **770 passing, 0 failing** (+3 tests).

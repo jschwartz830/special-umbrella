@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useActivePlan } from '../hooks/useActivePlan'
+import { useToday } from '../hooks/useToday'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { buildMonthGrid } from '../engine/calendarProjection'
@@ -29,8 +30,14 @@ import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../m
 import { useProgramStore } from '../store/programStore'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
 import { extraToPlanDay } from '../lib/planDayUtils'
+import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Stable sort key: prefer completedAt; fall back to calendarDate embedded in instanceId. */
+function outcomeSortKey(outcome: WorkoutOutcome): string {
+  return outcome.completedAt ?? parseWorkoutInstanceId(outcome.workoutInstanceId)?.calendarDate ?? ''
+}
 
 const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
   { type: 'weights', label: 'Weights' },
@@ -41,9 +48,10 @@ const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
 ]
 
 export function CalendarPage() {
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth())
+  const todayStr = useToday()
+  const [nowYear, nowMonth] = todayStr.split('-').map(Number)
+  const [year, setYear] = useState(nowYear)
+  const [month, setMonth] = useState(nowMonth - 1)
   const [selected, setSelected] = useState<ResolvedDay | null>(null)
 
   // Outcome modal state — null = closed, otherwise the props to pass
@@ -103,11 +111,11 @@ export function CalendarPage() {
   }
 
   function goToToday() {
-    setYear(now.getFullYear())
-    setMonth(now.getMonth())
+    setYear(nowYear)
+    setMonth(nowMonth - 1)
   }
 
-  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
+  const isCurrentMonth = year === nowYear && month === nowMonth - 1
 
   function logForDate(rd: ResolvedDay, action: ActionType, selectedPlanDayIdx: number) {
     if (!plan) return
@@ -254,7 +262,7 @@ export function CalendarPage() {
         if (rest.startsWith(currentDate)) return false
         return Boolean(outcome.weightsActual?.exercises?.length)
       })
-      .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
+      .sort((a, b) => outcomeSortKey(b).localeCompare(outcomeSortKey(a)))
 
     const byExercise: Record<string, LoggedSetActual[]> = {}
     for (const outcome of sorted) {
@@ -555,7 +563,9 @@ function DayDetailModal({
   const isComplete = status === 'past_complete' || status === 'today_complete'
   const isSkipped = status === 'past_skip' || status === 'today_skip'
   const canLog = isPast || isToday
-  const canDayOff = isToday || isFuture
+  // Past dates can also be marked Day Off — mirrors TodayPage's catch-up flow
+  // which calls markDaysAsOff for unlogged past days.
+  const canDayOff = isPast || isToday || isFuture
 
   const [detailTarget, setDetailTarget] = useState<
     | { kind: 'rotation' }
@@ -580,6 +590,10 @@ function DayDetailModal({
   }
 
   // ─── Level 1: Overview ───────────────────────────────────────────────────
+  const rotOutcomeLevel1 = outcomes[makeWorkoutInstanceId(plan.id, calendarDate)] ?? null
+  const effortLabels = ['', '●', '●●', '●●●', '●●●●', '●●●●●'] as const
+  const effortColors = ['', 'text-emerald-400', 'text-emerald-400', 'text-yellow-400', 'text-orange-400', 'text-red-400'] as const
+
   if (!detailTarget) {
     const statusInfo = isDayOff
       ? { label: 'Day Off', cls: 'text-amber-400 bg-amber-400/10' }
@@ -616,6 +630,16 @@ function DayDetailModal({
               </span>
               <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
             </button>
+            {isCompleteForDirect && rotOutcomeLevel1?.perceivedEffort && (
+              <p className={`text-[10px] px-1 leading-none ${effortColors[rotOutcomeLevel1.perceivedEffort]}`}>
+                {effortLabels[rotOutcomeLevel1.perceivedEffort]}
+              </p>
+            )}
+            {isCompleteForDirect && rotOutcomeLevel1?.notes && (
+              <p className="text-[11px] text-slate-500 italic truncate px-1">
+                "{rotOutcomeLevel1.notes}"
+              </p>
+            )}
             {isCompleteForDirect && (
               <div className="flex items-center gap-3 px-1">
                 <button

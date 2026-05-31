@@ -1,5 +1,92 @@
 # Review Notes — Overnight Audit
 
+## 2026-05-31 (forty-sixth pass) — branch `claude/dreamy-mccarthy-N2mc1`
+
+### Executive summary
+
+1. **What changed:** Four commits, all in `CalendarPage.tsx`. (1) Bug fix: ported the `outcomeSortKey` stable-sort fix from TodayPage to CalendarPage's `findPreviousSetsByExercise`. (2) Bug fix: replaced stale `const now = new Date()` with `useToday()` hook so the "Today" button and `isCurrentMonth` stay correct past midnight. (3) UX fix: Day Off is now available for past dates in the calendar's DayDetailModal, consistent with TodayPage's catch-up flow. (4) Feature: Level 1 DayDetailModal now shows effort dots + notes preview for completed workouts.
+
+2. **Highest confidence:** Commits 1, 2, and 3 are small targeted fixes; commit 1 is a direct port of an already-merged fix. All four leave test count unchanged at 770 (no regressions).
+
+3. **Risky:** Nothing high-risk. The Day Off change (commit 3) is a product decision embedded in a 1-line code change — verify that allowing retroactive Day Off in the calendar matches the intended UX. The effort preview (commit 4) uses Unicode dots; if the font rendering is unexpected, the strings can be swapped for any character.
+
+4. **Review first:** Commit 3 (Day Off for past dates) — confirm the product intent. Commit 4 (effort preview) — check the visual appearance on a real device.
+
+---
+
+### Biggest issues found
+
+| # | Severity | Issue | Location | Status |
+|---|---|---|---|---|
+| 1 | Medium | `findPreviousSetsByExercise` unstable sort — same bug fixed in TodayPage (18adf1f) | `CalendarPage.tsx:257` | Fixed |
+| 2 | Low | Stale `now` date past midnight in CalendarPage | `CalendarPage.tsx:50` | Fixed |
+| 3 | Low-UX | Day Off not available for past dates in Calendar | `CalendarPage.tsx:566` | Fixed |
+| 4 | Risk | Timezone sensitivity in `rotationEngine.ts`: `parseISO` + local `format` could produce wrong date strings for UTC-5 to UTC-12 users | `rotationEngine.ts` | Recommendation only |
+| 5 | Medium | `findPreviousSetsByExercise` duplicated in TodayPage and CalendarPage | Both pages | Recommendation only |
+
+---
+
+### Improvements completed
+
+1. **Sort stability fix** — `outcomeSortKey` ported to CalendarPage. Users whose CalendarPage OutcomeModal showed wrong prior-session weights will now see the correct most-recent data.
+2. **Midnight-staleness fix** — `useToday()` wired into CalendarPage. "Today" button and current-month highlight now auto-update at midnight.
+3. **Day Off for past dates** — retroactive Day Off now available from the Calendar, consistent with TodayPage's catch-up flow.
+
+---
+
+### Small feature added
+
+**Outcome summary preview in DayDetailModal Level 1** (`src/pages/CalendarPage.tsx`)
+
+- Effort shown as colored Unicode dots (● = 1 easy, ●●●●● = 5 hard) with color coding (green → red)
+- Notes shown as 1-line truncated italic preview
+- Only visible when data exists; no change for workouts without outcomes
+- Classify: **Keep** — the feature is purely additive, easy to understand, and solves a real friction point (monthly review of past sessions)
+
+---
+
+### Keep / revise / do not keep
+
+| Change | Recommendation |
+|---|---|
+| Sort fix (commit 1) | **Definitely keep** — clear bug, same fix already on main via TodayPage |
+| Midnight fix (commit 2) | **Definitely keep** — same class of fix as pass 45's `useToday` addition |
+| Day Off past dates (commit 3) | **Probably keep** — verify product intent; the code change is 1 line |
+| Effort + notes preview (commit 4) | **Probably keep** — check visual on device; easy to revert if not desired |
+
+---
+
+### Recommendations only (not implemented)
+
+1. **Extract shared `outcomeSortKey` + `findPreviousSetsByExercise`** into a shared utility (`src/lib/outcomeUtils.ts` or similar). The two functions are now nearly identical. Reduces future drift risk if the sort logic changes again.
+
+2. **Timezone audit for rotation engine**: `parseISO` returns UTC midnight; `format` uses local timezone. For UTC-5 to UTC-12 users, `format(addDays(parseISO('2026-01-01'), 0), 'yyyy-MM-dd')` could return `'2025-12-31'`. Recommend testing in a UTC-5 environment before declaring safe.
+
+3. **`logForDate` day_off + jump interaction** (carried from passes 44–45): When a retroactive entry with a jump override is changed to day_off, the jump is removed but not replaced — silently shifting the rotation pointer for subsequent dates. Low occurrence; document and guard next pass.
+
+---
+
+### Open questions for review
+
+1. Is **Day Off retroactively** on past calendar dates the intended behavior? The TodayPage catch-up flow supports it, but the Calendar restriction may have been intentional to prevent accidental catch-up.
+2. Should the **effort dots** use a different symbol or the difficulty color palette from `DifficultyBadge` rather than the custom green→red scale?
+3. Is there a preference for where the notes preview truncates — should it be `line-clamp-1` or `truncate`? (Currently `truncate` — single line, ellipsis at end.)
+
+---
+
+### Known issues / incomplete work
+
+- No new tests added this pass. Existing 770 tests all pass.
+- CalendarPage `findPreviousSetsByExercise` still duplicates TodayPage's equivalent — extraction deferred.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-05-30 (forty-fifth pass) — branch `claude/dreamy-mccarthy-mxssu`
 
 ### Executive summary

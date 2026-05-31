@@ -1,5 +1,42 @@
 # Test Results
 
+## 2026-05-31 (forty-sixth pass) — branch `claude/dreamy-mccarthy-N2mc1`
+
+**Result: 770 passing, 0 failing** (±0 tests; all changes are UI/logic only)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 770 |
+| Tests added | 0 |
+| Tests on exit | 770 |
+| Failing | 0 |
+
+### Tests reviewed
+
+All 19 test files reviewed. Highlights:
+
+- `rotationEngine.test.ts` — 670 LOC, comprehensive pointer, override, expiry, and range tests
+- `historyStats.test.ts` — covers `computeHistoryStats`, `computePlanProgress`, `computeWorkoutTypeBreakdown`, `countPastUnloggedDays`, `computeRotationCycleProgress`, `countPlanDayCompletions`, `computePersonalRecords`, `computePlanStreak`, `computeRotationPlanRemaining`, `computeWeeklyBreakdown`, `padWeekGaps`, `isoWeekStart` — all functions tested
+- `calendarProjection.test.ts`, `expressionEval.test.ts`, `csv.test.ts`, `sessionSummary.test.ts`, `workoutInstanceId.test.ts` — all pass
+- All store tests (`historyStore`, `outcomeStore`, `planStore`, `programStore`, `exerciseHistoryStore`, `planDeleteCleanup`) — pass
+- Module tests (`engine.test.ts`, `progression.test.ts`, `types.test.ts`, `explanation.test.ts`) — pass
+
+### Tests added / updated this pass
+
+None. All changes this pass were UI-layer fixes (CalendarPage sort, `useToday` hook wiring, Day Off logic, outcome preview feature). These areas have no corresponding unit tests because they involve React component rendering and store interactions not currently tested with Vitest.
+
+### Areas still untested
+
+- `CalendarPage.tsx` component rendering — no React Testing Library setup exists; component tests are implicitly validated by the E2E-style manual review
+- `TodayPage.tsx` component rendering — same
+- `OutcomeModal.tsx` — no render tests
+- `DayDetailModal` effort/notes preview — new feature, not tested
+
+The absence of component tests is a known gap carried from previous passes. Adding React Testing Library integration would require a setup change to Vitest (jsdom environment) and falls outside a single overnight pass scope.
+
+---
+
 ## 2026-05-30 (forty-fifth pass) — branch `claude/dreamy-mccarthy-mxssu`
 
 **Result: 770 passing, 0 failing** (+3 new tests)
