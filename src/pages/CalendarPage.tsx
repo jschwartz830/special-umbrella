@@ -29,8 +29,14 @@ import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../m
 import { useProgramStore } from '../store/programStore'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
 import { extraToPlanDay } from '../lib/planDayUtils'
+import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Stable sort key: prefer completedAt; fall back to calendarDate embedded in instanceId. */
+function outcomeSortKey(outcome: WorkoutOutcome): string {
+  return outcome.completedAt ?? parseWorkoutInstanceId(outcome.workoutInstanceId)?.calendarDate ?? ''
+}
 
 const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
   { type: 'weights', label: 'Weights' },
@@ -254,7 +260,7 @@ export function CalendarPage() {
         if (rest.startsWith(currentDate)) return false
         return Boolean(outcome.weightsActual?.exercises?.length)
       })
-      .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
+      .sort((a, b) => outcomeSortKey(b).localeCompare(outcomeSortKey(a)))
 
     const byExercise: Record<string, LoggedSetActual[]> = {}
     for (const outcome of sorted) {
