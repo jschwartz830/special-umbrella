@@ -563,7 +563,9 @@ function DayDetailModal({
   const isComplete = status === 'past_complete' || status === 'today_complete'
   const isSkipped = status === 'past_skip' || status === 'today_skip'
   const canLog = isPast || isToday
-  const canDayOff = isToday || isFuture
+  // Past dates can also be marked Day Off — mirrors TodayPage's catch-up flow
+  // which calls markDaysAsOff for unlogged past days.
+  const canDayOff = isPast || isToday || isFuture
 
   const [detailTarget, setDetailTarget] = useState<
     | { kind: 'rotation' }
