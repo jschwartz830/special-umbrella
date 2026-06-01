@@ -1,5 +1,42 @@
 # Test Results
 
+## 2026-06-01 (forty-seventh pass) — branch `claude/dreamy-mccarthy-iQpbb`
+
+**Result: 786 passing, 0 failing** (+16 tests vs entry baseline of 770)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 770 |
+| Tests added | 16 |
+| Tests on exit | 786 |
+| Failing | 0 |
+
+### Tests reviewed
+
+All 19 test files reviewed. Highlights:
+
+- `historyStats.test.ts` — 1,544 LOC on entry; 16 new tests appended. All `computeConsecutiveSkips` edge cases covered: empty history, gaps, streak of 1 / N, complete breaks streak, day_off breaks streak, extra breaks streak, extra on skipped day, different-plan isolation, today excluded, extras from different plan don't break streak. Plus 1 new `computeWorkoutTypeBreakdown` multi-slot gap documentation test.
+- `historyStore.test.ts` — 1 new test added in `updateEntryDate` describe block documenting the no-deduplication caller contract.
+- All 17 other test files: unchanged, all passing.
+
+### Tests added / updated this pass
+
+| File | Tests added | Description |
+|------|-------------|-------------|
+| `src/lib/__tests__/historyStats.test.ts` | 15 | `computeConsecutiveSkips` full coverage suite |
+| `src/lib/__tests__/historyStats.test.ts` | 1 | `computeWorkoutTypeBreakdown` multi-slot gap (documentation test) |
+| `src/store/__tests__/historyStore.test.ts` | 1 | `updateEntryDate` coexistence / caller contract |
+
+### Areas still untested
+
+- `CalendarPage.tsx` component rendering — no React Testing Library setup exists
+- `TodayPage.tsx` component rendering — same
+- `OutcomeModal.tsx` — no render tests
+- `computeConsecutiveSkips` is not yet consumed by any component, so end-to-end nudge behavior is untested (intentional — UI wiring is a future step)
+
+---
+
 ## 2026-05-31 (forty-sixth pass) — branch `claude/dreamy-mccarthy-N2mc1`
 
 **Result: 770 passing, 0 failing** (±0 tests; all changes are UI/logic only)

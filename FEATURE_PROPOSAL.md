@@ -1,5 +1,41 @@
 # Feature Proposals
 
+## Pass 47 — 2026-06-01 (branch `claude/dreamy-mccarthy-iQpbb`)
+
+### Feature selected
+
+`computeConsecutiveSkips` — a pure library function that counts how many consecutive days a user has only logged "skip" entries for a given plan, counting backwards from yesterday.
+
+### Why it was selected
+
+This was the clearest candidate for a purely additive, zero-risk feature in this pass:
+
+- The codebase has `computePlanStreak` (consecutive completions) but no equivalent "consecutive skip" counter. This creates an asymmetry: the app can reward consistency but cannot notice or surface a concerning skip streak.
+- Implementation is trivially parallel to `computePlanStreak`: scan filtered entries into two sets (`skipDates`, `breakDates`), then walk back from `shiftDay(today, -1)`. No store changes, no component changes.
+- The function is composable with any future notification, coaching nudge, or stats surface — it produces a simple number.
+- Other feature candidates (extraction of `findPreviousSetsByExercise` into a shared utility, `programVarsMap` selector memoization) were lower-value or required more architectural surface area than appropriate for a single pass.
+
+### Expected user value
+
+- A user who keeps clicking "Skip" on workouts can be shown "You've skipped 3 in a row — want to revisit your schedule?" — friendly accountability without the app requiring it.
+- A coach or plan designer reviewing history could see skip streaks in a stats panel.
+- The function is symmetric with `computePlanStreak`, making both accessible to any future stats dashboard.
+
+### Implementation scope for this run
+
+- Modified: `src/lib/historyStats.ts` — exported `computeConsecutiveSkips` function (~30 lines)
+- Modified: `src/lib/__tests__/historyStats.test.ts` — 15 new tests
+- Not changed: any UI component, store, or router
+
+### Assumptions being made
+
+- "Today" is excluded because the user may still log today. Counting from yesterday is conservative and correct.
+- Any gap in the skip sequence (a date not in skipDates and not yet in history) stops the streak. A date with no entry at all is not a skip.
+- Extras for the same plan break the streak (completing an extra is not skipping).
+- Extras for a different plan do not break the streak (different plan's activity doesn't count against this plan's streak).
+
+---
+
 ## Pass 45 — 2026-05-30 (branch `claude/dreamy-mccarthy-mxssu`)
 
 ### Feature selected

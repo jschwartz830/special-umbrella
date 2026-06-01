@@ -1,5 +1,52 @@
 # Feature Reviews
 
+## Pass 47 — 2026-06-01 (branch `claude/dreamy-mccarthy-iQpbb`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+`computeConsecutiveSkips(planId, entries, extras, today)` in `src/lib/historyStats.ts`.
+
+```typescript
+export function computeConsecutiveSkips(
+  planId: string,
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  today: string,
+): number
+```
+
+- Builds `skipDates` (dates with `action === 'skip'` for the plan) and `breakDates` (dates with any non-skip action, or any extra for the plan).
+- Starts at `shiftDay(today, -1)` and walks backwards one day at a time.
+- Increments `count` while cursor is in `skipDates` and not in `breakDates`. Stops at first gap or break.
+- Returns the consecutive skip count; 0 means "no current skip streak."
+
+### What assumptions were encoded
+
+- **Today excluded:** The user might still log today. Starting from yesterday is correct and conservative.
+- **Gap = stop:** If a date has no entry at all, the streak resets. This prevents false "streaks" spanning unlogged periods.
+- **Extras break the streak:** Completing any extra workout for the plan counts as "not just skipping." The user is still engaged.
+- **Different-plan extras don't break the streak:** Activity on another plan is irrelevant to this plan's skip streak.
+- **day_off breaks the streak:** A day off is not a skip — it's an intentional rest.
+
+### What worked well
+
+- The two-pass Set approach (collect all skip/break dates, then walk back) is O(n) and simple to reason about.
+- Reuses `shiftDay` already present in the module — no new imports needed.
+- 15 test cases cover every semantic edge case. Test coverage is higher here than for some older functions in the same file.
+
+### What feels risky or incomplete
+
+- The function is not wired to any UI. It is useful but invisible until a component calls it.
+- The streak semantics (gaps break it) mean that a user who logs "day off" then "skip" repeatedly won't accumulate a streak. Whether "day off" should be transparent to the skip streak is a product question — the current choice (day off breaks the streak) is conservative and favors the user.
+
+### Suggested next step
+
+Wire `computeConsecutiveSkips` into TodayPage's stats bar or a banner above the action buttons: "You've skipped the last N workouts." Only show when `N >= 2`. This is a 20-line UI change, appropriate for a future overnight pass once the product direction is confirmed.
+
+---
+
 ## Pass 45 — 2026-05-30 (branch `claude/dreamy-mccarthy-mxssu`)
 
 ### Classification: **Keep**

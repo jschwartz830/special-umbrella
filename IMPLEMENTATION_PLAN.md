@@ -1,5 +1,60 @@
 # Implementation Plan
 
+## Pass 47 — 2026-06-01 (branch `claude/dreamy-mccarthy-iQpbb`)
+
+### Observations on entry
+
+- Baseline on entry: **770 passing, 0 failing** — clean exit state from pass 46.
+- Pass 46 fixed CalendarPage unstable sort, stale `now`, retroactive Day Off availability, and added outcome summary preview in DayDetailModal Level 1.
+- Full codebase audit performed (fresh read of all key modules, stores, and tests).
+
+### Key findings
+
+**Documented limitation — `computeWorkoutTypeBreakdown` only attributes `slots[0]`** (`historyStats.ts:349`):
+For rotation entries where a plan day has 2 slots (double workouts defined in the plan), only the first slot's `type` is counted in the workout-type breakdown stats. The second slot is silently unattributed. No test documents this behavior, so it could be mistaken for a bug.
+
+**Documented design — `buildProgressionRecommendation` null-effort run/swim default** (`workout-outcomes/progression.ts:22`):
+Run/swim progress check uses `outcome.perceivedEffort ?? 3`, defaulting to 3 when no effort is logged. This means: complete a run, log no effort → get a "progress" recommendation (3 ≤ 3 threshold). The high-effort regress check correctly uses `?? 0`. The asymmetry is intentional (conservative default promotes progress) but not documented via tests. Pass 40 added a swim null-effort test; no corresponding test existed for the "progress check default = 3" path directly.
+
+**Test gap — `historyStore.updateEntryDate` caller contract** (`historyStore.ts:249`):
+`updateEntryDate` mutates `calendarDate` in-place without deduplication. If a second entry already exists at the target date, both will coexist until `computeCurrentDayIndex` resolves the conflict via `createdAt`. Callers must call `removeEntry` first. Correct callers already do this (TodayPage, CalendarPage). No test documents the "what happens when target date already has an entry" behavior.
+
+**New feature — `computeConsecutiveSkips`**:
+No function exists to count consecutive skip entries for a plan. This is useful for a "you've been skipping workouts" nudge in TodayPage. The data is already available in `historyStore.entries`; only the aggregation function is missing. Adding to `historyStats.ts` as a pure utility keeps it testable and consistent with the existing stat API.
+
+### Decisions
+
+- **Test: `computeWorkoutTypeBreakdown` multi-slot** (DOCUMENTATION): Add a test documenting that only `slots[0]` type is attributed. No code change to the function.
+- **Test: `buildProgressionRecommendation` null-effort progress path** (DOCUMENTATION): Add tests covering the `perceivedEffort: null` → defaults-to-3 → progress path for run and swim slots with `completedAsPlanned: undefined`. Documents the intentional design.
+- **Test: `historyStore.updateEntryDate` coexistence scenario** (DOCUMENTATION): Add a test showing that updating to a date that already has an entry does not remove the existing entry — documents the caller contract.
+- **Feature: `computeConsecutiveSkips`** (FEATURE, low risk): New pure function in `historyStats.ts`. Counts consecutive skip-only days (complete or day_off breaks the streak) going backwards from yesterday. Exported and covered by tests. Not yet wired into any UI.
+
+### Not implemented (recommendations only)
+
+- **UI integration of `computeConsecutiveSkips` into TodayPage**: Add a nudge after 3+ consecutive skips ("You've skipped your last N workouts — still want to build the habit?"). Deferred: UI changes require browser testing, out of scope for this run.
+- **Fix `computeWorkoutTypeBreakdown` to attribute all slots**: Would require callers to pass all slot types (not just `slots[0]`) or restructure the `planDaysById` map. Change is medium-complexity and the current behavior is acceptable for a personal tracker. Documenting.
+- **`logForDate` day_off + jump interaction** (carried from pass 44): Still open. Low occurrence probability; deferred.
+- **`programVarsMap` subscription granularity** (carried from pass 44): Still open. Low impact.
+
+### Architecture summary (unchanged from pass 46)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores: `planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`. Rotation logic is pure functions in `rotationEngine.ts`. Stats are pure utilities in `historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function rotation engine with 770 tests on entry; all passing.
+- Expression evaluator handles YAML progression DSL safely (no `eval()`).
+- Strong migration patterns in historyStore (v1) and planStore (v2).
+- Consistent separation of engine / stores / modules / lib / UI layers.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,150 lines) and `CalendarPage.tsx` (~950 lines) are large; future refactors into smaller units would reduce cognitive load.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `workoutInstanceId` parsing relies on nanoid never generating `_` — holds for the current base-36 charset but would silently break if the charset changes.
+
+---
+
 ## Pass 46 — 2026-05-31 (branch `claude/dreamy-mccarthy-N2mc1`)
 
 ### Observations on entry
