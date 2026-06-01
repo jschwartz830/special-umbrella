@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -1540,5 +1540,177 @@ describe('isoWeekStart', () => {
   it('crosses a year boundary correctly', () => {
     // 2026-01-01 is a Thursday → Monday is 2025-12-29
     expect(isoWeekStart('2026-01-01')).toBe('2025-12-29')
+  })
+})
+
+// ── computeConsecutiveSkips ───────────────────────────────────────────────────
+
+function skipEntry(date: string, planId = 'plan-1'): HistoryEntry {
+  return {
+    id: `skip-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    planDayIndex: 0,
+    action: 'skip',
+    createdAt: `${date}T12:00:00Z`,
+  }
+}
+
+function completeEntryCs(date: string, planId = 'plan-1'): HistoryEntry {
+  return {
+    id: `cs-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    planDayIndex: 0,
+    action: 'complete',
+    createdAt: `${date}T12:00:00Z`,
+  }
+}
+
+function dayOffEntryCs(date: string, planId = 'plan-1'): HistoryEntry {
+  return {
+    id: `cs-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    planDayIndex: undefined,
+    action: 'day_off',
+    createdAt: `${date}T12:00:00Z`,
+  }
+}
+
+function csExtra(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+  return {
+    id: `csx-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    workoutType: 'yoga',
+    workoutName: 'Yoga',
+    createdAt: `${date}T13:00:00Z`,
+  }
+}
+
+describe('computeConsecutiveSkips', () => {
+  const TODAY = '2026-05-10'
+
+  it('returns 0 when there are no entries', () => {
+    expect(computeConsecutiveSkips('plan-1', [], [], TODAY)).toBe(0)
+  })
+
+  it('returns 0 when yesterday has no entry (gap in history)', () => {
+    // 2026-05-08 skip, but 2026-05-09 (yesterday) has no entry — streak is broken
+    const entries = [skipEntry('2026-05-08')]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(0)
+  })
+
+  it('returns 0 when yesterday was completed', () => {
+    const entries = [completeEntryCs('2026-05-09')]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(0)
+  })
+
+  it('returns 0 when yesterday was day_off', () => {
+    const entries = [dayOffEntryCs('2026-05-09')]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(0)
+  })
+
+  it('returns 0 when yesterday has an extra (no rotation entry needed)', () => {
+    const extras = [csExtra('2026-05-09')]
+    expect(computeConsecutiveSkips('plan-1', [], extras, TODAY)).toBe(0)
+  })
+
+  it('returns 1 when only yesterday was skipped', () => {
+    const entries = [skipEntry('2026-05-09')]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('returns N for N consecutive skips ending yesterday', () => {
+    const entries = [
+      skipEntry('2026-05-09'),
+      skipEntry('2026-05-08'),
+      skipEntry('2026-05-07'),
+    ]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(3)
+  })
+
+  it('stops at the first non-skip (complete breaks the streak)', () => {
+    const entries = [
+      skipEntry('2026-05-09'),
+      skipEntry('2026-05-08'),
+      completeEntryCs('2026-05-07'), // streak stops here
+      skipEntry('2026-05-06'),
+    ]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(2)
+  })
+
+  it('stops at the first non-skip (day_off breaks the streak)', () => {
+    const entries = [
+      skipEntry('2026-05-09'),
+      dayOffEntryCs('2026-05-08'),
+    ]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('stops when a day has an extra even if it also has a skip entry', () => {
+    const entries = [skipEntry('2026-05-09'), skipEntry('2026-05-08')]
+    const extras = [csExtra('2026-05-08')] // extra on 2026-05-08 breaks streak
+    expect(computeConsecutiveSkips('plan-1', entries, extras, TODAY)).toBe(1)
+  })
+
+  it('stops at a gap (day with no entry at all)', () => {
+    const entries = [
+      skipEntry('2026-05-09'),
+      // 2026-05-08 has no entry — streak breaks here
+      skipEntry('2026-05-07'),
+    ]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('does not count entries for a different plan', () => {
+    const entries = [
+      skipEntry('2026-05-09', 'plan-1'),
+      skipEntry('2026-05-08', 'plan-2'), // wrong plan — treated as a gap
+    ]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('does not include today in the count', () => {
+    // Skipping today does not affect the backward scan (starts at yesterday)
+    const entries = [
+      skipEntry(TODAY, 'plan-1'),   // today — excluded from scan
+      skipEntry('2026-05-09'),
+      skipEntry('2026-05-08'),
+    ]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(2)
+  })
+
+  it('extras for a different plan do not break the streak', () => {
+    const entries = [skipEntry('2026-05-09'), skipEntry('2026-05-08')]
+    const extras = [csExtra('2026-05-08', 'plan-2')] // different plan — irrelevant
+    expect(computeConsecutiveSkips('plan-1', entries, extras, TODAY)).toBe(2)
+  })
+})
+
+// ── computeWorkoutTypeBreakdown — multi-slot day (documented limitation) ──────
+
+describe('computeWorkoutTypeBreakdown — multi-slot plan days', () => {
+  it('attributes only the first slot type when a plan day has 2 slots', () => {
+    // Plan day 0 has a weights slot first and a run slot second.
+    // The breakdown should only count the weights type; the run is invisible.
+    const entries: HistoryEntry[] = [{
+      id: 'e1',
+      planId: 'plan-1',
+      calendarDate: '2026-05-01',
+      planDayIndex: 0,
+      action: 'complete',
+      createdAt: '2026-05-01T12:00:00Z',
+    }]
+    const multiSlotDay = new Map<number, { slots: Array<{ type: 'weights' | 'run' }> }>()
+    multiSlotDay.set(0, { slots: [{ type: 'weights' }, { type: 'run' }] })
+
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, multiSlotDay as Map<number, { slots: Array<{ type: import('../../types').WorkoutType }> }>)
+
+    // Only weights is credited — this is the documented behavior
+    expect(result.weights?.completed).toBe(1)
+    // run is not attributed because slots[0] is weights
+    expect(result.run).toBeUndefined()
   })
 })

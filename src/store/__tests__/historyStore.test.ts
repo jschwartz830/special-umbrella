@@ -373,6 +373,26 @@ describe('updateEntryDate', () => {
     expect(moved.planDayIndex).toBe(3)
     expect(moved.notes).toBe('Good run')
   })
+
+  it('coexistence: does NOT deduplicate when target date already has an entry (caller contract)', () => {
+    // updateEntryDate mutates calendarDate in-place without deduplication.
+    // Callers (TodayPage, CalendarPage) must call removeEntry(planId, newDate) first
+    // to prevent two entries for the same (planId, calendarDate).
+    //
+    // This test documents the behavior: if a caller forgets removeEntry, two entries
+    // will coexist for the target date. The rotation engine resolves the conflict via
+    // the newest-createdAt rule in computeCurrentDayIndex/getResolvedDaysRange, so
+    // the rotation output is still deterministic, but the store holds redundant data.
+    getState().addEntry(makeEntry('2026-01-01', 'complete'))      // entry to be moved
+    getState().addEntry(makeEntry('2026-01-05', 'skip'))           // pre-existing at target
+    const movedId = getState().entries.find(e => e.calendarDate === '2026-01-01')!.id
+
+    getState().updateEntryDate(movedId, '2026-01-05')
+
+    // Both entries now share calendarDate '2026-01-05' — two entries in the store
+    const at0105 = getState().entries.filter(e => e.calendarDate === '2026-01-05')
+    expect(at0105).toHaveLength(2)
+  })
 })
 
 // ── updateExtraEntryDate ──────────────────────────────────────────────────────
