@@ -474,6 +474,59 @@ export function computePlanStreak(
   return streak
 }
 
+// ── Consecutive-skip counter ─────────────────────────────────────────────────
+
+/**
+ * Count consecutive calendar days (going backwards from yesterday) where the
+ * only logged action for `planId` was `skip`.
+ *
+ * The streak breaks immediately when any of the following is encountered:
+ *   - a `complete` or `day_off` entry on that day
+ *   - any extra workout entry on that day
+ *   - a day with no entry at all
+ *
+ * Today is excluded: if the user just completed today's workout the skip streak
+ * should not be invalidated mid-day; callers typically display this before the
+ * user acts for the day.
+ *
+ * Returns 0 when yesterday has no skip entry, or when `entries` is empty.
+ */
+export function computeConsecutiveSkips(
+  planId: string,
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  today: string,
+): number {
+  // Build a set of dates that break or satisfy the skip streak.
+  const skipDates = new Set<string>()
+  const breakDates = new Set<string>()
+
+  for (const e of entries) {
+    if (e.planId !== planId) continue
+    if (e.action === 'skip') {
+      skipDates.add(e.calendarDate)
+    } else {
+      // complete or day_off — breaks the consecutive skip streak
+      breakDates.add(e.calendarDate)
+    }
+  }
+  for (const e of extras) {
+    if (e.planId === planId) breakDates.add(e.calendarDate)
+  }
+
+  let count = 0
+  let cursor = shiftDay(today, -1)
+
+  while (true) {
+    if (breakDates.has(cursor)) break   // non-skip activity stops the streak
+    if (!skipDates.has(cursor)) break   // no entry or day not in skip set stops the streak
+    count++
+    cursor = shiftDay(cursor, -1)
+  }
+
+  return count
+}
+
 // ── Per-plan-day completion counter ──────────────────────────────────────────
 
 /**
