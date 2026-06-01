@@ -1,5 +1,60 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-01 (forty-seventh pass) — branch `claude/dreamy-mccarthy-iQpbb`
+
+### Executive summary
+
+1. **What changed:** Four commits. (1) Audit documentation in `IMPLEMENTATION_PLAN.md`. (2) New pure utility function `computeConsecutiveSkips` in `historyStats.ts`. (3) 16 new tests: 15 covering the new function, 1 documenting a known multi-slot attribution gap. (4) 1 test documenting the `updateEntryDate` caller contract. No production UI or store logic was modified.
+
+2. **Highest confidence:** All four changes are either documentation or additive test/library code. The new `computeConsecutiveSkips` function is pure (no side effects, no I/O) and tested exhaustively. Test count grew from 770 → 786, all green.
+
+3. **Risky:** Nothing high-risk. The only behavioral question is whether the `computeConsecutiveSkips` semantics (today excluded, any gap breaks streak, extras break streak) match the intended product definition — see Feature Review for reasoning.
+
+4. **Review first:** Feature Review for `computeConsecutiveSkips` — verify the streak semantics before wiring it to any UI notification path.
+
+---
+
+### Biggest issues found
+
+| # | Severity | Issue | Location | Status |
+|---|---|---|---|---|
+| 1 | Low | `computeWorkoutTypeBreakdown` attributes only `slots[0]` for multi-slot plan days; second slot's type ignored | `historyStats.ts:computeWorkoutTypeBreakdown` | Documented (not fixed — product decision needed) |
+| 2 | Low | `updateEntryDate` does not deduplicate — caller must pre-remove conflicting entry | `historyStore.ts:updateEntryDate` | Documented as test + plan note |
+| 3 | Info | Null-effort progression defaults (`?? 3` for progress, `?? 0` for regress in run/swim) diverge from gym-exercise defaults | `progression.ts:buildProgressionRecommendation` | Intentional; documented in pass 40 tests |
+
+---
+
+### Improvements completed
+
+1. **`computeConsecutiveSkips`** — new pure function that counts consecutive skip-only days backward from yesterday. Enables "you've skipped N workouts" nudge without any UI wiring in this pass.
+2. **`updateEntryDate` contract test** — explicit test documents the no-deduplication invariant so future callers can't miss it.
+3. **Multi-slot breakdown test** — documents the known attribution gap as a failing-case test so the behavior is visible in the suite.
+
+---
+
+### Small feature added
+
+**`computeConsecutiveSkips` utility** (`src/lib/historyStats.ts`)
+
+- Pure function, zero dependencies beyond existing `shiftDay` helper
+- Exported from `historyStats.ts`, ready to be consumed by any component
+- 15 tests covering all edge cases including different-plan isolation and today exclusion
+- Classify: **Keep** — additive, well-tested, zero risk
+
+---
+
+### Keep / revise / do not keep
+
+| Change | Recommendation |
+|--------|----------------|
+| `computeConsecutiveSkips` implementation | Keep |
+| `computeConsecutiveSkips` tests | Keep |
+| `updateEntryDate` coexistence test | Keep |
+| Multi-slot breakdown gap test | Keep (fix attribution in a future pass) |
+| `IMPLEMENTATION_PLAN.md` audit notes | Keep |
+
+---
+
 ## 2026-05-31 (forty-sixth pass) — branch `claude/dreamy-mccarthy-N2mc1`
 
 ### Executive summary

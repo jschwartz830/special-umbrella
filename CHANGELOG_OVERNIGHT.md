@@ -1,5 +1,53 @@
 # Overnight Changelog
 
+## 2026-06-01 (forty-seventh pass) — branch `claude/dreamy-mccarthy-iQpbb`
+
+Baseline on entry: **770 passing, 0 failing**. Exit state: **786 passing, 0 failing** (+16 tests).
+
+---
+
+### 1 — docs(IMPLEMENTATION_PLAN): pass 47 audit findings
+
+**Summary:** Appended pass 47 audit section to `IMPLEMENTATION_PLAN.md`, documenting four items discovered during the codebase review: (1) multi-slot type attribution gap in `computeWorkoutTypeBreakdown`, (2) null-effort progression defaults (documented, intentional), (3) `updateEntryDate` caller contract for deduplication, and (4) the `computeConsecutiveSkips` feature decision.
+
+**Files changed:** `IMPLEMENTATION_PLAN.md`
+
+**Risks / tradeoffs:** Documentation only. No code changed.
+
+---
+
+### 2 — feat(historyStats): add `computeConsecutiveSkips` utility
+
+**Summary:** Added a new pure function `computeConsecutiveSkips(planId, entries, extras, today)` to `src/lib/historyStats.ts`. It counts how many consecutive days (working backward from yesterday) have been logged exclusively as skips with no completed, day-off, or extra-workout entries breaking the streak. Today is always excluded (it may still be logged). The result enables UI nudges like "You've skipped 3 workouts in a row."
+
+**Algorithm:** Collects `skipDates` and `breakDates` from filtered entries/extras for the given plan. Walks backward from `shiftDay(today, -1)`, incrementing while the cursor is in `skipDates` and not in `breakDates`. Stops at the first gap, break date, or start of history.
+
+**Files changed:** `src/lib/historyStats.ts`
+
+**Risks / tradeoffs:** Purely additive. No existing behavior modified. No new dependencies. The function is exported but not yet consumed by any UI component — callable whenever the feature is surfaced.
+
+---
+
+### 3 — test(historyStats): `computeConsecutiveSkips` + multi-slot breakdown
+
+**Summary:** Added 15 tests covering `computeConsecutiveSkips` (empty history, gaps, streak of N, complete/day-off/extra breaks, different-plan isolation, today excluded) and 1 documentation test covering the known `computeWorkoutTypeBreakdown` multi-slot attribution gap.
+
+**Files changed:** `src/lib/__tests__/historyStats.test.ts`
+
+**Risks / tradeoffs:** Pure test additions. No production code affected.
+
+---
+
+### 4 — test(historyStore): document `updateEntryDate` coexistence contract
+
+**Summary:** Added one test to the `updateEntryDate` describe block explicitly documenting that the function does NOT deduplicate entries on the target date — it is a caller contract that callers remove any conflicting entry before calling `updateEntryDate`. This makes the invariant machine-verifiable rather than comment-only.
+
+**Files changed:** `src/store/__tests__/historyStore.test.ts`
+
+**Risks / tradeoffs:** Pure test addition. No production code affected.
+
+---
+
 ## 2026-05-31 (forty-sixth pass) — branch `claude/dreamy-mccarthy-N2mc1`
 
 Baseline on entry: **770 passing, 0 failing**. Exit state: **770 passing, 0 failing** (no new tests; all changes are UI/logic only).
