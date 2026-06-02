@@ -499,6 +499,28 @@ describe('isPlanExpired', () => {
       const plan = makePlan(3, { duration: { type: 'rotations', value: 0 } })
       expect(isPlanExpired(plan, [], '2026-01-01')).toBe(false)
     })
+
+    it('does not count future-dated entries toward rotation completion', () => {
+      // Imported or manually-added entries with calendarDate > today must not
+      // trigger a false "plan complete" banner.
+      const plan = makePlan(2, { duration: { type: 'rotations', value: 1 } })
+      const entries = [
+        makeEntry('2026-01-01', 'complete', 0),
+        // future entry that should be excluded
+        makeEntry('2099-01-01', 'complete', 1),
+      ]
+      // Only 1 of 2 needed entries falls on or before today → not expired
+      expect(isPlanExpired(plan, entries, '2026-01-02')).toBe(false)
+    })
+
+    it('expires when all entries are on or before today', () => {
+      const plan = makePlan(2, { duration: { type: 'rotations', value: 1 } })
+      const entries = [
+        makeEntry('2026-01-01', 'complete', 0),
+        makeEntry('2026-01-02', 'complete', 1),
+      ]
+      expect(isPlanExpired(plan, entries, '2026-01-02')).toBe(true)
+    })
   })
 })
 

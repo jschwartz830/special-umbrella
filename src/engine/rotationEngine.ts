@@ -249,7 +249,7 @@ export function isPlanExpired(
   }
   if (plan.days.length === 0) return false
   const completeSkip = entries.filter(
-    e => e.planId === plan.id && (e.action === 'complete' || e.action === 'skip'),
+    e => e.planId === plan.id && e.calendarDate <= today && (e.action === 'complete' || e.action === 'skip'),
   )
   return Math.floor(completeSkip.length / plan.days.length) >= value
 }
