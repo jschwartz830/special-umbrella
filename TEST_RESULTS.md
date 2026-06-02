@@ -1,5 +1,29 @@
 # Test Results
 
+## 2026-06-02 (forty-eighth pass) — branch `claude/dreamy-mccarthy-lm1Op`
+
+**Result: 788 passing, 0 failing** (+2 tests vs entry baseline of 786)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 786 |
+| Tests added | 2 |
+| Tests on exit | 788 |
+| Failing | 0 |
+
+### Tests added this pass
+
+| File | Tests added | Description |
+|------|-------------|-------------|
+| `src/engine/__tests__/rotationEngine.test.ts` | 2 | `isPlanExpired` future-entry guard: (a) future-dated entry not counted, (b) normal expiry still fires |
+
+### All other test files
+
+All 18 other test files unchanged; all passing.
+
+---
+
 ## 2026-06-01 (forty-seventh pass) — branch `claude/dreamy-mccarthy-iQpbb`
 
 **Result: 786 passing, 0 failing** (+16 tests vs entry baseline of 770)
