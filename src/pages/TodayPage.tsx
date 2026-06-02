@@ -36,13 +36,14 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak, computeConsecutiveSkips } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
+import { outcomeSortKey } from '../lib/outcomeSortKey'
 
 type ActivityFill = 'complete' | 'day_off' | 'skip' | 'extra' | 'empty'
 
@@ -102,17 +103,6 @@ function WeeklyActivityStrip({
       })}
     </div>
   )
-}
-
-/**
- * Stable sort key for an outcome: prefer completedAt (a full ISO datetime) when
- * present; fall back to the calendarDate embedded in workoutInstanceId so that
- * outcomes logged without explicit completedAt are still sorted by workout date.
- * Using '' as the fallback would make all non-completedAt outcomes compare as
- * equal, returning whichever Object.values() iteration order happened to be first.
- */
-function outcomeSortKey(outcome: WorkoutOutcome): string {
-  return outcome.completedAt ?? parseWorkoutInstanceId(outcome.workoutInstanceId)?.calendarDate ?? ''
 }
 
 /** Find the most recent outcome with weights data for this plan (excluding today). */
@@ -297,6 +287,9 @@ export function TodayPage() {
   const stats = computeHistoryStats(planEntries, planExtras, today)
   // Plan-scoped streak (only counts days active for this plan)
   const planStreak = computePlanStreak(plan.id, planEntries, planExtras, today)
+
+  // Consecutive skips ending at today — used to show the skip nudge
+  const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
 
   // Collect recent past days with no entry — used to show the stall nudge and quick catch-up.
   const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today)
@@ -596,6 +589,22 @@ export function TodayPage() {
           >
             Mark {unloggedDates.length === 1 ? 'as' : `${unloggedDates.length} as`} Day Off
           </button>
+          <button
+            onClick={() => navigate('/calendar')}
+            className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
+          >
+            Calendar →
+          </button>
+        </div>
+      )}
+
+      {/* Consecutive skips nudge — shown when 3+ workouts in a row were skipped */}
+      {!planExpired && consecutiveSkips >= 3 && (
+        <div className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <Info size={13} className="text-amber-400 flex-shrink-0" />
+          <p className="flex-1 text-xs text-amber-300">
+            {consecutiveSkips} workout{consecutiveSkips === 1 ? '' : 's'} skipped in a row — you've got this!
+          </p>
           <button
             onClick={() => navigate('/calendar')}
             className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"

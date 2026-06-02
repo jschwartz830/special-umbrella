@@ -1,5 +1,59 @@
 # Implementation Plan
 
+## Pass 48 — 2026-06-02 (branch `claude/dreamy-mccarthy-lm1Op`)
+
+### Observations on entry
+
+- Baseline on entry: **786 passing, 0 failing** — clean exit state from pass 47.
+- Pass 47 added `computeConsecutiveSkips` (pure utility, not yet wired to UI) and 16 tests documenting known gaps.
+- Full codebase audit resumed from pass 47 carry-forward list.
+
+### Key findings
+
+**Bug — `isPlanExpired` counts future-dated entries for rotations** (`rotationEngine.ts:251`):
+The filter `e.planId === plan.id && (e.action === 'complete' || e.action === 'skip')` had no date guard. An imported or manually-entered `HistoryEntry` with `calendarDate > today` would be counted toward the rotation total, potentially triggering the "Plan complete!" banner while the plan still has future rotations to run. The `weeks`-duration branch correctly uses a date comparison and was unaffected.
+
+**UX gap — Calendar legend missing `past_unlogged` entry** (`CalendarPage.tsx`):
+Five legend items (Done, Pending, Upcoming, Day Off, Skipped) but the `past_unlogged` status (`bg-slate-800/20`) had no label, leaving users without a visual key for cells representing workouts missed without any logged action.
+
+**Code duplication — `outcomeSortKey` defined locally in both pages**:
+`TodayPage.tsx` (lines ~114–116) and `CalendarPage.tsx` (lines ~38–40) each had an identical local function. No shared utility existed; pass 46 noted this but deferred it.
+
+**Deferred feature now tractable — `computeConsecutiveSkips` wiring**:
+Pass 47 added the utility and 15 tests. The function is zero-risk to wire into TodayPage since it's pure and already tested.
+
+### Decisions
+
+- **Fix `isPlanExpired` future-entry bug** (BUG, high confidence): Add `&& e.calendarDate <= today` to the filter. Two new tests verify the fix.
+- **Add "Unlogged" to Calendar legend** (UX FIX, trivial): Additive JSX change only.
+- **Extract `outcomeSortKey` to shared lib** (REFACTOR, low risk): New file `src/lib/outcomeSortKey.ts`. Both pages updated to import from there.
+- **Wire `computeConsecutiveSkips` to TodayPage** (FEATURE, low risk): Amber nudge banner after 3+ consecutive skips, with Calendar shortcut. Suppressed when plan is expired.
+
+### Not implemented (recommendations only)
+
+- **Fix `computeWorkoutTypeBreakdown` multi-slot attribution**: Medium complexity; product decision needed (single-slot behavior is fine for current use).
+- **`logForDate` day_off + jump interaction** (carried from pass 44): Still open. Low occurrence probability.
+- **`programVarsMap` subscription granularity** (carried from pass 44): Still open. Low impact.
+
+### Architecture summary (unchanged from pass 47)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores: `planStore`, `historyStore`, `outcomeStore`, `exerciseHistoryStore`, `programStore`. Rotation logic is pure functions in `rotationEngine.ts`. Stats are pure utilities in `historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function rotation engine with 788 tests on exit; all passing.
+- Expression evaluator handles YAML progression DSL safely (no `eval()`).
+- Strong migration patterns in historyStore (v1) and planStore (v2).
+- Consistent separation of engine / stores / modules / lib / UI layers.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,150 lines) and `CalendarPage.tsx` (~950 lines) are large; future refactors into smaller units would reduce cognitive load.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `workoutInstanceId` parsing relies on nanoid never generating `_` — holds for the current base-36 charset but would silently break if the charset changes.
+
+---
+
 ## Pass 47 — 2026-06-01 (branch `claude/dreamy-mccarthy-iQpbb`)
 
 ### Observations on entry
