@@ -409,6 +409,21 @@ describe('computePlanProgress', () => {
       expect(result.completed).toBe(1)
     })
 
+    it('does not count future-dated entries toward rotation progress', () => {
+      // Regression: a future-dated entry from a CSV import should not inflate progress.
+      // 3-day plan, 2-rotation goal → needs 6 entries.
+      // 3 past entries (1 rotation done) + 1 future entry → still shows 1 rotation.
+      const plan = makePlan({ duration: { type: 'rotations', value: 2 } })
+      const entries = [
+        completeEntry('2026-01-01', 'plan-1'),
+        completeEntry('2026-01-02', 'plan-1'),
+        completeEntry('2026-01-03', 'plan-1'),
+        completeEntry('2099-01-01', 'plan-1'), // future — must be excluded
+      ]
+      const result = computePlanProgress(plan, entries, '2026-01-10')
+      expect(result.completed).toBe(1) // only 1 full rotation, not 1.33
+    })
+
     it('returns zeros for a plan with 0 days', () => {
       const plan = makePlan({ days: [], duration: { type: 'rotations', value: 4 } })
       const result = computePlanProgress(plan, [], '2026-01-10')
@@ -858,6 +873,29 @@ describe('computeRotationCycleProgress', () => {
     expect(result!.doneInCycle).toBe(0)
     expect(result!.justCompletedRotation).toBe(false)
   })
+
+  it('does not count future-dated entries when today is provided', () => {
+    // Regression: future-dated entry should not affect cycle position.
+    // 1 past entry in a 3-day cycle → doneInCycle = 1.
+    // Adding a future entry should keep doneInCycle at 1, not 2.
+    const entries: HistoryEntry[] = [
+      entry('2026-01-01', 'complete', 'plan-1'),
+      entry('2099-01-01', 'complete', 'plan-1'), // future — must be excluded
+    ]
+    const withToday = computeRotationCycleProgress(THREE_DAY_PLAN, entries, '2026-01-05')
+    expect(withToday!.doneInCycle).toBe(1)
+  })
+
+  it('includes all entries when today is omitted (backward-compatible behavior)', () => {
+    // When today is not provided, all entries (including future-dated) are counted.
+    // This preserves the pre-fix behavior for callers that don't pass today.
+    const entries: HistoryEntry[] = [
+      entry('2026-01-01', 'complete', 'plan-1'),
+      entry('2099-01-01', 'complete', 'plan-1'), // future
+    ]
+    const withoutToday = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
+    expect(withoutToday!.doneInCycle).toBe(2) // both counted when today omitted
+  })
 })
 
 // ── countPlanDayCompletions ───────────────────────────────────────────────────
@@ -1208,6 +1246,29 @@ describe('computeRotationPlanRemaining', () => {
       completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
     )
     expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(1)
+  })
+
+  it('does not count future-dated entries when today is provided', () => {
+    // Regression: future-dated entry from CSV import should not reduce remaining count.
+    // 11 past entries + 1 future = only 11 should count → 1 remaining.
+    const entries = [
+      ...Array.from({ length: 11 }, (_, i) =>
+        completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
+      ),
+      completeEntry('2099-01-01'), // future — must be excluded
+    ]
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries, '2026-01-15')).toBe(1)
+  })
+
+  it('includes all entries when today is omitted (backward-compatible behavior)', () => {
+    // When today is not provided, all entries are counted.
+    const entries = [
+      ...Array.from({ length: 11 }, (_, i) =>
+        completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
+      ),
+      completeEntry('2099-01-01'), // future
+    ]
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(0) // 12 counted → done
   })
 })
 
