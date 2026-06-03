@@ -1,5 +1,46 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-02 (forty-eighth pass) — branch `claude/dreamy-mccarthy-lm1Op`
+
+### Executive summary
+
+1. **What changed:** Four commits. (1) Refactor: extracted `outcomeSortKey` to shared lib, eliminating code duplication across TodayPage and CalendarPage. (2) Fix: added missing "Unlogged" entry to the Calendar legend. (3) Feature: wired `computeConsecutiveSkips` into TodayPage — amber nudge banner after 3+ consecutive skips. (4) Bug fix: `isPlanExpired` for rotations no longer counts future-dated entries, preventing false "Plan complete!" banners.
+
+2. **Highest confidence:** All four changes are targeted and individually testable. `isPlanExpired` fix is the highest-value correctness change; the skip nudge is the highest-value UX change.
+
+3. **Risky:** Nothing high-risk. The `isPlanExpired` fix changes behavior only for plans where history entries with future `calendarDate` exist — that only happens via import or manual data entry, not from normal app usage.
+
+4. **Review first:** The skip nudge threshold (3) is a product decision. If 3 is too aggressive (appears too early) or too lenient, adjust the constant in TodayPage.
+
+---
+
+### Biggest issues found and fixed this pass
+
+| # | Severity | Issue | Location | Status |
+|---|---|---|---|---|
+| 1 | Medium | `isPlanExpired` counted future-dated entries for rotations plans → false "Plan complete!" | `rotationEngine.ts:isPlanExpired` | **Fixed** |
+| 2 | Low | Calendar legend missing "Unlogged" state | `CalendarPage.tsx` | **Fixed** |
+| 3 | Low | `computeConsecutiveSkips` existed but was never shown to the user | `historyStats.ts` | **Fixed** (wired to UI) |
+| 4 | Info | `outcomeSortKey` duplicated in TodayPage and CalendarPage | both pages | **Fixed** (extracted to lib) |
+
+---
+
+### Carried-forward open items
+
+| # | Severity | Issue | Status |
+|---|---|---|---|
+| 1 | Low | `computeWorkoutTypeBreakdown` attributes only `slots[0]` | Documented; product decision needed |
+| 2 | Low | `logForDate` day_off + jump interaction | Deferred (low occurrence) |
+| 3 | Info | `programVarsMap` subscription granularity | Deferred (low impact) |
+
+---
+
+### Tests: 786 → 788 (+2)
+
+- `rotationEngine.test.ts`: 2 new tests for `isPlanExpired` future-entry guard
+
+---
+
 ## 2026-06-01 (forty-seventh pass) — branch `claude/dreamy-mccarthy-iQpbb`
 
 ### Executive summary

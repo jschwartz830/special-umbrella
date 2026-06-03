@@ -1,5 +1,51 @@
 # Overnight Changelog
 
+## 2026-06-02 (forty-eighth pass) — branch `claude/dreamy-mccarthy-lm1Op`
+
+Baseline on entry: **786 passing, 0 failing**. Exit state: **788 passing, 0 failing** (+2 tests).
+
+---
+
+### 1 — refactor: extract `outcomeSortKey` to shared lib
+
+**Summary:** Both `TodayPage.tsx` and `CalendarPage.tsx` had identical local definitions of `outcomeSortKey`. Extracted to `src/lib/outcomeSortKey.ts` and updated both files to import from the shared module.
+
+**Files changed:** `src/lib/outcomeSortKey.ts` (new), `src/pages/TodayPage.tsx`, `src/pages/CalendarPage.tsx`
+
+**Risks / tradeoffs:** Pure refactor. No behavior change; same function in both call sites. `CalendarPage` no longer imports `parseWorkoutInstanceId` directly (it was only needed by the removed local function). `TodayPage` retains the import because it uses `parseWorkoutInstanceId` at line 317 for `prevSessionDate`.
+
+---
+
+### 2 — fix: add Unlogged entry to Calendar legend
+
+**Summary:** The Calendar legend listed Done, Pending, Upcoming, Day Off, and Skipped but was missing an entry for `past_unlogged` cells. These cells render as `bg-slate-800/20 text-slate-600` with no key in the legend. Added "Unlogged" item between Pending and Upcoming.
+
+**Files changed:** `src/pages/CalendarPage.tsx`
+
+**Risks / tradeoffs:** UI-only additive change. No logic modified.
+
+---
+
+### 3 — feat: show skip nudge banner after 3+ consecutive skipped workouts
+
+**Summary:** Wired `computeConsecutiveSkips` (added in pass 47, previously un-consumed) into `TodayPage`. When `consecutiveSkips >= 3`, an amber banner appears below the activity strip reading "N workouts skipped in a row — you've got this!" with a Calendar shortcut link. Banner is suppressed when the plan is expired.
+
+**Files changed:** `src/pages/TodayPage.tsx`
+
+**Risks / tradeoffs:** Additive UI change. The `computeConsecutiveSkips` function is already fully tested (15 tests in historyStats.test.ts). The 3-skip threshold is configurable via code; no magic constant elsewhere.
+
+---
+
+### 4 — fix: exclude future-dated entries from `isPlanExpired` rotation check
+
+**Summary:** `isPlanExpired` for `rotations`-duration plans was counting all entries with matching `planId` regardless of `calendarDate`. An imported or manually-added entry with `calendarDate > today` could prematurely trigger the "Plan complete!" banner. Added `&& e.calendarDate <= today` to the filter.
+
+**Files changed:** `src/engine/rotationEngine.ts`, `src/engine/__tests__/rotationEngine.test.ts`
+
+**Risks / tradeoffs:** The fix is targeted; only the future-entry guard was missing. `weeks`-duration plans use a date comparison and were never affected. Two new tests: one verifying that a future-dated completion is not counted, one confirming the normal expiry still fires when all entries are on or before today.
+
+---
+
 ## 2026-06-01 (forty-seventh pass) — branch `claude/dreamy-mccarthy-iQpbb`
 
 Baseline on entry: **770 passing, 0 failing**. Exit state: **786 passing, 0 failing** (+16 tests).
