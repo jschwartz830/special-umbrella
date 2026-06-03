@@ -124,6 +124,14 @@ export function PlansPage() {
                   </span>
                 )}
               </p>
+              {progress.total > 0 && progress.percentComplete > 0 && (
+                <div className="mt-2 h-1 w-full bg-slate-700/60 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${expired ? 'bg-emerald-500' : 'bg-sky-500'}`}
+                    style={{ width: `${progress.percentComplete}%` }}
+                  />
+                </div>
+              )}
             </div>
             <ChevronRight size={16} className="text-slate-500 flex-shrink-0 mt-0.5" />
           </div>
