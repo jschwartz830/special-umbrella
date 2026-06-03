@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO, addDays } from 'date-fns'
+import { useToday } from '../hooks/useToday'
 import {
   CheckCircle2,
   SkipForward,
@@ -137,7 +138,7 @@ export function HistoryPage() {
     return b.sortKey.localeCompare(a.sortKey)
   }), [filteredEntries, filteredExtras])
 
-  const todayKey = format(new Date(), 'yyyy-MM-dd')
+  const todayKey = useToday()
   const stats = computeHistoryStats(filteredEntries, filteredExtras, todayKey)
 
   // Count completed workouts by type for the training-mix summary row.

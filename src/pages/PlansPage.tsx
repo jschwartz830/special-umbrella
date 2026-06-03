@@ -12,6 +12,7 @@ import {
   FileCode,
 } from 'lucide-react'
 import { format } from 'date-fns'
+import { useToday } from '../hooks/useToday'
 import { usePlanStore } from '../store/planStore'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore } from '../store/outcomeStore'
@@ -40,7 +41,7 @@ export function PlansPage() {
   const clearVars = useProgramStore(s => s.clearPlanVars)
   const clearExerciseHistory = useExerciseHistoryStore(s => s.clearByPlanId)
   const entries = useHistoryStore(s => s.entries)
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = useToday()
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [activatingPlan, setActivatingPlan] = useState<Plan | null>(null)

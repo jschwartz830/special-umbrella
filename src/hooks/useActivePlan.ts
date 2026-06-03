@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { format } from 'date-fns'
 import { usePlanStore } from '../store/planStore'
 import { useHistoryStore } from '../store/historyStore'
 import { getTodayResolvedDay, getUpcomingDays } from '../engine/rotationEngine'
+import { useToday } from './useToday'
 import type { ResolvedDay } from '../types'
 
 export function useActivePlan() {
@@ -11,7 +11,7 @@ export function useActivePlan() {
   const entries = useHistoryStore(s => s.entries)
   const overrides = useHistoryStore(s => s.overrides)
 
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = useToday()
   const plan = activePlanId ? plans[activePlanId] ?? null : null
 
   const planEntries = useMemo(
