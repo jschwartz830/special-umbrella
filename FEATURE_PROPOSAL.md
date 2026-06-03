@@ -1,5 +1,61 @@
 # Feature Proposals
 
+## Pass 49 — 2026-06-03 (branch `claude/dreamy-mccarthy-yJLmG`)
+
+### Feature selected
+
+**Visual progress bar on plan cards (PlansPage)**
+
+### Why it was selected
+
+- The progress fraction text (`2/4 done (50%)`) was already computed and displayed — the bar is zero additional logic
+- Improves scannability: users with 3–5 plans benefit from a visual indicator without needing to parse numbers
+- Narrowest viable slice: single `div` with dynamic width, no new components, no store changes
+- Low risk of regression: purely additive JSX inside a non-interactive `PlanCard` render path
+
+### Expected user value
+
+When reviewing multiple plans (active, inactive, archived), a user can scan their progress at a glance instead of parsing fractions. The color distinction (sky → complete state) gives immediate context without text.
+
+### Implementation scope for this run
+
+- Single `div` progress bar inside `PlanCard` in `PlansPage.tsx`
+- Uses existing `progress.percentComplete` value (already computed just above)
+- Width driven by `style={{ width: '${pct}%' }}` (standard Tailwind dynamic width pattern)
+- Visible only when `percentComplete > 0`
+
+### Assumptions
+
+- The `progress.percentComplete` value is correct for both `weeks` and `rotations` duration types (verified — it is, and it's now also guarded against future-dated entries after the fix in this pass)
+- No accessibility requirement to add `aria-valuenow`/`aria-valuemax` (progress bar is decorative; the numeric text is still present)
+
+### Open product / UX decisions
+
+- Should archived plans show the bar? Currently they do. If the intent is "show progress only for plans you're actively tracking," add `!isArchived &&` to the condition.
+- Height: currently `h-1` (4px). Could be `h-0.5` (2px) for more subtle or `h-1.5` (6px) for more prominent.
+- Color for partially-complete plans: currently sky-500. Could use a gradient or match the active plan accent color.
+
+### Architecture / schema impact
+
+None. No new store fields, no new hooks, no new files.
+
+### Risks
+
+Negligible. Inline style is needed for dynamic width in Tailwind (standard pattern). The bar renders inside a `<button>` tag which is fine for nested `<div>` elements.
+
+### Rollback strategy
+
+`git revert d2ad6a5`. Single commit, zero data impact, no store changes.
+
+### What is intentionally not being built yet
+
+- A detailed progress breakdown modal (e.g. "X workouts done this week")
+- Animated fill on mount
+- Per-week tick marks
+- Historical completion rate graph
+
+---
+
 ## Pass 47 — 2026-06-01 (branch `claude/dreamy-mccarthy-iQpbb`)
 
 ### Feature selected

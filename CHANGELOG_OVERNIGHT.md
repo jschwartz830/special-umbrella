@@ -1,5 +1,74 @@
 # Overnight Changelog
 
+## 2026-06-03 (forty-ninth pass) — branch `claude/dreamy-mccarthy-yJLmG`
+
+Baseline on entry: **788 passing, 0 failing**. Exit state: **793 passing, 0 failing** (+5 tests).
+
+---
+
+### 1 — fix: exclude future-dated entries from rotation stats; use useToday() in pages
+
+**commit:** ef1b0e3
+
+Three rotation stats functions counted all complete/skip entries regardless of date.
+A future-dated entry (e.g. from a CSV import) would inflate rotation progress — same
+class as the `isPlanExpired` bug fixed in pass 48.
+
+- `computePlanProgress` (rotations branch): add `e.calendarDate <= today` guard
+- `computeRotationCycleProgress`: add optional `today` param + date guard
+- `computeRotationPlanRemaining`: add optional `today` param + date guard
+- TodayPage: pass `today` to both call sites
+
+Also replaced `format(new Date(), 'yyyy-MM-dd')` with `useToday()` in
+`useActivePlan`, `HistoryPage`, and `PlansPage` — the `useToday()` hook was created
+for exactly this purpose (auto-refresh at midnight); the inline form can be stale.
+
+**Files:** `src/lib/historyStats.ts`, `src/pages/TodayPage.tsx`,
+`src/hooks/useActivePlan.ts`, `src/pages/HistoryPage.tsx`, `src/pages/PlansPage.tsx`
+
+**Risks:** `computeRotationCycleProgress`/`computeRotationPlanRemaining` now accept
+an optional `today` — backward-compatible (callers without `today` get old behavior).
+`useToday()` adds one `useState`/`useEffect` per consumer; negligible performance cost.
+
+**Rollback:** `git revert ef1b0e3`. Bug only manifests when future-dated entries exist.
+
+---
+
+### 2 — test: future-date guard regression tests for rotation stats
+
+**commit:** 4813361
+
+5 new regression tests covering the guards added in commit ef1b0e3:
+- `computePlanProgress`: future entry excluded when `today` provided
+- `computeRotationCycleProgress`: future excluded; backward-compat when `today` omitted
+- `computeRotationPlanRemaining`: future excluded; backward-compat when `today` omitted
+
+**Files:** `src/lib/__tests__/historyStats.test.ts`
+
+**Risks:** None — purely additive tests.
+
+---
+
+### 3 — feat: visual progress bar on plan cards (PlansPage)
+
+**commit:** d2ad6a5
+
+Added a thin (1px) progress bar beneath the existing `completed/total` text on each plan
+card. Sky blue while in progress; emerald green when the plan is expired/complete. Only
+shown when `percentComplete > 0` (new unstarted plans don't show an empty bar).
+
+The bar makes completion state scannable at a glance without reading fractions — especially
+useful when managing multiple plans.
+
+**Files:** `src/pages/PlansPage.tsx` (8 lines added)
+
+**Risks:** Inline `style={{ width }}` for dynamic fill (standard Tailwind pattern).
+Purely additive; no data or logic changes.
+
+**Rollback:** `git revert d2ad6a5`. Zero data impact.
+
+---
+
 ## 2026-06-02 (forty-eighth pass) — branch `claude/dreamy-mccarthy-lm1Op`
 
 Baseline on entry: **786 passing, 0 failing**. Exit state: **788 passing, 0 failing** (+2 tests).

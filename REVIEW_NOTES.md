@@ -1,5 +1,108 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-03 (forty-ninth pass) — branch `claude/dreamy-mccarthy-yJLmG`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Bug fix (×3 functions + ×3 stale-date pages): rotation stats now exclude future-dated entries; `useToday()` used consistently in all pages. (2) Tests: 5 regression tests covering the fixed functions. (3) Feature: visual progress bar on plan cards.
+
+2. **Highest confidence:** The stats bug fixes are high-confidence — identical guard to the `isPlanExpired` fix from pass 48 applied to three sibling functions that were missed. The `useToday()` change is similarly safe (hook already used in TodayPage/CalendarPage). The progress bar is additive JSX only.
+
+3. **Risky:** Nothing high-risk this pass. The optional `today` parameter on `computeRotationCycleProgress`/`computeRotationPlanRemaining` is backward-compatible; existing call sites that don't pass it keep the old behavior.
+
+4. **Review first:** The rotation stats fix (`historyStats.ts`) — it's the only logic change. Check the filter line in the rotations branch of `computePlanProgress` and the new `today` guards in the other two functions.
+
+---
+
+### Biggest issues found
+
+**Bug (fixed): `computePlanProgress` rotations branch — future-dated entries inflated rotation count**
+`src/lib/historyStats.ts:127` — filtered only by `planId` and `action`, not `calendarDate`. A CSV-imported entry with a future date would count toward completed rotations. Added `&& e.calendarDate <= today` (the `today` param was already in the signature but unused in this branch).
+
+**Bug (fixed): `computeRotationCycleProgress` — no date guard, no `today` param**
+Same class as above. Could show a spurious "rotation complete!" banner on TodayPage when future-dated entries pushed `doneInCycle` to 0. Added optional `today` parameter and date guard.
+
+**Bug (fixed): `computeRotationPlanRemaining` — no date guard, no `today` param**
+Same class. Could show fewer remaining workouts than actually exist. Added optional `today` and date guard.
+
+**Bug (fixed): `useActivePlan`, `HistoryPage`, `PlansPage` — stale `today` across midnight**
+All three used `format(new Date(), 'yyyy-MM-dd')` inline. If the component doesn't re-render after midnight, these would use yesterday's date. Replaced with `useToday()` which auto-refreshes via `setTimeout`.
+
+---
+
+### Improvements completed
+
+| # | Type | Description |
+|---|------|-------------|
+| 1 | Bug fix | `computePlanProgress` rotations branch: exclude future-dated entries |
+| 2 | Bug fix | `computeRotationCycleProgress`: add `today` param + date guard |
+| 3 | Bug fix | `computeRotationPlanRemaining`: add `today` param + date guard |
+| 4 | Bug fix | `useActivePlan`: replace inline date with `useToday()` |
+| 5 | Bug fix | `HistoryPage`: replace inline date with `useToday()` |
+| 6 | Bug fix | `PlansPage`: replace inline date with `useToday()` |
+| 7 | Tests | 5 regression tests for future-date guards |
+| 8 | Feature | Visual progress bar on plan cards (PlansPage) |
+
+---
+
+### Small feature added
+
+**Plan progress bar (PlansPage)**
+The progress fraction text (`2/4 done (50%)`) was already shown; this adds a thin colored bar beneath it. Sky blue while in progress, emerald green when complete. Only visible when `percentComplete > 0`. Purely additive — no store or logic changes.
+
+---
+
+### Definitely keep
+
+- All bug fixes (commits ef1b0e3 and 4813361)
+- The regression tests (commit 4813361)
+
+### Probably keep but tweak
+
+- The progress bar (commit d2ad6a5) — works correctly but you may prefer a different height, color, or positioning. Easy to adjust in `PlansPage.tsx` around line 130.
+
+### Do not keep
+
+- Nothing to reject this pass.
+
+### Recommendations only (not implemented)
+
+**`computeWorkoutTypeBreakdown` multi-slot attribution** (carried from pass 47):
+For plan days with two slots, only `slots[0]` type is attributed in the workout-type breakdown. This is a known documented limitation. Fixing it requires passing all slot types to the function — medium complexity, product decision needed.
+
+**`logForDate` day_off + jump interaction** (carried from pass 44):
+In CalendarPage's retroactive logging flow, logging a `day_off` on a date that has an existing `jump` override may leave a stale jump. Low occurrence probability; deferred.
+
+**`programVarsMap` subscription granularity** (carried from pass 44):
+TodayPage subscribes to the entire `programVarsMap` when it only needs vars for the active plan. Low impact in practice (map is small); could be addressed with a selector.
+
+**`outcomeStore` cross-store coupling**:
+`logOutcomeWithProgression` reaches into `planStore`, `historyStore`, and `exerciseHistoryStore`. This makes unit testing the outcome store in isolation difficult. Refactoring would require extracting the cross-store calls to a layer above the stores (e.g., a service function called from the component). Medium complexity.
+
+---
+
+### Open questions
+
+1. The optional `today` parameter on `computeRotationCycleProgress`/`computeRotationPlanRemaining` — should it be required? Making it optional preserves backward compatibility for any tests or callers that don't pass it, but requiring it would make the contract more explicit. The current approach is safe since the functions are only called from TodayPage.
+
+2. Should the progress bar on PlansPage also show for archived plans? Currently it does (since it's inside `PlanCard` which renders all statuses). If you'd prefer it only for active plans, add `isActive &&` to the condition.
+
+3. The `computeWeeklyBreakdown` function on HistoryPage uses `addDays(new Date(), -55)` which is also susceptible to the stale-date issue across midnight. Lower priority since History is mostly retrospective, but worth noting.
+
+---
+
+### Known issues or incomplete work
+
+- `computeWeeklyBreakdown` call in HistoryPage still uses `addDays(new Date(), -55)` for the window start — same stale-date pattern, lower priority than the stats functions. Added to carry-forward list for pass 50.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-06-02 (forty-eighth pass) — branch `claude/dreamy-mccarthy-lm1Op`
 
 ### Executive summary

@@ -1,5 +1,51 @@
 # Feature Reviews
 
+## Pass 49 — 2026-06-03 (branch `claude/dreamy-mccarthy-yJLmG`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+A thin progress bar inside `PlanCard` in `src/pages/PlansPage.tsx`. Sky-500 fill while
+in progress; emerald-500 when the plan is expired/complete. Only visible when
+`percentComplete > 0`. 8 lines of JSX added, nothing else changed.
+
+### What assumptions were encoded
+
+- Progress bar is decorative; numeric text remains for accessibility
+- `percentComplete` from `computePlanProgress` is correct (verified + fixed this pass)
+- No `aria-*` attributes needed since numeric text is still present
+
+### What worked well
+
+- The `progress.percentComplete` value was already computed immediately above the bar in
+  the render path — zero additional logic needed
+- `expired` is also already computed, so the color switch (sky → emerald) is free
+
+### What feels risky or incomplete
+
+- The bar is inside a `<button>` element. This is valid HTML (div inside button) but
+  worth noting in case any browser accessibility tooling flags it
+- No explicit ARIA role (`progressbar`) — the bar is visually informative but not
+  announced to screen readers as a progress element
+
+### What I should evaluate tomorrow
+
+- Does the bar render correctly on all plan types (weeks, rotations, archived)?
+- Does it look visually balanced when the plan has 0 progress vs near-complete vs 100%?
+- Is the `h-1` height (4px) appropriate or should it be thinner/thicker?
+- Should archived plans show progress (currently they do)?
+
+### Recommended next steps
+
+If keeping: no changes needed.
+
+If tweaking: adjust height (`h-0.5`, `h-1`, `h-1.5`), color, or visibility condition.
+
+### Keep / revise / prototype only / reject: **Keep**
+
+---
+
 ## Pass 47 — 2026-06-01 (branch `claude/dreamy-mccarthy-iQpbb`)
 
 ### Classification: **Keep**

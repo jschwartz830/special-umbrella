@@ -1,5 +1,47 @@
 # Test Results
 
+## 2026-06-03 (forty-ninth pass) — branch `claude/dreamy-mccarthy-yJLmG`
+
+**Result: 793 passing, 0 failing** (+5 tests vs entry baseline of 788)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 788 |
+| Tests added | 5 |
+| Tests on exit | 793 |
+| Failing | 0 |
+
+### Tests added this pass
+
+All 5 tests in `src/lib/__tests__/historyStats.test.ts`:
+
+| Test | Function | Purpose |
+|------|----------|---------|
+| `does not count future-dated entries toward rotation progress` | `computePlanProgress` | Regression guard: future entry excluded when `today` provided |
+| `does not count future-dated entries when today is provided` | `computeRotationCycleProgress` | Regression guard: future entry excluded when `today` provided |
+| `includes all entries when today is omitted (backward-compatible behavior)` | `computeRotationCycleProgress` | Documents that callers without `today` get old behavior |
+| `does not count future-dated entries when today is provided` | `computeRotationPlanRemaining` | Regression guard: future entry excluded when `today` provided |
+| `includes all entries when today is omitted (backward-compatible behavior)` | `computeRotationPlanRemaining` | Documents backward-compat when `today` omitted |
+
+### Tests reviewed
+
+All 19 test files reviewed on entry. Notable coverage:
+- `rotationEngine.test.ts`: 44 tests covering all rotation engine functions; clean
+- `historyStats.test.ts`: 152 tests (now 157); comprehensive coverage of all stats functions
+- `historyStore.test.ts`: strong coverage of store mutations and migration
+- `planDeleteCleanup.test.ts`: integration-style cleanup cascade tests
+- `outcomeStore.test.ts`, `planStore.test.ts`: good store-level coverage
+
+### Important areas still untested
+
+- `computeWeeklyBreakdown`: call in HistoryPage uses `addDays(new Date(), -55)` which is stale past midnight — minor, lower priority
+- `computeWorkoutTypeBreakdown` multi-slot attribution: documented limitation, test added in pass 47 but function not changed
+- UI behavior of progress bar (PlansPage): not unit testable; requires browser testing
+- `useActivePlan` midnight refresh with `useToday()`: hook behavior is tested indirectly via component renders but there's no dedicated test for the `useToday()` midnight refresh
+
+---
+
 ## 2026-06-02 (forty-eighth pass) — branch `claude/dreamy-mccarthy-lm1Op`
 
 **Result: 788 passing, 0 failing** (+2 tests vs entry baseline of 786)
