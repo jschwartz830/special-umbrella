@@ -125,7 +125,7 @@ export function computePlanProgress(
     completed = Math.min(weeksElapsed, total)
   } else {
     const planEntries = entries.filter(
-      e => e.planId === plan.id && (e.action === 'complete' || e.action === 'skip'),
+      e => e.planId === plan.id && e.calendarDate <= today && (e.action === 'complete' || e.action === 'skip'),
     )
     const rotationsFinished = Math.floor(planEntries.length / plan.days.length)
     completed = Math.min(rotationsFinished, total)
@@ -159,11 +159,14 @@ export interface RotationCycleProgress {
 export function computeRotationCycleProgress(
   plan: Plan,
   entries: HistoryEntry[],
+  today?: string,
 ): RotationCycleProgress | null {
   if (plan.duration.type !== 'rotations' || plan.days.length === 0) return null
 
   const planEntries = entries.filter(
-    e => e.planId === plan.id && (e.action === 'complete' || e.action === 'skip'),
+    e => e.planId === plan.id &&
+      (today === undefined || e.calendarDate <= today) &&
+      (e.action === 'complete' || e.action === 'skip'),
   )
   const totalDone = planEntries.length
   const rotationLength = plan.days.length
@@ -193,6 +196,7 @@ export function computeRotationCycleProgress(
 export function computeRotationPlanRemaining(
   plan: Plan,
   entries: HistoryEntry[],
+  today?: string,
 ): number | null {
   if (
     plan.duration.type !== 'rotations' ||
@@ -202,7 +206,9 @@ export function computeRotationPlanRemaining(
 
   const totalNeeded = plan.duration.value * plan.days.length
   const done = entries.filter(
-    e => e.planId === plan.id && (e.action === 'complete' || e.action === 'skip'),
+    e => e.planId === plan.id &&
+      (today === undefined || e.calendarDate <= today) &&
+      (e.action === 'complete' || e.action === 'skip'),
   ).length
   return Math.max(0, totalNeeded - done)
 }

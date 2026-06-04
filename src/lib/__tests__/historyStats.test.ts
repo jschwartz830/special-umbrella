@@ -397,6 +397,18 @@ describe('computePlanProgress', () => {
       expect(result.percentComplete).toBe(100)
     })
 
+    it('excludes future-dated entries (consistent with isPlanExpired)', () => {
+      // Only 2 of 3 needed entries fall on or before today; future entry must not count.
+      const plan = makePlan({ duration: { type: 'rotations', value: 1 } })
+      const entries = [
+        completeEntry('2026-01-01'),
+        completeEntry('2026-01-02'),
+        completeEntry('2099-12-31'), // future — must be excluded
+      ]
+      const result = computePlanProgress(plan, entries, '2026-01-05')
+      expect(result.completed).toBe(0) // 2 of 3 needed — still 0 full rotations
+    })
+
     it('only counts entries for this plan (ignores other plans)', () => {
       const plan = makePlan({ duration: { type: 'rotations', value: 4 } })
       const entries = [
@@ -858,6 +870,25 @@ describe('computeRotationCycleProgress', () => {
     expect(result!.doneInCycle).toBe(0)
     expect(result!.justCompletedRotation).toBe(false)
   })
+
+  it('excludes future-dated entries when today is provided', () => {
+    const entries = [
+      entry('2026-01-01', 'complete'),
+      entry('2099-06-01', 'complete'), // future — must not count
+    ]
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries, '2026-01-05')
+    expect(result!.doneInCycle).toBe(1)
+    expect(result!.remaining).toBe(2)
+  })
+
+  it('includes all entries when today is omitted (backward-compatible)', () => {
+    const entries = [
+      entry('2026-01-01', 'complete'),
+      entry('2099-06-01', 'complete'),
+    ]
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
+    expect(result!.doneInCycle).toBe(2)
+  })
 })
 
 // ── countPlanDayCompletions ───────────────────────────────────────────────────
@@ -1208,6 +1239,25 @@ describe('computeRotationPlanRemaining', () => {
       completeEntry(`2026-01-${String(i + 1).padStart(2, '0')}`),
     )
     expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(1)
+  })
+
+  it('excludes future-dated entries when today is provided', () => {
+    const entries = [
+      completeEntry('2026-01-01'),
+      completeEntry('2026-01-02'),
+      completeEntry('2099-12-31'), // future — must not count
+    ]
+    // 12 needed - 2 valid = 10
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries, '2026-01-05')).toBe(10)
+  })
+
+  it('includes all entries when today is omitted (backward-compatible)', () => {
+    const entries = [
+      completeEntry('2026-01-01'),
+      completeEntry('2099-12-31'),
+    ]
+    // All 2 entries counted → 12 - 2 = 10
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(10)
   })
 })
 

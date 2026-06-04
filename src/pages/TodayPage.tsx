@@ -295,12 +295,12 @@ export function TodayPage() {
   const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today)
 
   // Rotation cycle progress — for rotations-duration plans only
-  const cycleProgress = computeRotationCycleProgress(plan, planEntries)
+  const cycleProgress = computeRotationCycleProgress(plan, planEntries, today)
 
   // Total workouts remaining to finish the whole plan (rotations plans only).
   // Shown only in the final rotation so it doesn't clutter the header during
   // earlier phases.
-  const rotationPlanRemaining = computeRotationPlanRemaining(plan, planEntries)
+  const rotationPlanRemaining = computeRotationPlanRemaining(plan, planEntries, today)
 
   // Week progress — for weeks-duration plans only (null for rotations plans)
   const weekProgress = plan.duration.type === 'weeks'
