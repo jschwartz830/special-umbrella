@@ -1,5 +1,38 @@
 # Test Results
 
+## 2026-06-04 (forty-ninth pass) — branch `claude/dreamy-mccarthy-WovqU`
+
+**Result: 793 passing, 0 failing** (+5 tests vs entry baseline of 788)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 788 |
+| Tests on exit | 793 |
+| New tests | 5 |
+| Failing tests | 0 |
+
+### Tests added
+
+**`src/lib/__tests__/historyStats.test.ts`** — 5 new tests:
+
+| Test | Description |
+|------|-------------|
+| `computePlanProgress > rotations > excludes future-dated entries` | Verifies `calendarDate <= today` guard on the rotations branch |
+| `computeRotationCycleProgress > excludes future-dated entries when today is provided` | Verifies the new `today` param filter |
+| `computeRotationCycleProgress > includes all entries when today is omitted (backward-compatible)` | Confirms the optional param preserves existing behavior |
+| `computeRotationPlanRemaining > excludes future-dated entries when today is provided` | Verifies the new `today` param filter |
+| `computeRotationPlanRemaining > includes all entries when today is omitted (backward-compatible)` | Confirms the optional param preserves existing behavior |
+
+### Areas still untested
+
+- `DayDetailModal` render-phase state call (integration test would require React Testing Library setup)
+- `logForDate` day_off + jump interaction (carry-forward from pass 44)
+- `computeWorkoutTypeBreakdown` multi-slot attribution behavior (documented gap, carry-forward from pass 47)
+- TodayPage `rotationProgress` UI rendering (UI-level; no component tests exist today)
+
+---
+
 ## 2026-06-02 (forty-eighth pass) — branch `claude/dreamy-mccarthy-lm1Op`
 
 **Result: 788 passing, 0 failing** (+2 tests vs entry baseline of 786)

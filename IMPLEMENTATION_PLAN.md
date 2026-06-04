@@ -1,5 +1,70 @@
 # Implementation Plan
 
+## Pass 49 — 2026-06-04 (branch `claude/dreamy-mccarthy-WovqU`)
+
+### Observations on entry
+
+- Baseline on entry: **788 passing, 0 failing** — clean exit state from pass 48.
+- Pass 48 fixed `isPlanExpired` future-entry guard, extracted `outcomeSortKey`, wired `computeConsecutiveSkips` to TodayPage.
+- Full codebase audit performed: all source files, all tests, all stores, both key pages.
+
+### Key findings
+
+**Bug — `computePlanProgress` (rotations), `computeRotationCycleProgress`, `computeRotationPlanRemaining` all miss the future-entry filter**
+Pass 48 fixed `isPlanExpired` with `e.calendarDate <= today` but left these three utility functions unpatched. A CSV import with `calendarDate > today` would:
+- Show the wrong rotation number in the cycle bar (inflated `doneInCycle`)
+- Show artificially low `rotationPlanRemaining`
+- Show inflated `computePlanProgress.completed` for rotations plans
+
+This is a direct inconsistency with the now-correct `isPlanExpired`. Low occurrence in practice but creates confusing UI when it happens.
+
+**UX gap — No "Rotation X of Y" overview for multi-rotation plans**
+For weeks-based plans, TodayPage shows "Week 3 of 8" in the header subtext. For rotations-based plans, only within-cycle detail (`3/7 done`, `last one!`) and end-of-plan hints (`2 left to finish`) are shown; there is no "you are in rotation 2 of 4" context. Users tracking a 4-rotation plan cannot tell which rotation they are in without mental arithmetic from the cycle bar.
+
+**Audit finding — `DayDetailModal` calls parent state setter during render (line 729)**
+`setDetailTarget(null)` is called when the selected extra can't be found mid-render. This pattern (own-component state update during render) works in React but triggers a strict-mode warning in development. Not user-visible; low priority.
+
+**Audit finding — `WorkoutType` has two synonymous string values: `'weights'` and `'weightlifting'`**
+`WORKOUT_TYPES` in CalendarPage uses `'weights'` while the rotation engine test fixtures use `'weightlifting'`. Both appear in `WorkoutType`. This is legacy naming but creates ambiguity when reading stats breakdowns. No user-visible bug exists today.
+
+**All prior risks remain (no new architectural concerns)**
+- `TodayPage.tsx` (~1,180 lines) and `CalendarPage.tsx` (~950 lines) — large files, refactor deferred
+- `outcomeStore` cross-store coupling in `logOutcomeWithProgression`
+- `workoutInstanceId` parsing trusts nanoid charset (base-36, no `_`)
+
+### Decisions
+
+- **Fix future-entry filter in all three stats functions** (BUG, high confidence): Consistent with `isPlanExpired`. `computeRotationCycleProgress` and `computeRotationPlanRemaining` get an optional `today` parameter (backward-compatible). `computePlanProgress` rotations branch adds the guard inline. TodayPage callers updated to pass `today`. Five new regression tests added.
+
+- **Add "Rotation X of Y" to TodayPage header** (FEATURE, low risk): Uses the now-corrected `computePlanProgress` for rotations plans. Only shown when `duration.value > 1`. Mirrors the existing "Week X of Y" display for weeks plans. Hidden when expired. Includes "· last rotation!" parallel to "· last week!".
+
+### Not implemented (recommendations only)
+
+- `DayDetailModal` render-phase state call: acceptable React pattern (own-component derived-state bail-out); document-only.
+- `WorkoutType` 'weights' vs 'weightlifting' naming: legacy; no user-visible bug; cleanup deferred to avoid churn.
+- `computeWorkoutTypeBreakdown` multi-slot attribution: carry-forward from pass 47.
+- `logForDate` day_off + jump interaction: carry-forward from pass 44.
+
+### Architecture summary (unchanged from pass 48)
+
+React + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores. Rotation logic is pure functions in `rotationEngine.ts`. Stats are pure utilities in `historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### Key strengths (unchanged)
+
+- Pure-function rotation engine with 793 tests on exit; all passing.
+- Expression evaluator handles YAML progression DSL safely (no `eval()`).
+- Strong migration patterns in historyStore (v1) and planStore (v2).
+- Consistent separation of engine / stores / modules / lib / UI layers.
+- Future-entry guards now consistent across all rotation stat functions.
+
+### Key risks (carried forward)
+
+- `TodayPage.tsx` (~1,180 lines) and `CalendarPage.tsx` (~950 lines) are large; future refactors into smaller units would reduce cognitive load.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `workoutInstanceId` parsing relies on nanoid never generating `_` — holds for the current base-36 charset but would silently break if the charset changes.
+
+---
+
 ## Pass 48 — 2026-06-02 (branch `claude/dreamy-mccarthy-lm1Op`)
 
 ### Observations on entry
