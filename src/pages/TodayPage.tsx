@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, addDays, parseISO } from 'date-fns'
 import {
@@ -17,6 +17,7 @@ import {
   PartyPopper,
   CheckCircle2,
   Play,
+  ChevronDown,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
@@ -101,6 +102,43 @@ function WeeklyActivityStrip({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** Collapsible panel showing current program variable values for YAML plans. */
+function ProgramVarsPanel({ vars }: { vars: Record<string, number> }) {
+  const [open, setOpen] = useState(false)
+  const toggle = useCallback(() => setOpen(v => !v), [])
+  const entries = Object.entries(vars)
+  if (entries.length === 0) return null
+  return (
+    <div className="rounded-xl bg-slate-800/60 border border-slate-700/60 overflow-hidden">
+      <button
+        onClick={toggle}
+        className="w-full flex items-center justify-between px-3 py-2 text-left"
+        aria-expanded={open}
+      >
+        <span className="text-xs font-medium text-slate-400">
+          Program variables ({entries.length})
+        </span>
+        <ChevronDown
+          size={13}
+          className={`text-slate-500 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <div className="px-3 pb-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-slate-700/50 pt-2">
+          {entries.map(([name, value]) => (
+            <div key={name} className="flex items-baseline justify-between gap-2 min-w-0">
+              <span className="text-xs text-slate-500 truncate font-mono">{name}</span>
+              <span className="text-xs font-semibold text-slate-200 tabular-nums flex-shrink-0">
+                {Number.isInteger(value) ? value : value.toFixed(2).replace(/\.?0+$/, '')}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -747,6 +785,12 @@ export function TodayPage() {
             <p className="text-xs text-sky-700 truncate">↗ {prevSessionOutcome.progressionRecommendation.note}</p>
           )}
         </div>
+      )}
+
+      {/* Program variables inspector — only for YAML plans with auto-progression vars,
+          only when today's workout is still pending so it's actionable context */}
+      {isPending && Object.keys(planProgramVars).length > 0 && (
+        <ProgramVarsPanel vars={planProgramVars} />
       )}
 
       {/* Double-day bonus workout */}

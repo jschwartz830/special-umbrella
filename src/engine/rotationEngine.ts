@@ -85,6 +85,28 @@ export function getTodayResolvedDay(
   overrides: OverrideEntry[],
   today: string,
 ): ResolvedDay {
+  // Guard: a plan with no days can't have a meaningful rotation day.
+  // Return a synthetic rest-day so callers don't receive planDay=undefined.
+  if (plan.days.length === 0) {
+    const todayEntries = entries.filter(e => e.calendarDate === today)
+    const entry = todayEntries.length > 1
+      ? todayEntries.reduce((best, e) => (e.createdAt > best.createdAt ? e : best))
+      : todayEntries[0]
+    let status: DayStatus = 'today_pending'
+    if (entry) {
+      if (entry.action === 'complete') status = 'today_complete'
+      else if (entry.action === 'skip') status = 'today_skip'
+      else if (entry.action === 'day_off') status = 'today_day_off'
+    }
+    return {
+      calendarDate: today,
+      planDayIndex: 0,
+      planDay: { id: '', label: 'Rest', slots: [] },
+      status,
+      historyEntry: entry,
+    }
+  }
+
   const sortedOverrides = [...overrides].sort((a, b) =>
     a.appliedAt.localeCompare(b.appliedAt),
   )

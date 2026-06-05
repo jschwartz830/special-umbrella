@@ -313,6 +313,27 @@ describe('getTodayResolvedDay', () => {
     // They differ — the header must use historyEntry.planDayIndex, not planDayIndex
     expect(rd.planDayIndex).not.toBe(rd.historyEntry?.planDayIndex)
   })
+
+  it('returns a safe rest-day ResolvedDay for a plan with 0 days (no crash)', () => {
+    const plan = makePlan(0)
+    // Should not throw; planDay must be a valid object so callers can access .slots
+    const rd = getTodayResolvedDay(plan, [], [], '2026-01-01')
+    expect(rd.calendarDate).toBe('2026-01-01')
+    expect(rd.planDayIndex).toBe(0)
+    expect(rd.status).toBe('today_pending')
+    expect(Array.isArray(rd.planDay.slots)).toBe(true)
+  })
+
+  it('reflects existing entry status for 0-day plan', () => {
+    const plan = makePlan(0)
+    const entry: HistoryEntry = {
+      id: 'e1', planId: 'plan-1', calendarDate: '2026-01-01',
+      planDayIndex: undefined, action: 'day_off', createdAt: '2026-01-01T12:00:00Z',
+    }
+    const rd = getTodayResolvedDay(plan, [entry], [], '2026-01-01')
+    expect(rd.status).toBe('today_day_off')
+    expect(rd.historyEntry?.id).toBe('e1')
+  })
 })
 
 // ── getUpcomingDays ───────────────────────────────────────────────────────────

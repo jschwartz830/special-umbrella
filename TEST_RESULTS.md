@@ -1,5 +1,55 @@
 # Test Results
 
+## 2026-06-05 (fiftieth pass) — branch `claude/dreamy-mccarthy-UIayl`
+
+**Result: 798 passing, 0 failing** (+5 tests vs entry baseline of 793)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 793 |
+| Tests on exit | 798 |
+| Tests added | +5 |
+| Tests failed | 0 |
+
+### Tests added
+
+**`src/engine/__tests__/rotationEngine.test.ts`** (+2)
+
+| Test | What it covers |
+|------|---------------|
+| `getTodayResolvedDay > returns a safe rest-day ResolvedDay for a plan with 0 days (no crash)` | Guard returns `{ planDay: { slots: [] }, status: 'today_pending' }` instead of crashing |
+| `getTodayResolvedDay > reflects existing entry status for 0-day plan` | Guard correctly maps entry.action → status for 0-day plans |
+
+**`src/store/__tests__/programStore.test.ts`** (+3)
+
+| Test | What it covers |
+|------|---------------|
+| `applyProgressionRule > error resilience > returns {} and does not throw when rule.if is not evaluable` | Malformed condition string is handled gracefully |
+| `applyProgressionRule > error resilience > returns {} and does not throw when rule.then is an empty string` | Empty then-string is a no-op (hits early-return path, not error path) |
+| `applyProgressionRule > error resilience > leaves vars unchanged after a catch — no partial mutation` | `null` then-string triggers outer try/catch; vars remain unchanged |
+
+### Tests reviewed but not modified
+
+All 19 test files passed on entry. No existing tests were changed. Key files reviewed:
+- `rotationEngine.test.ts` — comprehensive coverage; only missing empty-plan case for `getTodayResolvedDay` (added)
+- `programStore.test.ts` — complete coverage of happy paths; missing error cases (added)
+- `historyStore.test.ts` — 873 lines, thorough coverage including migration, dedup, extra entries
+- `historyStats.test.ts` — 1766 lines, covers all exported functions including `computeConsecutiveSkips`, `getUnloggedPastDates`, `computePlanStreak`
+
+### Important areas still untested
+
+| Area | Risk | Notes |
+|------|------|-------|
+| `TodayPage.tsx` | Medium | 1200-line page; double-day flow, undo, upcoming log — integration-test candidates |
+| `CalendarPage.tsx` | Medium | Retroactive logging, jump overrides, day-off logic |
+| `ProgramVarsPanel` | Low | Purely presentational; no logic to unit-test |
+| `OutcomeModal` component | Low | Complex but UI-layer; Playwright/E2E tests would be more valuable |
+| `CalendarPage.handleOutcomeConfirm` slot fallback | Medium | Slot fallback path passes dummy slot; progression untested for this path |
+| `outcomeStore.logOutcomeWithProgression` section 3 | Medium | YAML progression branch covered by programStore tests; outcomeStore integration not tested |
+
+---
+
 ## 2026-06-04 (forty-ninth pass) — branch `claude/dreamy-mccarthy-WovqU`
 
 **Result: 793 passing, 0 failing** (+5 tests vs entry baseline of 788)

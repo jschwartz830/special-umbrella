@@ -1,5 +1,101 @@
 # Overnight Changelog
 
+## 2026-06-05 (fiftieth pass) — branch `claude/dreamy-mccarthy-UIayl`
+
+Baseline on entry: **793 passing, 0 failing**. Exit state: **798 passing, 0 failing** (+5 tests).
+
+---
+
+### 1. fix: add error guard to applyProgressionRule and empty-plan to getTodayResolvedDay
+
+**Summary:** Two correctness fixes in one commit.
+
+**Fix A — `applyProgressionRule` (programStore.ts):**
+Wrapped the entire function body in `try/catch`. If a YAML plan has a malformed
+progression rule (bad condition type, `null` then-string, unexpected exception in
+`evaluateCondition`/`evaluateUpdates`), the error is now caught and logged to
+console; the function returns `{}` instead of propagating. This prevents the
+exception from bubbling up through `outcomeStore.logOutcomeWithProgression` →
+`handleOutcomeConfirm`, which would leave the user's UI in a broken state.
+The workout entry and outcome are already persisted before progression rules run,
+so silent failure is acceptable; silent success is not always correct, but it is
+safe.
+
+**Fix B — `getTodayResolvedDay` (rotationEngine.ts):**
+Added an early-return guard for `plan.days.length === 0`. Without this guard,
+`applyOverridesForDate` calls `mod(n, 0)` which returns `NaN`, and
+`plan.days[NaN]` returns `undefined` — meaning the returned `ResolvedDay` has
+`planDay: undefined` even though the type says `WorkoutDay`. This is consistent
+with the guard already present in `getUpcomingDays` and `getResolvedDaysRange`.
+The synthetic rest day returned has an empty slots array, making it safe for any
+caller that accesses `planDay.slots`.
+
+**Tests added:**
+- `rotationEngine.test.ts` — two new cases: (1) `getTodayResolvedDay` with 0-day plan returns safe ResolvedDay; (2) reflects existing entry status for 0-day plan
+- `programStore.test.ts` — three error-resilience cases: (1) malformed condition string returns `{}`; (2) empty then-string is a no-op; (3) null then-string doesn't throw and leaves vars unchanged
+
+**Files changed:**
+- `src/store/programStore.ts`
+- `src/engine/rotationEngine.ts`
+- `src/engine/__tests__/rotationEngine.test.ts`
+- `src/store/__tests__/programStore.test.ts`
+
+**Risks / tradeoffs:**
+- `applyProgressionRule` now swallows errors silently. The console.error call makes
+  them visible to developers but not to end users. For a future pass, consider
+  surfacing a toast when progression fails so YAML plan authors know their rule is broken.
+- The synthetic rest day returned by `getTodayResolvedDay` for 0-day plans could
+  confuse TodayPage if it tries to act on `planDay.slots[0]` (it will be `undefined`).
+  TodayPage already handles the no-slot case (`primarySlot` check in `handleOutcomeConfirm`).
+
+**Rollback:**
+```bash
+git revert fc7d317
+```
+
+---
+
+### 2. feat: add Program Variables Inspector panel to TodayPage
+
+**Summary:** Collapsible read-only panel showing current YAML program variable values.
+
+YAML plan users auto-progress variables like `squat: 135` or `easy_miles: 3.5` each
+session — but until now had no way to inspect current values in the app. The only
+signal was the workout card's resolved weight/distance, which requires knowing what
+to look for.
+
+The panel is rendered between the previous-session hint and the double-day block, only when:
+1. `Object.keys(planProgramVars).length > 0` (YAML/program plans only)
+2. `isPending === true` (today's workout not yet logged)
+
+It is **collapsed by default** (a single-line header row) and expands on tap. The
+expanded state shows a compact two-column grid of `variable_name → current value`.
+Non-integer values are formatted to remove trailing zeros (e.g. `3.50` → `3.5`).
+
+`planProgramVars` was already computed in TodayPage (wired to `ActiveWorkoutTracker`)
+so no new store subscription or computation is needed.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` (new `ProgramVarsPanel` component + JSX wiring)
+- `FEATURE_PROPOSAL.md` (Pass 50 entry appended)
+
+**Risks / tradeoffs:**
+- Non-YAML plan users: never see the panel (condition guard ensures this)
+- YAML plan users: see an extra panel above the action buttons; it's collapsed by
+  default so it doesn't disrupt the flow unless the user taps it
+- Variable names are shown as-is (no formatting). This is intentional — the user
+  chose the names in their YAML, so they understand them
+- The `useCallback` import was already needed; `ChevronDown` icon was added to the
+  existing lucide-react import
+
+**Rollback:**
+Remove the `ProgramVarsPanel` component definition and the JSX block that renders it:
+```bash
+git revert a631615
+```
+
+---
+
 ## 2026-06-04 (forty-ninth pass) — branch `claude/dreamy-mccarthy-WovqU`
 
 Baseline on entry: **788 passing, 0 failing**. Exit state: **793 passing, 0 failing** (+5 tests).

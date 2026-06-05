@@ -251,4 +251,48 @@ describe('applyProgressionRule', () => {
       expect(getState().getVars('plan-2').squat).toBe(185) // untouched
     })
   })
+
+  describe('error resilience', () => {
+    // applyProgressionRule must never throw — a malformed YAML rule (bad condition
+    // string or non-string then/else) must be caught silently so the caller's
+    // workout log is not disrupted.
+
+    it('returns {} and does not throw when rule.if is not evaluable', () => {
+      getState().initVars('plan-1', { squat: 135 })
+      // evaluateCondition catches parse errors internally and returns false,
+      // so a weird condition string is safe.
+      const result = getState().applyProgressionRule(
+        'plan-1',
+        rule('this is @#$ not valid expr', 'squat += 5'),
+        BASE_CTX,
+      )
+      expect(result).toEqual({})
+      expect(getState().getVars('plan-1').squat).toBe(135) // unchanged
+    })
+
+    it('returns {} and does not throw when rule.then is an empty string', () => {
+      getState().initVars('plan-1', { squat: 135 })
+      const result = getState().applyProgressionRule(
+        'plan-1',
+        { if: 'all_reps', then: '', else: undefined },
+        { ...BASE_CTX, all_reps: true },
+      )
+      // Empty then-string means no-op (early return before evaluateUpdates)
+      expect(result).toEqual({})
+      expect(getState().getVars('plan-1').squat).toBe(135)
+    })
+
+    it('leaves vars unchanged after a catch — no partial mutation', () => {
+      getState().initVars('plan-1', { squat: 135, bench: 95 })
+      // Force a throw by passing a rule object where .then is not a string
+      // (simulates malformed YAML parsed with a wrong type).
+      const badRule = { if: undefined, then: null as unknown as string }
+      expect(() => {
+        getState().applyProgressionRule('plan-1', badRule, BASE_CTX)
+      }).not.toThrow()
+      // Vars must be untouched
+      expect(getState().getVars('plan-1').squat).toBe(135)
+      expect(getState().getVars('plan-1').bench).toBe(95)
+    })
+  })
 })
