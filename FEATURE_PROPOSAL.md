@@ -1,5 +1,73 @@
 # Feature Proposals
 
+## Pass 50 — 2026-06-05 (branch `claude/dreamy-mccarthy-UIayl`)
+
+### Feature selected
+
+**Program Variables Inspector — collapsible read-only panel on TodayPage**
+
+### Why it was selected
+
+YAML plans support auto-progression via named variables (e.g. `squat: 135`,
+`easy_miles: 3.5`). These variables update automatically each time the user logs
+a workout — but the user has **no visibility** into their current values anywhere
+in the app. They would have to look at the YAML source (which shows starting
+values, not current ones) or infer from the workout card.
+
+This creates a trust gap: "Is my weight auto-progressing? What is my current
+training load?" The panel closes this gap.
+
+`planProgramVars` is already computed in TodayPage (wired to ActiveWorkoutTracker)
+and `programVarsMap` is already subscribed — so the feature costs nearly zero
+extra computation.
+
+### Implementation scope for this run
+
+- Collapsible panel below the previous-session hint block, only on TodayPage
+- Only rendered when `Object.keys(planProgramVars).length > 0` (YAML plans)
+- Only rendered when today is pending (before today's workout is logged)
+- Shows variable name + current numeric value in a compact two-column grid
+- Collapsed by default (expands on tap/click via React state)
+- Inline in TodayPage.tsx — no new files or stores needed
+
+### Assumptions being made
+
+- All program variables are numeric (enforced by `ProgramVarDefs` type)
+- Users who see the panel understand the variable names (they defined them in YAML)
+- Collapsed-by-default is correct — most sessions the user doesn't need to inspect vars
+- Showing only current values (not deltas from last session) is sufficient for v1
+
+### Open product / UX decisions
+
+1. Should values show a delta vs. last session? (Not implemented — requires storing previous vars)
+2. Should variable names be auto-formatted (`easy_miles` → "Easy Miles")? (Not done)
+3. Should the panel appear on CalendarPage for past days? (Not done)
+4. Should values be editable inline? (Not done — editing needs validation UX)
+
+### Architecture / schema impact
+
+None. Read-only display of `planProgramVars` already available in TodayPage.
+
+### Risks
+
+- Low: additive, behind `planProgramVars` non-empty condition
+- Non-YAML plan users (the majority) never see it
+- Collapsible so it doesn't affect layout for users who don't want it
+
+### Rollback strategy
+
+Remove the ~25-line JSX block from TodayPage.tsx. No data migration.
+
+### What is intentionally not built yet
+
+- Variable editing UI
+- Variable history / trend chart
+- Calendar-day variable snapshot
+- Formatted variable names
+- Reset-to-defaults action
+
+---
+
 ## Pass 49 — 2026-06-04 (branch `claude/dreamy-mccarthy-WovqU`)
 
 ### Feature selected
