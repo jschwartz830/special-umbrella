@@ -295,15 +295,22 @@ export function TodayPage() {
   const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today)
 
   // Rotation cycle progress — for rotations-duration plans only
-  const cycleProgress = computeRotationCycleProgress(plan, planEntries)
+  const cycleProgress = computeRotationCycleProgress(plan, planEntries, today)
 
   // Total workouts remaining to finish the whole plan (rotations plans only).
   // Shown only in the final rotation so it doesn't clutter the header during
   // earlier phases.
-  const rotationPlanRemaining = computeRotationPlanRemaining(plan, planEntries)
+  const rotationPlanRemaining = computeRotationPlanRemaining(plan, planEntries, today)
 
   // Week progress — for weeks-duration plans only (null for rotations plans)
   const weekProgress = plan.duration.type === 'weeks'
+    ? computePlanProgress(plan, planEntries, today)
+    : null
+
+  // Overall rotation number for multi-rotation plans (e.g. "Rotation 2 of 4").
+  // Only computed when the plan has more than one rotation; single-rotation plans
+  // have no meaningful "Rotation 1 of 1" to display.
+  const rotationProgress = plan.duration.type === 'rotations' && plan.duration.value > 1
     ? computePlanProgress(plan, planEntries, today)
     : null
 
@@ -518,6 +525,14 @@ export function TodayPage() {
           )}
           {cycleProgress?.justCompletedRotation && !planExpired && (
             <span className="ml-1.5 text-emerald-400/80">· rotation complete!</span>
+          )}
+          {rotationProgress && rotationProgress.completed < rotationProgress.total && !planExpired && (
+            <span className="ml-1.5">
+              · <span className="text-slate-400">Rotation {rotationProgress.completed + 1} of {rotationProgress.total}</span>
+              {rotationProgress.completed + 1 === rotationProgress.total && (
+                <span className="ml-1 text-emerald-400/80">· last rotation!</span>
+              )}
+            </span>
           )}
           {rotationPlanRemaining !== null && rotationPlanRemaining > 0 &&
            rotationPlanRemaining <= plan.days.length && !planExpired && (

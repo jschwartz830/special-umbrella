@@ -1,5 +1,57 @@
 # Feature Proposals
 
+## Pass 49 — 2026-06-04 (branch `claude/dreamy-mccarthy-WovqU`)
+
+### Feature selected
+
+**"Rotation X of Y" in TodayPage header for multi-rotation plans**
+
+### Why it was selected
+
+Weeks-based plans already show "Week 3 of 8" context in the header. Rotation-based plans show only within-cycle detail (`3/7 done`, `last one!`) but give no overview of which rotation the user is in. Users doing a 4-rotation training block must count from history to know whether they're in rotation 1 or 4. This closes the information parity gap with a narrow, additive change.
+
+### Expected user value
+
+- At-a-glance orientation: "I'm in rotation 2 of 4" vs "I'm on day 3 of 7 in this cycle"
+- Motivation: seeing "last rotation!" parallels the existing "last week!" celebratory hint
+- No extra taps or navigation required
+
+### Implementation scope for this run
+
+- Compute `rotationProgress` via `computePlanProgress(plan, planEntries, today)` (already correctly future-filtered as of this pass)
+- Add one conditional `<span>` to the existing header subtext in TodayPage
+- No new state, no new store, no new utility functions
+
+### Assumptions being made
+
+- A plan with `duration.value === 1` doesn't need a rotation indicator ("Rotation 1 of 1" is noise)
+- The `computePlanProgress` return value (number of completed full rotations) is the right source of truth for "which rotation are we in"
+- Expired plans should not show a rotation number (banner takes precedence)
+
+### Open product / UX decisions
+
+- Should the Plans list also show a compact rotation indicator?
+- Should the CalendarPage month header show which rotation that month falls in?
+
+### Architecture or schema impact
+
+None. Read-only use of existing computed values.
+
+### Risks
+
+- Information density in the header subtext grows. The "Rotation X of Y" only renders when `rotationProgress.completed < rotationProgress.total` (not expired), so it doesn't stack with the expiry banner. It does stack with `cycleProgress.doneInCycle/rotationLength`, but each piece displays in different contexts.
+
+### Rollback strategy
+
+`git revert 4cb90ae` — removes the `rotationProgress` compute and the conditional JSX span.
+
+### What is intentionally not being built yet
+
+- Per-plan rotation indicator in Plans list
+- CalendarPage month-header rotation context
+
+---
+
 ## Pass 47 — 2026-06-01 (branch `claude/dreamy-mccarthy-iQpbb`)
 
 ### Feature selected

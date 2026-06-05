@@ -1,5 +1,46 @@
 # Feature Reviews
 
+## Pass 49 — 2026-06-04 (branch `claude/dreamy-mccarthy-WovqU`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+A `rotationProgress` constant computed from `computePlanProgress(plan, planEntries, today)` (the now-corrected version that excludes future entries). When `plan.duration.type === 'rotations'` and `plan.duration.value > 1` and the plan is not expired, the header subtext gains a "Rotation 2 of 4" span. The last rotation also renders "· last rotation!".
+
+### What assumptions were encoded
+
+- `computePlanProgress` returns `completed` = number of full rotations finished; `completed + 1` = current rotation number
+- Plans with only 1 rotation defined don't need this indicator
+- The display is suppressed when the plan is expired (banner takes precedence)
+
+### What worked well
+
+- No new utility functions, no new state — pure read of existing data
+- The fix to `computePlanProgress` (this same pass) ensures the rotation number is accurate
+- Clean parity with the weeks-plan "Week X of Y" pattern already in the codebase
+
+### What feels risky or incomplete
+
+- Header subtext line can grow long when multiple indicators are shown simultaneously (e.g., cycle progress + rotation number + "left to finish"). Tested mentally but not via automated visual regression.
+- The "last rotation!" text could overlap with existing "last one!" (for the last workout in a cycle) on the same render if the user is on the last workout of the last rotation. Both appear on the same subtext line but refer to different things.
+
+### What I should evaluate tomorrow
+
+- Does the header subtext ever exceed one line on a narrow screen (320px viewport)?
+- Is "Rotation 4 of 4 · last rotation! · last one!" overly busy for the final workout of the final rotation?
+
+### Recommended next steps
+
+- Manual visual check on a narrow viewport to verify line wrapping
+- Consider whether "last one!" (within-cycle) should be suppressed when "last rotation!" (overall) is already shown
+
+### Keep / revise / prototype only / reject recommendation
+
+**Keep** — the feature is additive, uses correct data, has a clear rollback path, and closes a genuine information gap.
+
+---
+
 ## Pass 47 — 2026-06-01 (branch `claude/dreamy-mccarthy-iQpbb`)
 
 ### Classification: **Keep**

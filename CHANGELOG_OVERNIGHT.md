@@ -1,5 +1,43 @@
 # Overnight Changelog
 
+## 2026-06-04 (forty-ninth pass) — branch `claude/dreamy-mccarthy-WovqU`
+
+Baseline on entry: **788 passing, 0 failing**. Exit state: **793 passing, 0 failing** (+5 tests).
+
+---
+
+### 1. fix: filter future-dated entries from rotation stats functions
+
+**Summary:** Three rotation stat utilities (`computePlanProgress` rotations branch, `computeRotationCycleProgress`, `computeRotationPlanRemaining`) did not filter history entries with `calendarDate > today`, unlike `isPlanExpired` which was fixed in pass 48. A CSV import or manually-entered entry dated in the future would silently inflate or deflate these displays.
+
+**Why it matters:** Inconsistency with the canonical expiry check creates user confusion — the cycle bar might show wrong progress while the "plan complete" banner uses a different filter. The guard is easy to add and has clear test coverage.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — add `e.calendarDate <= today` filter in `computePlanProgress` rotations branch; add optional `today?: string` parameter to `computeRotationCycleProgress` and `computeRotationPlanRemaining`
+- `src/lib/__tests__/historyStats.test.ts` — 5 new regression tests
+- `src/pages/TodayPage.tsx` — pass `today` to both new optional-param callers
+
+**Risks / tradeoffs:** Optional parameter with `undefined = no filter` is backward-compatible; existing tests and callers without `today` continue to work as before. No behavioral change unless a future-dated entry exists in the store.
+
+**Rollback:** Revert the commit (`git revert 622cd4f`). No data migration needed.
+
+---
+
+### 2. feat: show overall rotation number in TodayPage header
+
+**Summary:** Multi-rotation plans (e.g. a 4-rotation training block) now show "Rotation 2 of 4" in the TodayPage header subtext, alongside the existing per-cycle `3/7 done` display. The final rotation shows "· last rotation!" to mirror the weeks-plan "· last week!" label.
+
+**Why it matters:** Users doing a 4-rotation plan had no clear signal of which rotation they were in — they had to count manually from history. This closes the parity gap with `weekProgress` (weeks plans already show "Week X of Y").
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — compute `rotationProgress` via `computePlanProgress`; render "Rotation X of Y" in header
+
+**Risks / tradeoffs:** The feature uses the newly corrected `computePlanProgress` (future-entry fix applied), so the count is accurate. Hidden when `plan.duration.value <= 1` (no meaningful "Rotation 1 of 1") and when the plan is expired. Additive JSX change only — easy to revert.
+
+**Rollback:** Revert the commit (`git revert 4cb90ae`). No data migration needed.
+
+---
+
 ## 2026-06-02 (forty-eighth pass) — branch `claude/dreamy-mccarthy-lm1Op`
 
 Baseline on entry: **786 passing, 0 failing**. Exit state: **788 passing, 0 failing** (+2 tests).

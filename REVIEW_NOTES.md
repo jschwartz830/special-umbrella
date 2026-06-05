@@ -1,5 +1,92 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-04 (forty-ninth pass) — branch `claude/dreamy-mccarthy-WovqU`
+
+### Executive summary
+
+1. **What changed:** Two commits. (1) Bug fix: `computePlanProgress` (rotations), `computeRotationCycleProgress`, and `computeRotationPlanRemaining` all lacked a future-entry date guard, inconsistent with the `isPlanExpired` fix from pass 48. Guard added, 5 regression tests added, TodayPage callers updated. (2) Feature: multi-rotation plans now show "Rotation X of Y" in the TodayPage header, closing a parity gap with weeks-based plans.
+
+2. **Highest confidence:** The future-entry filter fix (commit 1) — it directly mirrors what `isPlanExpired` already does, the tests are unambiguous, and the behavior change only fires when a future-dated entry exists in the store (CSV import edge case).
+
+3. **What is risky:** The `rotationProgress` display (commit 2) is additive UI. The main risk is information density — the header subtext now contains more items in edge cases. The feature is unconditional (can't be turned off per plan) but is easy to revert.
+
+4. **What to review first:** CHANGELOG_OVERNIGHT.md → then the two commits in order.
+
+---
+
+### Biggest issues found
+
+**Future-entry filter inconsistency (fixed):** `isPlanExpired` was patched in pass 48 but three companion functions in `historyStats.ts` still counted future-dated entries. A single bad CSV import row could produce inflated cycle progress or a spuriously-low "workouts remaining" count.
+
+**`DayDetailModal` calls state setter during render (documented, not fixed):** At CalendarPage line ~729, `setDetailTarget(null)` is called when the selected extra is no longer in the `extras` array (e.g., deleted mid-modal). This is the component's own state, so React handles it correctly (immediate re-render, no infinite loop), but it triggers a "setState during render" warning in Strict Mode. Proper fix: move to a `useEffect`. Risk is very low — this branch only fires if an extra is deleted while the user is viewing it in the modal detail level. Leaving as-is for now; documented.
+
+**`WorkoutType` naming: `'weights'` vs `'weightlifting'` (documented, not fixed):** Two synonymous string values in the `WorkoutType` union. `'weightlifting'` appears in test fixtures; `'weights'` is used in the CalendarPage type picker. No user-visible bug; a future cleanup pass should consolidate.
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Commit |
+|---|------|-------------|--------|
+| 1 | Bug fix | Future-entry guard in `computePlanProgress`, `computeRotationCycleProgress`, `computeRotationPlanRemaining` | `622cd4f` |
+| 2 | Feature | "Rotation X of Y" display in TodayPage header for multi-rotation plans | `4cb90ae` |
+
+---
+
+### Feature added (Rotation X of Y)
+
+**What it does:** For plans with `duration.type === 'rotations'` and `duration.value > 1`, the TodayPage header subtext now shows "Rotation 2 of 4" (or equivalent). The last rotation also shows "· last rotation!". Hidden when the plan is expired.
+
+**Assumptions encoded:** A plan with `duration.value === 1` has no meaningful rotation number ("Rotation 1 of 1"). The display uses `computePlanProgress` as the source of truth, which now correctly excludes future entries.
+
+**Open decisions:** Whether to also surface this in the CalendarPage month header or the Plans list view. Not implemented.
+
+**Classification:** Keep (low risk, additive, mirrors existing weeks-plan pattern)
+
+---
+
+### Definitely keep
+
+- Fix: future-entry guard in three rotation stats functions
+- Feature: "Rotation X of Y" header display (additive, reversible)
+
+### Probably keep but tweak
+
+- n/a this pass
+
+### Do not keep
+
+- n/a this pass
+
+### Recommendations only (not implemented)
+
+- **`DayDetailModal` render-phase state call:** Refactor to `useEffect` to eliminate the strict-mode warning. Low urgency.
+- **`WorkoutType` naming consolidation:** Unify `'weights'` and `'weightlifting'` into a single canonical value. Needs audit of all consumers.
+- **`computeWorkoutTypeBreakdown` multi-slot attribution:** Only `slots[0]` type is counted for rotation entries. For plans with double-slot days, secondary slot types are silently unattributed. (carry-forward from pass 47)
+- **`logForDate` day_off + jump interaction:** Unclear edge case when a day_off is logged via retroactive CalendarPage and a jump override exists for the same date. (carry-forward from pass 44)
+
+---
+
+### Open questions for me
+
+1. For "Rotation X of Y" — do you want this in the Plans list as well, so you can see at a glance where each plan stands?
+2. Is the `'weights'` / `'weightlifting'` split intentional (different slot types) or legacy duplication? If the latter, it's worth cleaning up before the user base grows.
+
+---
+
+### Known issues or incomplete work
+
+- The `DayDetailModal` render-phase state call is a React Strict Mode warning that doesn't affect runtime behavior. See IMPLEMENTATION_PLAN.md for details.
+- `computeWorkoutTypeBreakdown` multi-slot attribution gap remains (carry-forward).
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-06-02 (forty-eighth pass) — branch `claude/dreamy-mccarthy-lm1Op`
 
 ### Executive summary
