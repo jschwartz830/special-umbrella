@@ -1,5 +1,70 @@
 # Implementation Plan
 
+## Pass 50 — 2026-06-05 (branch `claude/dreamy-mccarthy-UIayl`)
+
+### Observations on entry
+
+- Baseline on entry: **793 passing, 0 failing** — clean exit from pass 49.
+- Pass 49 fixed a future-entry guard in rotation stats functions and added "Rotation X of Y" header.
+- Full codebase audit performed: all source files read, all stores, engine, both key pages.
+
+### Architecture summary
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD (active plan drives everything else)
+2. `historyStore` — rotation entries, overrides, extra workouts (persisted to `wpt_history`)
+3. `outcomeStore` — per-workout outcome records keyed by `workoutInstanceId` (persisted to `wpt_outcomes`)
+4. `programStore` — YAML plan progression variables (persisted to `wpt_program_vars`)
+5. `exerciseHistoryStore` — per-exercise session records for charting (derived from outcomes)
+6. `rotationEngine.ts` — pure functions computing today's workout from the above data
+
+**Key pages:**
+- `TodayPage.tsx` (1175+ lines) — today's workout, nudges, upcoming preview, double-day flow
+- `CalendarPage.tsx` (~950 lines) — retroactive logging, month grid, day detail modals
+
+### What appears strong and well-designed
+
+- Rotation engine is pure functions, thoroughly tested, handles edge cases (overrides, go_back, dedup)
+- Zustand stores have clean interfaces; cross-store calls use `.getState()` to avoid circular deps
+- historyStore migration (v0→v1) is correct and tested
+- Test coverage for core logic (engine, stores, lib) is high (~793 tests passing)
+- Double-day flow is architecturally sound (ExtraWorkoutEntry + separate outcome keys)
+- Entry deduplication strategy (newest-createdAt wins) is consistent across engine and store
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `applyProgressionRule` not wrapped in try/catch — malformed YAML rule could throw and disrupt the workout log flow | **Fixed** |
+| Medium | `getTodayResolvedDay` has no guard for `plan.days.length === 0` — would produce `planDay=undefined` and crash callers | **Fixed** |
+| Low | CalendarPage slot fallback `{ id: '', type: 'rest' }` when planDay has no slots — progression skipped silently | Documented |
+| Low | Double-day flow only picks `upcoming[0].planDay.slots[0]` — multi-slot days partially supported | Documented |
+| Low | `outcomeStore.logOutcomeWithProgression` section 3 (YAML progression) has no outer error guard — now partially addressed by programStore fix | Improved |
+| Low | `findPreviousSetsByExercise` O(n) scan per render — exercise history store already has a better index | Documented |
+| Low | CalendarPage re-grids entire month on any entry change — scope reduction possible | Documented |
+
+### Prioritized plan
+
+1. ✅ **Error resilience: `applyProgressionRule`** — highest-risk silent failure path
+2. ✅ **Empty plan guard in `getTodayResolvedDay`** — correctness fix, mirrors peer functions
+3. ✅ **Tests for the above** — 5 new tests covering both fixes
+4. ✅ **Feature: Program Variables Inspector** — low-risk, high-value for YAML plan users
+5. ⬜ **Slot fallback handling in CalendarPage** — recommend explicit guard, not implemented
+6. ⬜ **Calendar re-render optimization** — profile first, not worth blind change
+7. ⬜ **Multi-slot double-day support** — product decision needed first
+
+### Rationale for sequencing
+
+Bug fixes first: the `applyProgressionRule` error is the most impactful because it silently breaks YAML plan progression — a key differentiating feature. The empty plan guard is lower real-world risk (hard to create empty plans via UI) but is a correctness issue that makes the function inconsistent with its peers.
+
+Tests before feature: new tests lock in the fixes and give a regression baseline before adding new surface area.
+
+Feature last: ProgramVarsPanel is purely additive; if it had introduced any regressions, the fixes would already be captured in prior commits.
+
+---
+
 ## Pass 49 — 2026-06-04 (branch `claude/dreamy-mccarthy-WovqU`)
 
 ### Observations on entry

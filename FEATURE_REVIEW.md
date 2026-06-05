@@ -1,5 +1,68 @@
 # Feature Reviews
 
+## Pass 50 — 2026-06-05 (branch `claude/dreamy-mccarthy-UIayl`)
+
+### Classification: **Keep with revisions**
+
+### What was actually built
+
+A `ProgramVarsPanel` React component in `TodayPage.tsx` that renders a collapsible
+panel showing the current values of YAML progression variables. It is:
+- Gated on `Object.keys(planProgramVars).length > 0` (never shown for non-YAML plans)
+- Gated on `isPending` (only shown before today's workout is logged)
+- Collapsed by default, expandable on tap
+- Rendered as a compact two-column grid: `variable_name → value`
+- Non-integer values formatted to remove trailing zeros (`3.50` → `3.5`)
+
+### What assumptions were encoded
+
+1. YAML plan users understand their variable names as-is (no formatting applied)
+2. Collapsed-by-default is the right UX default
+3. Showing only current values (not deltas) is sufficient for an initial implementation
+4. The panel is most useful before logging (pending state) rather than after
+
+### What worked well
+
+- Zero-cost integration: `planProgramVars` was already computed in TodayPage
+- Clean component isolation: `ProgramVarsPanel` is self-contained with its own local state
+- The condition gates are correct and efficient
+- Value formatting (trailing zero removal) looks clean for common cases like `3.5` miles
+
+### What feels risky or incomplete
+
+- **No tests**: purely presentational, but if logic is added later (e.g., editing vars),
+  tests would need to be added at that point
+- **Collapsed by default**: power users with many variables might prefer it open; the
+  default is an untested assumption
+- **No delta indication**: users can't tell if a variable just progressed or has been
+  the same for weeks
+- **No variable editing**: the natural next step users might expect after seeing the
+  panel is being able to edit values — that's not supported and there's no affordance
+  indicating "read-only"
+
+### What I should evaluate tomorrow
+
+1. Open the app with a YAML plan active — does the panel appear where expected?
+2. Tap to expand — does it render all variables cleanly at different screen widths?
+3. Does the collapsed-by-default feel right, or do you keep needing to tap to open it?
+4. Are there variables you want to see that aren't shown (e.g., notes, units)?
+
+### Recommended next steps
+
+1. **If you use the panel regularly**: add `localStorage` persistence for the
+   expanded/collapsed state so it remembers your preference per plan
+2. **If the names are confusing**: add underscore-to-space formatting (`easy_miles` → `Easy miles`)
+3. **If you want deltas**: store `prevVars` snapshot before logging; compare after
+4. **If you want editing**: add an edit mode with number inputs and validation
+
+### Keep / revise / prototype only / reject recommendation
+
+**Keep with revisions.** The core feature is sound and fills a real gap. The UI
+assumption (collapsed by default) and missing delta display are worth revisiting
+once you've used it for a few sessions.
+
+---
+
 ## Pass 49 — 2026-06-04 (branch `claude/dreamy-mccarthy-WovqU`)
 
 ### Classification: **Keep**

@@ -1,5 +1,153 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-05 (fiftieth pass) — branch `claude/dreamy-mccarthy-UIayl`
+
+### Executive summary
+
+1. **What changed:** Two commits. (1) Bug fixes: `applyProgressionRule` now has a
+   try/catch wrapper; `getTodayResolvedDay` gains an early-return guard for
+   0-day plans; 5 new tests. (2) Feature: Program Variables Inspector panel on
+   TodayPage for YAML plan users — collapsible, read-only, no new stores.
+
+2. **Highest confidence:** `applyProgressionRule` try/catch — the fix is isolated,
+   testable, and has a clear failure mode. The 0-day guard in `getTodayResolvedDay`
+   mirrors two peer functions that already have it.
+
+3. **What is risky:** The ProgramVarsPanel feature is safe but untested in browser
+   (no YAML plan available in CI to trigger the condition). The collapsed-by-default
+   UX is an assumption — some users might prefer it expanded by default.
+
+4. **What to review first:** The `applyProgressionRule` change — any YAML plan user
+   who experienced silent progression failures (no console.error previously) will now
+   see errors in DevTools. The fix itself is correct but the `console.error` call
+   might be surprising if YAML rules are intentionally written to fail gracefully.
+
+---
+
+### Biggest issues found
+
+| Severity | Issue | Action |
+|----------|-------|--------|
+| Medium | `applyProgressionRule` no try/catch — malformed YAML rule propagates exception | **Fixed** |
+| Medium | `getTodayResolvedDay` no empty-plan guard — `planDay=undefined` crash path | **Fixed** |
+| Low | CalendarPage slot fallback `{ id: '', type: 'rest' }` passed to `logOutcomeWithProgression` — progression silently skipped | Documented |
+| Low | Double-day flow only supports `slots[0]` from the bonus day — multi-slot bonus days lose slot 2+ | Documented |
+| Low | `findPreviousSetsByExercise` is O(n) across all outcomes per render — exerciseHistoryStore already has better indexing | Documented |
+| Low | Calendar month grid rebuilds on any store entry change — could filter plan-scoped entries before passing | Documented |
+
+---
+
+### Improvements completed
+
+1. **`applyProgressionRule` error resilience** (programStore.ts) — try/catch wrapper,
+   console.error on failure, returns `{}`. 3 tests added.
+
+2. **`getTodayResolvedDay` empty-plan guard** (rotationEngine.ts) — early-return
+   with synthetic rest day when `plan.days.length === 0`. 2 tests added.
+
+---
+
+### Small features added
+
+None beyond the medium-complexity feature below.
+
+---
+
+### Medium-complexity feature explored
+
+**Program Variables Inspector** — `ProgramVarsPanel` component in TodayPage.tsx.
+
+**Classification: Keep (prototype-quality; review UX before polishing)**
+
+- Functional: correctly reads `planProgramVars` and renders collapsed/expanded states
+- UX assumption: collapsed by default; some YAML power users might want it expanded
+- No tests added (purely presentational component, no logic to test)
+- Recommend: gather feedback from YAML plan users on the collapsed-by-default default
+  before committing to the interaction model
+
+---
+
+### Definitely keep
+
+- `applyProgressionRule` try/catch — strictly safer than current behavior
+- `getTodayResolvedDay` empty-plan guard — strictly safer, matches peer functions
+- All 5 new tests
+
+---
+
+### Probably keep but tweak
+
+- **ProgramVarsPanel** — correct and useful, but:
+  - Could format variable names (underscore → space, capitalize)
+  - Could show a delta badge ("↑5" since last session) — needs previous vars stored
+  - Could persist expanded/collapsed state in localStorage
+
+---
+
+### Do not keep
+
+Nothing falls in this category.
+
+---
+
+### Recommendations only (not implemented)
+
+1. **CalendarPage slot fallback** — `handleOutcomeConfirm` at line 226 creates a dummy
+   slot `{ id: '', type: 'rest' }` when planDay has no slots. The `logOutcomeWithProgression`
+   call with this slot means progression rules tied to the slot's `slotProgress` field are
+   never evaluated. Consider validating planDay before opening OutcomeModal, or handling
+   missing slots explicitly.
+
+2. **Double-day multi-slot support** — `upcoming[0].planDay.slots[0]` at TodayPage:400
+   only picks the first slot of the bonus day. If a rotation day has multiple workout
+   slots (e.g. AM run + PM weights), only the first is logged as the bonus. Add UI
+   clarification or extend to include all slots.
+
+3. **Outcome scan optimization** — `findPreviousSetsByExercise` scans all outcomes
+   on every render. The exerciseHistoryStore already maintains per-exercise records
+   for charting. Consider computing previous sets from that store instead.
+
+4. **Calendar re-render scope** — `buildMonthGrid` receives the full `entries` and
+   `overrides` arrays. Filtering to plan-scoped entries/overrides before passing
+   would reduce the dependency's volatility and prevent full re-grids on unrelated plan
+   entry changes.
+
+5. **Progression rule user feedback** — When `applyProgressionRule` catches an error
+   and logs it, the user has no idea. For YAML plan authors, a short toast ("Progression
+   rule evaluation failed — check your YAML") would dramatically improve debuggability.
+
+---
+
+### Open questions for me
+
+1. Do any of your current plans use YAML progression variables? If yes, the
+   ProgramVarsPanel is immediately useful. If no, the feature is harmless but untested
+   in practice.
+
+2. Should the progression rule error be surfaced to users (toast/banner) or kept as
+   console.error only? The current implementation assumes users won't notice — but YAML
+   plan authors might miss silent failures.
+
+3. Is the 7-day lookback for unlogged past days the right window? If you typically take
+   more than 7 days off between app opens, the nudge won't catch all unlogged days.
+
+---
+
+### Known issues / incomplete work
+
+- ProgramVarsPanel has no automated tests (it's a UI-only component with no logic)
+- The `console.error` in `applyProgressionRule` will appear in production DevTools;
+  acceptable for now, but consider a `console.warn` or suppressing in production builds
+- The empty-plan guard in `getTodayResolvedDay` returns a synthetic `{ id: '', label: 'Rest', slots: [] }` day — if any downstream code pattern-matches on `planDay.id === ''`, it could misfire
+
+---
+
+### Any dependencies added
+
+None.
+
+---
+
 ## 2026-06-04 (forty-ninth pass) — branch `claude/dreamy-mccarthy-WovqU`
 
 ### Executive summary
