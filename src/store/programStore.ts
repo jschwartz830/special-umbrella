@@ -69,18 +69,23 @@ export const useProgramStore = create<ProgramState>()(
       },
 
       applyProgressionRule(planId, rule, ctxBase) {
-        const currentVars = get().getVars(planId)
-        const ctx: EvalContext = { ...ctxBase, vars: currentVars }
+        try {
+          const currentVars = get().getVars(planId)
+          const ctx: EvalContext = { ...ctxBase, vars: currentVars }
 
-        const condMet = evaluateCondition(rule.if, ctx)
-        const updateStr = condMet ? rule.then : (rule.else ?? '')
-        if (!updateStr) return {}
+          const condMet = evaluateCondition(rule.if, ctx)
+          const updateStr = condMet ? rule.then : (rule.else ?? '')
+          if (!updateStr) return {}
 
-        const updates = evaluateUpdates(updateStr, ctx)
-        if (Object.keys(updates).length > 0) {
-          get().setVars(planId, updates)
+          const updates = evaluateUpdates(updateStr, ctx)
+          if (Object.keys(updates).length > 0) {
+            get().setVars(planId, updates)
+          }
+          return updates
+        } catch (err) {
+          console.error('[programStore] applyProgressionRule failed:', err, { planId, rule })
+          return {}
         }
-        return updates
       },
     }),
     { name: 'wpt_program_vars' },
