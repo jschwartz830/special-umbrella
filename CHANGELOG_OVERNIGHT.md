@@ -1,5 +1,62 @@
 # Overnight Changelog
 
+## 2026-06-06 (fifty-first pass) — branch `claude/dreamy-mccarthy-HOACg`
+
+Baseline on entry: **798 passing, 0 failing**. Exit state: **801 passing, 0 failing** (+3 tests).
+
+---
+
+### 1. fix: wire `useToday()` into HistoryPage
+
+**Summary:** `HistoryPage` computed `todayKey` with `format(new Date(), 'yyyy-MM-dd')` at render time and never refreshed it. If the app was left open past midnight, `computeHistoryStats`, `computeWeeklyBreakdown`, and the "today" date used in those calls would all be stale.
+
+**Why it matters:** Same class of bug fixed in TodayPage (pass 45) and CalendarPage (pass 46). With PWA installs and pinned tabs, sessions staying open past midnight is realistic.
+
+**Files changed:**
+- `src/pages/HistoryPage.tsx` — add `useToday` import; replace `const todayKey = format(new Date(), ...)` with `const today = useToday()`
+
+**Risks / tradeoffs:** None. The `useToday` hook is already tested in TodayPage. HistoryPage re-renders at midnight to pick up the new date.
+
+**Rollback:** Revert the single commit.
+
+---
+
+### 2. fix: eliminate setState-during-render in DayDetailModal
+
+**Summary:** `DayDetailModal` (CalendarPage) called `setDetailTarget(null)` during its own render when the selected extra could no longer be found in the `extras` array. This is a React antipattern — calling setState during render of your own component — and triggers a strict-mode warning.
+
+**Why it matters:** Not user-visible under normal use, but the React Strict Mode warning is real. The pattern also violates React's rendering contract; future React versions may not handle it gracefully.
+
+**Fix:** Add a `useEffect` that watches `detailTarget` and `extras` and resets `detailTarget` to null when the referenced extra is missing. The render branch now simply returns `null` without calling setState.
+
+**Files changed:**
+- `src/pages/CalendarPage.tsx` — add `useEffect` import; add cleanup effect; remove setState from render path
+
+**Risks / tradeoffs:** Low. The `useEffect` fires after the render, so there's a single frame where `return null` is shown before the effect clears `detailTarget`. In practice this is imperceptible since the modal closes immediately.
+
+**Rollback:** Revert the single commit.
+
+---
+
+### 3. feat: use computeWorkoutTypeBreakdown in HistoryPage and surface avgEffort
+
+**Summary:** The HistoryPage training-mix label ("3 weights · 2 runs · 1 yoga") was computed by an inline `typeCountMap` that only counted completed entries and had no access to effort data. For single-plan views, this is replaced with `computeWorkoutTypeBreakdown`, which provides proper completed/skipped counts and avg perceived effort from outcomes. When effort data is available, the mix label now shows it: "3 weights (effort 3.2) · 2 runs (effort 2.5) · 1 yoga".
+
+**Why it matters:** `computeWorkoutTypeBreakdown` was added in an earlier pass specifically to compute avgEffort but it was never surfaced to users. The HistoryPage is the natural place to show training quality at a glance.
+
+**Files changed:**
+- `src/pages/HistoryPage.tsx` — add `computeWorkoutTypeBreakdown` + `WorkoutTypeBreakdown` imports; add `typeBreakdown` memo using function; update `typeMixLabel` to use breakdown data; keep inline `typeCountMapFallback` for 'all' plan view
+- `src/lib/__tests__/historyStats.test.ts` — +3 tests: 'weights' slot type, null avgEffort for skipped-only, mixed rotation+extra avgEffort
+
+**Risks / tradeoffs:**
+- The effort suffix only appears when at least one workout in the type has a `perceivedEffort` logged. Users who never set perceived effort see no change in the label.
+- For 'all' plan view, the inline computation is kept because `computeWorkoutTypeBreakdown` requires a single `planDaysById` Map and can't attribute types across multiple plans in a single pass.
+- The label format "effort 3.2" is a first iteration — could be tweaked to use a symbol or be hidden behind a toggle if it feels too dense.
+
+**Rollback:** Revert the single commit.
+
+---
+
 ## 2026-06-05 (fiftieth pass) — branch `claude/dreamy-mccarthy-UIayl`
 
 Baseline on entry: **793 passing, 0 failing**. Exit state: **798 passing, 0 failing** (+5 tests).
