@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -575,6 +575,15 @@ function DayDetailModal({
   const [extraName, setExtraName] = useState('')
   const [confirmDeleteExtraId, setConfirmDeleteExtraId] = useState<string | null>(null)
 
+  // If we're showing an extra's detail but the extra was deleted (e.g. another tab), reset.
+  // Use useEffect rather than calling setState during render to avoid the strict-mode warning.
+  useEffect(() => {
+    if (detailTarget?.kind === 'extra') {
+      const stillExists = extras.some(e => e.id === detailTarget.extraId)
+      if (!stillExists) setDetailTarget(null)
+    }
+  }, [detailTarget, extras])
+
   const dateLabel = format(new Date(calendarDate + 'T00:00'), 'EEEE, MMMM d')
 
   function submitAddExtra() {
@@ -726,7 +735,7 @@ function DayDetailModal({
   // ─── Level 2: Extra detail ────────────────────────────────────────────────
   if (detailTarget.kind === 'extra') {
     const extra = extras.find(e => e.id === detailTarget.extraId)
-    if (!extra) { setDetailTarget(null); return null }
+    if (!extra) return null // useEffect above will reset detailTarget on next render
     const iid = makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id)
     const extraOutcome = outcomes[iid] ?? null
 
