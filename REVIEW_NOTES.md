@@ -1,5 +1,112 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-06 (fifty-first pass) — branch `claude/dreamy-mccarthy-HOACg`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Bug fix: `useToday()` wired into `HistoryPage` — same midnight-staleness fix applied to TodayPage in pass 45 and CalendarPage in pass 46. (2) Bug fix: `DayDetailModal` in CalendarPage no longer calls `setDetailTarget(null)` during its own render; the pattern is replaced by a `useEffect`. (3) Feature: HistoryPage training-mix label now uses `computeWorkoutTypeBreakdown` for single-plan view and shows avg perceived effort when logged.
+
+2. **Highest confidence:** Bug fix #1 (useToday) — identical fix already proven in two other pages. Bug fix #2 (DayDetailModal) — the pattern is correct; the useEffect fires after render with no user-visible flash.
+
+3. **What is risky:** The avgEffort label format ("effort 3.2") is an assumption about how dense the user wants the mix label. If it feels too crowded, the effort part can be removed or moved to a tooltip.
+
+4. **What to review first:** The `typeMixLabel` display in HistoryPage when you have a plan with at least one workout where you logged perceived effort. Confirm the "(effort N.N)" format feels right. If no effort is logged, the label is unchanged.
+
+---
+
+### Biggest issues found
+
+| Severity | Issue | Action |
+|----------|-------|--------|
+| Low | HistoryPage stale `today` past midnight | **Fixed** |
+| Low | `DayDetailModal` setState-during-render (strict mode warning) | **Fixed** |
+| Low | HistoryPage `typeCountMap` never surfaced avgEffort from outcomes | **Fixed** |
+| Info | `WorkoutType` union has both 'weights' AND 'weightlifting' as separate values | Documented (carry-forward) |
+| Info | `findPreviousSetsByExercise` duplicated in TodayPage + CalendarPage | Documented (carry-forward) |
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Commit |
+|---|------|-------------|--------|
+| 1 | Bug fix | `useToday()` in HistoryPage — prevent stale stats past midnight | `514e381` |
+| 2 | Bug fix | `DayDetailModal` useEffect replaces setState-during-render | `8a8177f` |
+| 3 | Feature | `computeWorkoutTypeBreakdown` + avgEffort in HistoryPage mix label | `3bb13e8` |
+
+---
+
+### Medium-complexity feature explored
+
+**avgEffort in HistoryPage training-mix label** — uses existing `computeWorkoutTypeBreakdown` infrastructure that had never been surfaced to users.
+
+**Classification: Keep (with possible UX tweak to label format)**
+
+- Functional: correctly reads `perceivedEffort` from outcomes via existing function
+- The "(effort 3.2)" suffix is only shown when data exists; users who don't log effort see no change
+- No new stores, no new computation — purely surfaces existing data
+- Potential UX concern: mix label may feel dense when both count and effort are shown; could move effort to a separate row if preferred
+
+---
+
+### Definitely keep
+
+- `useToday()` in HistoryPage — identical to the proven CalendarPage fix
+- DayDetailModal `useEffect` pattern — strictly better than setState-during-render
+- All 3 new tests (accurate production-type coverage)
+
+---
+
+### Probably keep but tweak
+
+- **avgEffort display format** — "effort 3.2" is readable but could be formatted as "★3.2" or moved to a separate stat line if the mix label feels too long
+- **'all' plan fallback** — `typeCountMapFallback` keeps the old inline logic for multi-plan view; consider whether to show skipped counts there too in a future pass
+
+---
+
+### Do not keep
+
+Nothing from this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+1. **'weights' vs 'weightlifting' naming cleanup** — Both appear in `WorkoutType`. The UI uses 'weights'; test fixtures mostly use 'weightlifting'. Unifying is medium-complexity (many files) with no user-visible benefit today. Recommend a dedicated cleanup pass.
+
+2. **Extract shared `findPreviousSetsByExercise`** — Exists in both TodayPage and CalendarPage. Extraction to a shared `src/lib/outcomeUtils.ts` would prevent future drift. Deferred since both versions currently return identical results.
+
+3. **Effort display as visual indicator** — Instead of "(effort 3.2)", use colored dots (like the DayDetailModal effort preview added in pass 46). Requires a non-text element in the mix label, which may complicate the string-based approach.
+
+4. **'all' plan view also use `computeWorkoutTypeBreakdown`** — Currently falls back to the inline computation. Could be solved by iterating plans and calling the function once per plan, then merging results. Medium complexity; deferred.
+
+5. **`useToday` in other utilities** — `weeklyBreakdown` memo at line 178 still calls `addDays(new Date(), -55)` which computes a fixed past date at mount time. This could drift if the component is left mounted across multiple days. Low severity for a historical-only query.
+
+---
+
+### Open questions for me
+
+1. Does the "(effort N.N)" format in the training-mix label feel right to you, or would you prefer it on a separate line below the type counts?
+
+2. The 'all' plan view still uses the older inline computation. Should future work also add avgEffort to the 'all' view? (It would require iterating per plan, which is doable but more code.)
+
+3. Do any of your current plans have workouts where you've logged `perceivedEffort`? If yes, the avgEffort display is immediately useful. If you never log effort, consider removing the suffix to keep the label simple.
+
+---
+
+### Known issues / incomplete work
+
+- `DayDetailModal` fix: there is a one-frame flash where the modal shows nothing (returns null) before the useEffect fires and closes the modal. In practice this is imperceptible but could in theory cause a layout shift.
+- No React Testing Library tests exist for the CalendarPage or HistoryPage component behavior. Adding them would require a jsdom test environment change — deferred across all passes.
+
+---
+
+### Any dependencies added
+
+None.
+
+---
+
 ## 2026-06-05 (fiftieth pass) — branch `claude/dreamy-mccarthy-UIayl`
 
 ### Executive summary

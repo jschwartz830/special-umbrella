@@ -1,5 +1,46 @@
 # Test Results
 
+## 2026-06-06 (fifty-first pass) — branch `claude/dreamy-mccarthy-HOACg`
+
+**Result: 801 passing, 0 failing** (+3 tests vs entry baseline of 798)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 19 |
+| Tests on entry | 798 |
+| Tests on exit | 801 |
+| Tests added | +3 |
+| Tests failed | 0 |
+
+### Tests added
+
+**`src/lib/__tests__/historyStats.test.ts`** (+3 in `computeWorkoutTypeBreakdown` describe)
+
+| Test | What it covers |
+|------|---------------|
+| `works with the production "weights" slot type (not just "weightlifting")` | Verifies type attribution with the real 'weights' value used in HistoryPage (existing tests only used 'weightlifting') |
+| `avgEffort is null for skipped-only entries (no outcome data)` | Skipped entries count toward breakdown but produce no effort data |
+| `averages effort across mixed completed rotation entries and extras` | Rotation (effort 4) + extra (effort 2) → combined avg 3 |
+
+### Tests reviewed but not modified
+
+All 19 test files passed on entry. No existing tests were changed. Key files reviewed:
+- `historyStats.test.ts` — comprehensive; added 3 tests covering production 'weights' type and effort averaging
+- `rotationEngine.test.ts` — fully passing; no engine changes in this pass
+- `historyStore.test.ts` — fully passing; no store changes in this pass
+
+### Important areas still untested
+
+| Area | Risk | Notes |
+|------|------|-------|
+| `TodayPage.tsx` | Medium | Double-day flow, undo, active tracker — integration-test candidates |
+| `CalendarPage.tsx` | Medium | DayDetailModal useEffect fix (requires React Testing Library) |
+| `HistoryPage.tsx` typeBreakdown integration | Low | Component-level; uses `computeWorkoutTypeBreakdown` which is unit-tested |
+| `useToday` hook | Low | Timeout-dependent; would need `vi.useFakeTimers()` + jsdom environment |
+| `OutcomeModal` component | Low | Complex but UI-layer; E2E tests would be more valuable |
+
+---
+
 ## 2026-06-05 (fiftieth pass) — branch `claude/dreamy-mccarthy-UIayl`
 
 **Result: 798 passing, 0 failing** (+5 tests vs entry baseline of 793)

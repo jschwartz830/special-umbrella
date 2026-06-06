@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { format, parseISO, addDays } from 'date-fns'
+import { useToday } from '../hooks/useToday'
 import {
   CheckCircle2,
   SkipForward,
@@ -22,8 +23,8 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps } from '../lib/historyStats'
-import type { PersonalRecord, WeeklyBreakdown } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown } from '../lib/historyStats'
+import type { PersonalRecord, WeeklyBreakdown, WorkoutTypeBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
@@ -54,6 +55,7 @@ type FlatItem =
   | { kind: 'extra'; date: string; sortKey: string; extra: ExtraWorkoutEntry }
 
 export function HistoryPage() {
+  const today = useToday()
   const plans = usePlanStore(s => s.plans)
   const activePlanId = usePlanStore(s => s.activePlanId)
   const entries = useHistoryStore(s => s.entries)
@@ -137,12 +139,22 @@ export function HistoryPage() {
     return b.sortKey.localeCompare(a.sortKey)
   }), [filteredEntries, filteredExtras])
 
-  const todayKey = format(new Date(), 'yyyy-MM-dd')
-  const stats = computeHistoryStats(filteredEntries, filteredExtras, todayKey)
+  const stats = computeHistoryStats(filteredEntries, filteredExtras, today)
 
-  // Count completed workouts by type for the training-mix summary row.
-  // Rotation entries use the plan day's first slot type; extras use workoutType.
-  const typeCountMap = useMemo(() => {
+  // For single-plan view: use computeWorkoutTypeBreakdown which gives completed/skipped
+  // counts and avgEffort per type from outcome data. For 'all' plans, fall back to the
+  // inline computation since there's no single planDaysById to pass.
+  const typeBreakdown = useMemo((): WorkoutTypeBreakdown | null => {
+    if (filterPlanId === 'all') return null
+    const p = plans[filterPlanId]
+    if (!p) return null
+    const planDaysById = new Map(p.days.map((day, i) => [i, { slots: day.slots }]))
+    return computeWorkoutTypeBreakdown(filteredEntries, filteredExtras, outcomes, planDaysById)
+  }, [filterPlanId, filteredEntries, filteredExtras, outcomes, plans])
+
+  // Fallback for 'all' plan view: count completed entries + all extras per type.
+  const typeCountMapFallback = useMemo(() => {
+    if (typeBreakdown !== null) return null
     const counts = new Map<WorkoutType, number>()
     for (const item of flatItems) {
       let type: WorkoutType | undefined
@@ -155,16 +167,29 @@ export function HistoryPage() {
       if (type) counts.set(type, (counts.get(type) ?? 0) + 1)
     }
     return counts
-  }, [flatItems, plans])
+  }, [flatItems, plans, typeBreakdown])
 
   const typeMixLabel = useMemo(() => {
-    if (typeCountMap.size === 0) return null
-    return [...typeCountMap.entries()]
+    if (typeBreakdown !== null) {
+      // Single-plan view: use structured breakdown; show avg effort when available.
+      const rows = Object.entries(typeBreakdown) as [WorkoutType, { completed: number; avgEffort: number | null }][]
+      if (rows.length === 0) return null
+      return rows
+        .sort(([, a], [, b]) => b.completed - a.completed)
+        .slice(0, 4)
+        .map(([t, { completed, avgEffort }]) => {
+          const base = `${completed} ${TYPE_MIX_LABEL[t] ?? t}`
+          return avgEffort !== null ? `${base} (effort ${avgEffort.toFixed(1)})` : base
+        })
+        .join(' · ')
+    }
+    if (!typeCountMapFallback || typeCountMapFallback.size === 0) return null
+    return [...typeCountMapFallback.entries()]
       .sort(([, a], [, b]) => b - a)
       .slice(0, 4)
       .map(([t, n]) => `${n} ${TYPE_MIX_LABEL[t] ?? t}`)
       .join(' · ')
-  }, [typeCountMap])
+  }, [typeBreakdown, typeCountMapFallback])
 
   const allExerciseRecords = useExerciseHistoryStore(s => s.records)
   const personalRecords = useMemo(
@@ -175,10 +200,10 @@ export function HistoryPage() {
   const weeklyBreakdown = useMemo<WeeklyBreakdown[]>(() => {
     if (filterPlanId === 'all') return []
     const from = format(addDays(new Date(), -55), 'yyyy-MM-dd')
-    const active = computeWeeklyBreakdown(filterPlanId, filteredEntries, filteredExtras, from, todayKey)
+    const active = computeWeeklyBreakdown(filterPlanId, filteredEntries, filteredExtras, from, today)
     // Fill gap weeks so training breaks are visible rather than silently skipped.
     return padWeekGaps(active).reverse()
-  }, [filterPlanId, filteredEntries, filteredExtras, todayKey])
+  }, [filterPlanId, filteredEntries, filteredExtras, today])
 
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')

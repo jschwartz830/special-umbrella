@@ -714,6 +714,54 @@ describe('computeWorkoutTypeBreakdown', () => {
     )
     expect(result.yoga?.completed).toBe(1)
   })
+
+  it('works with the production "weights" slot type (not just "weightlifting")', () => {
+    // HistoryPage builds planDaysById from plan.days which use 'weights' in the UI.
+    // Verify the function attributes entries correctly for that real-world type.
+    const entries = [
+      makeEntry('2026-05-01', 'complete', 0),
+      makeEntry('2026-05-02', 'complete', 0),
+      makeEntry('2026-05-03', 'skip', 0),
+    ]
+    const days = new Map<number, { slots: Array<{ type: import('../../types').WorkoutType }> }>([
+      [0, { slots: [{ type: 'weights' }] }],
+    ])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.weights?.completed).toBe(2)
+    expect(result.weights?.skipped).toBe(1)
+    expect(result.weights?.avgEffort).toBeNull()
+  })
+
+  it('avgEffort is null for skipped-only entries (no outcome data)', () => {
+    // Skipped entries are counted but produce no outcome/effort data.
+    const entries = [
+      makeEntry('2026-05-01', 'skip', 0),
+      makeEntry('2026-05-02', 'skip', 0),
+    ]
+    const days = new Map<number, { slots: Array<{ type: import('../../types').WorkoutType }> }>([
+      [0, { slots: [{ type: 'run' }] }],
+    ])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.run?.skipped).toBe(2)
+    expect(result.run?.completed).toBe(0)
+    expect(result.run?.avgEffort).toBeNull()
+  })
+
+  it('averages effort across mixed completed rotation entries and extras', () => {
+    // Rotation: effort 4; Extra: effort 2. Combined avg = (4+2)/2 = 3.
+    const entries = [makeEntry('2026-05-01', 'complete', 0)]
+    const extras = [makeExtra('2026-05-02', 'run', 'x1')]
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-05-01': makeOutcome('plan-1_2026-05-01', 4),
+      'plan-1_2026-05-02_extra_x1': makeOutcome('plan-1_2026-05-02_extra_x1', 2),
+    }
+    const days = new Map<number, { slots: Array<{ type: import('../../types').WorkoutType }> }>([
+      [0, { slots: [{ type: 'run' }] }],
+    ])
+    const result = computeWorkoutTypeBreakdown(entries, extras, outcomes, days)
+    expect(result.run?.completed).toBe(2) // 1 rotation + 1 extra
+    expect(result.run?.avgEffort).toBe(3) // (4+2)/2
+  })
 })
 
 // ── countPastUnloggedDays ─────────────────────────────────────────────────────

@@ -1,5 +1,61 @@
 # Implementation Plan
 
+## Pass 51 — 2026-06-06 (branch `claude/dreamy-mccarthy-HOACg`)
+
+### Observations on entry
+
+- Baseline on entry: **798 passing, 0 failing** — clean exit from pass 50.
+- Pass 50 fixed `applyProgressionRule` error guard, `getTodayResolvedDay` 0-day guard, and added ProgramVarsPanel.
+- Full codebase audit performed: all source files, stores, pages.
+
+### Architecture summary (unchanged from pass 50)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,220 lines), CalendarPage (~950 lines), HistoryPage (~972 lines)
+
+### What appears strong
+
+- Pure-function rotation engine with 798+ tests on entry; all passing.
+- Expression evaluator handles YAML progression DSL safely.
+- Strong migration patterns in historyStore (v1) and planStore (v2).
+- Consistent separation of engine / stores / modules / lib / UI layers.
+- Future-entry guards now consistent across all rotation stat functions.
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Low | HistoryPage uses stale `today` date (same class as CalendarPage pass 46) | **Fixed** |
+| Low | `DayDetailModal` calls own setState during render — strict mode warning | **Fixed** |
+| Low | HistoryPage `typeCountMap` doesn't surface avgEffort from outcomes | **Fixed** |
+| Low | `computeWorkoutTypeBreakdown` tests only use 'weightlifting' slot type, not 'weights' | **Fixed** (tests added) |
+| Info | `WorkoutType` has 'weights' AND 'weightlifting' as separate values | Documented (carry-forward) |
+| Info | `findPreviousSetsByExercise` still duplicated in TodayPage and CalendarPage | Documented (carry-forward) |
+
+### Prioritized plan
+
+1. ✅ **Wire `useToday()` into HistoryPage** — same fix as CalendarPage pass 46
+2. ✅ **Fix DayDetailModal setState-during-render** — useEffect pattern
+3. ✅ **Replace typeCountMap with computeWorkoutTypeBreakdown + avgEffort** — surfaces new data from existing infrastructure
+4. ✅ **Add tests** — 3 new tests for computeWorkoutTypeBreakdown with 'weights' type
+5. ⬜ 'weights' vs 'weightlifting' naming — cleanup deferred (high churn, no user-visible bug)
+6. ⬜ Extract shared `findPreviousSetsByExercise` — deferred (medium refactor)
+
+### Rationale for sequencing
+
+Bug fixes first (useToday and DayDetailModal). Feature last. Tests anchor the production-realistic 'weights' slot type path that HistoryPage now exercises.
+
+---
+
 ## Pass 50 — 2026-06-05 (branch `claude/dreamy-mccarthy-UIayl`)
 
 ### Observations on entry
