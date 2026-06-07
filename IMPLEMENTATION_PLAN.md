@@ -1,5 +1,48 @@
 # Implementation Plan
 
+## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
+
+### Observations on entry
+
+- Baseline on entry: **801 passing, 0 failing** — clean exit from pass 51.
+- Pass 51 fixed `useToday()` in HistoryPage, DayDetailModal setState-during-render, and wired `computeWorkoutTypeBreakdown` with avgEffort into HistoryPage.
+- Full codebase audit performed: all source files, stores, pages, lib utilities.
+
+### Architecture summary (unchanged from pass 51)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,220 lines), CalendarPage (~950 lines), HistoryPage (~985 lines)
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `computePersonalRecords` iterated exercise history in arbitrary insertion order; `>` comparison means same-load PR date stays on first occurrence, not most recent | **Fixed** |
+| Low | `findPreviousSetsByExercise` duplicated in TodayPage and CalendarPage with identical logic; drift risk on future changes | **Fixed** (extracted to shared lib) |
+| Info | Personal Records page section had no export — the only stats table without a CSV download | **Fixed** (feature added) |
+
+### Prioritized plan
+
+1. ✅ **Fix `computePersonalRecords` date non-determinism** — sort records ascending by `calendarDate` before iterating; change `>` to `>=` for both load and reps comparisons so the most recent session matching the PR value gets the date
+2. ✅ **Extract `findPreviousSetsByExercise` to `src/lib/previousSetsHelper.ts`** — unifies two identical implementations; TodayPage and CalendarPage both updated to import the shared version
+3. ✅ **Personal Records CSV export** — `personalRecordsToCsv` in `csv.ts`, Export CSV button in HistoryPage `PersonalRecordsSection`
+4. ✅ **Tests** — 4 new tests in `historyStats.test.ts`, 6 in new `previousSetsHelper.test.ts`, 3 in `csv.test.ts`
+
+### Rationale for sequencing
+
+Bug fix first: the `computePersonalRecords` issue is a user-visible data correctness problem — a user who hit the same PR on a later date would see an old date on their records. Refactor second: extracting `findPreviousSetsByExercise` closes a drift risk before the codebase grows further. Feature third: Personal Records export is strictly additive and uses the infrastructure already proven correct.
+
+---
+
 ## Pass 51 — 2026-06-06 (branch `claude/dreamy-mccarthy-HOACg`)
 
 ### Observations on entry

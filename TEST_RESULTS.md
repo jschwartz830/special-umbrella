@@ -1,5 +1,71 @@
 # Test Results
 
+## 2026-06-07 (fifty-second pass) — branch `claude/dreamy-mccarthy-j725m`
+
+**Result: 814 passing, 0 failing** (+13 tests vs entry baseline of 801)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 20 |
+| Tests on entry | 801 |
+| Tests on exit | 814 |
+| Tests added | +13 |
+| Tests failed | 0 |
+
+### Tests added
+
+**`src/lib/__tests__/historyStats.test.ts`** (+4 in `computePersonalRecords` and `computePlanStreak` describe blocks)
+
+| Test | What it covers |
+|------|---------------|
+| `shows most-recent date when same max load is matched on a later session` | `>=` fix: later session with same max load gets the date |
+| `shows most-recent date when same max reps matched on a later session` | `>=` fix: later session with same max reps gets the date |
+| `result is stable regardless of input record order` | Sort fix: shuffled input records produce the same maxLoadDate/maxRepsDate |
+| `future-dated extras do not extend the streak backward past today` | `computePlanStreak` never walks past today even with future-dated extras |
+
+**`src/lib/__tests__/previousSetsHelper.test.ts`** (new file, +6 tests)
+
+| Test | What it covers |
+|------|---------------|
+| `returns empty map when no outcomes exist` | Empty input guard |
+| `returns empty map when all outcomes are on the current date` | Current-date exclusion |
+| `returns sets from a previous date` | Basic previous-session lookup |
+| `picks the most-recent prior session when multiple exist for the same exercise` | First-wins after descending sort |
+| `excludes a specific instanceId when excludeInstanceId is provided` | Optional `excludeInstanceId` falls back to next-most-recent |
+| `does not include outcomes from a different plan` | Plan prefix filter |
+
+**`src/lib/__tests__/csv.test.ts`** (+3 in new `personalRecordsToCsv` describe block)
+
+| Test | What it covers |
+|------|---------------|
+| `returns header-only CSV for empty records array` | Empty input produces valid RFC-4180 |
+| `serialises a standard PR record correctly` | Header + one data row with all fields populated |
+| `handles null maxLoad and maxReps gracefully` | Null values become empty cells in CSV output |
+
+### Test files added this pass
+
+- `src/lib/__tests__/previousSetsHelper.test.ts` — new file covering the extracted `findPreviousSetsByExercise` helper
+
+### Tests reviewed but not modified
+
+All 19 previously-existing test files passed on entry. Key files reviewed:
+- `historyStats.test.ts` — comprehensive; 4 new tests added for PR date and streak edge cases
+- `csv.test.ts` — extended with 3 tests for the new `personalRecordsToCsv` function
+- `rotationEngine.test.ts` — fully passing; no engine changes in this pass
+- `outcomeStore.test.ts` — fully passing; no store changes in this pass
+
+### Important areas still untested
+
+| Area | Risk | Notes |
+|------|------|-------|
+| `TodayPage.tsx` | Medium | Double-day flow, undo, active tracker — integration-test candidates |
+| `CalendarPage.tsx` | Medium | DayDetailModal behavior, slot fallback path |
+| `HistoryPage.tsx` export button | Low | UI-layer; component behavior verified by code review |
+| `useToday` hook | Low | Timeout-dependent; would need `vi.useFakeTimers()` + jsdom environment |
+| `OutcomeModal` component | Low | Complex but UI-layer; E2E tests would be more valuable |
+
+---
+
 ## 2026-06-06 (fifty-first pass) — branch `claude/dreamy-mccarthy-HOACg`
 
 **Result: 801 passing, 0 failing** (+3 tests vs entry baseline of 798)

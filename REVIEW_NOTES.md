@@ -1,5 +1,108 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-07 (fifty-second pass) — branch `claude/dreamy-mccarthy-j725m`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Bug fix: `computePersonalRecords` now always shows the most-recent date on which the PR was achieved (not the first). (2) Refactor: `findPreviousSetsByExercise` extracted from TodayPage and CalendarPage into a shared lib helper — eliminates duplication first documented in pass 46 and carried forward through passes 47–51. (3) Feature: "Export CSV" button added to the Personal Records section in HistoryPage, backed by a new `personalRecordsToCsv` utility in `csv.ts`.
+
+2. **Highest confidence:** The `computePersonalRecords` fix — the bug is unambiguous (same `>=` pattern already used for run/swim stats in the same file), the fix is 4 lines, and the 3 targeted tests cover the exact failure mode. The `findPreviousSetsByExercise` extraction — zero semantic change; both call sites produce identical results, and the new test file covers 6 distinct cases.
+
+3. **What is risky:** Nothing high-risk. The HistoryPage header DOM restructure (single `<button>` → `<div>` + two `<button>` elements) changes the interactive structure of the Personal Records section; verify that the expand/collapse and export buttons both work as expected in the browser.
+
+4. **What to review first:** The `computePersonalRecords` fix — specifically, run the HistoryPage with a plan where you've hit the same lift weight on multiple sessions. The PR date should now show the *most recent* session, not the first one.
+
+---
+
+### Biggest issues found
+
+| Severity | Issue | Action |
+|----------|-------|--------|
+| Medium | `computePersonalRecords` PR date stale — showed first occurrence of PR, not most recent | **Fixed** |
+| Low | `findPreviousSetsByExercise` duplicated in TodayPage + CalendarPage for 5+ passes | **Fixed** (extracted) |
+| Info | Personal Records had no CSV export — only stats table without a download | **Fixed** (feature added) |
+
+---
+
+### Improvements completed
+
+| # | Type | Description | Commit |
+|---|------|-------------|--------|
+| 1 | Bug fix | `computePersonalRecords` sort + `>=` → most-recent PR date | `97f9c9a` (partial — also includes 2 and 3 below) |
+| 2 | Refactor | `findPreviousSetsByExercise` extracted to `src/lib/previousSetsHelper.ts` | `97f9c9a` |
+| 3 | Feature | `personalRecordsToCsv` + Export CSV button in HistoryPage | (same commit) |
+
+---
+
+### Medium-complexity feature explored
+
+**Personal Records CSV export** — adds a new `personalRecordsToCsv` function to the existing `csv.ts` utility module and wires it to a new button in the HistoryPage PR section.
+
+**Classification: Keep**
+
+- Functional: produces valid RFC-4180 CSV with correct headers and null-field handling
+- Non-breaking: button is hidden when `records.length === 0`; all existing behavior is preserved
+- Consistent with the existing export pattern used by history CSV and CalendarPage
+- 3 new tests cover the output format
+
+See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md for full analysis.
+
+---
+
+### Definitely keep
+
+- `computePersonalRecords` fix — correctness bug with no tradeoffs
+- `findPreviousSetsByExercise` extraction — reduces drift risk, no behavior change, well-tested
+- All 13 new tests
+- Personal Records CSV export — additive, minimal, consistent with existing UI patterns
+
+---
+
+### Probably keep but tweak
+
+- **Export CSV button placement** — the button currently appears in the header alongside the expand/collapse chevron. If the header feels crowded, it could move to the bottom of the expanded content area. Current position is more discoverable for collapsed sections.
+
+---
+
+### Do not keep
+
+Nothing from this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+1. **`WorkoutType` naming cleanup** (`'weights'` vs `'weightlifting'`)  — carry-forward from passes 49–51. Both values exist in `WorkoutType`; fixtures use `'weightlifting'`; HistoryPage uses `'weights'`. A dedicated cleanup pass is still warranted.
+
+2. **`findPreviousSetsByExercise` scan optimization** — the shared helper is still O(n) over all outcomes per render. `exerciseHistoryStore` already maintains per-exercise records for charting. Swapping the data source would be a medium refactor (different data shape). Carry-forward.
+
+3. **Calendar month grid re-render scope** — `buildMonthGrid` receives the full `entries` and `overrides` arrays. Filtering to plan-scoped entries before passing would reduce re-grids on unrelated plan changes. Carry-forward.
+
+4. **`useToday` in other utilities** — `weeklyBreakdown` memo in HistoryPage still computes `addDays(new Date(), -55)` at mount time. This is a historical-only query so staleness is less critical, but the pattern is inconsistent. Carry-forward.
+
+---
+
+### Open questions for me
+
+1. Does the most-recent PR date (vs. first PR date) feel more useful to you? The semantics are now "when did I last hit this weight", which is the natural reading for most lifters checking if their PR is recent or stale.
+
+2. The "Export CSV" label in the Personal Records header: does "Export CSV" feel right or would "Download" or "Export" (shorter) be better?
+
+---
+
+### Known issues / incomplete work
+
+- No React Testing Library tests for HistoryPage component behavior. The export button and PR section restructure are UI-layer changes verified by code review only.
+- The `computePersonalRecords` fix is forward-looking: historical records in `exerciseHistoryStore` will be correctly sorted on next computation (Zustand derives them each time from the stored array), so no migration is needed.
+
+---
+
+### Any dependencies added
+
+None.
+
+---
+
 ## 2026-06-06 (fifty-first pass) — branch `claude/dreamy-mccarthy-HOACg`
 
 ### Executive summary

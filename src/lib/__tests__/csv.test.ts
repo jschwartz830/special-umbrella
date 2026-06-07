@@ -10,6 +10,7 @@ import {
   plansFromCsv,
   historyToCsv,
   historyFromCsv,
+  personalRecordsToCsv,
 } from '../csv'
 import type { Plan, HistoryEntry, ExtraWorkoutEntry, WorkoutOutcome } from '../../types'
 
@@ -551,5 +552,49 @@ describe('historyToCsv + historyFromCsv', () => {
     expect(extras).toEqual([])
     expect(parsed.find(e => e.calendarDate === '2026-04-10')!.action).toBe('complete')
     expect(parsed.find(e => e.calendarDate === '2026-04-12')!.action).toBe('day_off')
+  })
+})
+
+// ── personalRecordsToCsv ──────────────────────────────────────────────────────
+
+describe('personalRecordsToCsv', () => {
+  it('emits header row and one data row per record', () => {
+    const csv = personalRecordsToCsv([
+      {
+        exerciseName: 'Squat',
+        maxLoad: 225,
+        maxLoadDate: '2026-03-15',
+        maxReps: 8,
+        maxRepsDate: '2026-02-01',
+        sessionCount: 12,
+      },
+    ])
+    const rows = parseCsv(csv)
+    expect(rows[0]).toEqual(['exercise', 'maxLoad_lb', 'maxLoadDate', 'maxReps', 'maxRepsDate', 'sessionCount'])
+    expect(rows[1]).toEqual(['Squat', '225', '2026-03-15', '8', '2026-02-01', '12'])
+  })
+
+  it('emits empty cells for null load and reps', () => {
+    const csv = personalRecordsToCsv([
+      {
+        exerciseName: 'Push-up',
+        maxLoad: null,
+        maxLoadDate: null,
+        maxReps: 30,
+        maxRepsDate: '2026-04-01',
+        sessionCount: 5,
+      },
+    ])
+    const rows = parseCsv(csv)
+    expect(rows[1][1]).toBe('') // maxLoad_lb empty
+    expect(rows[1][2]).toBe('') // maxLoadDate empty
+    expect(rows[1][3]).toBe('30')
+  })
+
+  it('returns header-only CSV for an empty records array', () => {
+    const csv = personalRecordsToCsv([])
+    const rows = parseCsv(csv)
+    expect(rows).toHaveLength(1)
+    expect(rows[0][0]).toBe('exercise')
   })
 })

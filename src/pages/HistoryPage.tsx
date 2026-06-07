@@ -22,7 +22,7 @@ import { OutcomeMetrics } from '../components/workout/OutcomeMetrics'
 import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
-import { downloadCsv, historyToCsv, historyFromCsv } from '../lib/csv'
+import { downloadCsv, historyToCsv, historyFromCsv, personalRecordsToCsv } from '../lib/csv'
 import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown } from '../lib/historyStats'
 import type { PersonalRecord, WeeklyBreakdown, WorkoutTypeBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
@@ -872,22 +872,38 @@ function PersonalRecordsSection({ records }: { records: PersonalRecord[] }) {
 
   return (
     <div className="mb-4">
-      <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-1 py-1 text-left group"
-        aria-expanded={expanded}
-      >
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+      <div className="w-full flex items-center justify-between px-1 py-1">
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider flex-1 text-left"
+          aria-expanded={expanded}
+        >
           <Trophy size={12} className="text-yellow-500/80" />
           Personal Records
           <span className="font-normal text-slate-600 normal-case tracking-normal">({records.length})</span>
-        </span>
-        {expanded ? (
-          <ChevronUp size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
-        ) : (
-          <ChevronDown size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
-        )}
-      </button>
+        </button>
+        <div className="flex items-center gap-2">
+          {records.length > 0 && (
+            <button
+              onClick={() => downloadCsv('personal-records.csv', personalRecordsToCsv(records))}
+              className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors px-1.5 py-0.5 rounded border border-slate-700/50 hover:border-slate-600/50"
+            >
+              Export CSV
+            </button>
+          )}
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="group"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+          >
+            {expanded ? (
+              <ChevronUp size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+            ) : (
+              <ChevronDown size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors" />
+            )}
+          </button>
+        </div>
+      </div>
 
       {expanded && (
         <div className="mt-1 rounded-xl border border-slate-700/50 bg-slate-800/40 overflow-hidden">
