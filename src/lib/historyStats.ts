@@ -410,9 +410,13 @@ export function computePersonalRecords(
 ): PersonalRecord[] {
   const scoped = planId ? records.filter(r => r.planId === planId) : records
 
+  // Sort ascending by date so later sessions overwrite with `>=`, giving the
+  // most-recent date where a PR was matched (not the first date it was set).
+  const sorted = [...scoped].sort((a, b) => a.calendarDate.localeCompare(b.calendarDate))
+
   const byExercise = new Map<string, PersonalRecord>()
 
-  for (const r of scoped) {
+  for (const r of sorted) {
     const existing = byExercise.get(r.exerciseName)
     if (!existing) {
       byExercise.set(r.exerciseName, {
@@ -428,11 +432,11 @@ export function computePersonalRecords(
 
     existing.sessionCount++
 
-    if (r.maxLoad !== null && (existing.maxLoad === null || r.maxLoad > existing.maxLoad)) {
+    if (r.maxLoad !== null && (existing.maxLoad === null || r.maxLoad >= existing.maxLoad)) {
       existing.maxLoad = r.maxLoad
       existing.maxLoadDate = r.calendarDate
     }
-    if (r.maxReps !== null && (existing.maxReps === null || r.maxReps > existing.maxReps)) {
+    if (r.maxReps !== null && (existing.maxReps === null || r.maxReps >= existing.maxReps)) {
       existing.maxReps = r.maxReps
       existing.maxRepsDate = r.calendarDate
     }

@@ -39,12 +39,13 @@ import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak, computeConsecutiveSkips } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
-import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
+import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 import { outcomeSortKey } from '../lib/outcomeSortKey'
+import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 
 type ActivityFill = 'complete' | 'day_off' | 'skip' | 'extra' | 'empty'
 
@@ -161,33 +162,6 @@ function findPreviousWeightsOutcome(
   return best
 }
 
-/** Find latest prior sets per exercise for this plan (excluding today). */
-function findPreviousSetsByExercise(
-  planId: string,
-  currentDate: string,
-  outcomes: Record<string, WorkoutOutcome>,
-): Record<string, LoggedSetActual[]> {
-  const prefix = planId + '_'
-  const sortedOutcomes = Object.values(outcomes)
-    .filter(outcome => {
-      if (!outcome.workoutInstanceId.startsWith(prefix)) return false
-      const rest = outcome.workoutInstanceId.slice(prefix.length)
-      if (rest.startsWith(currentDate)) return false
-      return Boolean(outcome.weightsActual?.exercises?.length)
-    })
-    .sort((a, b) => outcomeSortKey(b).localeCompare(outcomeSortKey(a)))
-
-  const previousByExercise: Record<string, LoggedSetActual[]> = {}
-  for (const outcome of sortedOutcomes) {
-    for (const ex of outcome.weightsActual?.exercises ?? []) {
-      if (!previousByExercise[ex.exercise]) {
-        previousByExercise[ex.exercise] = ex.sets
-      }
-    }
-  }
-
-  return previousByExercise
-}
 
 export function TodayPage() {
   const navigate = useNavigate()

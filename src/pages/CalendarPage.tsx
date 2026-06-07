@@ -26,11 +26,11 @@ import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { Plan, ResolvedDay, ActionType, WorkoutType, ExtraWorkoutEntry, PlanDay } from '../types'
-import type { WorkoutOutcome, LoggedExerciseActual, LoggedSetActual } from '../modules/workout-outcomes/types'
+import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { useProgramStore } from '../store/programStore'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
 import { extraToPlanDay } from '../lib/planDayUtils'
-import { outcomeSortKey } from '../lib/outcomeSortKey'
+import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -241,31 +241,6 @@ export function CalendarPage() {
     setOutcomeTarget(null)
     setActiveTrackedExercises(null)
     setActiveTrackedDurationMin(null)
-  }
-
-  function findPreviousSetsByExercise(
-    currentDate: string,
-    currentInstanceId: string,
-  ): Record<string, LoggedSetActual[]> {
-    if (!plan) return {}
-    const prefix = `${plan.id}_`
-    const sorted = Object.values(outcomes)
-      .filter(outcome => {
-        if (outcome.workoutInstanceId === currentInstanceId) return false
-        if (!outcome.workoutInstanceId.startsWith(prefix)) return false
-        const rest = outcome.workoutInstanceId.slice(prefix.length)
-        if (rest.startsWith(currentDate)) return false
-        return Boolean(outcome.weightsActual?.exercises?.length)
-      })
-      .sort((a, b) => outcomeSortKey(b).localeCompare(outcomeSortKey(a)))
-
-    const byExercise: Record<string, LoggedSetActual[]> = {}
-    for (const outcome of sorted) {
-      for (const ex of outcome.weightsActual?.exercises ?? []) {
-        if (!byExercise[ex.exercise]) byExercise[ex.exercise] = ex.sets
-      }
-    }
-    return byExercise
   }
 
   function clearDate(rd: ResolvedDay) {
@@ -481,7 +456,7 @@ export function CalendarPage() {
                 }
               : (outcomes[outcomeTarget.instanceId] ?? null)
           }
-          previousSetsByExercise={findPreviousSetsByExercise(outcomeTarget.calendarDate, outcomeTarget.instanceId)}
+          previousSetsByExercise={plan ? findPreviousSetsByExercise(plan.id, outcomeTarget.calendarDate, outcomes, outcomeTarget.instanceId) : {}}
           workoutInstanceId={outcomeTarget.instanceId}
           onConfirm={handleOutcomeConfirm}
           onClose={() => {
@@ -505,7 +480,7 @@ export function CalendarPage() {
             programVars={planProgramVars}
             previousOutcome={null}
             resumeOutcome={outcomes[activeWorkoutTarget.workoutInstanceId] ?? null}
-            previousSetsByExercise={findPreviousSetsByExercise(activeWorkoutTarget.calendarDate, activeWorkoutTarget.workoutInstanceId)}
+            previousSetsByExercise={plan ? findPreviousSetsByExercise(plan.id, activeWorkoutTarget.calendarDate, outcomes, activeWorkoutTarget.workoutInstanceId) : {}}
             minimized={activeWorkoutState === 'minimized'}
             onMinimize={() => setActiveWorkoutState('minimized')}
             onResume={() => setActiveWorkoutState('open')}
