@@ -1,5 +1,53 @@
 # Feature Proposals
 
+## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
+
+### Feature selected
+
+**Personal Records CSV export — "Export CSV" button in HistoryPage PR section**
+
+### Why it was selected
+
+The HistoryPage surfaces three types of summary data: history stats/streaks, weekly activity breakdown, and personal records. Both the history data and the weekly breakdown are either already exportable (history CSV via `CsvToolbar`) or could be rebuilt from the history CSV. Personal Records are the only summary computed from `exerciseHistoryStore` — a separate store that the main history CSV does not cover.
+
+A user who wants to archive their PRs, share them, or import them into a spreadsheet has no current path. The "Export CSV" feature closes this gap with a single button and a minimal pure function.
+
+`computePersonalRecords` and `downloadCsv` are both already imported in HistoryPage. The only new surface area is `personalRecordsToCsv` in `csv.ts` and a button in the PR section header.
+
+### Implementation scope for this run
+
+- `personalRecordsToCsv(records: PersonalRecord[]): string` in `src/lib/csv.ts`
+  - RFC-4180 CSV with 6 columns: `exercise`, `maxLoad_lb`, `maxLoadDate`, `maxReps`, `maxRepsDate`, `sessionCount`
+  - Uses existing `encodeCsv` utility; null values become empty cells
+- "Export CSV" button in `PersonalRecordsSection` header in HistoryPage
+  - Visible only when `records.length > 0`
+  - Calls `downloadCsv('personal-records.csv', personalRecordsToCsv(records))`
+  - Header restructured: single `<button>` → `<div>` containing two `<button>` elements (expand toggle + export)
+- 3 new tests: empty array, standard round-trip, null-field handling
+
+### Assumptions being made
+
+- PRs are read-only (no import path for this CSV — export only)
+- The filename `personal-records.csv` is descriptive and stable
+- Users understand that PR data reflects the current state of `exerciseHistoryStore`, not a historical snapshot
+- The "Export CSV" label is clear enough without an icon
+
+### Open product / UX decisions
+
+1. Should the exported CSV be importable back (round-trip)? Currently export-only. Import would require validation and conflict resolution between the CSV and the current store.
+2. Should the button appear above or below the PR table? Currently it appears in the header (always visible, even when collapsed) — this makes it discoverable without expanding first.
+3. Should the CSV include `planId` or `planName` to distinguish PRs across plans? Currently PRs are plan-scoped but the export omits the plan context. If a user has multiple plans, the exported file has no plan column.
+
+### Why not implement a different feature
+
+**Considered:** Adding a "Notes" text input to the PersonalRecordsSection (per-exercise commentary). This would require a new store field or a separate store, which is medium architectural complexity. Deferred.
+
+**Considered:** PR history chart (max load over time per exercise). Requires chart library or custom SVG — medium complexity, out of scope for a single overnight pass.
+
+**Chosen approach rationale:** CSV export touches only pure utility code (`csv.ts`) and a single component (`HistoryPage.tsx`). It closes a gap that has been noted in the recommendations sections of prior passes. Risk is near-zero because the export button is additive and the `personalRecordsToCsv` function has no side effects.
+
+---
+
 ## Pass 50 — 2026-06-05 (branch `claude/dreamy-mccarthy-UIayl`)
 
 ### Feature selected

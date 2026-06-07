@@ -769,3 +769,38 @@ function buildOutcomeFromRow(
 
   return outcome
 }
+
+// ── Personal Records export ───────────────────────────────────────────────────
+
+import type { PersonalRecord } from './historyStats'
+
+const PR_HEADERS = [
+  'exercise',
+  'maxLoad_lb',
+  'maxLoadDate',
+  'maxReps',
+  'maxRepsDate',
+  'sessionCount',
+]
+
+/**
+ * Encode personal-record rows to CSV.
+ *
+ * Columns: exercise, maxLoad_lb, maxLoadDate, maxReps, maxRepsDate, sessionCount.
+ * Exercises are ordered alphabetically (same as computePersonalRecords output).
+ * Blank cells are emitted for null values so importers can round-trip safely.
+ */
+export function personalRecordsToCsv(records: PersonalRecord[]): string {
+  const rows: (string | number | null | undefined)[][] = [[...PR_HEADERS]]
+  for (const pr of records) {
+    rows.push([
+      pr.exerciseName,
+      pr.maxLoad,
+      pr.maxLoadDate,
+      pr.maxReps,
+      pr.maxRepsDate,
+      pr.sessionCount,
+    ])
+  }
+  return encodeCsv(rows)
+}

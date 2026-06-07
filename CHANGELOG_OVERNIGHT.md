@@ -1,5 +1,63 @@
 # Overnight Changelog
 
+## 2026-06-07 (fifty-second pass) — branch `claude/dreamy-mccarthy-j725m`
+
+Baseline on entry: **801 passing, 0 failing**. Exit state: **814 passing, 0 failing** (+13 tests).
+
+---
+
+### 1. fix(historyStats): `computePersonalRecords` shows most-recent PR date
+
+**Summary:** `computePersonalRecords` iterated exercise session records in insertion order (the order records were pushed into the `exerciseHistoryStore` array). The comparison used strict `>`, so if a user hit the same max load on a later session, `maxLoadDate` and `maxRepsDate` would retain the *first* date they ever hit that weight, not the most recent. A lifter who has repeatedly hit 225 lb across many sessions would see an old date rather than the most recent one.
+
+**Why it matters:** Personal records show a date to give context ("you last hit this on March 3"). An old date is misleading and reduces trust in the stats.
+
+**Fix:**
+- Sort the per-exercise `scoped` array ascending by `calendarDate` before iterating
+- Change `>` to `>=` for both `maxLoad` and `maxReps` comparisons, so a session matching or beating the current record updates the date
+
+**Files changed:**
+- `src/lib/historyStats.ts` — sort + `>=` comparisons in `computePersonalRecords`
+- `src/lib/__tests__/historyStats.test.ts` — +3 tests in `computePersonalRecords` describe block, +1 in `computePlanStreak` describe block
+
+**Risks / tradeoffs:** None. The change only affects the recorded date, not the max value. For users with a single PR session the result is identical.
+
+---
+
+### 2. refactor: extract shared `findPreviousSetsByExercise` to `src/lib/previousSetsHelper.ts`
+
+**Summary:** An identical `findPreviousSetsByExercise` function existed in both `TodayPage.tsx` (~26 lines) and `CalendarPage.tsx` (~24 lines). Both filtered outcomes to the current plan, excluded the current date, sorted descending by `outcomeSortKey`, and returned a first-wins map by exercise name. Any future change to this logic (e.g., extending the sort key) would need to be applied twice.
+
+**Fix:** New file `src/lib/previousSetsHelper.ts` with a single exported `findPreviousSetsByExercise(planId, currentDate, outcomes, excludeInstanceId?)`. The optional fourth parameter handles CalendarPage's additional filter (it also excludes a specific `instanceId` for the currently-open session). Both pages updated to import from the shared location.
+
+**Files changed:**
+- `src/lib/previousSetsHelper.ts` — new file
+- `src/lib/__tests__/previousSetsHelper.test.ts` — new test file (6 tests)
+- `src/pages/TodayPage.tsx` — removed local implementation, import shared helper
+- `src/pages/CalendarPage.tsx` — removed local implementation, import shared helper
+
+**Risks / tradeoffs:** None. The extracted function is semantically identical to both callers' implementations. The optional `excludeInstanceId` param defaults to no-op so TodayPage callers are unchanged.
+
+---
+
+### 3. feat: Personal Records CSV export
+
+**Summary:** The HistoryPage Personal Records section displayed exercise PRs (max load, max reps, session count) but had no export. The history CSV and weekly-breakdown data had export buttons; PRs were the only stats without one.
+
+**Implementation:**
+- `personalRecordsToCsv(records: PersonalRecord[]): string` added to `src/lib/csv.ts` — RFC-4180 CSV with columns: `exercise`, `maxLoad_lb`, `maxLoadDate`, `maxReps`, `maxRepsDate`, `sessionCount`
+- HistoryPage `PersonalRecordsSection` header restructured: the expand-toggle button and a new "Export CSV" button (`downloadCsv('personal-records.csv', personalRecordsToCsv(records))`) are now separate interactive elements; export button is hidden when the list is empty
+- 3 new tests in `csv.test.ts` covering empty array, standard PR export, and null-field handling
+
+**Files changed:**
+- `src/lib/csv.ts` — `personalRecordsToCsv` function + `PersonalRecord` import
+- `src/lib/__tests__/csv.test.ts` — 3 new tests in `personalRecordsToCsv` describe block
+- `src/pages/HistoryPage.tsx` — `personalRecordsToCsv` import, header restructure, Export CSV button
+
+**Risks / tradeoffs:** Header DOM structure changed from a single `<button>` to a `<div>` containing two `<button>` elements. The expand/collapse behavior is preserved. No new dependencies.
+
+---
+
 ## 2026-06-06 (fifty-first pass) — branch `claude/dreamy-mccarthy-HOACg`
 
 Baseline on entry: **798 passing, 0 failing**. Exit state: **801 passing, 0 failing** (+3 tests).

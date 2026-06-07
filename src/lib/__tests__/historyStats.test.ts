@@ -1077,6 +1077,45 @@ describe('computePersonalRecords', () => {
     expect(result[0].maxReps).toBe(20)
     expect(result[0].maxRepsDate).toBe('2026-01-01')
   })
+
+  it('shows most-recent date when same max load is matched on a later session', () => {
+    // 225 lb is hit on Jan 8, then matched again on Jan 22.
+    // maxLoadDate should reflect Jan 22 (most recent match), not Jan 8 (first occurrence).
+    const records = [
+      rec('Squat', 185, 5, '2026-01-01'),
+      rec('Squat', 225, 3, '2026-01-08'),
+      rec('Squat', 225, 4, '2026-01-22'),
+    ]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].maxLoad).toBe(225)
+    expect(result[0].maxLoadDate).toBe('2026-01-22')
+  })
+
+  it('shows most-recent date when same max reps matched on a later session', () => {
+    const records = [
+      rec('Pull-up', null, 12, '2026-01-01'),
+      rec('Pull-up', null, 12, '2026-02-01'),
+    ]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].maxReps).toBe(12)
+    expect(result[0].maxRepsDate).toBe('2026-02-01')
+  })
+
+  it('result is stable regardless of input record order', () => {
+    // Records given in reverse-chronological order — after internal ascending-date sort,
+    // the correct PR values and dates should be returned regardless of input order.
+    const records = [
+      rec('Deadlift', 315, 3, '2026-03-01'),  // middle load, latest date, middle reps
+      rec('Deadlift', 365, 1, '2026-01-15'),  // highest load, middle date, lowest reps
+      rec('Deadlift', 205, 5, '2026-01-01'),  // lowest load, earliest date, highest reps
+    ]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].maxLoad).toBe(365)
+    expect(result[0].maxLoadDate).toBe('2026-01-15')
+    expect(result[0].maxReps).toBe(5)
+    expect(result[0].maxRepsDate).toBe('2026-01-01')
+    expect(result[0].sessionCount).toBe(3)
+  })
 })
 
 // ── computePlanStreak ──────────────────────────────────────────────────────────
@@ -1202,6 +1241,14 @@ describe('computePlanStreak', () => {
     ]
     expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(1)
     expect(computePlanStreak('plan-2', entries, [], TODAY)).toBe(3)
+  })
+
+  it('future-dated extras do not extend the streak backward past today', () => {
+    // The backward walk starts from today and cannot reach future dates.
+    // A future extra should never appear in the streak count.
+    const entries = [planEntry(TODAY, 'complete')]
+    const extras = [planExtra('2099-01-01')] // far-future extra
+    expect(computePlanStreak('plan-1', entries, extras, TODAY)).toBe(1)
   })
 })
 

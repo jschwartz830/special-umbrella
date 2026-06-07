@@ -1,5 +1,50 @@
 # Feature Reviews
 
+## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+A `personalRecordsToCsv` function in `src/lib/csv.ts` that takes a `PersonalRecord[]` and returns a valid RFC-4180 CSV string. An "Export CSV" button in the `PersonalRecordsSection` component header in `HistoryPage.tsx` that calls `downloadCsv('personal-records.csv', personalRecordsToCsv(records))`.
+
+**CSV format:**
+```
+exercise,maxLoad_lb,maxLoadDate,maxReps,maxRepsDate,sessionCount
+Squat,225,2026-05-15,8,2026-04-20,12
+Bench Press,185,2026-06-01,5,2026-05-10,8
+```
+
+**Header restructure:** `PersonalRecordsSection` header changed from a single full-width `<button>` (expand/collapse only) to a `<div>` containing:
+1. Left: `<button>` for expand/collapse (text + chevron)
+2. Right: a `<div>` with optional Export CSV button + chevron button
+
+### What assumptions were encoded
+
+1. Export-only is sufficient for v1 (no round-trip import path)
+2. The exported file has no plan-context column — acceptable for a single-plan user; edge case for multi-plan users
+3. "Export CSV" label is clear without an icon
+4. Hiding the button when `records.length === 0` avoids a confusing empty-file download
+
+### What worked well
+
+- Zero-cost integration: `downloadCsv` was already imported in HistoryPage
+- Consistent with the existing export pattern in the history CSV (`CsvToolbar`)
+- `personalRecordsToCsv` is a pure function — easy to test and easy to extend
+- Null-field handling (empty cell for null load/reps) uses the same `encodeCsv` primitive already in use for swim/run actuals
+
+### What feels risky or incomplete
+
+- **Export-only**: no import path. If a user clears `exerciseHistoryStore` (or switches devices), the exported CSV cannot restore PRs. This is a known limitation of v1.
+- **No plan column**: for users with multiple plans, the exported file has no way to indicate which plan's PRs are included. The `PersonalRecordsSection` already receives pre-filtered records for the selected plan, so the data is plan-scoped — it just isn't labeled as such in the CSV.
+- **Header DOM restructure**: changing from one button to two changes tab-order and click-target behavior. The chevron button is now small (14px icon only); on mobile the tap target may feel smaller than before. Could be addressed by giving the chevron button more padding if user feedback indicates difficulty.
+
+### Verdict
+
+**Keep** — the feature is correct, minimal, and consistent with existing patterns. The two incomplete items (no import, no plan column) are known gaps that could be addressed in a future pass if needed. Neither is a regression; both are out-of-scope for a v1 export.
+
+---
+
 ## Pass 50 — 2026-06-05 (branch `claude/dreamy-mccarthy-UIayl`)
 
 ### Classification: **Keep with revisions**
