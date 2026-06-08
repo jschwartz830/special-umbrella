@@ -1,5 +1,58 @@
 # Implementation Plan
 
+## Pass 53 — 2026-06-08 (branch `claude/dreamy-mccarthy-B7dXE`)
+
+### Observations on entry
+
+- Baseline on entry: **814 passing, 0 failing** — clean exit from pass 52.
+- Pass 52 fixed `computePersonalRecords` date non-determinism, extracted `findPreviousSetsByExercise` to `lib/previousSetsHelper.ts`, and added Personal Records CSV export.
+- Full codebase audit performed: all source files, stores, pages, engine, lib utilities, and all test files.
+
+### Architecture summary (unchanged from pass 52)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,220 lines), CalendarPage (~950 lines), HistoryPage (~985 lines)
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Low | `ExtraWorkoutEntry.source` comment contradicted the actual migration behavior | **Fixed** |
+| Low | `makeWorkoutInstanceId`/`makeExtraWorkoutInstanceId` lived in outcomeStore.ts; historyStats.ts hardcoded the format string | **Fixed** (constructors moved to lib/workoutInstanceId.ts) |
+| Medium | rotationEngine functions did not filter entries/overrides by plan.id — callers bore the full responsibility; passing unfiltered store data would silently mix plans | **Fixed** (defensive plan.id filters added throughout) |
+| Info | No tests documenting plan isolation or swap_slot behavior in rotationEngine | **Fixed** (3 new regression tests) |
+
+### Prioritized plan
+
+1. ✅ **Fix misleading `ExtraWorkoutEntry.source` comment** — 1-line doc fix, zero risk
+2. ✅ **Move ID constructors to lib/workoutInstanceId.ts** — colocation + removes hardcoded format in historyStats.ts
+3. ✅ **Defensive plan.id filter in rotationEngine** — engine now correct even with unfiltered inputs
+4. ✅ **3 new regression-anchor tests** — plan isolation, swap_slot no-op on pointer
+
+### Rationale for sequencing
+
+Documentation first (zero risk). Refactor second (backward compatible, re-export preserves all callers). Engine fix third (additive filter, no behavior change for pre-filtered callers). Tests alongside each change.
+
+### Carried-forward risks (unchanged from pass 52)
+
+- `TodayPage.tsx` (~1,220 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `workoutInstanceId` parsing now defensive (parse uses date regex, handles underscore-heavy planIds).
+- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay` (should store just `calendarDate`).
+- CSV import has no user feedback for skipped/rejected entries.
+- History page filter state not persisted across page reloads.
+
+---
+
 ## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
 
 ### Observations on entry

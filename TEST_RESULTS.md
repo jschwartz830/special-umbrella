@@ -1,5 +1,45 @@
 # Test Results
 
+## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
+
+**Result: 821 passing, 0 failing** (+7 tests vs entry baseline of 814)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 20 (unchanged) |
+| Tests on entry | 814 |
+| Tests on exit | 821 |
+| Delta | +7 |
+| Failures | 0 |
+
+### Tests reviewed
+
+All 20 test files reviewed as part of the audit. No failing tests identified on entry.
+
+### Tests added
+
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `src/lib/__tests__/workoutInstanceId.test.ts` | 4 | `makeWorkoutInstanceId` (format, round-trip), `makeExtraWorkoutInstanceId` (format, round-trip) |
+| `src/engine/__tests__/rotationEngine.test.ts` | 3 | `computeCurrentDayIndex` plan isolation; `getResolvedDaysRange` plan isolation; `getResolvedDaysRange` swap_slot no-op on pointer |
+
+### Results (all 821 tests pass)
+
+```
+Test Files  20 passed (20)
+Tests  821 passed (821)
+```
+
+### Important areas still untested
+
+- **TodayPage / CalendarPage integration** — no component tests; relies on manual browser testing
+- **Double-day flow end-to-end** — complex state machine across TodayPage + historyStore + outcomeStore; tested via individual store/engine unit tests only
+- **Outcome date-change conflict detection** — `updateEntryDate` overwrites silently; no test for the collision case (noted as carry-forward from pass 47)
+- **CSV import rejection feedback** — `historyFromCsv` drops invalid entries silently; no test verifying the user-facing message when entries are rejected
+- **ActiveWorkoutTracker** — timer-based, session-local state; not unit-tested
+
+---
+
 ## 2026-06-07 (fifty-second pass) — branch `claude/dreamy-mccarthy-j725m`
 
 **Result: 814 passing, 0 failing** (+13 tests vs entry baseline of 801)

@@ -240,12 +240,6 @@ export const useOutcomeStore = create<OutcomeState>()(
   ),
 )
 
-/** Build the workoutInstanceId from plan + date */
-export function makeWorkoutInstanceId(planId: string, calendarDate: string): string {
-  return `${planId}_${calendarDate}`
-}
-
-/** Build the workoutInstanceId for an extra (ad-hoc) workout entry */
-export function makeExtraWorkoutInstanceId(planId: string, calendarDate: string, extraId: string): string {
-  return `${planId}_${calendarDate}_extra_${extraId}`
-}
+// Re-export ID constructors from their canonical location so callers that
+// import from outcomeStore continue to work without changes.
+export { makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../lib/workoutInstanceId'

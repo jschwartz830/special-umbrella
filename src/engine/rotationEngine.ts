@@ -45,15 +45,16 @@ export function computeCurrentDayIndex(
 
   const entryByDate = new Map<string, HistoryEntry>()
   for (const e of entries) {
+    if (e.planId !== plan.id) continue
     const existing = entryByDate.get(e.calendarDate)
     if (!existing || e.createdAt > existing.createdAt) {
       entryByDate.set(e.calendarDate, e)
     }
   }
 
-  const sortedOverrides = [...overrides].sort((a, b) =>
-    a.appliedAt.localeCompare(b.appliedAt),
-  )
+  const sortedOverrides = [...overrides]
+    .filter(o => o.planId === plan.id)
+    .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt))
 
   const dayCount = differenceInCalendarDays(parseISO(targetDate), parseISO(plan.startDate))
   let pointer = plan.startDayIndex
@@ -88,7 +89,7 @@ export function getTodayResolvedDay(
   // Guard: a plan with no days can't have a meaningful rotation day.
   // Return a synthetic rest-day so callers don't receive planDay=undefined.
   if (plan.days.length === 0) {
-    const todayEntries = entries.filter(e => e.calendarDate === today)
+    const todayEntries = entries.filter(e => e.planId === plan.id && e.calendarDate === today)
     const entry = todayEntries.length > 1
       ? todayEntries.reduce((best, e) => (e.createdAt > best.createdAt ? e : best))
       : todayEntries[0]
@@ -107,9 +108,9 @@ export function getTodayResolvedDay(
     }
   }
 
-  const sortedOverrides = [...overrides].sort((a, b) =>
-    a.appliedAt.localeCompare(b.appliedAt),
-  )
+  const sortedOverrides = [...overrides]
+    .filter(o => o.planId === plan.id)
+    .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt))
 
   // Base pointer (everything before today) + today's overrides
   let idx = computeCurrentDayIndex(plan, entries, overrides, today)
@@ -118,7 +119,7 @@ export function getTodayResolvedDay(
   const planDay = plan.days[idx]
   // Match deduplication behavior of computeCurrentDayIndex / getResolvedDaysRange:
   // pick the entry with the newest createdAt when duplicates exist for today.
-  const todayEntries = entries.filter(e => e.calendarDate === today)
+  const todayEntries = entries.filter(e => e.planId === plan.id && e.calendarDate === today)
   const entry = todayEntries.length > 1
     ? todayEntries.reduce((best, e) => (e.createdAt > best.createdAt ? e : best))
     : todayEntries[0]
@@ -146,9 +147,9 @@ export function getUpcomingDays(
 ): ResolvedDay[] {
   if (plan.days.length === 0) return []
 
-  const sortedOverrides = [...overrides].sort((a, b) =>
-    a.appliedAt.localeCompare(b.appliedAt),
-  )
+  const sortedOverrides = [...overrides]
+    .filter(o => o.planId === plan.id)
+    .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt))
 
   // Start from today's pointer (with today's overrides applied)
   let pointer = computeCurrentDayIndex(plan, entries, overrides, today)
@@ -195,15 +196,16 @@ export function getResolvedDaysRange(
 
   const entryByDate = new Map<string, HistoryEntry>()
   for (const e of entries) {
+    if (e.planId !== plan.id) continue
     const existing = entryByDate.get(e.calendarDate)
     if (!existing || e.createdAt > existing.createdAt) {
       entryByDate.set(e.calendarDate, e)
     }
   }
 
-  const sortedOverrides = [...overrides].sort((a, b) =>
-    a.appliedAt.localeCompare(b.appliedAt),
-  )
+  const sortedOverrides = [...overrides]
+    .filter(o => o.planId === plan.id)
+    .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt))
 
   // Pointer at the start of fromDate (processes everything before fromDate)
   let pointer = computeCurrentDayIndex(plan, entries, overrides, fromDate)

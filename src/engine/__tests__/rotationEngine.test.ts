@@ -207,6 +207,22 @@ describe('computeCurrentDayIndex', () => {
     expect(idx).toBe(2)
   })
 
+  it('ignores entries for a different plan (plan isolation)', () => {
+    // An entry with planId !== plan.id must not advance the pointer.
+    const plan = makePlan(4) // id = 'plan-1'
+    const otherEntry: HistoryEntry = {
+      id: 'foreign-entry',
+      planId: 'plan-9',        // ← different plan
+      calendarDate: '2026-01-01',
+      planDayIndex: 0,
+      action: 'complete',
+      createdAt: '2026-01-01T12:00:00Z',
+    }
+    // plan-1 has no entries → pointer should stay at startDayIndex (0)
+    const idx = computeCurrentDayIndex(plan, [otherEntry], [], '2026-01-02')
+    expect(idx).toBe(0)
+  })
+
   it('removing a retroactive jump override without re-adding one shifts the rotation for subsequent dates', () => {
     // Regression anchor: CalendarPage.logForDate must re-add a jump when
     // removing an existing one, even if the user confirms the same planDayIndex.
@@ -708,5 +724,46 @@ describe('getResolvedDaysRange', () => {
     // Most recent = skip, so pointer advances by 1 and status is past_skip
     const result = getResolvedDaysRange(plan, entries, [], '2026-01-10', '2026-01-01', '2026-01-01')
     expect(result[0].status).toBe('past_skip')
+  })
+
+  it('ignores entries for a different plan (plan isolation)', () => {
+    // Entries for 'plan-2' must not affect the pointer for 'plan-1'.
+    const plan = makePlan(4)
+    const otherPlanEntry: HistoryEntry = {
+      id: 'other-entry',
+      planId: 'plan-2',         // ← different plan
+      calendarDate: '2026-01-01',
+      planDayIndex: 0,
+      action: 'complete',
+      createdAt: '2026-01-01T12:00:00Z',
+    }
+    // With only entries for plan-2, plan-1's pointer should stay at 0 (no logged days)
+    const result = getResolvedDaysRange(
+      plan, [otherPlanEntry], [], '2026-01-10', '2026-01-02', '2026-01-02',
+    )
+    expect(result[0].planDayIndex).toBe(0)
+    expect(result[0].status).toBe('past_unlogged')
+  })
+
+  it('swap_slot override does not change planDayIndex (pointer stays, planDay is unchanged)', () => {
+    // swap_slot changes only the slot type shown in the UI layer; the engine
+    // ignores it for pointer purposes. Verify that a swap_slot override on
+    // today leaves planDayIndex at the natural pointer value.
+    const plan = makePlan(4)
+    const swapOverride: OverrideEntry = {
+      id: 'ov-swap',
+      planId: 'plan-1',
+      appliedAt: '2026-01-03T12:00:00Z',
+      type: 'swap_slot',
+      slotId: 'slot-0',
+      newSlotType: 'yoga',
+    }
+    // No prior entries → natural pointer at 0 on Jan 3 (Jan 1-2 unlogged).
+    // swap_slot does not affect pointer → planDayIndex remains 0.
+    const result = getResolvedDaysRange(
+      plan, [], [swapOverride], '2026-01-10', '2026-01-03', '2026-01-03',
+    )
+    expect(result[0].planDayIndex).toBe(0)
+    expect(result[0].planDay.label).toBe('Day 1') // planDay itself unchanged
   })
 })
