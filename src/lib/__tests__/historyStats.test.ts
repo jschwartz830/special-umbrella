@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips } from '../historyStats'
-import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
+import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
 function entry(
@@ -542,7 +542,7 @@ function makeEntry(
 
 function makeExtra(
   date: string,
-  type: 'yoga' | 'swim' | 'recovery_run' = 'yoga',
+  type: WorkoutType = 'yoga',
   id = `extra_${date}`,
   planId = 'plan-1',
 ): ExtraWorkoutEntry {
