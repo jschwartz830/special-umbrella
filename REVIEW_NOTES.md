@@ -1,5 +1,104 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Doc fix: corrected a misleading comment on `ExtraWorkoutEntry.source` that described the wrong migration default. (2) Refactor: moved `makeWorkoutInstanceId` and `makeExtraWorkoutInstanceId` from `outcomeStore.ts` to `lib/workoutInstanceId.ts` (canonical location), updated `historyStats.ts` to use them instead of hardcoded format strings. (3) Defensive fix: added `plan.id` filters throughout `rotationEngine.ts` so the engine produces correct results even when passed unfiltered store data — also revealed and documented the `swap_slot` override's non-effect on the rotation pointer.
+
+2. **Highest confidence:** The ID constructor move — purely structural, zero behavior change, existing call sites re-export covers all callers. The engine plan.id filters — additive (stricter), all existing callers already pre-filter so no path changes on the normal execution.
+
+3. **What is risky:** Nothing in this pass is risky. The engine filter change is the most impactful — a test confirmed the pre-existing behavior (unfiltered data was being processed cross-plan) and the fix makes it correct by construction.
+
+4. **What to review first:** Commit 3 (`736aa3b`) — the `rotationEngine.ts` changes touch the most critical file. The diff is small (one `if` guard per loop, one `.filter()` per sort). Verify that the test for "swap_slot does not change planDayIndex" matches your mental model.
+
+---
+
+### Biggest issues found
+
+1. **Engine plan isolation gap** — `computeCurrentDayIndex` and `getResolvedDaysRange` did not filter entries/overrides by `plan.id` before processing. Callers like `useActivePlan` and `buildMonthGrid` always pre-filter, but the engine itself was not defensive. A caller passing unfiltered store arrays would silently use entries from other plans. Fixed with `plan.id` guard in all four functions.
+
+2. **Misleading comment on `ExtraWorkoutEntry.source`** — The JSDoc claimed undefined pre-migration records are "treated as 'double_day'". The actual v1 migration (added in pass 43) sets them to `'history'`. Developer reading the type definition would infer incorrect behavior about Undo. Fixed.
+
+3. **`makeWorkoutInstanceId` format scattered** — Two hardcoded `${planId}_${calendarDate}` strings in `historyStats.ts` were format-coupled to `outcomeStore.ts` without sharing the canonical construction function. If the format changed, `historyStats.ts`'s effort lookup would silently return undefined. Fixed.
+
+---
+
+### Improvements completed
+
+| # | Type | Change | Tests Added |
+|---|------|--------|-------------|
+| 1 | doc-fix | Corrected `ExtraWorkoutEntry.source` comment | 0 |
+| 2 | refactor | Moved ID constructors to `lib/workoutInstanceId.ts` | 4 |
+| 3 | fix | Defensive plan.id filters in rotationEngine | 3 |
+
+**Test delta: +7 (814 → 821, all passing)**
+
+---
+
+### Small features added
+
+None. The codebase is in excellent shape after 52 prior passes; this run focused on correctness and maintainability rather than new features.
+
+---
+
+### Medium-complexity feature explored
+
+None. Given the small, targeted nature of the issues found, and the absence of clear user-facing gaps not already addressed in prior passes, no medium feature was attempted this run.
+
+See **Recommendations only** below for the one feature worth considering next.
+
+---
+
+### Definitely keep
+
+- All three commits — low risk, clear value, no behavior regression.
+
+### Probably keep but tweak
+
+- Nothing in this pass.
+
+### Do not keep
+
+- Nothing in this pass.
+
+---
+
+### Recommendations only (not implemented)
+
+**1. Expose `loggingUpcoming` stale state fix (TodayPage)**
+`loggingUpcoming` in TodayPage stores a full `ResolvedDay` object when the user opens the "log tomorrow" modal. If an override is applied in another tab while the modal is open, the stored `ResolvedDay` becomes stale. Fix: replace `loggingUpcoming: ResolvedDay | null` with `loggingUpcoming: { calendarDate: string; extraId?: string } | null` and re-derive `ResolvedDay` from the store on confirm. Low risk, small change, but TodayPage is 1200+ lines.
+
+**2. CSV import feedback for rejected entries**
+`historyFromCsv` silently drops entries with unknown planIds or malformed dates. The import dialog shows only success state. Suggested fix: surface `{ imported: N, skipped: N, reasons: string[] }` from the import parser and show a summary in the success toast.
+
+**3. History page filter persistence**
+`filterPlanId` in HistoryPage resets to the active plan on every page reload. Persisting it to `sessionStorage` is a small change that improves UX for users who regularly review a non-active plan's history.
+
+---
+
+### Open questions for you
+
+1. **Plan isolation in rotationEngine** — The fix adds a `plan.id` filter inside the engine. The behavior of all real callers is unchanged (they all pre-filter). Is this the right trade-off, or do you prefer callers to remain solely responsible for filtering (in which case the engine filter should be reverted and the test should document the caller contract instead)?
+
+2. **`makeWorkoutInstanceId` location** — `OutcomeModal.tsx` still imports from `outcomeStore.ts` via the re-export. Is that acceptable, or would you prefer the import be updated directly to `lib/workoutInstanceId.ts`? (Either works; re-export is backward compatible.)
+
+3. **Feature direction for next pass** — The "loggingUpcoming stale state" fix and "CSV import feedback" are both small, safe UX improvements. If you'd like one addressed next, just say which.
+
+---
+
+### Known issues or incomplete work
+
+None. All changes are committed and all 821 tests pass.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-06-07 (fifty-second pass) — branch `claude/dreamy-mccarthy-j725m`
 
 ### Executive summary

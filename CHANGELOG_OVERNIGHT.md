@@ -1,5 +1,66 @@
 # Overnight Changelog
 
+## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
+
+Baseline on entry: **814 passing, 0 failing**. Exit state: **821 passing, 0 failing** (+7 tests).
+
+---
+
+### 1. fix(types): Correct misleading `ExtraWorkoutEntry.source` comment
+
+**Summary:** The JSDoc comment on the optional `source` field in `ExtraWorkoutEntry` claimed that pre-migration records without a `source` value are "treated as 'double_day' for safety." The v1 migration introduced in pass 43 actually sets them to `'history'` — the conservative choice that keeps the entry and prevents accidental removal on Undo.
+
+**Why it matters:** A developer reading the type definition would infer the wrong default behavior and might write code assuming old extras would be auto-removed on Undo. The comment now accurately describes what the migration does and why.
+
+**Files changed:** `src/types/index.ts`
+
+**Risks/tradeoffs:** Zero — doc-only change.
+
+**Rollback:** `git revert b8c3ae7`
+
+---
+
+### 2. refactor: Move `makeWorkoutInstanceId` / `makeExtraWorkoutInstanceId` to `lib/workoutInstanceId.ts`
+
+**Summary:** These two constructor functions lived in `src/store/outcomeStore.ts` but logically belong alongside `parseWorkoutInstanceId` in `src/lib/workoutInstanceId.ts`. Moved both constructors to the lib file. `outcomeStore.ts` now re-exports them for backward compatibility so no call sites need to change. Updated `historyStats.ts` to use the canonical constructors instead of hardcoded string templates (`${planId}_${calendarDate}`).
+
+**Why it matters:**
+- Colocation: all three format helpers (make/make/parse) are now in one file.
+- Reduces format-drift risk: `historyStats.ts` was hardcoding the `workoutInstanceId` format string in two places. If the format ever changes, `historyStats.ts` would silently use wrong lookup keys for outcome data (avgEffort, effort attribution). Now it uses the canonical constructors.
+
+**Files changed:**
+- `src/lib/workoutInstanceId.ts` — added `makeWorkoutInstanceId`, `makeExtraWorkoutInstanceId`
+- `src/store/outcomeStore.ts` — replaced inline definitions with re-export
+- `src/lib/historyStats.ts` — uses canonical constructors, added import
+- `src/lib/__tests__/workoutInstanceId.test.ts` — 4 new tests (constructor + round-trip)
+
+**Risks/tradeoffs:** Very low. Re-export from `outcomeStore.ts` means all existing callers (`OutcomeModal.tsx`) continue to work without changes. Behavior of `historyStats.ts` is identical since the string format is unchanged.
+
+**Rollback:** `git revert 4167158`
+
+---
+
+### 3. fix: Defensive `plan.id` filters throughout rotationEngine
+
+**Summary:** All four public functions in `rotationEngine.ts` (`computeCurrentDayIndex`, `getTodayResolvedDay`, `getUpcomingDays`, `getResolvedDaysRange`) now filter their `entries` and `overrides` inputs to the current `plan.id` before processing. Previously, callers bore the full responsibility for pre-filtering — passing unfiltered store arrays would silently mix entries from multiple plans, producing wrong rotation pointers.
+
+**Why it matters:** This was discovered while writing plan-isolation tests. All existing callers (useActivePlan, buildMonthGrid) already pre-filter correctly, so there is no behavior change on the normal path. But the engine was fragile: a new caller or test that passed unfiltered data would get silently wrong results. The fix makes the engine correct by construction.
+
+**Files changed:**
+- `src/engine/rotationEngine.ts` — plan.id guard in all four functions
+- `src/engine/__tests__/rotationEngine.test.ts` — 3 new regression tests
+
+**New tests:**
+1. `computeCurrentDayIndex: ignores entries for a different plan` — entries from `plan-9` don't advance plan-1's pointer
+2. `getResolvedDaysRange: ignores entries for a different plan` — plan isolation in the calendar range function
+3. `getResolvedDaysRange: swap_slot override does not change planDayIndex` — documents that swap_slot only affects the UI layer, not the rotation pointer
+
+**Risks/tradeoffs:** Low. The filter is additive (stricter input validation). Callers that already pre-filter see no change. The only observable difference is for hypothetical callers passing mixed-plan data — they would now get correct (plan-scoped) results instead of wrong (cross-plan) results.
+
+**Rollback:** `git revert 736aa3b`
+
+---
+
 ## 2026-06-07 (fifty-second pass) — branch `claude/dreamy-mccarthy-j725m`
 
 Baseline on entry: **801 passing, 0 failing**. Exit state: **814 passing, 0 failing** (+13 tests).
