@@ -1,5 +1,6 @@
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutType, WorkoutOutcome } from '../types'
 import type { ExerciseSessionRecord } from '../store/exerciseHistoryStore'
+import { makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from './workoutInstanceId'
 
 export interface HistoryStats {
   totalLogged: number
@@ -358,7 +359,7 @@ export function computeWorkoutTypeBreakdown(
     ensureType(type)
     if (e.action === 'complete') {
       counts.get(type)!.completed++
-      const outcome = outcomes[`${e.planId}_${e.calendarDate}`]
+      const outcome = outcomes[makeWorkoutInstanceId(e.planId, e.calendarDate)]
       addEffort(type, outcome?.perceivedEffort)
     } else if (e.action === 'skip') {
       counts.get(type)!.skipped++
@@ -370,7 +371,7 @@ export function computeWorkoutTypeBreakdown(
     if (!inRange(x.calendarDate)) continue
     ensureType(x.workoutType)
     counts.get(x.workoutType)!.completed++
-    const extraKey = `${x.planId}_${x.calendarDate}_extra_${x.id}`
+    const extraKey = makeExtraWorkoutInstanceId(x.planId, x.calendarDate, x.id)
     addEffort(x.workoutType, outcomes[extraKey]?.perceivedEffort)
   }
 

@@ -1,5 +1,44 @@
 import { describe, it, expect } from 'vitest'
-import { parseWorkoutInstanceId } from '../workoutInstanceId'
+import {
+  makeWorkoutInstanceId,
+  makeExtraWorkoutInstanceId,
+  parseWorkoutInstanceId,
+} from '../workoutInstanceId'
+
+// ── makeWorkoutInstanceId ─────────────────────────────────────────────────────
+
+describe('makeWorkoutInstanceId', () => {
+  it('returns planId_date format', () => {
+    expect(makeWorkoutInstanceId('plan123', '2026-05-21')).toBe('plan123_2026-05-21')
+  })
+
+  it('round-trips through parseWorkoutInstanceId', () => {
+    const planId = 'abc9xyz'
+    const calendarDate = '2026-11-30'
+    const id = makeWorkoutInstanceId(planId, calendarDate)
+    expect(parseWorkoutInstanceId(id)).toEqual({ planId, calendarDate })
+  })
+})
+
+// ── makeExtraWorkoutInstanceId ────────────────────────────────────────────────
+
+describe('makeExtraWorkoutInstanceId', () => {
+  it('returns planId_date_extra_extraId format', () => {
+    expect(makeExtraWorkoutInstanceId('plan1', '2026-06-01', 'ex99')).toBe(
+      'plan1_2026-06-01_extra_ex99',
+    )
+  })
+
+  it('round-trips through parseWorkoutInstanceId (returns planId + date)', () => {
+    const planId = 'myplan'
+    const calendarDate = '2026-03-15'
+    const extraId = 'xyz'
+    const id = makeExtraWorkoutInstanceId(planId, calendarDate, extraId)
+    expect(parseWorkoutInstanceId(id)).toEqual({ planId, calendarDate })
+  })
+})
+
+// ── parseWorkoutInstanceId ────────────────────────────────────────────────────
 
 describe('parseWorkoutInstanceId', () => {
   it('parses a standard instanceId (planId without underscores)', () => {
