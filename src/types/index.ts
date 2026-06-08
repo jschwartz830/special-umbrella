@@ -136,8 +136,8 @@ export interface ExtraWorkoutEntry {
    * Where this extra originated. Used by Undo on TodayPage to distinguish
    * double-day bonus entries (which Undo should remove) from user-initiated
    * extras added via History or Calendar (which Undo should leave alone).
-   * Undefined on pre-migration records — treated as 'double_day' for safety
-   * so no orphaned extras are ever left behind.
+   * Pre-v1 records have source=undefined; the v1 migration in historyStore
+   * sets them to 'history' (conservative — keeps the entry, never auto-removes).
    */
   source?: 'history' | 'double_day'
 }
