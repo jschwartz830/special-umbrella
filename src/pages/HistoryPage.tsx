@@ -23,7 +23,7 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv, personalRecordsToCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeAdherenceRate } from '../lib/historyStats'
 import type { PersonalRecord, WeeklyBreakdown, WorkoutTypeBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -140,6 +140,7 @@ export function HistoryPage() {
   }), [filteredEntries, filteredExtras])
 
   const stats = computeHistoryStats(filteredEntries, filteredExtras, today)
+  const adherenceRate = computeAdherenceRate(filteredEntries, filteredExtras, today, 30)
 
   // For single-plan view: use computeWorkoutTypeBreakdown which gives completed/skipped
   // counts and avgEffort per type from outcome data. For 'all' plans, fall back to the
@@ -434,6 +435,17 @@ export function HistoryPage() {
               <StatTile label="30-day" value={stats.last30Completed} />
               <StatTile label="Total" value={stats.totalCompleted} />
             </div>
+            {adherenceRate.rate !== null && (
+              <p className="text-xs text-slate-500 text-center">
+                <span className={adherenceRate.rate >= 80 ? 'text-emerald-400' : adherenceRate.rate >= 50 ? 'text-amber-400' : 'text-slate-400'}>
+                  {adherenceRate.rate}% adherence
+                </span>
+                {' '}
+                <span className="text-slate-600">
+                  ({adherenceRate.completedCount} completed, {adherenceRate.skippedCount} skipped · last 30 days)
+                </span>
+              </p>
+            )}
             {typeMixLabel && (
               <p className="text-xs text-slate-500 text-center">{typeMixLabel}</p>
             )}
