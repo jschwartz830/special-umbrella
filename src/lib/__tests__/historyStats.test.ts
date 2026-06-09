@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeAdherenceRate } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -1859,3 +1859,139 @@ describe('computeWorkoutTypeBreakdown — multi-slot plan days', () => {
     expect(result.run).toBeUndefined()
   })
 })
+
+// ── computeAdherenceRate ──────────────────────────────────────────────────────
+
+describe('computeAdherenceRate', () => {
+  const TODAY = '2026-06-09'
+
+  function e(date: string, action: HistoryEntry['action']): HistoryEntry {
+    return {
+      id: `e_${date}_${action}`,
+      planId: 'plan-1',
+      calendarDate: date,
+      planDayIndex: action === 'day_off' ? undefined : 0,
+      action,
+      createdAt: `${date}T12:00:00Z`,
+    }
+  }
+
+  function x(date: string): ExtraWorkoutEntry {
+    return {
+      id: `x_${date}`,
+      planId: 'plan-1',
+      calendarDate: date,
+      workoutType: 'yoga',
+      workoutName: 'Yoga',
+      createdAt: `${date}T13:00:00Z`,
+    }
+  }
+
+  it('returns rate=null when no entries exist', () => {
+    const result = computeAdherenceRate([], [], TODAY)
+    expect(result.rate).toBeNull()
+    expect(result.completedCount).toBe(0)
+    expect(result.skippedCount).toBe(0)
+  })
+
+  it('returns 100% when only complete entries', () => {
+    const entries = [e('2026-06-07', 'complete'), e('2026-06-08', 'complete')]
+    const result = computeAdherenceRate(entries, [], TODAY)
+    expect(result.rate).toBe(100)
+    expect(result.completedCount).toBe(2)
+    expect(result.skippedCount).toBe(0)
+  })
+
+  it('returns 0% when only skip entries', () => {
+    const entries = [e('2026-06-07', 'skip'), e('2026-06-08', 'skip')]
+    const result = computeAdherenceRate(entries, [], TODAY)
+    expect(result.rate).toBe(0)
+    expect(result.completedCount).toBe(0)
+    expect(result.skippedCount).toBe(2)
+  })
+
+  it('computes mixed complete/skip rate correctly', () => {
+    // 3 complete, 1 skip → 75%
+    const entries = [
+      e('2026-06-06', 'complete'),
+      e('2026-06-07', 'complete'),
+      e('2026-06-08', 'complete'),
+      e('2026-06-09', 'skip'),
+    ]
+    const result = computeAdherenceRate(entries, [], TODAY)
+    expect(result.rate).toBe(75)
+    expect(result.completedCount).toBe(3)
+    expect(result.skippedCount).toBe(1)
+  })
+
+  it('excludes day_off entries (they are intentional rest, not missed workouts)', () => {
+    const entries = [
+      e('2026-06-07', 'complete'),
+      e('2026-06-08', 'day_off'), // should not affect rate
+    ]
+    const result = computeAdherenceRate(entries, [], TODAY)
+    expect(result.rate).toBe(100) // only 1 complete, 0 skips
+    expect(result.completedCount).toBe(1)
+    expect(result.skippedCount).toBe(0)
+  })
+
+  it('counts extras as completed', () => {
+    const extras = [x('2026-06-08'), x('2026-06-07')]
+    const result = computeAdherenceRate([], extras, TODAY)
+    expect(result.completedCount).toBe(2)
+    expect(result.rate).toBe(100)
+  })
+
+  it('extras and rotation completes combine for the numerator', () => {
+    // 1 complete, 1 extra, 1 skip → 2/3 ≈ 67%
+    const entries = [e('2026-06-07', 'complete'), e('2026-06-09', 'skip')]
+    const extras = [x('2026-06-08')]
+    const result = computeAdherenceRate(entries, extras, TODAY)
+    expect(result.completedCount).toBe(2)
+    expect(result.skippedCount).toBe(1)
+    expect(result.rate).toBe(67)
+  })
+
+  it('respects the default 30-day window (excludes entries older than 30 days)', () => {
+    // 31 days ago = outside window; 30 days ago = on the boundary (inclusive)
+    const outsideDate = shiftTestDay(TODAY, -30) // 30 days before today = outside 30-day window (window starts at -29)
+    const insideDate = shiftTestDay(TODAY, -29) // 29 days before today = inside
+    const entries = [
+      e(outsideDate, 'skip'),  // day -30 — outside (window is -29 to today)
+      e(insideDate, 'complete'), // day -29 — inside
+    ]
+    const result = computeAdherenceRate(entries, [], TODAY)
+    // Only insideDate counts → 1 complete, 0 skip
+    expect(result.completedCount).toBe(1)
+    expect(result.skippedCount).toBe(0)
+    expect(result.rate).toBe(100)
+  })
+
+  it('uses a custom lookbackDays window', () => {
+    const entries = [
+      e('2026-06-03', 'complete'), // 6 days ago — inside 7d window
+      e('2026-06-01', 'skip'),     // 8 days ago — outside 7d window
+    ]
+    const result = computeAdherenceRate(entries, [], TODAY, 7)
+    expect(result.completedCount).toBe(1)
+    expect(result.skippedCount).toBe(0)
+    expect(result.rate).toBe(100)
+  })
+
+  it('excludes future-dated entries', () => {
+    const entries = [e('2099-01-01', 'complete')]
+    const result = computeAdherenceRate(entries, [], TODAY)
+    expect(result.rate).toBeNull()
+  })
+})
+
+/** Inline day-shift helper — avoids importing shiftDay (private to historyStats). */
+function shiftTestDay(date: string, delta: number): string {
+  const [y, m, d] = date.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + delta)
+  const yy = dt.getUTCFullYear()
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getUTCDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}

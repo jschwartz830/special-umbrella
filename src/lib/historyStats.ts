@@ -85,6 +85,65 @@ export function computeHistoryStats(
   return { totalLogged, totalCompleted, last7Completed, last30Completed, currentStreak, longestStreak }
 }
 
+// ── Adherence rate ────────────────────────────────────────────────────────────
+
+export interface AdherenceRate {
+  /** Number of 'complete' rotation entries in the window (extras always count as complete). */
+  completedCount: number
+  /** Number of 'skip' rotation entries in the window. */
+  skippedCount: number
+  /**
+   * completedCount / (completedCount + skippedCount) as a 0–100 integer.
+   * `null` when there are no complete or skip entries in the window.
+   */
+  rate: number | null
+}
+
+/**
+ * Compute the completion adherence rate over a sliding window ending on `today`.
+ *
+ * Adherence = completed / (completed + skipped) — ignores `day_off` entries
+ * because those are intentional rest days, not missed workouts.
+ *
+ * Extras are counted as completed (the user showed up and did extra work).
+ *
+ * `lookbackDays` defaults to 30 (inclusive of today). Pass a smaller window
+ * (e.g. 7) for a recent-only view.
+ *
+ * Returns `null` for `rate` when no complete or skip entries exist in the window,
+ * so callers can suppress the metric rather than display "NaN%".
+ */
+export function computeAdherenceRate(
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  today: string,
+  lookbackDays = 30,
+): AdherenceRate {
+  const from = shiftDay(today, -(lookbackDays - 1))
+
+  const inWindow = (date: string) => date >= from && date <= today
+
+  const completedFromEntries = entries.filter(
+    e => e.action === 'complete' && inWindow(e.calendarDate),
+  ).length
+
+  const skippedFromEntries = entries.filter(
+    e => e.action === 'skip' && inWindow(e.calendarDate),
+  ).length
+
+  const completedFromExtras = extras.filter(e => inWindow(e.calendarDate)).length
+
+  const completedCount = completedFromEntries + completedFromExtras
+  const skippedCount = skippedFromEntries
+  const total = completedCount + skippedCount
+
+  return {
+    completedCount,
+    skippedCount,
+    rate: total > 0 ? Math.round((completedCount / total) * 100) : null,
+  }
+}
+
 // ── Plan progress ─────────────────────────────────────────────────────────────
 
 export interface PlanProgress {
