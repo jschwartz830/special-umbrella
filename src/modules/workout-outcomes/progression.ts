@@ -100,7 +100,9 @@ function buildWeightsRecommendation(
   // Only generate a recommendation when progression logic is explicitly configured.
   if (!exercises.some(ex => ex.progressionMode != null)) return null
 
-  const mode = exercises[0].progressionMode ?? 'single'
+  // Use the first exercise that has a mode set — exercises[0] may be a warmup
+  // exercise with no progressionMode, while the main lifts in later positions do.
+  const mode = exercises.find(ex => ex.progressionMode != null)?.progressionMode ?? 'single'
 
   if ((effort ?? 0) >= 5) {
     return {

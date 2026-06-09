@@ -189,6 +189,35 @@ describe('buildProgressionRecommendation — weights: single mode (default)', ()
     )
     expect(result?.mode).toBe('single')
   })
+
+  it('uses progressionMode from the first exercise that has one set — skips warmup at [0]', () => {
+    // Regression: exercises[0] is a warmup with no progressionMode;
+    // exercises[1] is the main lift with progressionMode: 'double'.
+    // Before the fix, mode would default to 'single' because exercises[0].progressionMode
+    // was undefined and the fallback ?? 'single' fired. Now it scans to find the first
+    // exercise with a mode set.
+    const result = buildProgressionRecommendation(
+      makeSlot('weights'),
+      makeOutcome({
+        weightsActual: {
+          exercises: [
+            {
+              exercise: 'Warmup',
+              // no progressionMode — warmup sets do not track progression
+              sets: [completedSet({ targetReps: 10, actualReps: 10, actualLoad: 45 })],
+            },
+            {
+              exercise: 'Squat',
+              progressionMode: 'double',
+              sets: [completedSet(), completedSet(), completedSet()],
+            },
+          ],
+        },
+      }),
+    )
+    expect(result?.mode).toBe('double')
+    expect(result?.action).toBe('progress')
+  })
 })
 
 // ── Weights: double mode ──────────────────────────────────────────────────────
