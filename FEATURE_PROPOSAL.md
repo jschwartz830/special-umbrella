@@ -1,5 +1,54 @@
 # Feature Proposals
 
+## Pass 54 — 2026-06-09 (branch `claude/dreamy-mccarthy-advhpt`)
+
+### Feature selected
+
+**Adherence rate — rolling 30-day completion percentage in HistoryPage stats**
+
+### Why it was selected
+
+HistoryPage already shows four numeric stat tiles (total workouts, current streak, best streak, weekly average), but all four measure *quantity*. There is no *quality* metric — nothing that tells the user what fraction of scheduled workouts they actually completed vs skipped. A single adherence percentage closes this gap with existing data.
+
+Every piece of data needed already exists in `historyStore` (`HistoryEntry[]` with `action: 'complete' | 'skip' | 'day_off'` and `ExtraWorkoutEntry[]`). No new store, no new schema, no new persistence. The function follows the same pure-function pattern already established by `computeHistoryStats`, `computeStreaks`, and `computePlanProgress` in `historyStats.ts`.
+
+### Implementation scope for this run
+
+**New utility: `computeAdherenceRate` in `src/lib/historyStats.ts`**
+- Input: `entries: HistoryEntry[]`, `extras: ExtraWorkoutEntry[]`, `today: string`, `lookbackDays?: number` (default 30)
+- Output: `AdherenceRate { completedCount, skippedCount, rate: number | null }`
+- Logic: filter entries to `[today - lookbackDays + 1, today]`; count `action === 'complete'` + extras as completed; count `action === 'skip'` as skipped; `day_off` is excluded (not an actionable missed workout); return `null` if total === 0
+
+**New display in `src/pages/HistoryPage.tsx`**
+- One line below the four stat tiles: `{rate}% adherence (X completed, Y skipped · last 30 days)`
+- Color-coded: ≥80% emerald, ≥50% amber, <50% default slate
+- Hidden entirely when `rate === null` (no data)
+
+**New tests: 10 cases in `src/lib/__tests__/historyStats.test.ts`**
+
+### Assumptions being made
+
+- `day_off` entries represent intentional rest days and should not count as missed workouts in the adherence rate
+- 30 days is the right default lookback for "recent" adherence
+- Extra workouts count toward completion (they represent genuine workout activity)
+- The stat is displayed but not persisted — it is always derived on render from the current history window
+
+### Open product / UX decisions
+
+1. Should the lookback window be user-configurable? Currently fixed at 30 days. Could surface a toggle (7 / 30 / 90 days) in a future pass.
+2. Should `day_off` count as "compliant" (scheduled rest → respected) rather than being excluded? Currently excluded because the HistoryPage filter can be set to show only certain plan ranges, making "scheduled rest" hard to determine without the rotation engine.
+3. Should adherence be shown per-plan when multiple plans exist? Currently computed over the filtered entries visible on HistoryPage (which is already plan-filtered by the active filter dropdown).
+
+### Why not implement a different feature
+
+**Considered:** Editing/merging duplicate exercise history entries in `exerciseHistoryStore`. This would require a non-trivial UI (select, confirm, merge logic) with real data-loss risk. Deferred — higher risk than benefit for one overnight pass.
+
+**Considered:** A "missed workouts" calendar overlay (red dots on CalendarPage). Requires the rotation engine to determine what *should* have been done on each past date — which is expensive and stateful. Deferred.
+
+**Chosen approach rationale:** `computeAdherenceRate` is a pure function over already-loaded data. The display is additive (no existing UI removed or restructured). Risk is near-zero. The function is independently testable and the UI change is a single conditional render block.
+
+---
+
 ## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
 
 ### Feature selected

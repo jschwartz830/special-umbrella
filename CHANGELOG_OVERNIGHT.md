@@ -1,5 +1,67 @@
 # Overnight Changelog
 
+## 2026-06-09 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-advhpt`
+
+Baseline on entry: **821 passing, 0 failing**. Exit state: **832 passing, 0 failing** (+11 tests).
+
+---
+
+### 1. fix(progression): Use first exercise with progressionMode, not exercises[0]
+
+**Summary:** `buildProgressionRecommendation` in `progression.ts` was reading `exercises[0].progressionMode ?? 'single'` to determine the recommendation mode for a weights session. If `exercises[0]` was a warmup exercise logged without a `progressionMode` (warmup sets don't have progression semantics), but a main lift at a later index had `progressionMode: 'double'` or `'volume'`, the recommendation would silently use `'single'` mode.
+
+**Why it matters:** Users with YAML-imported plans that include structured warmup exercises in their session log would receive incorrect "single progression" guidance even when their main lifts were configured for double or volume progression. The recommendation text and action (progress/hold/regress) logic is mode-specific, so the wrong mode could suggest "+2.5–5 lb" (single) when the correct advice was "increase reps toward the top of range, then add load" (double).
+
+**Fix:** `exercises.find(ex => ex.progressionMode != null)?.progressionMode ?? 'single'` — scans to the first exercise that has a mode set.
+
+**Files changed:**
+- `src/modules/workout-outcomes/progression.ts` — one-line fix
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` — regression test: warmup at [0] + 'double' at [1] → mode is 'double', action is 'progress'
+
+**Risks / tradeoffs:** None. The new behavior is strictly more correct — it finds the first configured mode rather than always using index 0. Workouts where exercises[0] has a mode (the vast majority) are unaffected.
+
+**Rollback:** Revert `b2e3708`.
+
+---
+
+### 2. feat(historyStats): Add computeAdherenceRate utility
+
+**Summary:** New pure function `computeAdherenceRate(entries, extras, today, lookbackDays?)` in `historyStats.ts`. Returns `{ completedCount, skippedCount, rate }` where `rate` is a 0–100 integer (or `null` when no qualifying entries exist).
+
+**Why it matters:** Users could see raw completed/skipped counts but had no quick single-number summary of "when I showed up, how often did I actually complete the workout?" Adherence rate answers that question. Excluding `day_off` entries from the denominator is intentional — rest days are planned, not missed workouts.
+
+**Design decisions:**
+- Extras count as completed (the user voluntarily did extra work)
+- `day_off` entries excluded from denominator
+- Rate is `null` rather than 0 when no qualifying entries exist, so callers can suppress the stat
+- Default window is 30 days (matches the existing `last30Completed` stat)
+- Future-dated entries fall outside the window naturally (window is `today - 29` to `today`)
+
+**Files changed:**
+- `src/lib/historyStats.ts` — new function + `AdherenceRate` interface export
+- `src/lib/__tests__/historyStats.test.ts` — 10 tests covering all paths
+
+**Risks / tradeoffs:** Strictly additive. No behavior change to existing functions.
+
+**Rollback:** Revert `4356d04`.
+
+---
+
+### 3. feat(HistoryPage): Display adherence rate in stats section
+
+**Summary:** Shows `"X% adherence (N completed, M skipped · last 30 days)"` as a small text line below the 4-stat grid (Streak, 7-day, 30-day, Total). Color-coded: emerald ≥80%, amber ≥50%, slate <50%. Hidden entirely when rate is null (no qualifying entries).
+
+**Why it matters:** Gives users an at-a-glance quality metric alongside the quantity metrics. A user with a 4-day current streak and 40% adherence rate can see they're showing up but frequently not completing. Respects the plan filter — updates when a specific plan is selected.
+
+**Files changed:**
+- `src/pages/HistoryPage.tsx` — import `computeAdherenceRate`, compute value, add display
+
+**Risks / tradeoffs:** Purely additive UI change. No behavior changes elsewhere.
+
+**Rollback:** Revert `908db67`.
+
+---
+
 ## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
 
 Baseline on entry: **814 passing, 0 failing**. Exit state: **821 passing, 0 failing** (+7 tests).

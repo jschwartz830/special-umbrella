@@ -1,5 +1,73 @@
 # Implementation Plan
 
+## Pass 54 — 2026-06-09 (branch `claude/dreamy-mccarthy-advhpt`)
+
+### Observations on entry
+
+- Baseline on entry: **821 passing, 0 failing** — clean exit from pass 53.
+- Pass 53 fixed `ExtraWorkoutEntry.source` comment, moved ID constructors to `lib/workoutInstanceId.ts`, added defensive plan.id filters in rotationEngine, and added 3 new regression tests.
+- Full codebase audit performed: all source files, stores, engine, pages, modules, and all test files.
+
+### Architecture summary (unchanged from pass 53)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,220 lines), CalendarPage (~950 lines), HistoryPage (~985 lines)
+
+### What appears strong and well-designed
+
+- Pure-function rotation engine is exceptionally well-tested (44 tests)
+- `historyStats.ts` is comprehensive (1861+ lines of tests covering all edge cases)
+- Strict TypeScript with `noUnusedLocals` and `noUnusedParameters`
+- Migration logic in `historyStore` (v0→v1) is correct and tested
+- CASCADE semantics on plan deletion are correct
+- Expression evaluator for YAML progression DSL uses no `eval()`
+- All 821 tests pass cleanly on entry
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `buildProgressionRecommendation` reads `exercises[0].progressionMode` even when `exercises[0]` is a warmup exercise without a mode set; main lifts at later indices silently use 'single' instead of their configured 'double'/'volume' | **Fixed** |
+| Info | No regression test for the above edge case (warmup at index 0 + configured mode at index 1) | **Fixed** |
+| Info | `HistoryPage` shows completed/skipped counts but no quick "adherence rate" metric (what % of show-up days became completions) | **Implemented as feature** |
+
+### Decisions
+
+1. ✅ **Fix `buildProgressionRecommendation` mode selection** — `exercises.find(ex => ex.progressionMode != null)?.progressionMode ?? 'single'` replaces `exercises[0].progressionMode ?? 'single'`. One-line fix, high confidence, 0 risk.
+2. ✅ **Add regression test** — Warmup at [0] (no progressionMode) + main lift at [1] (progressionMode: 'double') → mode is 'double' and action is 'progress'. Pins the correct behavior.
+3. ✅ **`computeAdherenceRate` utility** — New pure function in `historyStats.ts`. Returns `{ completedCount, skippedCount, rate }` over a sliding window (default 30 days). Rate is null when no qualifying entries exist. Extras count as completed; day_offs excluded from denominator. 10 tests.
+4. ✅ **Adherence rate display in HistoryPage** — Small text line below the 4-stat grid. Color-coded: emerald ≥80%, amber ≥50%, slate <50%. Hidden when rate is null (no qualifying entries).
+
+### Not implemented (recommendations only)
+
+- `loggingUpcoming` stores a stale `ResolvedDay` in TodayPage — theoretical race condition when modal is open; in practice the modal is full-screen and blocks other interactions; deferred
+- CSV import has no user feedback for skipped/rejected entries — medium UI work, deferred
+- History page filter state not persisted across page reloads — minor UX, deferred
+- Pre-existing TypeScript error in `historyStats.test.ts:753` (`'run'` not in `makeExtra` type union) — pre-dates this run; fix would require updating the test fixture type which has no behavior impact
+
+### Rationale for sequencing
+
+Bug fix first: the `buildProgressionRecommendation` mode selection error is a silent data quality issue affecting YAML plan users with warmup exercises logged as part of their outcome. The fix is trivial and the regression test pins the corrected behavior permanently. Feature last: `computeAdherenceRate` is strictly additive and uses the established historyStats pattern.
+
+### Carried-forward risks (unchanged from pass 53)
+
+- `TodayPage.tsx` (~1,220 lines) and `CalendarPage.tsx` (~950 lines) are large
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder
+- `workoutInstanceId` parsing uses date regex; nanoid charset assumption holds but is fragile
+- `loggingUpcoming` state in TodayPage stores a full `ResolvedDay` (should store just `calendarDate + planDayIndex`)
+- CSV import has no user feedback for skipped/rejected entries
+
+---
+
 ## Pass 53 — 2026-06-08 (branch `claude/dreamy-mccarthy-B7dXE`)
 
 ### Observations on entry

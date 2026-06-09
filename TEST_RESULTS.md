@@ -1,5 +1,47 @@
 # Test Results
 
+## 2026-06-09 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-advhpt`
+
+**Result: 832 passing, 0 failing** (+11 tests vs entry baseline of 821)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 20 (unchanged) |
+| Tests on entry | 821 |
+| Tests on exit | 832 |
+| Delta | +11 |
+| Failures | 0 |
+
+### Tests reviewed
+
+All 20 test files reviewed as part of the audit. No failing tests on entry.
+
+One pre-existing TypeScript error was identified in `src/lib/__tests__/historyStats.test.ts:753` — `'run'` assigned to `makeExtra`'s type which accepts `'yoga' | 'swim' | 'recovery_run' | undefined`. Confirmed pre-existing via `git stash && npx tsc --noEmit`. Not introduced by this pass.
+
+### Tests added
+
+| File | New tests | What they cover |
+|------|-----------|-----------------|
+| `src/modules/workout-outcomes/__tests__/progression.test.ts` | 1 | Regression guard for the `progressionMode` warmup-skip bug — warmup exercise at `[0]` (no mode) must not shadow `'double'` mode set on `[1]` |
+| `src/lib/__tests__/historyStats.test.ts` | 10 | `computeAdherenceRate`: null on empty data; 100% all-complete; 0% all-skipped; 75% mixed; `day_off` entry excluded; extra workouts counted as completed; extras + rotation combined (67%); default 30-day window boundary; custom 7-day lookback; future entries excluded |
+
+### Results (all 832 tests pass)
+
+```
+Test Files  20 passed (20)
+Tests  832 passed (832)
+```
+
+### Important areas still untested
+
+- **TodayPage / CalendarPage integration** — no component tests; relies on manual browser testing
+- **Double-day flow end-to-end** — complex state machine across TodayPage + historyStore + outcomeStore; tested via individual store/engine unit tests only
+- **Outcome date-change conflict detection** — `updateEntryDate` overwrites silently; no test for the collision case (carry-forward from pass 47)
+- **CSV import rejection feedback** — `historyFromCsv` drops invalid entries silently; no test verifying user-facing message when entries are rejected
+- **ActiveWorkoutTracker** — timer-based session-local state; not unit-tested
+
+---
+
 ## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
 
 **Result: 821 passing, 0 failing** (+7 tests vs entry baseline of 814)

@@ -1,5 +1,51 @@
 # Feature Reviews
 
+## Pass 54 — 2026-06-09 (branch `claude/dreamy-mccarthy-advhpt`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+A `computeAdherenceRate` pure function in `src/lib/historyStats.ts` and a one-line stat display in `src/pages/HistoryPage.tsx`.
+
+**`computeAdherenceRate(entries, extras, today, lookbackDays = 30): AdherenceRate`**
+- Filters history entries to the rolling `[today - lookbackDays + 1, today]` window
+- Counts `action === 'complete'` entries + all `ExtraWorkoutEntry` items as completions
+- Counts `action === 'skip'` entries as missed; `'day_off'` is excluded
+- Returns `{ completedCount, skippedCount, rate: number | null }` where `rate` is null when total === 0
+
+**HistoryPage display** (below the four stat tiles):
+```
+75% adherence (15 completed, 5 skipped · last 30 days)
+```
+Color-coded by threshold: ≥80% emerald-400, ≥50% amber-400, <50% slate-400. Hidden when `rate === null`.
+
+### What assumptions were encoded
+
+1. `day_off` entries are intentional rest — not a missed obligation — so they are excluded from the denominator
+2. Extra workouts are genuine activity — they count toward the completed total
+3. 30-day lookback is the right default granularity for "recent consistency"
+4. A single-line text display is sufficient for v1 (no chart, no trend)
+
+### What worked well
+
+- Zero schema changes — uses `HistoryEntry.action` and `ExtraWorkoutEntry` which already exist
+- Pure function follows the established pattern in `historyStats.ts`; easy to test
+- 10 tests cover all meaningful edge cases including boundary dates, custom lookback, and future-entry exclusion
+- Additive UI: if `rate === null`, the display disappears entirely — no empty state to handle
+
+### What feels risky or incomplete
+
+- **Fixed 30-day window**: the lookback is not user-configurable. If the user's history is shorter than 30 days, the rate reflects whatever window exists — which is correct behavior but could be confusing ("only 3 workouts in last 30 days — 100% adherence").
+- **`day_off` exclusion**: this is a deliberate design decision but could be contested. If the user skips a scheduled workout and then marks it `day_off` retroactively to avoid it counting against their rate, the stat can be gamed. The app doesn't prevent this.
+- **No plan-awareness in the numerator**: the adherence stat uses the already-filtered `filteredEntries` from HistoryPage (which respects the plan selector), but the lookback window is calendar-based, not rotation-cycle-based. A user who has been on a plan for only 10 days will get 10 data points, not 30.
+
+### Verdict
+
+**Keep** — the function is correct, well-tested, and additive. The incomplete items (fixed window, `day_off` gating) are acceptable v1 trade-offs. Neither is a regression, and both can be addressed in a future pass.
+
+---
+
 ## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
 
 ### Classification: **Keep**

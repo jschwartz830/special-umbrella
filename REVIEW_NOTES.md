@@ -1,5 +1,74 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-09 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-advhpt`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Bug fix: `buildProgressionRecommendation` now selects the progression mode from the first exercise that has `progressionMode` set, rather than always reading `exercises[0]`. (2) New utility: `computeAdherenceRate` added to `historyStats.ts` with 10 tests. (3) Feature display: HistoryPage stats section now shows an adherence rate line below the 4-stat grid.
+
+2. **Highest confidence:** The `buildProgressionRecommendation` bug fix — it's a one-line change from `exercises[0].progressionMode ?? 'single'` to `exercises.find(...)?.progressionMode ?? 'single'`. For workouts where all exercises have modes (typical), it behaves identically. Only changes for the edge case where `exercises[0]` lacks a mode. The `computeAdherenceRate` utility is pure, fully tested (10 tests), and additive.
+
+3. **What is risky:** Nothing in this pass is risky. The HistoryPage UI change is purely additive (one conditional text line). The progression fix has no behavior change for typical workouts.
+
+4. **What to review first:** Commit 1 (`b2e3708`) — the progression mode fix. It's a one-line diff. Verify that the regression test matches the bug scenario you might encounter with YAML plans that have warmup exercises logged separately from main lifts.
+
+---
+
+### Biggest issues found
+
+**Bug (fixed):** `buildProgressionRecommendation` in `src/modules/workout-outcomes/progression.ts` always read `exercises[0].progressionMode`. If the first logged exercise is a warmup (typically no `progressionMode` set), main lifts at later indices with `double` or `volume` modes would silently get `single` mode recommendations. This affects YAML plan users with structured warmup sets logged as part of their workout outcome.
+
+**No bugs found in:** rotation engine, historyStats, programStore, expressionEval, outcomeStore, historyStore, csv, session summary, exerciseHistoryStore.
+
+**Pre-existing TypeScript error:** `src/lib/__tests__/historyStats.test.ts:753` passes `'run'` as the workout type to `makeExtra()`, but the fixture function's type union doesn't include `'run'`. This does not affect test behavior (Vitest runs correctly), but `tsc --noEmit` reports it. Pre-dates this run.
+
+---
+
+### Improvements completed
+
+| # | Item | Commit |
+|---|---|---|
+| 1 | Bug fix: progression mode from first configured exercise | `b2e3708` |
+| 2 | Regression test for warmup-at-0 edge case | `b2e3708` |
+| 3 | New: `computeAdherenceRate` utility (10 tests) | `4356d04` |
+| 4 | Feature: adherence rate display in HistoryPage | `908db67` |
+
+---
+
+### Recommendation categories
+
+**Definitely keep:**
+- Progression mode fix (`b2e3708`) — directly addresses a silent data quality bug. Zero risk.
+- `computeAdherenceRate` utility (`4356d04`) — well-tested, strictly additive, useful metric.
+
+**Probably keep but review:**
+- HistoryPage adherence rate display (`908db67`) — Product judgment call: does an adherence rate stat provide value to users, or is it noise alongside the existing streak/count stats? The implementation is small and easy to revert if unwanted. The color-coding (green/amber/grey) adds visual affordance.
+
+**Not implemented (recommendations only):**
+- Fix pre-existing TypeScript error in test fixture (`makeExtra` type union doesn't include `'run'`). Low priority — tests pass, no behavior impact. Fix: add `'run'` to the union type in `makeExtra`.
+- `loggingUpcoming` stores a full stale `ResolvedDay` instead of just `{ calendarDate, planDayIndex }`. Theoretical correctness issue; the modal overlays the full screen in practice so no concurrent rotation changes can occur.
+- CSV import feedback: no user-facing indication of how many rows were skipped/rejected during a CSV import. Medium UI work.
+- History page filter state not persisted on page reload. Minor UX.
+
+---
+
+### Open questions
+
+1. **Adherence rate definition:** The current definition excludes `day_off` from the denominator. An alternative is to include it (making adherence = complete / all logged). Which definition matches your mental model of "am I being consistent"?
+
+2. **Adherence rate window:** Currently hard-coded to 30 days in HistoryPage. Should the 7-day and 30-day views have separate adherence stats? Or is 30-day always the right window?
+
+3. **Progression mode per-exercise:** Currently a single mode applies to the whole workout recommendation (from the first exercise with a mode). For workouts with mixed modes (e.g. squat=double, accessory=volume), would per-exercise recommendations be more useful? This is a larger feature.
+
+---
+
+### Known issues / incomplete work
+
+- Pre-existing TypeScript error at `historyStats.test.ts:753` (see above).
+- `computeAdherenceRate` is computed on `filteredEntries`/`filteredExtras` which includes all action types — no planId filter (entries are already pre-filtered by the plan selector in HistoryPage). This is correct behavior.
+
+---
+
 ## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
 
 ### Executive summary
