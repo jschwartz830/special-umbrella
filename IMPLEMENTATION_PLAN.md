@@ -1,5 +1,52 @@
 # Implementation Plan
 
+## Pass 54 — 2026-06-10 (branch `claude/dreamy-mccarthy-00qje6`)
+
+### Observations on entry
+
+- Baseline on entry: **821 passing, 0 failing** — clean exit from pass 53.
+- Pass 53 added defensive plan.id filters to rotationEngine, moved ID constructors to lib/workoutInstanceId.ts, and fixed a misleading source comment.
+- Full codebase re-read performed: all source files, stores, modules, lib utilities, and all 20 test files.
+
+### Architecture summary (unchanged from pass 53)
+
+React 18 + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores. Rotation logic is pure functions in `rotationEngine.ts`. Stats are pure utilities in `historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+
+### What appears strong and well-designed
+
+- **Excellent test coverage**: 821 tests on entry, comprehensive across all business-logic layers.
+- **Strong type safety**: No `any` in production code; Zustand stores are fully typed.
+- **Store consistency**: `addEntry`/`importEntries` always deduplicates by `(planId, calendarDate)` — duplicate-entry bugs are structurally prevented.
+- **Progression logic separation**: Two independent systems (`buildProgressionRecommendation` for generic outcomes, `evaluateRunProgression` for the adaptation engine) coexist cleanly.
+- **Error resilience**: `applyProgressionRule` is guarded; empty plan guards are in place; `isPlanExpired` correctly filters future entries.
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Low — correctness | `findPreviousSessionForPlanDay` used an inline `\`${planId}_${calendarDate}\`` literal instead of `makeWorkoutInstanceId` | **Fixed** |
+| Low — documentation | `evaluateRunProgression` treats `completedAsPlanned: absent` like `false` (no progress without distance); contrast with `buildProgressionRecommendation` which uses `!== false` (looser). Not documented by a test. | **Fixed (new test)** |
+| Info | `buildWeightsRecommendation` uses only the first exercise's `progressionMode` for the whole workout — already tested/documented, carry-forward only | Carry-forward |
+| Info | `WorkoutTypeStat` had `avgEffort` but no `avgDuration` — `durationActualMin` already in outcomes | **Feature: `avgDurationMin` added** |
+
+### Prioritized plan
+
+1. ✅ Fix inline `workoutInstanceId` format in `sessionSummary.ts` — 1-line, zero risk
+2. ✅ Add test documenting `completedAsPlanned: absent` behavior in `evaluateRunProgression`
+3. ✅ Feature: `avgDurationMin` in `WorkoutTypeStat` + `computeWorkoutTypeBreakdown` + 7 tests
+4. ⬜ Surface `avgDurationMin` in HistoryPage UI — deferred; see FEATURE_REVIEW.md
+
+### Carried-forward risks (from pass 53)
+
+- `TodayPage.tsx` (~1,220 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `workoutInstanceId` parsing relies on nanoid never generating `_`.
+- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay`.
+- CSV import has no user feedback for skipped/rejected entries.
+- History page filter state not persisted across page reloads.
+
+---
+
 ## Pass 53 — 2026-06-08 (branch `claude/dreamy-mccarthy-B7dXE`)
 
 ### Observations on entry

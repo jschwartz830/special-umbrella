@@ -1,5 +1,49 @@
 # Feature Proposals
 
+## Pass 54 — 2026-06-10 (branch `claude/dreamy-mccarthy-00qje6`)
+
+### Feature selected
+
+**`avgDurationMin` data layer in `WorkoutTypeStat` breakdown**
+
+### Why it was selected
+
+The `WorkoutTypeStat` interface already tracked `avgEffort` (aggregated from `perceivedEffort` on outcomes). Duration (`durationActualMin`) is equally fundamental as a training metric and is stored on the same `WorkoutOutcome` object, yet it was not part of the breakdown. A HistoryPage component wanting to display "avg session time" for each workout type had no data to read from — it would need to either re-aggregate outcomes from scratch or add its own store subscription.
+
+The selection criteria for this pass:
+
+1. **Adjacent to existing work** — `avgDurationMin` follows the identical accumulation pattern (`effortSums` map → `addEffort` helper → result assembly) already in the function. The implementation was a near-mechanical extension.
+2. **Narrowest viable slice** — implementing only the data layer (the `WorkoutTypeStat` field + aggregation logic) without touching any UI component keeps the change reviewable and browser-testing-free.
+3. **Testable in isolation** — pure function; 7 tests cover all paths in under 30 lines.
+4. **No new dependencies** — uses only fields already on `WorkoutOutcome`.
+
+### Implementation scope for this run
+
+**Data layer only (no UI):**
+
+- `WorkoutTypeStat` interface: add `avgDurationMin: number | null`
+- `computeWorkoutTypeBreakdown`: add `durationSums` map, `addDuration` helper, calls to `addDuration` for rotation-entry completions and extras, `avgDurationMin` in result assembly
+- 7 new tests in `src/lib/__tests__/historyStats.test.ts`
+
+**Explicitly deferred:**
+
+- UI display in `HistoryPage` breakdown table (requires browser testing, layout decisions, and potentially a wider table or collapsible columns)
+
+### Assumptions being made
+
+- `durationActualMin` is the canonical duration field on `WorkoutOutcome` (confirmed — used in sessionSummary, outcomeStore, and existing breakdown logic)
+- Rounding to the nearest whole minute is appropriate for display (avoids "avg: 42.3 min")
+- `null` is the correct sentinel when no duration data exists for a workout type (consistent with `avgEffort: null` for same condition)
+- UI display can wait until HistoryPage layout is reviewed — the data contract is stable enough to ship before the UI is ready
+
+### Open product / UX decisions
+
+1. Should "avg duration" show alongside "avg effort" in the breakdown table row, or in a separate expandable detail section?
+2. Is per-workout-type avg duration the right granularity, or should it be per-plan-week to show training load trends?
+3. Should `null` render as "—" or be hidden entirely from the breakdown row?
+
+---
+
 ## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
 
 ### Feature selected

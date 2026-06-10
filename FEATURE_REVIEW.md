@@ -1,5 +1,40 @@
 # Feature Reviews
 
+## Pass 54 — 2026-06-10 (branch `claude/dreamy-mccarthy-00qje6`)
+
+### Classification: **Keep (data layer complete; UI deferred)**
+
+### What was actually built
+
+`WorkoutTypeStat` now has `avgDurationMin: number | null`. `computeWorkoutTypeBreakdown` accumulates `durationActualMin` from outcomes using a `durationSums` map (same pattern as `effortSums`), for both rotation-entry completions and extra workouts. The result is rounded to the nearest whole minute; `null` when no duration data is available for that type.
+
+No UI changes were made.
+
+### What assumptions were encoded
+
+1. `durationActualMin` on `WorkoutOutcome` is the canonical duration field — confirmed by its use in `sessionSummary.ts`, `outcomeStore.ts` `logOutcomeWithProgression`, and the existing `durationSums` pattern in pass 53's deferred note.
+2. Rounding to the nearest whole minute is appropriate (mirrors the `actualDurationMin` field which is already a whole-number input).
+3. `null` as sentinel (not `0`) is consistent with `avgEffort: null` for the same condition (no data).
+4. UI display can ship independently — the type contract is additive and stable.
+
+### What worked well
+
+- The implementation was near-mechanical: `durationSums` parallels `effortSums` exactly. No design decisions were needed.
+- The `addDuration` helper is the same shape as `addEffort`; both sit inside the function scope and are invisible to callers.
+- 7 tests cover every distinct code path: null baseline, rotation completions, rounding, extras, mixed sources, null-duration skip, skipped-only null.
+- No existing test needed modification — the new field is additive on the interface.
+
+### What feels risky or incomplete
+
+- **UI not shipped:** A user cannot see `avgDurationMin` yet. Any component that renders the `WorkoutTypeStat` breakdown will need a layout decision before this value is displayed. The `HistoryPage` workout-type breakdown table currently has two data cells per row (completed count, avg effort); adding a third requires either widening the table or collapsing one cell on mobile.
+- **No derivation fallback:** If `durationActualMin` is absent but `runActual.actualDurationMin` or `swimActual.actualDurationMin` is present, the duration is not counted. This is consistent with how `avgEffort` works (no fallback), but a future improvement could derive duration from the activity-specific subfields for workouts where the top-level field was not filled in.
+
+### Recommendation for next pass
+
+Add the "Avg duration" cell to the HistoryPage workout-type breakdown table. Suggested approach: display it next to "avg effort" in the same `<td>`, formatted as "38 min avg" with secondary text styling. No new layout columns needed — piggyback on the existing effort cell with a line break or divider.
+
+---
+
 ## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
 
 ### Classification: **Keep**

@@ -1,5 +1,57 @@
 # Overnight Changelog
 
+## 2026-06-10 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-00qje6`
+
+Baseline on entry: **821 passing, 0 failing**. Exit state: **829 passing, 0 failing** (+8 tests).
+
+---
+
+### 1. fix(sessionSummary): use `makeWorkoutInstanceId` instead of inline format string
+
+**Summary:** `findPreviousSessionForPlanDay` in `src/lib/sessionSummary.ts` was constructing the outcome lookup key via an inline template literal `` `${planId}_${e.calendarDate}` `` rather than the canonical `makeWorkoutInstanceId()` helper. This was a DRY violation: if the `workoutInstanceId` format ever changed, this function would silently return `null` for every lookup (no match found) instead of surfacing past session summaries.
+
+**Why it matters:** "Last session" hints on TodayPage rely entirely on this lookup. A format mismatch means the hint would disappear for the user with no visible error.
+
+**Files changed:** `src/lib/sessionSummary.ts` — added `import { makeWorkoutInstanceId } from './workoutInstanceId'`, replaced inline template literal with `makeWorkoutInstanceId(planId, e.calendarDate)`.
+
+**Risks/tradeoffs:** Zero — the format is identical today; this change only improves maintainability.
+
+**Rollback:** `git revert 55a4377`
+
+---
+
+### 2. test(run-adaptation): document `completedAsPlanned` absent → hold behavior
+
+**Summary:** Added one targeted test to `engine.test.ts` documenting that when `completedAsPlanned` is `undefined` (absent) and no `actualDistanceMiles` is logged, `evaluateRunProgression` returns `hold` — not `progress`. This is intentionally stricter than `buildProgressionRecommendation` (which uses `!== false`, accepting `undefined` as truthy). The new test makes this behavioral difference explicit and guards against accidental relaxation.
+
+**Why it matters:** Two progression systems coexist in this codebase with subtly different semantics for the same field. Without this test, a future developer reading the looser check might "normalize" the engine to match — silently changing progression behavior for outcomes logged without distance data.
+
+**Files changed:** `src/modules/run-adaptation/__tests__/engine.test.ts` — 1 new test in the "default hold path" describe block.
+
+**Risks/tradeoffs:** Zero — test-only change.
+
+**Rollback:** `git revert c752aa6`
+
+---
+
+### 3. feat(historyStats): add `avgDurationMin` to `WorkoutTypeStat` breakdown
+
+**Summary:** Extended `WorkoutTypeStat` with a new `avgDurationMin: number | null` field and populated it in `computeWorkoutTypeBreakdown`. Duration is sourced from `outcome.durationActualMin` for both rotation-entry completions and extra workouts. Result is rounded to the nearest whole minute; `null` when no duration data is available for that workout type.
+
+**Why it matters:** The existing breakdown returned `avgEffort` but not average duration. Duration is a primary training metric — a user with a HistoryPage breakdown can currently see how consistent their effort has been but not how long sessions typically run. This completes the data layer so HistoryPage components can render average duration without further plumbing.
+
+**What was intentionally deferred:** UI display (adding an "Avg duration" cell to the HistoryPage breakdown table) was left for a future pass. Modifying the HistoryPage table requires browser testing to verify layout and is a larger surface area than the data layer change alone.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — `WorkoutTypeStat` interface + `avgDurationMin` computation in `computeWorkoutTypeBreakdown`
+- `src/lib/__tests__/historyStats.test.ts` — 7 new tests covering null baseline, rotation entries, rounding, extras, mixed sources, null-duration skip, and skipped-only null
+
+**Risks/tradeoffs:** Additive change. All existing callers that destructure `WorkoutTypeStat` will simply ignore the new field. No behavior change for any existing functionality.
+
+**Rollback:** `git revert b8fa267`
+
+---
+
 ## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
 
 Baseline on entry: **814 passing, 0 failing**. Exit state: **821 passing, 0 failing** (+7 tests).

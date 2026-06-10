@@ -1,5 +1,55 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-10 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-00qje6`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Bug fix: `findPreviousSessionForPlanDay` in `sessionSummary.ts` was using an inline template literal for the outcome key instead of the canonical `makeWorkoutInstanceId()` helper — a DRY violation that would silently break the "Last session" hint if the key format ever changed. (2) Documentation test: added a targeted test in `engine.test.ts` explicitly documenting that `completedAsPlanned: undefined` behaves like `false` in `evaluateRunProgression` (stricter than the sibling `buildProgressionRecommendation`). (3) Feature (data layer): extended `WorkoutTypeStat` with `avgDurationMin` and populated it in `computeWorkoutTypeBreakdown`, with 7 new tests; UI display deliberately deferred.
+
+2. **Highest confidence:** All three changes. The fix is a one-line substitution with identical runtime behavior today. The test is additive. The feature is purely additive — no existing caller behavior changes.
+
+3. **What is risky:** Nothing in this pass is risky. The only non-trivial change (duration aggregation in `computeWorkoutTypeBreakdown`) follows the exact same pattern as the pre-existing `avgEffort` aggregation in the same function.
+
+4. **What to review first:** Commit 3 (`b8fa267`) — the `historyStats.ts` changes are the most substantive. Verify `durationSums` follows the same accumulation pattern as `effortSums` and that the result assembly correctly produces `null` when no duration data is present.
+
+---
+
+### Biggest issues found
+
+1. **`sessionSummary.ts` inline ID construction** — `findPreviousSessionForPlanDay` used `` `${planId}_${e.calendarDate}` `` instead of `makeWorkoutInstanceId()`. A format change to `workoutInstanceId` would silently break the "Last session" hint on TodayPage with no error. Fixed. (This is the third instance of inline ID construction eliminated across passes 53–54; the codebase is now consistent.)
+
+2. **Undocumented behavioral divergence between progression systems** — `evaluateRunProgression` (adaptation engine) requires `completedAsPlanned === true` (strict) to treat a no-distance outcome as hit-target, while `buildProgressionRecommendation` uses `!== false` (permissive). No test documented this difference. Added explicit test.
+
+3. **`WorkoutTypeStat` missing `avgDurationMin`** — The breakdown computed `avgEffort` but not duration. Both are first-class training metrics and `durationActualMin` is available on `WorkoutOutcome`. Added at the data layer.
+
+---
+
+### Improvements completed
+
+| # | Type | Change | Tests Added |
+|---|------|--------|-------------|
+| 1 | fix | `sessionSummary.ts` → `makeWorkoutInstanceId` | 0 |
+| 2 | test | Document `completedAsPlanned` absent → hold | 1 |
+| 3 | feat | `avgDurationMin` in `WorkoutTypeStat` + breakdown | 7 |
+
+**Test delta: +8 (821 → 829, all passing)**
+
+---
+
+### Small features added
+
+**`avgDurationMin` in `WorkoutTypeStat`** — Data layer only. `computeWorkoutTypeBreakdown` now aggregates `durationActualMin` from outcomes for both rotation completions and extra workouts. The UI display (adding an "Avg duration" column to the HistoryPage breakdown table) was intentionally left for a future pass to keep this change narrow and browser-testing-free.
+
+---
+
+### Carry-forward risks (unchanged from pass 53)
+
+- **Outcome date-change collision** — `updateEntryDate` overwrites silently; no test for the collision case.
+- **CSV import rejection feedback** — `historyFromCsv` drops invalid entries silently; no test verifying the user-facing message.
+- **`ActiveWorkoutTracker` timer state** — session-local, no unit tests.
+
+---
+
 ## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
 
 ### Executive summary
