@@ -14,7 +14,7 @@ interface Props {
 
 export function WorkoutDayCard({ resolved, planId, isToday, sessionCount, onClick }: Props) {
   const { planDay, status, historyEntry } = resolved
-  const meta = WORKOUT_META[planDay.slots[0].type]
+  const meta = WORKOUT_META[planDay.slots[0]?.type ?? 'rest']
 
   const isComplete = status === 'past_complete' || status === 'today_complete'
   const isSkipped = status === 'past_skip' || status === 'today_skip'
