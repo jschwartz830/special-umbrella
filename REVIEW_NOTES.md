@@ -1,5 +1,45 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-11 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-q8dj7t`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Crash fix: guarded `planDay.slots[0]?.type ?? 'rest'` in `WorkoutDayCard` to prevent a null-dereference when the rotation engine emits a synthetic rest day with an empty slots array. (2) New pure function `computeLoggedRate` in `historyStats.ts` + 11 unit tests. (3) Logged-rate progress bar in `HistoryPage` stats section, visible only when a single plan is selected.
+
+2. **Highest confidence:** The WorkoutDayCard crash fix — one optional-chain with a safe fallback, zero behaviour change for any non-empty slots array. The `computeLoggedRate` function — pure, tested exhaustively, adds no external dependencies.
+
+3. **What is risky:** Nothing in this pass is risky. The HistoryPage UI addition is purely additive (new JSX branch gated on `loggedRate !== null`). No existing logic paths were modified.
+
+4. **What to review first:** Commit 1 (`ce442de`) — the crash fix. Verify the `?? 'rest'` fallback is the correct default (yes — `meta` is only consumed for `meta.borderColor` when `isPending`, and a synthetic rest day can never be `isPending`).
+
+---
+
+### Biggest issues found
+
+1. **WorkoutDayCard crash on empty-slots day** — `WORKOUT_META[planDay.slots[0].type]` throws `TypeError: Cannot read properties of undefined` when `planDay.slots` is empty. The rotation engine's 0-day plan guard returns exactly this shape: `{ id: '', label: 'Rest', slots: [] }`. Any user who creates a plan with zero days and opens Today would see a white screen. Fixed with `planDay.slots[0]?.type ?? 'rest'`.
+
+2. **No logging-consistency feedback** — The stats section showed streak, volume, and type mix but no signal for whether the user is actually recording all their workouts. A user who forgets to log every third workout gets the same streaks display as one who never misses. Added `computeLoggedRate` + progress bar to surface this gap.
+
+---
+
+### Improvements completed
+
+| # | Type | Change | Tests Added |
+|---|------|--------|-------------|
+| 1 | Bug fix | `WorkoutDayCard`: guard `slots[0]?.type ?? 'rest'` | 0 (crash path, not unit-testable in isolation) |
+| 2 | Feature | `computeLoggedRate` in `historyStats.ts` | 11 |
+| 3 | Feature | Logged-rate progress bar in `HistoryPage` | 0 (UI) |
+
+---
+
+### Issues considered but not acted on
+
+- **`updateEntryDate` deduplication gap** — The function is a raw field swap with no dedup logic. Current callers all pre-validate, so it is safe by contract. Adding a guard would be higher-value but also higher-risk (store mutation pattern). Carried forward to Pass 55.
+- **`computeCurrentDayIndex` stall on unlogged past days** — By design, per plan spec. No change warranted.
+- **`sessionCount` badge already present** — Considered adding it to upcoming days; it was already implemented. No work needed.
+
+---
+
 ## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
 
 ### Executive summary

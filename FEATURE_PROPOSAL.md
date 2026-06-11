@@ -1,5 +1,50 @@
 # Feature Proposals
 
+## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
+
+### Feature selected
+
+**Logged-rate stat — "% logged" progress bar in HistoryPage plan stats**
+
+### Why it was selected
+
+The history stats section already shows streaks, volume, and type mix, but gives no indication of how consistently the user actually records their workouts. A user could have a 10-day streak but have silently skipped logging 30% of the preceding days (stalling the rotation engine). Surfacing "% logged" closes this observability gap with zero new dependencies: it is a pure derivation from existing `HistoryEntry` data.
+
+Alternatives considered and rejected:
+- **Personal records trend chart** — requires a charting lib or SVG math; out of scope for no-new-dependency constraint.
+- **Upcoming session count badge** — already implemented.
+- **Weekly goal ring** — requires a target-per-week config field that doesn't exist yet.
+
+`computeLoggedRate` is a pure function with a clear specification, fully unit-testable, and adds a single UI element that is completely hidden when not applicable (plan started today, or "all plans" filter active).
+
+### Implementation scope
+
+**`src/lib/historyStats.ts`**
+- New export: `computeLoggedRate(planId, entries, planStartDate, today): number | null`
+- Counts unique `calendarDate` values in `[planStartDate, today)` for the given plan
+- Returns `null` when `activeDays <= 0` (plan started today or in future)
+- Returns an integer 0–100 (percentage, rounded, capped at 100)
+- Any logged action (complete, skip, day_off) counts as a logged day
+
+**`src/lib/__tests__/historyStats.test.ts`**
+- 11 new test cases covering all boundary conditions (see TEST_RESULTS.md)
+
+**`src/pages/HistoryPage.tsx`**
+- New `loggedRate` useMemo computed from `filterPlanId`, `filteredEntries`, `plans`, `today`
+- Returns `null` when `filterPlanId === 'all'` or plan not found
+- New JSX block below `typeMixLabel`: a thin sky-500 progress bar + `"{N}% logged"` label
+- Completely hidden when `loggedRate` is `null`
+
+### Dependencies introduced
+
+None.
+
+### Rollback
+
+Delete the `loggedRate` useMemo and its JSX block from `HistoryPage.tsx`. The `computeLoggedRate` export in `historyStats.ts` can remain — it is dead code until re-imported and causes no runtime side effects.
+
+---
+
 ## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
 
 ### Feature selected

@@ -1,5 +1,58 @@
 # Implementation Plan
 
+## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
+
+### Observations on entry
+
+- Baseline on entry: **821 passing, 0 failing** — clean exit from pass 53.
+- Pass 53 added defensive plan.id filters in rotationEngine, moved ID constructors to workoutInstanceId.ts, and fixed the ExtraWorkoutEntry.source comment.
+- Full codebase audit performed: all source files, stores, pages, engine, lib utilities, and all test files.
+
+### Architecture summary (unchanged from pass 53)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,220 lines), CalendarPage (~950 lines), HistoryPage (~985 lines)
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `WorkoutDayCard` crashes when `planDay.slots` is empty — `slots[0].type` throws TypeError | **Fixed** |
+| Low | No "logged rate" metric showing what % of plan days have been logged | **Fixed** (new `computeLoggedRate` + HistoryPage UI) |
+| Info | `updateEntryDate` relies on caller contract for deduplication; all callers correct | Documented (carry-forward) |
+| Info | `computeWorkoutTypeBreakdown` credits only first slot per plan day | Documented (carry-forward) |
+| Info | `isPlanExpired` does not deduplicate entries before counting | Documented (carry-forward) |
+
+### Prioritized plan
+
+1. ✅ **Fix `WorkoutDayCard` empty-slots crash** — `slots[0]?.type ?? 'rest'`, purely defensive
+2. ✅ **Add `computeLoggedRate` with 11 tests** — new pure function in historyStats.ts
+3. ✅ **Surface logged rate in HistoryPage** — thin progress bar + percentage below stats grid
+
+### Rationale for sequencing
+
+Crash fix first (zero risk, highest priority). Pure utility + tests second (additive, no UI coupling). UI display last so it can be trivially reverted independently of the logic.
+
+### Carried-forward risks (unchanged from pass 53)
+
+- `TodayPage.tsx` (~1,220 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `outcomeStore` cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `workoutInstanceId` parsing now defensive (parse uses date regex, handles underscore-heavy planIds).
+- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay` (should store just `calendarDate`).
+- CSV import has no user feedback for skipped/rejected entries.
+- History page filter state not persisted across page reloads.
+
+---
+
 ## Pass 53 — 2026-06-08 (branch `claude/dreamy-mccarthy-B7dXE`)
 
 ### Observations on entry

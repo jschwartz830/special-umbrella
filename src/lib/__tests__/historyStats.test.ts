@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -1831,6 +1831,94 @@ describe('computeConsecutiveSkips', () => {
     const entries = [skipEntry('2026-05-09'), skipEntry('2026-05-08')]
     const extras = [csExtra('2026-05-08', 'plan-2')] // different plan — irrelevant
     expect(computeConsecutiveSkips('plan-1', entries, extras, TODAY)).toBe(2)
+  })
+})
+
+// ── computeLoggedRate ─────────────────────────────────────────────────────────
+
+describe('computeLoggedRate', () => {
+  it('returns null when the plan starts today (no past days)', () => {
+    expect(computeLoggedRate('plan-1', [], '2026-06-11', '2026-06-11')).toBeNull()
+  })
+
+  it('returns null when the plan starts in the future', () => {
+    expect(computeLoggedRate('plan-1', [], '2026-12-01', '2026-06-11')).toBeNull()
+  })
+
+  it('returns 0 when the plan started yesterday and nothing was logged', () => {
+    expect(computeLoggedRate('plan-1', [], '2026-06-10', '2026-06-11')).toBe(0)
+  })
+
+  it('returns 100 when all past days have entries', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-06-08', 'complete'),
+      entry('2026-06-09', 'complete'),
+      entry('2026-06-10', 'complete'),
+    ]
+    // today = 2026-06-11, startDate = 2026-06-08, activeDays = 3
+    expect(computeLoggedRate('plan-1', entries, '2026-06-08', '2026-06-11')).toBe(100)
+  })
+
+  it('returns correct percentage for partially-logged plan', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-06-08', 'complete'),
+      entry('2026-06-10', 'skip'),
+    ]
+    // 2026-06-08 to 2026-06-10 = 3 active days, 2 logged → 67%
+    expect(computeLoggedRate('plan-1', entries, '2026-06-08', '2026-06-11')).toBe(67)
+  })
+
+  it('counts any action as logged (skip, day_off, complete)', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-06-08', 'skip'),
+      entry('2026-06-09', 'day_off'),
+    ]
+    expect(computeLoggedRate('plan-1', entries, '2026-06-08', '2026-06-11')).toBe(67)
+  })
+
+  it('does not count today in the denominator or numerator', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-06-10', 'complete'),
+      entry('2026-06-11', 'complete'), // today — must be excluded
+    ]
+    // Only 2026-06-10 counts (1 logged / 1 active day = 100%)
+    expect(computeLoggedRate('plan-1', entries, '2026-06-10', '2026-06-11')).toBe(100)
+  })
+
+  it('counts duplicate entries for the same date as one logged day', () => {
+    const entries: HistoryEntry[] = [
+      { ...entry('2026-06-08', 'complete'), id: 'e1', createdAt: '2026-06-08T10:00:00Z' },
+      { ...entry('2026-06-08', 'skip'), id: 'e2', createdAt: '2026-06-08T18:00:00Z' },
+    ]
+    // 1 unique logged day out of 3 active days → 33%
+    expect(computeLoggedRate('plan-1', entries, '2026-06-08', '2026-06-11')).toBe(33)
+  })
+
+  it('ignores entries for other plans', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-06-08', 'complete', 'plan-2'),
+    ]
+    expect(computeLoggedRate('plan-1', entries, '2026-06-08', '2026-06-11')).toBe(0)
+  })
+
+  it('ignores entries before the plan start date', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-06-07', 'complete'), // before start
+      entry('2026-06-08', 'complete'), // on start date
+    ]
+    // activeDays = 3 (Jun 8-10), loggedDates = {Jun 8} → 33%
+    expect(computeLoggedRate('plan-1', entries, '2026-06-08', '2026-06-11')).toBe(33)
+  })
+
+  it('caps at 100 when logged > active days (should not happen in practice)', () => {
+    // Defensive: result never exceeds 100
+    const entries: HistoryEntry[] = [
+      entry('2026-06-08', 'complete'),
+      entry('2026-06-09', 'complete'),
+      entry('2026-06-10', 'complete'),
+    ]
+    const result = computeLoggedRate('plan-1', entries, '2026-06-08', '2026-06-11')
+    expect(result).not.toBeGreaterThan(100)
   })
 })
 

@@ -1,5 +1,38 @@
 # Feature Reviews
 
+## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+`computeLoggedRate(planId, entries, planStartDate, today): number | null` in `src/lib/historyStats.ts` — a pure function that counts unique `calendarDate` values in the half-open interval `[planStartDate, today)` for a given plan, returning an integer 0–100 or `null` for newly-started plans.
+
+A `loggedRate` useMemo in `HistoryPage.tsx` that calls `computeLoggedRate` and returns `null` when viewing "all plans".
+
+A UI block in the stats section: a 1px-high sky-500 progress bar at `width: ${loggedRate}%` plus a `"{N}% logged"` label in slate-500. Hidden entirely when `loggedRate` is `null`.
+
+### Quality assessment
+
+| Criterion | Assessment |
+|-----------|------------|
+| Correctness | Pure function; 11 tests verify all boundary cases |
+| Performance | O(n) filter+map over history entries; memoised in UI |
+| Accessibility | Progress bar is visual-only; no ARIA role. Acceptable for a supplementary stat |
+| Consistency | Matches existing stats-section visual style (small label, muted colour) |
+| Scope discipline | Zero new dependencies; three files touched |
+
+### Concerns / known gaps
+
+- **No ARIA progressbar role** — the `<div>` acting as a progress bar has no `role="progressbar"` or `aria-valuenow`. Low priority for a decorative stat, but noted for a future a11y pass.
+- **"% logged" semantics** — the stat counts any logged action (complete, skip, day_off) as "logged". A user who marks every day as day_off gets 100%. This is intentional (the stat measures whether the rotation engine has data, not workout quality), but the label doesn't communicate this nuance.
+
+### Verdict
+
+The feature is correct, contained, and fills a real observability gap. The concerns above are minor. No rollback recommended.
+
+---
+
 ## Pass 52 — 2026-06-07 (branch `claude/dreamy-mccarthy-j725m`)
 
 ### Classification: **Keep**

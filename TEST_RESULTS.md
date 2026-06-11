@@ -1,5 +1,49 @@
 # Test Results
 
+## 2026-06-11 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-q8dj7t`
+
+**Result: 832 passing, 0 failing** (+11 tests vs entry baseline of 821)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 20 (unchanged) |
+| Tests on entry | 821 |
+| Tests on exit | 832 |
+| Delta | +11 |
+| Failures | 0 |
+
+### Tests reviewed
+
+All 20 test files were confirmed clean on entry. No pre-existing failures.
+
+### Tests added
+
+**`src/lib/__tests__/historyStats.test.ts`** — 11 new cases in `describe('computeLoggedRate', ...)`:
+
+| Test | What it asserts |
+|------|----------------|
+| returns null when plan started today | `activeDays = 0` → `null` |
+| returns null when plan starts in the future | `activeDays < 0` → `null` |
+| returns 0 when no entries logged | 0 logged dates out of 7 → `0` |
+| returns 100 when all days logged | 7/7 logged → `100` |
+| returns correct partial percentage | 3/7 logged → `43` |
+| counts skip entries | skip action → logged date counted |
+| counts day_off entries | day_off action → logged date counted |
+| excludes today from denominator | today not in `[planStart, today)` range |
+| counts duplicate entries as single day | two entries same date → 1 unique day |
+| ignores entries from other plans | foreign planId filtered out |
+| ignores entries before plan start date | pre-start entries not counted |
+
+### Command run
+
+```
+npm test
+```
+
+All 832 tests passed. No skipped tests.
+
+---
+
 ## 2026-06-08 (fifty-third pass) — branch `claude/dreamy-mccarthy-B7dXE`
 
 **Result: 821 passing, 0 failing** (+7 tests vs entry baseline of 814)
