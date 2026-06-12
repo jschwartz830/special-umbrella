@@ -1,5 +1,57 @@
 # Implementation Plan
 
+## Pass 55 — 2026-06-12 (branch `claude/dreamy-mccarthy-wh71fb`)
+
+### Observations on entry
+
+- Baseline on entry: **832 passing, 0 failing** — clean exit from pass 54.
+- Pass 54 fixed the empty-slots crash in `WorkoutDayCard`, added `computeLoggedRate` + 11 tests, and surfaced the logged-rate bar in HistoryPage.
+- Full codebase audit performed: all source files, stores, pages, engine, lib utilities, and all test files.
+
+### Architecture summary (unchanged from pass 54)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,220 lines), CalendarPage (~950 lines), HistoryPage (~985 lines)
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `evaluateUpdates` stores NaN/Infinity into programStore vars when ctx.vars contains corrupted values | **Fixed** |
+| Medium | `updateEntryDate` raw-field-swap lets two entries coexist at the same (planId, date) | **Fixed** |
+| Low | HistoryPage `filterPlanId` resets to default on every page navigation | **Fixed** (sessionStorage persistence) |
+| Info | `computeWorkoutTypeBreakdown` credits only first slot per plan day | Documented (carry-forward) |
+| Info | `isPlanExpired` does not deduplicate entries before counting | Documented (carry-forward) |
+
+### Prioritized plan
+
+1. ✅ **Fix `evaluateUpdates` NaN/Infinity guard** — prevents cross-variable corruption when YAML progression vars contain bad values; fall back to previous variable value; 4 new tests
+2. ✅ **Fix `updateEntryDate` deduplication** — when moving an entry to a date that already has an entry for the same plan, remove the old entry (consistent with `addEntry` semantics); update contract test
+3. ✅ **Persist HistoryPage `filterPlanId` across navigations** — sessionStorage key `wpt_history_filterPlanId`; validated against current `plans` on init; falls back gracefully
+
+### Rationale for sequencing
+
+Bug fixes first (NaN guard, dedup fix) — both touch hot paths. Feature last — sessionStorage persistence is purely additive with no store changes.
+
+### Carried-forward risks
+
+- `TodayPage.tsx` (~1,220 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `outcomeStore` cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay` (should store just `calendarDate`).
+- CSV import has no user feedback for skipped/rejected entries.
+- `computeWorkoutTypeBreakdown` credits only `slots[0]` type for multi-slot plan days.
+
+---
+
 ## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
 
 ### Observations on entry

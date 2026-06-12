@@ -1,5 +1,55 @@
 # Test Results
 
+## 2026-06-12 (fifty-fifth pass) — branch `claude/dreamy-mccarthy-wh71fb`
+
+**Result: 836 passing, 0 failing** (+4 tests vs entry baseline of 832)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 20 (unchanged) |
+| Tests on entry | 832 |
+| Tests on exit | 836 |
+| Delta | +4 |
+| Failures | 0 |
+
+### Tests reviewed
+
+All 20 test files were confirmed clean on entry. No pre-existing failures.
+
+### Tests added
+
+**`src/lib/__tests__/expressionEval.test.ts`** — 4 new cases in `describe('NaN / Infinity guard — corrupted program vars must not propagate', ...)`:
+
+| Test | What it asserts |
+|------|----------------|
+| keeps previous bench value when squat var is NaN | `bench = squat * 0.85` where `squat = NaN` → guard keeps `bench = 135` |
+| keeps previous bench value when squat var is Infinity | Same with `squat = Infinity` → guard keeps `bench = 135` |
+| chained updates: NaN-tainted first assignment does not corrupt second clean statement | `bench = squat * 0.85, ohp += 5` with NaN squat → bench stays 100, ohp increments 75→80 |
+| squat += 5 on a NaN var stays NaN | NaN + 5 = NaN; guard falls back to cur = NaN; cannot self-repair but does not spread |
+
+**`src/store/__tests__/historyStore.test.ts`** — 1 test updated in `describe('updateEntryDate', ...)`:
+
+- The "coexistence: does NOT deduplicate" contract test was replaced with "deduplicates: moving to a date that already has an entry removes the old one", verifying that the moved entry wins and only 1 entry exists at the target date after the move.
+
+### Command run
+
+```
+npx vitest run
+```
+
+All 836 tests passed. No skipped tests.
+
+### Important areas still untested
+
+| Area | Risk | Notes |
+|------|------|-------|
+| `TodayPage.tsx` | Medium | Double-day flow, undo, active tracker — integration-test candidates |
+| `CalendarPage.tsx` | Medium | DayDetailModal behavior, slot fallback path |
+| `HistoryPage.tsx` filter sessionStorage | Low | UI-layer; cannot be tested without jsdom + React Testing Library |
+| `useToday` hook | Low | Timeout-dependent; would need `vi.useFakeTimers()` + jsdom environment |
+
+---
+
 ## 2026-06-11 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-q8dj7t`
 
 **Result: 832 passing, 0 failing** (+11 tests vs entry baseline of 821)
