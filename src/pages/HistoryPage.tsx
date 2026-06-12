@@ -23,7 +23,7 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv, personalRecordsToCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate } from '../lib/historyStats'
 import type { PersonalRecord, WeeklyBreakdown, WorkoutTypeBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -53,6 +53,8 @@ const TYPE_MIX_LABEL: Partial<Record<WorkoutType, string>> = {
 type FlatItem =
   | { kind: 'rotation'; date: string; sortKey: string; entry: HistoryEntry }
   | { kind: 'extra'; date: string; sortKey: string; extra: ExtraWorkoutEntry }
+
+const SESSION_FILTER_KEY = 'wpt_history_filterPlanId'
 
 export function HistoryPage() {
   const today = useToday()
@@ -105,9 +107,15 @@ export function HistoryPage() {
   const plansWithHistory = getPlansWithHistory(plans, entries, extraEntries)
   const showPlanFilter = plansWithHistory.length > 1
   const activePlanHasHistory = hasPlanHistory(activePlanId, entries, extraEntries)
-  const [filterPlanId, setFilterPlanId] = useState<string | 'all'>(
-    activePlanHasHistory ? activePlanId! : 'all',
-  )
+  const [filterPlanId, setFilterPlanIdRaw] = useState<string | 'all'>(() => {
+    const stored = sessionStorage.getItem(SESSION_FILTER_KEY)
+    if (stored && (stored === 'all' || stored in plans)) return stored as string | 'all'
+    return activePlanHasHistory ? activePlanId! : 'all'
+  })
+  const setFilterPlanId = (value: string | 'all') => {
+    sessionStorage.setItem(SESSION_FILTER_KEY, value)
+    setFilterPlanIdRaw(value)
+  }
 
   const filteredEntries = useMemo(
     () => entries.filter(e => filterPlanId === 'all' || e.planId === filterPlanId),
@@ -140,6 +148,15 @@ export function HistoryPage() {
   }), [filteredEntries, filteredExtras])
 
   const stats = computeHistoryStats(filteredEntries, filteredExtras, today)
+
+  // Logged rate: % of past plan days that have any entry logged.
+  // Only meaningful for a single-plan view (null for "all plans").
+  const loggedRate = useMemo(() => {
+    if (filterPlanId === 'all') return null
+    const p = plans[filterPlanId]
+    if (!p) return null
+    return computeLoggedRate(filterPlanId, filteredEntries, p.startDate, today)
+  }, [filterPlanId, filteredEntries, plans, today])
 
   // For single-plan view: use computeWorkoutTypeBreakdown which gives completed/skipped
   // counts and avgEffort per type from outcome data. For 'all' plans, fall back to the
@@ -436,6 +453,19 @@ export function HistoryPage() {
             </div>
             {typeMixLabel && (
               <p className="text-xs text-slate-500 text-center">{typeMixLabel}</p>
+            )}
+            {loggedRate !== null && (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1 rounded-full bg-slate-700/60 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-sky-500/60 transition-all"
+                    style={{ width: `${loggedRate}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-slate-500 flex-shrink-0 tabular-nums">
+                  {loggedRate}% logged
+                </span>
+              </div>
             )}
           </div>
         )}

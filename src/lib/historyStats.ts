@@ -214,6 +214,39 @@ export function computeRotationPlanRemaining(
   return Math.max(0, totalNeeded - done)
 }
 
+// ── Logged rate ───────────────────────────────────────────────────────────────
+
+/**
+ * Compute the percentage of past plan days (since `planStartDate` up to, but
+ * not including, `today`) that have at least one history entry logged.
+ *
+ * "Logged" counts any action — complete, skip, or day_off. The goal is to
+ * measure how consistently the user is recording their activity, regardless
+ * of the outcome.
+ *
+ * Returns `null` when the plan started today or in the future (no past days
+ * to measure against). Returns 0–100 (integer, capped at 100).
+ *
+ * Multiple entries for the same date count as one logged day.
+ */
+export function computeLoggedRate(
+  planId: string,
+  entries: HistoryEntry[],
+  planStartDate: string,
+  today: string,
+): number | null {
+  const activeDays = dateDiffDays(planStartDate, today)
+  if (activeDays <= 0) return null
+
+  const loggedDates = new Set(
+    entries
+      .filter(e => e.planId === planId && e.calendarDate >= planStartDate && e.calendarDate < today)
+      .map(e => e.calendarDate),
+  )
+
+  return Math.min(Math.round((loggedDates.size / activeDays) * 100), 100)
+}
+
 /** Difference in calendar days between two YYYY-MM-DD strings (b − a). */
 function dateDiffDays(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number)

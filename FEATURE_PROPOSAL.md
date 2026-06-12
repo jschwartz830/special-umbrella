@@ -1,46 +1,47 @@
 # Feature Proposals
 
-## Pass 54 — 2026-06-10 (branch `claude/dreamy-mccarthy-00qje6`)
+## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
 
 ### Feature selected
 
-**`avgDurationMin` data layer in `WorkoutTypeStat` breakdown**
+**Logged-rate stat — "% logged" progress bar in HistoryPage plan stats**
 
 ### Why it was selected
 
-The `WorkoutTypeStat` interface already tracked `avgEffort` (aggregated from `perceivedEffort` on outcomes). Duration (`durationActualMin`) is equally fundamental as a training metric and is stored on the same `WorkoutOutcome` object, yet it was not part of the breakdown. A HistoryPage component wanting to display "avg session time" for each workout type had no data to read from — it would need to either re-aggregate outcomes from scratch or add its own store subscription.
+The history stats section already shows streaks, volume, and type mix, but gives no indication of how consistently the user actually records their workouts. A user could have a 10-day streak but have silently skipped logging 30% of the preceding days (stalling the rotation engine). Surfacing "% logged" closes this observability gap with zero new dependencies: it is a pure derivation from existing `HistoryEntry` data.
 
-The selection criteria for this pass:
+Alternatives considered and rejected:
+- **Personal records trend chart** — requires a charting lib or SVG math; out of scope for no-new-dependency constraint.
+- **Upcoming session count badge** — already implemented.
+- **Weekly goal ring** — requires a target-per-week config field that doesn't exist yet.
 
-1. **Adjacent to existing work** — `avgDurationMin` follows the identical accumulation pattern (`effortSums` map → `addEffort` helper → result assembly) already in the function. The implementation was a near-mechanical extension.
-2. **Narrowest viable slice** — implementing only the data layer (the `WorkoutTypeStat` field + aggregation logic) without touching any UI component keeps the change reviewable and browser-testing-free.
-3. **Testable in isolation** — pure function; 7 tests cover all paths in under 30 lines.
-4. **No new dependencies** — uses only fields already on `WorkoutOutcome`.
+`computeLoggedRate` is a pure function with a clear specification, fully unit-testable, and adds a single UI element that is completely hidden when not applicable (plan started today, or "all plans" filter active).
 
-### Implementation scope for this run
+### Implementation scope
 
-**Data layer only (no UI):**
+**`src/lib/historyStats.ts`**
+- New export: `computeLoggedRate(planId, entries, planStartDate, today): number | null`
+- Counts unique `calendarDate` values in `[planStartDate, today)` for the given plan
+- Returns `null` when `activeDays <= 0` (plan started today or in future)
+- Returns an integer 0–100 (percentage, rounded, capped at 100)
+- Any logged action (complete, skip, day_off) counts as a logged day
 
-- `WorkoutTypeStat` interface: add `avgDurationMin: number | null`
-- `computeWorkoutTypeBreakdown`: add `durationSums` map, `addDuration` helper, calls to `addDuration` for rotation-entry completions and extras, `avgDurationMin` in result assembly
-- 7 new tests in `src/lib/__tests__/historyStats.test.ts`
+**`src/lib/__tests__/historyStats.test.ts`**
+- 11 new test cases covering all boundary conditions (see TEST_RESULTS.md)
 
-**Explicitly deferred:**
+**`src/pages/HistoryPage.tsx`**
+- New `loggedRate` useMemo computed from `filterPlanId`, `filteredEntries`, `plans`, `today`
+- Returns `null` when `filterPlanId === 'all'` or plan not found
+- New JSX block below `typeMixLabel`: a thin sky-500 progress bar + `"{N}% logged"` label
+- Completely hidden when `loggedRate` is `null`
 
-- UI display in `HistoryPage` breakdown table (requires browser testing, layout decisions, and potentially a wider table or collapsible columns)
+### Dependencies introduced
 
-### Assumptions being made
+None.
 
-- `durationActualMin` is the canonical duration field on `WorkoutOutcome` (confirmed — used in sessionSummary, outcomeStore, and existing breakdown logic)
-- Rounding to the nearest whole minute is appropriate for display (avoids "avg: 42.3 min")
-- `null` is the correct sentinel when no duration data exists for a workout type (consistent with `avgEffort: null` for same condition)
-- UI display can wait until HistoryPage layout is reviewed — the data contract is stable enough to ship before the UI is ready
+### Rollback
 
-### Open product / UX decisions
-
-1. Should "avg duration" show alongside "avg effort" in the breakdown table row, or in a separate expandable detail section?
-2. Is per-workout-type avg duration the right granularity, or should it be per-plan-week to show training load trends?
-3. Should `null` render as "—" or be hidden entirely from the breakdown row?
+Delete the `loggedRate` useMemo and its JSX block from `HistoryPage.tsx`. The `computeLoggedRate` export in `historyStats.ts` can remain — it is dead code until re-imported and causes no runtime side effects.
 
 ---
 

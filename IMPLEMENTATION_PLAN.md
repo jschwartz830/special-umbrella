@@ -1,47 +1,105 @@
 # Implementation Plan
 
-## Pass 54 — 2026-06-10 (branch `claude/dreamy-mccarthy-00qje6`)
+## Pass 55 — 2026-06-12 (branch `claude/dreamy-mccarthy-wh71fb`)
 
 ### Observations on entry
 
-- Baseline on entry: **821 passing, 0 failing** — clean exit from pass 53.
-- Pass 53 added defensive plan.id filters to rotationEngine, moved ID constructors to lib/workoutInstanceId.ts, and fixed a misleading source comment.
-- Full codebase re-read performed: all source files, stores, modules, lib utilities, and all 20 test files.
+- Baseline on entry: **832 passing, 0 failing** — clean exit from pass 54.
+- Pass 54 fixed the empty-slots crash in `WorkoutDayCard`, added `computeLoggedRate` + 11 tests, and surfaced the logged-rate bar in HistoryPage.
+- Full codebase audit performed: all source files, stores, pages, engine, lib utilities, and all test files.
 
-### Architecture summary (unchanged from pass 53)
+### Architecture summary (unchanged from pass 54)
 
-React 18 + TypeScript + Zustand + Vite PWA. Core state in five persisted Zustand stores. Rotation logic is pure functions in `rotationEngine.ts`. Stats are pure utilities in `historyStats.ts`, `sessionSummary.ts`, and `historyScope.ts`.
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
 
-### What appears strong and well-designed
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
 
-- **Excellent test coverage**: 821 tests on entry, comprehensive across all business-logic layers.
-- **Strong type safety**: No `any` in production code; Zustand stores are fully typed.
-- **Store consistency**: `addEntry`/`importEntries` always deduplicates by `(planId, calendarDate)` — duplicate-entry bugs are structurally prevented.
-- **Progression logic separation**: Two independent systems (`buildProgressionRecommendation` for generic outcomes, `evaluateRunProgression` for the adaptation engine) coexist cleanly.
-- **Error resilience**: `applyProgressionRule` is guarded; empty plan guards are in place; `isPlanExpired` correctly filters future entries.
+**Key pages:** TodayPage (~1,220 lines), CalendarPage (~950 lines), HistoryPage (~985 lines)
 
 ### Key issues found in this audit
 
 | Priority | Issue | Status |
 |----------|-------|--------|
-| Low — correctness | `findPreviousSessionForPlanDay` used an inline `\`${planId}_${calendarDate}\`` literal instead of `makeWorkoutInstanceId` | **Fixed** |
-| Low — documentation | `evaluateRunProgression` treats `completedAsPlanned: absent` like `false` (no progress without distance); contrast with `buildProgressionRecommendation` which uses `!== false` (looser). Not documented by a test. | **Fixed (new test)** |
-| Info | `buildWeightsRecommendation` uses only the first exercise's `progressionMode` for the whole workout — already tested/documented, carry-forward only | Carry-forward |
-| Info | `WorkoutTypeStat` had `avgEffort` but no `avgDuration` — `durationActualMin` already in outcomes | **Feature: `avgDurationMin` added** |
+| Medium | `evaluateUpdates` stores NaN/Infinity into programStore vars when ctx.vars contains corrupted values | **Fixed** |
+| Medium | `updateEntryDate` raw-field-swap lets two entries coexist at the same (planId, date) | **Fixed** |
+| Low | HistoryPage `filterPlanId` resets to default on every page navigation | **Fixed** (sessionStorage persistence) |
+| Info | `computeWorkoutTypeBreakdown` credits only first slot per plan day | Documented (carry-forward) |
+| Info | `isPlanExpired` does not deduplicate entries before counting | Documented (carry-forward) |
 
 ### Prioritized plan
 
-1. ✅ Fix inline `workoutInstanceId` format in `sessionSummary.ts` — 1-line, zero risk
-2. ✅ Add test documenting `completedAsPlanned: absent` behavior in `evaluateRunProgression`
-3. ✅ Feature: `avgDurationMin` in `WorkoutTypeStat` + `computeWorkoutTypeBreakdown` + 7 tests
-4. ⬜ Surface `avgDurationMin` in HistoryPage UI — deferred; see FEATURE_REVIEW.md
+1. ✅ **Fix `evaluateUpdates` NaN/Infinity guard** — prevents cross-variable corruption when YAML progression vars contain bad values; fall back to previous variable value; 4 new tests
+2. ✅ **Fix `updateEntryDate` deduplication** — when moving an entry to a date that already has an entry for the same plan, remove the old entry (consistent with `addEntry` semantics); update contract test
+3. ✅ **Persist HistoryPage `filterPlanId` across navigations** — sessionStorage key `wpt_history_filterPlanId`; validated against current `plans` on init; falls back gracefully
 
-### Carried-forward risks (from pass 53)
+### Rationale for sequencing
+
+Bug fixes first (NaN guard, dedup fix) — both touch hot paths. Feature last — sessionStorage persistence is purely additive with no store changes.
+
+### Carried-forward risks
 
 - `TodayPage.tsx` (~1,220 lines) and `CalendarPage.tsx` (~950 lines) are large.
-- `outcomeStore` has cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
-- `workoutInstanceId` parsing relies on nanoid never generating `_`.
-- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay`.
+- `outcomeStore` cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay` (should store just `calendarDate`).
+- CSV import has no user feedback for skipped/rejected entries.
+- `computeWorkoutTypeBreakdown` credits only `slots[0]` type for multi-slot plan days.
+
+---
+
+## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
+
+### Observations on entry
+
+- Baseline on entry: **821 passing, 0 failing** — clean exit from pass 53.
+- Pass 53 added defensive plan.id filters in rotationEngine, moved ID constructors to workoutInstanceId.ts, and fixed the ExtraWorkoutEntry.source comment.
+- Full codebase audit performed: all source files, stores, pages, engine, lib utilities, and all test files.
+
+### Architecture summary (unchanged from pass 53)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,220 lines), CalendarPage (~950 lines), HistoryPage (~985 lines)
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `WorkoutDayCard` crashes when `planDay.slots` is empty — `slots[0].type` throws TypeError | **Fixed** |
+| Low | No "logged rate" metric showing what % of plan days have been logged | **Fixed** (new `computeLoggedRate` + HistoryPage UI) |
+| Info | `updateEntryDate` relies on caller contract for deduplication; all callers correct | Documented (carry-forward) |
+| Info | `computeWorkoutTypeBreakdown` credits only first slot per plan day | Documented (carry-forward) |
+| Info | `isPlanExpired` does not deduplicate entries before counting | Documented (carry-forward) |
+
+### Prioritized plan
+
+1. ✅ **Fix `WorkoutDayCard` empty-slots crash** — `slots[0]?.type ?? 'rest'`, purely defensive
+2. ✅ **Add `computeLoggedRate` with 11 tests** — new pure function in historyStats.ts
+3. ✅ **Surface logged rate in HistoryPage** — thin progress bar + percentage below stats grid
+
+### Rationale for sequencing
+
+Crash fix first (zero risk, highest priority). Pure utility + tests second (additive, no UI coupling). UI display last so it can be trivially reverted independently of the logic.
+
+### Carried-forward risks (unchanged from pass 53)
+
+- `TodayPage.tsx` (~1,220 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `outcomeStore` cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `workoutInstanceId` parsing now defensive (parse uses date regex, handles underscore-heavy planIds).
+- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay` (should store just `calendarDate`).
 - CSV import has no user feedback for skipped/rejected entries.
 - History page filter state not persisted across page reloads.
 

@@ -1,43 +1,96 @@
 # Test Results
 
-## 2026-06-10 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-00qje6`
+## 2026-06-12 (fifty-fifth pass) — branch `claude/dreamy-mccarthy-wh71fb`
 
-**Result: 829 passing, 0 failing** (+8 tests vs entry baseline of 821)
+**Result: 836 passing, 0 failing** (+4 tests vs entry baseline of 832)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 20 (unchanged) |
+| Tests on entry | 832 |
+| Tests on exit | 836 |
+| Delta | +4 |
+| Failures | 0 |
+
+### Tests reviewed
+
+All 20 test files were confirmed clean on entry. No pre-existing failures.
+
+### Tests added
+
+**`src/lib/__tests__/expressionEval.test.ts`** — 4 new cases in `describe('NaN / Infinity guard — corrupted program vars must not propagate', ...)`:
+
+| Test | What it asserts |
+|------|----------------|
+| keeps previous bench value when squat var is NaN | `bench = squat * 0.85` where `squat = NaN` → guard keeps `bench = 135` |
+| keeps previous bench value when squat var is Infinity | Same with `squat = Infinity` → guard keeps `bench = 135` |
+| chained updates: NaN-tainted first assignment does not corrupt second clean statement | `bench = squat * 0.85, ohp += 5` with NaN squat → bench stays 100, ohp increments 75→80 |
+| squat += 5 on a NaN var stays NaN | NaN + 5 = NaN; guard falls back to cur = NaN; cannot self-repair but does not spread |
+
+**`src/store/__tests__/historyStore.test.ts`** — 1 test updated in `describe('updateEntryDate', ...)`:
+
+- The "coexistence: does NOT deduplicate" contract test was replaced with "deduplicates: moving to a date that already has an entry removes the old one", verifying that the moved entry wins and only 1 entry exists at the target date after the move.
+
+### Command run
+
+```
+npx vitest run
+```
+
+All 836 tests passed. No skipped tests.
+
+### Important areas still untested
+
+| Area | Risk | Notes |
+|------|------|-------|
+| `TodayPage.tsx` | Medium | Double-day flow, undo, active tracker — integration-test candidates |
+| `CalendarPage.tsx` | Medium | DayDetailModal behavior, slot fallback path |
+| `HistoryPage.tsx` filter sessionStorage | Low | UI-layer; cannot be tested without jsdom + React Testing Library |
+| `useToday` hook | Low | Timeout-dependent; would need `vi.useFakeTimers()` + jsdom environment |
+
+---
+
+## 2026-06-11 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-q8dj7t`
+
+**Result: 832 passing, 0 failing** (+11 tests vs entry baseline of 821)
 
 | Metric | Value |
 |--------|-------|
 | Test files | 20 (unchanged) |
 | Tests on entry | 821 |
-| Tests on exit | 829 |
-| Delta | +8 |
+| Tests on exit | 832 |
+| Delta | +11 |
 | Failures | 0 |
 
 ### Tests reviewed
 
-All 20 test files reviewed as part of the audit. No failing tests identified on entry.
+All 20 test files were confirmed clean on entry. No pre-existing failures.
 
 ### Tests added
 
-| File | New tests | What they cover |
-|------|-----------|-----------------|
-| `src/modules/run-adaptation/__tests__/engine.test.ts` | 1 | `completedAsPlanned` absent (undefined) → hold, not progress |
-| `src/lib/__tests__/historyStats.test.ts` | 7 | `avgDurationMin`: null when no outcomes; average from rotation entries; rounding to nearest minute; extra entries; mixed rotation+extra (avg 38); ignoring null-duration outcomes; null for skipped-only |
+**`src/lib/__tests__/historyStats.test.ts`** — 11 new cases in `describe('computeLoggedRate', ...)`:
 
-### Results (all 829 tests pass)
+| Test | What it asserts |
+|------|----------------|
+| returns null when plan started today | `activeDays = 0` → `null` |
+| returns null when plan starts in the future | `activeDays < 0` → `null` |
+| returns 0 when no entries logged | 0 logged dates out of 7 → `0` |
+| returns 100 when all days logged | 7/7 logged → `100` |
+| returns correct partial percentage | 3/7 logged → `43` |
+| counts skip entries | skip action → logged date counted |
+| counts day_off entries | day_off action → logged date counted |
+| excludes today from denominator | today not in `[planStart, today)` range |
+| counts duplicate entries as single day | two entries same date → 1 unique day |
+| ignores entries from other plans | foreign planId filtered out |
+| ignores entries before plan start date | pre-start entries not counted |
+
+### Command run
 
 ```
-Test Files  20 passed (20)
-     Tests  829 passed (829)
-  Duration  2.22s
+npm test
 ```
 
-### Important areas still untested
-
-- **TodayPage / CalendarPage integration** — no component tests; relies on manual browser testing
-- **Double-day flow end-to-end** — complex state machine across TodayPage + historyStore + outcomeStore; tested via individual store/engine unit tests only
-- **Outcome date-change conflict detection** — `updateEntryDate` overwrites silently; no test for the collision case (noted as carry-forward from pass 47)
-- **CSV import rejection feedback** — `historyFromCsv` drops invalid entries silently; no test verifying the user-facing message when entries are rejected
-- **ActiveWorkoutTracker** — timer-based, session-local state; not unit-tested
+All 832 tests passed. No skipped tests.
 
 ---
 

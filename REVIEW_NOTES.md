@@ -1,26 +1,24 @@
 # Review Notes — Overnight Audit
 
-## 2026-06-10 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-00qje6`
+## 2026-06-12 (fifty-fifth pass) — branch `claude/dreamy-mccarthy-wh71fb`
 
 ### Executive summary
 
-1. **What changed:** Three commits. (1) Bug fix: `findPreviousSessionForPlanDay` in `sessionSummary.ts` was using an inline template literal for the outcome key instead of the canonical `makeWorkoutInstanceId()` helper — a DRY violation that would silently break the "Last session" hint if the key format ever changed. (2) Documentation test: added a targeted test in `engine.test.ts` explicitly documenting that `completedAsPlanned: undefined` behaves like `false` in `evaluateRunProgression` (stricter than the sibling `buildProgressionRecommendation`). (3) Feature (data layer): extended `WorkoutTypeStat` with `avgDurationMin` and populated it in `computeWorkoutTypeBreakdown`, with 7 new tests; UI display deliberately deferred.
+1. **What changed:** Three commits. (1) Bug fix: `evaluateUpdates` in `expressionEval.ts` now guards each assignment with `isFinite(next) ? next : cur`, preventing NaN/Infinity from spreading through YAML progression expressions when `ctx.vars` contains a corrupted value. (2) Bug fix: `updateEntryDate` in `historyStore.ts` now deduplicates on collision — if the target date already has an entry for the same plan, it is removed; the moved entry wins. (3) Feature: HistoryPage `filterPlanId` is now persisted in `sessionStorage` across page navigations.
 
-2. **Highest confidence:** All three changes. The fix is a one-line substitution with identical runtime behavior today. The test is additive. The feature is purely additive — no existing caller behavior changes.
+2. **Highest confidence:** The `evaluateUpdates` guard — a 5-line arithmetic change, purely additive safety check. The `updateEntryDate` dedup — small, consistent with `addEntry` semantics, all existing callers are already correct.
 
-3. **What is risky:** Nothing in this pass is risky. The only non-trivial change (duration aggregation in `computeWorkoutTypeBreakdown`) follows the exact same pattern as the pre-existing `avgEffort` aggregation in the same function.
+3. **What is risky:** Nothing in this pass is risky. The sessionStorage feature is UI-only with a safe fallback. Both bug fixes are narrow scope.
 
-4. **What to review first:** Commit 3 (`b8fa267`) — the `historyStats.ts` changes are the most substantive. Verify `durationSums` follows the same accumulation pattern as `effortSums` and that the result assembly correctly produces `null` when no duration data is present.
+4. **What to review first:** Commit 2 (`updateEntryDate`) — verify the filter logic removes the correct (pre-existing) entry rather than the moved one. The key predicate is `e.id === id || !(e.planId === planId && e.calendarDate === newDate)` — the moved entry keeps `e.id === id` which wins the first clause; the pre-existing entry fails both clauses and is removed.
 
 ---
 
 ### Biggest issues found
 
-1. **`sessionSummary.ts` inline ID construction** — `findPreviousSessionForPlanDay` used `` `${planId}_${e.calendarDate}` `` instead of `makeWorkoutInstanceId()`. A format change to `workoutInstanceId` would silently break the "Last session" hint on TodayPage with no error. Fixed. (This is the third instance of inline ID construction eliminated across passes 53–54; the codebase is now consistent.)
+1. **NaN/Infinity propagation in `evaluateUpdates`** — if a program variable is NaN (e.g., due to a prior bad write to `programStore`), any YAML expression using it as input would overwrite other variables with NaN. This was a silent corruption path. Fixed with `isFinite` guard.
 
-2. **Undocumented behavioral divergence between progression systems** — `evaluateRunProgression` (adaptation engine) requires `completedAsPlanned === true` (strict) to treat a no-distance outcome as hit-target, while `buildProgressionRecommendation` uses `!== false` (permissive). No test documented this difference. Added explicit test.
-
-3. **`WorkoutTypeStat` missing `avgDurationMin`** — The breakdown computed `avgEffort` but not duration. Both are first-class training metrics and `durationActualMin` is available on `WorkoutOutcome`. Added at the data layer.
+2. **`updateEntryDate` double-entry accumulation** — the raw field-swap allowed two entries to share the same `(planId, calendarDate)` if a caller omitted the pre-deletion step. Even though the rotation engine resolves the conflict correctly by `createdAt`, the store held redundant data. Fixed with post-move deduplication.
 
 ---
 
@@ -28,25 +26,57 @@
 
 | # | Type | Change | Tests Added |
 |---|------|--------|-------------|
-| 1 | fix | `sessionSummary.ts` → `makeWorkoutInstanceId` | 0 |
-| 2 | test | Document `completedAsPlanned` absent → hold | 1 |
-| 3 | feat | `avgDurationMin` in `WorkoutTypeStat` + breakdown | 7 |
-
-**Test delta: +8 (821 → 829, all passing)**
+| 1 | Bug fix | `evaluateUpdates` NaN/Infinity guard in `expressionEval.ts` | 4 |
+| 2 | Bug fix | `updateEntryDate` dedup on target-date collision | 1 (updated) |
+| 3 | Feature | HistoryPage `filterPlanId` sessionStorage persistence | 0 (UI) |
 
 ---
 
-### Small features added
+### Issues considered but not acted on
 
-**`avgDurationMin` in `WorkoutTypeStat`** — Data layer only. `computeWorkoutTypeBreakdown` now aggregates `durationActualMin` from outcomes for both rotation completions and extra workouts. The UI display (adding an "Avg duration" column to the HistoryPage breakdown table) was intentionally left for a future pass to keep this change narrow and browser-testing-free.
+- **`computeWorkoutTypeBreakdown` multi-slot attribution** — only `slots[0]` is credited. Fixing requires iterating all slots and splitting counts, which changes the existing stats semantics. Carried forward.
+- **`loggingUpcoming` stale `ResolvedDay` in TodayPage** — stores a full `ResolvedDay` snapshot that can become stale if the plan is edited; should store just `calendarDate`. Non-trivial refactor across TodayPage flow. Carried forward.
+- **CSV import rejection feedback** — `historyFromCsv` already collects a `warnings` array, but it is not surfaced in the UI. Adding a toast/modal would require UI work and is carried forward.
 
 ---
 
-### Carry-forward risks (unchanged from pass 53)
+## 2026-06-11 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-q8dj7t`
 
-- **Outcome date-change collision** — `updateEntryDate` overwrites silently; no test for the collision case.
-- **CSV import rejection feedback** — `historyFromCsv` drops invalid entries silently; no test verifying the user-facing message.
-- **`ActiveWorkoutTracker` timer state** — session-local, no unit tests.
+### Executive summary
+
+1. **What changed:** Three commits. (1) Crash fix: guarded `planDay.slots[0]?.type ?? 'rest'` in `WorkoutDayCard` to prevent a null-dereference when the rotation engine emits a synthetic rest day with an empty slots array. (2) New pure function `computeLoggedRate` in `historyStats.ts` + 11 unit tests. (3) Logged-rate progress bar in `HistoryPage` stats section, visible only when a single plan is selected.
+
+2. **Highest confidence:** The WorkoutDayCard crash fix — one optional-chain with a safe fallback, zero behaviour change for any non-empty slots array. The `computeLoggedRate` function — pure, tested exhaustively, adds no external dependencies.
+
+3. **What is risky:** Nothing in this pass is risky. The HistoryPage UI addition is purely additive (new JSX branch gated on `loggedRate !== null`). No existing logic paths were modified.
+
+4. **What to review first:** Commit 1 (`ce442de`) — the crash fix. Verify the `?? 'rest'` fallback is the correct default (yes — `meta` is only consumed for `meta.borderColor` when `isPending`, and a synthetic rest day can never be `isPending`).
+
+---
+
+### Biggest issues found
+
+1. **WorkoutDayCard crash on empty-slots day** — `WORKOUT_META[planDay.slots[0].type]` throws `TypeError: Cannot read properties of undefined` when `planDay.slots` is empty. The rotation engine's 0-day plan guard returns exactly this shape: `{ id: '', label: 'Rest', slots: [] }`. Any user who creates a plan with zero days and opens Today would see a white screen. Fixed with `planDay.slots[0]?.type ?? 'rest'`.
+
+2. **No logging-consistency feedback** — The stats section showed streak, volume, and type mix but no signal for whether the user is actually recording all their workouts. A user who forgets to log every third workout gets the same streaks display as one who never misses. Added `computeLoggedRate` + progress bar to surface this gap.
+
+---
+
+### Improvements completed
+
+| # | Type | Change | Tests Added |
+|---|------|--------|-------------|
+| 1 | Bug fix | `WorkoutDayCard`: guard `slots[0]?.type ?? 'rest'` | 0 (crash path, not unit-testable in isolation) |
+| 2 | Feature | `computeLoggedRate` in `historyStats.ts` | 11 |
+| 3 | Feature | Logged-rate progress bar in `HistoryPage` | 0 (UI) |
+
+---
+
+### Issues considered but not acted on
+
+- **`updateEntryDate` deduplication gap** — The function is a raw field swap with no dedup logic. Current callers all pre-validate, so it is safe by contract. Adding a guard would be higher-value but also higher-risk (store mutation pattern). Carried forward to Pass 55.
+- **`computeCurrentDayIndex` stall on unlogged past days** — By design, per plan spec. No change warranted.
+- **`sessionCount` badge already present** — Considered adding it to upcoming days; it was already implemented. No work needed.
 
 ---
 

@@ -247,9 +247,16 @@ export const useHistoryStore = create<HistoryState>()(
       },
 
       updateEntryDate(id, newDate) {
-        set(s => ({
-          entries: s.entries.map(e => e.id === id ? { ...e, calendarDate: newDate } : e),
-        }))
+        set(s => {
+          const target = s.entries.find(e => e.id === id)
+          if (!target) return s
+          const planId = target.planId
+          const mapped = s.entries.map(e => e.id === id ? { ...e, calendarDate: newDate } : e)
+          // Remove any pre-existing entry that now collides on (planId, newDate)
+          return {
+            entries: mapped.filter(e => e.id === id || !(e.planId === planId && e.calendarDate === newDate)),
+          }
+        })
       },
 
       updateExtraEntryDate(id, newDate) {
