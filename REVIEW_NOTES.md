@@ -1,5 +1,45 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-12 (fifty-fifth pass) — branch `claude/dreamy-mccarthy-wh71fb`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Bug fix: `evaluateUpdates` in `expressionEval.ts` now guards each assignment with `isFinite(next) ? next : cur`, preventing NaN/Infinity from spreading through YAML progression expressions when `ctx.vars` contains a corrupted value. (2) Bug fix: `updateEntryDate` in `historyStore.ts` now deduplicates on collision — if the target date already has an entry for the same plan, it is removed; the moved entry wins. (3) Feature: HistoryPage `filterPlanId` is now persisted in `sessionStorage` across page navigations.
+
+2. **Highest confidence:** The `evaluateUpdates` guard — a 5-line arithmetic change, purely additive safety check. The `updateEntryDate` dedup — small, consistent with `addEntry` semantics, all existing callers are already correct.
+
+3. **What is risky:** Nothing in this pass is risky. The sessionStorage feature is UI-only with a safe fallback. Both bug fixes are narrow scope.
+
+4. **What to review first:** Commit 2 (`updateEntryDate`) — verify the filter logic removes the correct (pre-existing) entry rather than the moved one. The key predicate is `e.id === id || !(e.planId === planId && e.calendarDate === newDate)` — the moved entry keeps `e.id === id` which wins the first clause; the pre-existing entry fails both clauses and is removed.
+
+---
+
+### Biggest issues found
+
+1. **NaN/Infinity propagation in `evaluateUpdates`** — if a program variable is NaN (e.g., due to a prior bad write to `programStore`), any YAML expression using it as input would overwrite other variables with NaN. This was a silent corruption path. Fixed with `isFinite` guard.
+
+2. **`updateEntryDate` double-entry accumulation** — the raw field-swap allowed two entries to share the same `(planId, calendarDate)` if a caller omitted the pre-deletion step. Even though the rotation engine resolves the conflict correctly by `createdAt`, the store held redundant data. Fixed with post-move deduplication.
+
+---
+
+### Improvements completed
+
+| # | Type | Change | Tests Added |
+|---|------|--------|-------------|
+| 1 | Bug fix | `evaluateUpdates` NaN/Infinity guard in `expressionEval.ts` | 4 |
+| 2 | Bug fix | `updateEntryDate` dedup on target-date collision | 1 (updated) |
+| 3 | Feature | HistoryPage `filterPlanId` sessionStorage persistence | 0 (UI) |
+
+---
+
+### Issues considered but not acted on
+
+- **`computeWorkoutTypeBreakdown` multi-slot attribution** — only `slots[0]` is credited. Fixing requires iterating all slots and splitting counts, which changes the existing stats semantics. Carried forward.
+- **`loggingUpcoming` stale `ResolvedDay` in TodayPage** — stores a full `ResolvedDay` snapshot that can become stale if the plan is edited; should store just `calendarDate`. Non-trivial refactor across TodayPage flow. Carried forward.
+- **CSV import rejection feedback** — `historyFromCsv` already collects a `warnings` array, but it is not surfaced in the UI. Adding a toast/modal would require UI work and is carried forward.
+
+---
+
 ## 2026-06-11 (fifty-fourth pass) — branch `claude/dreamy-mccarthy-q8dj7t`
 
 ### Executive summary

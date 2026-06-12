@@ -347,13 +347,16 @@ export function evaluateUpdates(
       } catch { return 0 }
     })()
     const cur = result[varName] ?? vars[varName] ?? 0
+    let next: number
     switch (op) {
-      case '+': result[varName] = cur + rhsVal; break
-      case '-': result[varName] = cur - rhsVal; break
-      case '*': result[varName] = cur * rhsVal; break
-      case '/': result[varName] = rhsVal !== 0 ? cur / rhsVal : cur; break
-      default:  result[varName] = rhsVal; break
+      case '+': next = cur + rhsVal; break
+      case '-': next = cur - rhsVal; break
+      case '*': next = cur * rhsVal; break
+      case '/': next = rhsVal !== 0 ? cur / rhsVal : cur; break
+      default:  next = rhsVal; break
     }
+    // Discard NaN/Infinity from bad YAML expressions — keep previous value instead
+    result[varName] = isFinite(next) ? next : cur
   }
   return result
 }

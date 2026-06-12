@@ -1,3 +1,60 @@
+# Overnight Changelog — 2026-06-12
+
+## [1] Fix: NaN/Infinity guard in `evaluateUpdates` (`expressionEval.ts`)
+
+**Summary**: Added an `isFinite` guard after each arithmetic operation in `evaluateUpdates`. If the result of an assignment is NaN or Infinity, the previous value of the variable is kept instead.
+
+**Why it matters**: YAML progression rules are user-authored strings. If a program variable in `programStore` contains a corrupted value (e.g. NaN persisted in localStorage from an earlier bad write), an expression like `bench = squat * 0.85` would propagate the NaN to `bench`, corrupting a previously clean variable. With the guard, each assignment is validated before being stored, so NaN/Infinity cannot spread across variables through derived expressions.
+
+**Before**: `result[varName] = cur + rhsVal` — no validation, NaN/Infinity silently persisted.
+**After**: `result[varName] = isFinite(next) ? next : cur` — falls back to previous value on bad result.
+
+**Files changed**: `src/lib/expressionEval.ts` (5 lines changed), `src/lib/__tests__/expressionEval.test.ts` (+4 tests)
+
+**Risks / tradeoffs**: The fallback-to-previous behaviour means a YAML rule with a NaN input is a silent no-op rather than a crashing error. This is the safer choice for a user-facing app where YAML errors should degrade gracefully. The downside is that silent no-ops can hide YAML bugs; a future improvement could surface a warning.
+
+**Rollback**: `git revert <commit>`
+
+---
+
+## [2] Fix: `updateEntryDate` now deduplicates on target-date collision
+
+**Summary**: When moving a rotation entry to a new date, if another entry for the same `(planId, calendarDate)` pair already exists, it is now removed. The moved entry wins, consistent with `addEntry` semantics.
+
+**Why it matters**: Before this fix, `updateEntryDate` was a raw field swap with no deduplication. If a caller moved an entry to a date that already had an entry for the same plan, the store would end up with two entries sharing the same `(planId, calendarDate)`. The rotation engine resolves this by newest-`createdAt`, so the output was deterministic, but the store held redundant data that could cause subtle bugs if the `createdAt` values happened to be identical. The fix eliminates the redundant data at the source.
+
+**Before**: `entries.map(e => e.id === id ? { ...e, calendarDate: newDate } : e)` — no dedup.
+**After**: Move the entry, then filter out any other entry at `(planId, newDate)`.
+
+**Existing callers** (TodayPage, CalendarPage): both already called `removeEntry(planId, newDate)` before `updateEntryDate`, so their behaviour is unchanged. The fix just makes the store itself correct by construction.
+
+**Files changed**: `src/store/historyStore.ts` (7 lines), `src/store/__tests__/historyStore.test.ts` (test updated)
+
+**Risks / tradeoffs**: Zero risk. Callers that already pre-deleted see no difference. Callers that forgot are now safe.
+
+**Rollback**: `git revert <commit>`
+
+---
+
+## [3] Feature: HistoryPage `filterPlanId` persists across navigations (sessionStorage)
+
+**Summary**: The plan filter dropdown in HistoryPage now saves its selection to `sessionStorage` under key `wpt_history_filterPlanId`. On page re-mount, it restores the saved value if the stored plan still exists in the current `plans` map; otherwise falls back to the default (active plan with history, or 'all').
+
+**Why it matters**: Before this fix, navigating away from HistoryPage and back always reset the filter to the active plan. Users reviewing history for an archived plan had to re-select it on every navigation, which was friction for the most common history-review pattern (switching to Calendar or Today and coming back).
+
+**Implementation**: `const SESSION_FILTER_KEY = 'wpt_history_filterPlanId'` module-level constant. `useState` lazy initializer reads from `sessionStorage` and validates the stored ID against `plans`. The setter wrapper writes to `sessionStorage` before calling `setFilterPlanIdRaw`. No `useEffect` or extra state — the persistence is piggy-backed on the existing setter.
+
+**Files changed**: `src/pages/HistoryPage.tsx` (+9 lines net; 1 line replaced with 8)
+
+**Risks / tradeoffs**:
+- `sessionStorage` is cleared when the browser tab is closed — the filter resets on a fresh session, which is the expected behavior.
+- If a planId stored in sessionStorage no longer exists (plan was deleted), the fallback logic correctly returns the default.
+- No new dependencies.
+
+**Rollback**: `git revert <commit>`
+
+---
+
 # Overnight Changelog — 2026-06-11
 
 ## [1] Fix: `WorkoutDayCard` safe access for empty `planDay.slots`

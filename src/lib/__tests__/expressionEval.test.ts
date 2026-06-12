@@ -409,6 +409,46 @@ describe('evaluateUpdates', () => {
     })
   })
 
+  describe('NaN / Infinity guard — corrupted program vars must not propagate', () => {
+    it('keeps previous bench value when squat var is NaN in ctx.vars', () => {
+      // If squat is corrupted (e.g. NaN persisted in programStore), a derived
+      // assignment like bench = squat * 0.85 must not overwrite bench with NaN.
+      const result = evaluateUpdates(
+        'bench = squat * 0.85',
+        ctx({ squat: NaN, bench: 135 }),
+      )
+      expect(result.bench).toBe(135)
+      expect(isFinite(result.bench)).toBe(true)
+    })
+
+    it('keeps previous bench value when squat var is Infinity', () => {
+      const result = evaluateUpdates(
+        'bench = squat * 0.85',
+        ctx({ squat: Infinity, bench: 135 }),
+      )
+      expect(result.bench).toBe(135)
+      expect(isFinite(result.bench)).toBe(true)
+    })
+
+    it('chained updates: NaN-tainted first assignment does not corrupt second clean statement', () => {
+      // bench = squat * 0.85 (NaN) → guard keeps bench at 100
+      // ohp += 5 (clean) → ohp increments normally
+      const result = evaluateUpdates(
+        'bench = squat * 0.85, ohp += 5',
+        ctx({ squat: NaN, bench: 100, ohp: 75 }),
+      )
+      expect(result.bench).toBe(100)
+      expect(result.ohp).toBe(80)
+    })
+
+    it('squat += 5 on a NaN var stays NaN (guard cannot resurrect a corrupted source)', () => {
+      // NaN + 5 = NaN; isFinite(NaN) = false; falls back to cur = NaN. Stays NaN.
+      // This is expected — guard prevents cross-var contamination, not self-repair.
+      const result = evaluateUpdates('squat += 5', ctx({ squat: NaN }))
+      expect(Number.isNaN(result.squat)).toBe(true)
+    })
+  })
+
   describe('splitStatements — commas inside function calls are not separators', () => {
     it('treats comma inside min() as part of the expression, not a separator', () => {
       // The string has two statements separated by an outer comma,

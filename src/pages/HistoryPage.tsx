@@ -54,6 +54,8 @@ type FlatItem =
   | { kind: 'rotation'; date: string; sortKey: string; entry: HistoryEntry }
   | { kind: 'extra'; date: string; sortKey: string; extra: ExtraWorkoutEntry }
 
+const SESSION_FILTER_KEY = 'wpt_history_filterPlanId'
+
 export function HistoryPage() {
   const today = useToday()
   const plans = usePlanStore(s => s.plans)
@@ -105,9 +107,15 @@ export function HistoryPage() {
   const plansWithHistory = getPlansWithHistory(plans, entries, extraEntries)
   const showPlanFilter = plansWithHistory.length > 1
   const activePlanHasHistory = hasPlanHistory(activePlanId, entries, extraEntries)
-  const [filterPlanId, setFilterPlanId] = useState<string | 'all'>(
-    activePlanHasHistory ? activePlanId! : 'all',
-  )
+  const [filterPlanId, setFilterPlanIdRaw] = useState<string | 'all'>(() => {
+    const stored = sessionStorage.getItem(SESSION_FILTER_KEY)
+    if (stored && (stored === 'all' || stored in plans)) return stored as string | 'all'
+    return activePlanHasHistory ? activePlanId! : 'all'
+  })
+  const setFilterPlanId = (value: string | 'all') => {
+    sessionStorage.setItem(SESSION_FILTER_KEY, value)
+    setFilterPlanIdRaw(value)
+  }
 
   const filteredEntries = useMemo(
     () => entries.filter(e => filterPlanId === 'all' || e.planId === filterPlanId),
