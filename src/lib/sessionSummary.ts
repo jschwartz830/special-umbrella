@@ -1,6 +1,7 @@
 import type { HistoryEntry } from '../types'
 import { formatPace, formatSwimPace } from '../modules/workout-outcomes/types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+import { makeWorkoutInstanceId } from './workoutInstanceId'
 
 /**
  * Find the most recent completed outcome for a specific planDayIndex, excluding
@@ -27,7 +28,7 @@ export function findPreviousSessionForPlanDay(
   if (candidates.length === 0) return null
   candidates.sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
   for (const e of candidates) {
-    const outcome = outcomes[`${planId}_${e.calendarDate}`]
+    const outcome = outcomes[makeWorkoutInstanceId(planId, e.calendarDate)]
     if (outcome) return outcome
   }
   return null

@@ -559,11 +559,13 @@ function makeExtra(
 function makeOutcome(
   instanceId: string,
   effort: number | null = null,
+  durationMin: number | null = null,
 ): WorkoutOutcome {
   return {
     workoutInstanceId: instanceId,
     completionState: 'completed',
     perceivedEffort: effort as WorkoutOutcome['perceivedEffort'],
+    durationActualMin: durationMin,
   }
 }
 
@@ -761,6 +763,93 @@ describe('computeWorkoutTypeBreakdown', () => {
     const result = computeWorkoutTypeBreakdown(entries, extras, outcomes, days)
     expect(result.run?.completed).toBe(2) // 1 rotation + 1 extra
     expect(result.run?.avgEffort).toBe(3) // (4+2)/2
+  })
+
+  // ── avgDurationMin ──────────────────────────────────────────────────────────
+
+  it('avgDurationMin is null when no outcomes have duration data', () => {
+    const entries = [makeEntry('2026-05-01', 'complete', 0)]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.weightlifting?.avgDurationMin).toBeNull()
+  })
+
+  it('avgDurationMin averages duration from rotation entry outcomes', () => {
+    // 40 min + 50 min = average 45 min (rounded)
+    const entries = [
+      makeEntry('2026-05-01', 'complete', 0),
+      makeEntry('2026-05-02', 'complete', 0),
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-05-01': makeOutcome('plan-1_2026-05-01', null, 40),
+      'plan-1_2026-05-02': makeOutcome('plan-1_2026-05-02', null, 50),
+    }
+    const result = computeWorkoutTypeBreakdown(entries, [], outcomes, days)
+    expect(result.weightlifting?.avgDurationMin).toBe(45)
+  })
+
+  it('avgDurationMin rounds to nearest whole minute', () => {
+    // 30 + 35 + 40 = 105 / 3 = 35.0 exactly
+    const entries = [
+      makeEntry('2026-05-01', 'complete', 0),
+      makeEntry('2026-05-02', 'complete', 0),
+      makeEntry('2026-05-03', 'complete', 0),
+    ]
+    const days = daysMap([{ index: 0, type: 'long_run' }])
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-05-01': makeOutcome('plan-1_2026-05-01', null, 30),
+      'plan-1_2026-05-02': makeOutcome('plan-1_2026-05-02', null, 35),
+      'plan-1_2026-05-03': makeOutcome('plan-1_2026-05-03', null, 40),
+    }
+    const result = computeWorkoutTypeBreakdown(entries, [], outcomes, days)
+    expect(result.long_run?.avgDurationMin).toBe(35)
+  })
+
+  it('avgDurationMin includes duration from extra entry outcomes', () => {
+    const extras = [makeExtra('2026-05-01', 'yoga', 'x1')]
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-05-01_extra_x1': makeOutcome('plan-1_2026-05-01_extra_x1', null, 60),
+    }
+    const result = computeWorkoutTypeBreakdown([], extras, outcomes, null)
+    expect(result.yoga?.avgDurationMin).toBe(60)
+  })
+
+  it('avgDurationMin averages across rotation entries and extras for the same type', () => {
+    // Rotation entry: 45 min; Extra: 30 min → avg = 37.5 → rounds to 38
+    const entries = [makeEntry('2026-05-01', 'complete', 0)]
+    const extras = [makeExtra('2026-05-02', 'run', 'x1')]
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-05-01': makeOutcome('plan-1_2026-05-01', null, 45),
+      'plan-1_2026-05-02_extra_x1': makeOutcome('plan-1_2026-05-02_extra_x1', null, 30),
+    }
+    const days = new Map<number, { slots: Array<{ type: import('../../types').WorkoutType }> }>([
+      [0, { slots: [{ type: 'run' }] }],
+    ])
+    const result = computeWorkoutTypeBreakdown(entries, extras, outcomes, days)
+    expect(result.run?.avgDurationMin).toBe(38) // Math.round(37.5)
+  })
+
+  it('avgDurationMin ignores entries that have no duration in their outcome', () => {
+    // Only one of two outcomes has a duration; avg should reflect just that one.
+    const entries = [
+      makeEntry('2026-05-01', 'complete', 0),
+      makeEntry('2026-05-02', 'complete', 0),
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-05-01': makeOutcome('plan-1_2026-05-01', null, 50),
+      'plan-1_2026-05-02': makeOutcome('plan-1_2026-05-02', null, null), // no duration
+    }
+    const result = computeWorkoutTypeBreakdown(entries, [], outcomes, days)
+    expect(result.weightlifting?.avgDurationMin).toBe(50)
+  })
+
+  it('avgDurationMin is null for skipped-only entries', () => {
+    const entries = [makeEntry('2026-05-01', 'skip', 0)]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.weightlifting?.avgDurationMin).toBeNull()
   })
 })
 

@@ -336,6 +336,12 @@ export interface WorkoutTypeStat {
    * outcome with perceivedEffort set. null when no effort data is available.
    */
   avgEffort: number | null
+  /**
+   * Average actual session duration in minutes across completed workouts that
+   * have an outcome with durationActualMin set. null when no duration data is
+   * available. Rounded to the nearest whole minute.
+   */
+  avgDurationMin: number | null
 }
 
 export type WorkoutTypeBreakdown = Partial<Record<WorkoutType, WorkoutTypeStat>>
@@ -364,6 +370,7 @@ export function computeWorkoutTypeBreakdown(
 ): WorkoutTypeBreakdown {
   const counts = new Map<WorkoutType, { completed: number; skipped: number }>()
   const effortSums = new Map<WorkoutType, { sum: number; count: number }>()
+  const durationSums = new Map<WorkoutType, { sum: number; count: number }>()
 
   const inRange = (date: string) =>
     !dateRange || (date >= dateRange.from && date <= dateRange.to)
@@ -380,6 +387,14 @@ export function computeWorkoutTypeBreakdown(
     effortSums.set(type, cur)
   }
 
+  function addDuration(type: WorkoutType, durationMin: number | null | undefined) {
+    if (durationMin == null) return
+    const cur = durationSums.get(type) ?? { sum: 0, count: 0 }
+    cur.sum += durationMin
+    cur.count += 1
+    durationSums.set(type, cur)
+  }
+
   // ── Rotation entries ──────────────────────────────────────────────────────
   for (const e of entries) {
     if (!inRange(e.calendarDate)) continue
@@ -394,6 +409,7 @@ export function computeWorkoutTypeBreakdown(
       counts.get(type)!.completed++
       const outcome = outcomes[makeWorkoutInstanceId(e.planId, e.calendarDate)]
       addEffort(type, outcome?.perceivedEffort)
+      addDuration(type, outcome?.durationActualMin)
     } else if (e.action === 'skip') {
       counts.get(type)!.skipped++
     }
@@ -405,18 +421,24 @@ export function computeWorkoutTypeBreakdown(
     ensureType(x.workoutType)
     counts.get(x.workoutType)!.completed++
     const extraKey = makeExtraWorkoutInstanceId(x.planId, x.calendarDate, x.id)
-    addEffort(x.workoutType, outcomes[extraKey]?.perceivedEffort)
+    const extraOutcome = outcomes[extraKey]
+    addEffort(x.workoutType, extraOutcome?.perceivedEffort)
+    addDuration(x.workoutType, extraOutcome?.durationActualMin)
   }
 
   // ── Assemble result ───────────────────────────────────────────────────────
   const result: WorkoutTypeBreakdown = {}
   for (const [type, { completed, skipped }] of counts) {
     const effort = effortSums.get(type)
+    const duration = durationSums.get(type)
     result[type] = {
       completed,
       skipped,
       avgEffort: effort && effort.count > 0
         ? Math.round((effort.sum / effort.count) * 10) / 10
+        : null,
+      avgDurationMin: duration && duration.count > 0
+        ? Math.round(duration.sum / duration.count)
         : null,
     }
   }

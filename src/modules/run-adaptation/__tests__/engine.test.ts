@@ -269,6 +269,22 @@ describe('evaluateRunProgression', () => {
       )
       expect(result.action).toBe('hold')
     })
+
+    it('holds when completedAsPlanned is absent (undefined) and no actual distance', () => {
+      // completedAsPlanned absent ≡ false for hitTarget: `undefined === true` is false.
+      // This engine requires an EXPLICIT true to progress with no distance data —
+      // contrast with buildProgressionRecommendation which uses !== false (looser check).
+      const result = evaluateRunProgression(
+        makeSlot(),
+        makeOutcome({
+          completionState: 'completed',
+          perceivedEffort: 2,
+          runActual: { actualDistanceMiles: null },
+        }),
+        makeState(),
+      )
+      expect(result.action).toBe('hold')
+    })
   })
 })
 
