@@ -470,6 +470,16 @@ describe('isPlanExpired', () => {
       expect(isPlanExpired(plan, [], '2026-01-01')).toBe(false)
       expect(isPlanExpired(plan, [], '2099-12-31')).toBe(false)
     })
+
+    it('is not expired when today is before plan startDate (future-start plan)', () => {
+      // A plan created/activated in the future must not show the expiry banner
+      // before the user has even begun it.
+      const plan = makePlan(4, {
+        duration: { type: 'weeks', value: 4 },
+        startDate: '2026-07-01',
+      })
+      expect(isPlanExpired(plan, [], '2026-06-13')).toBe(false)
+    })
   })
 
   describe('rotations-based duration', () => {
