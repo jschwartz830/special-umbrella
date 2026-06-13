@@ -1,5 +1,47 @@
 # Feature Reviews
 
+## Pass 56 — 2026-06-13 (branch `claude/dreamy-mccarthy-qvt8m6`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+A thin horizontal progress bar (`h-1`, sky-500/50 fill) placed between the WeeklyActivityStrip and the unlogged-days nudge on TodayPage. It shows `computeLoggedRate`'s result as both a visual bar and an `"X% logged"` text label. The bar is hidden when the plan has no past days (`computeLoggedRate` returns null).
+
+One `computeLoggedRate` import was added to TodayPage. No new functions, no store changes, no new files.
+
+### What assumptions were encoded
+
+- Showing the bar from day 1 (as soon as there is one past day) is acceptable. A 1-day-old plan at 100% is technically correct even if trivially so.
+- 100% logged is worth showing (positive reinforcement).
+- The bar doesn't need to be interactive or link anywhere.
+
+### What worked well
+
+The implementation was trivially small because `computeLoggedRate` already existed, was already tested (11 tests), and the HistoryPage version established the UI pattern. Total new lines in TodayPage: ~20.
+
+### What feels risky or incomplete
+
+- For a plan active only 1–3 days, the rate is volatile (one missed day → 0% or 50%); could feel like noise.
+- No explicit visual hierarchy: the bar sits between the strip and the stall nudge; a user who missed days sees both the bar at a low % AND the nudge. These are complementary but may feel redundant.
+
+### What to evaluate tomorrow
+
+- Does the bar show for a plan active only 1 day? (Yes — `computeLoggedRate` returns 100 or 0 the moment there's 1 past day.)
+- Does the bar disappear correctly for plans started today? (Yes — `computeLoggedRate` returns null.)
+- Does 100% look good / motivating, or does it just add clutter?
+
+### Recommended next steps
+
+1. Consider adding a ≥7 days threshold before the bar appears, so it only shows meaningful data.
+2. Consider linking the `"X% logged"` text to HistoryPage (filtered to the active plan) for users who want to see the breakdown.
+
+### Keep / revise / prototype only / reject
+
+**Keep** — low-risk addition that provides daily logging-consistency feedback using an already-tested function and an established UI pattern from HistoryPage.
+
+---
+
 ## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
 
 ### Classification: **Keep**

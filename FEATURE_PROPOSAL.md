@@ -1,5 +1,57 @@
 # Feature Proposals
 
+## Pass 56 — 2026-06-13 (branch `claude/dreamy-mccarthy-qvt8m6`)
+
+### Feature selected
+
+**Logged-rate bar on TodayPage — surface `computeLoggedRate` where users look daily**
+
+### Why it was selected
+
+`computeLoggedRate` was introduced in pass 54 with 11 unit tests and surfaced in HistoryPage. HistoryPage is a secondary screen most users check periodically, not daily. The logged rate is most actionable on TodayPage — if you forgot to log yesterday you find out while you're thinking about today's workout, not days later when you open History.
+
+### Expected user value
+
+Users see at a glance whether their logging habit is consistent. The bar drops noticeably after a few missed entries, prompting them to either log retroactively (via the Calendar) or accept the gap and move on. For users at 100% it's positive reinforcement. No action is required to dismiss or interact with it.
+
+### Implementation scope
+
+- Import `computeLoggedRate` in TodayPage.
+- Compute `loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)` in the render path.
+- Add a `<div>` with a sky-500/50 filled bar + `"X% logged"` label below the WeeklyActivityStrip.
+- Hidden when `loggedRate === null` (new plan with no past days).
+
+### Assumptions
+
+- No min-day threshold: the bar appears as soon as the plan has one past day. A 1-day plan at 100% is trivially correct but not harmful.
+- No max or hide-at-100%: showing 100% is positive reinforcement, not noise.
+
+### Open product / UX decisions
+
+- Should there be a minimum plan age before the bar appears (e.g. ≥7 days)?
+- Should the bar be hidden when at 100% to reduce visual clutter?
+- Should the label link to HistoryPage for the detailed breakdown?
+
+### Architecture / schema impact
+
+None — `computeLoggedRate` is already in the codebase. Only TodayPage JSX changes.
+
+### Risks
+
+None. Additive JSX, no store or data model changes.
+
+### Rollback strategy
+
+Delete the `loggedRate` computation line and the JSX block (≈14 lines between WeeklyActivityStrip and the unlogged-days nudge). The `computeLoggedRate` import can remain — it's dead code with no side effects.
+
+### What is intentionally not being built
+
+- Linking the bar to a filtered HistoryPage view.
+- Showing week-by-week breakdown (that's HistoryPage's job).
+- Animating the bar on mount.
+
+---
+
 ## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
 
 ### Feature selected

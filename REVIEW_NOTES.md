@@ -1,5 +1,82 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-13 (fifty-sixth pass) — branch `claude/dreamy-mccarthy-qvt8m6`
+
+### Executive summary
+
+1. **What changed:** Three commits covering two bug fixes, one new test, and one small feature. (1) Bug fix: `useActivePlan` now uses `useToday()` instead of a bare `format(new Date())` call, so the hook reactively refreshes at midnight without requiring a store event. (2) Bug fix: `ProgramVarsPanel` now renders `?` for NaN/Infinity program variable values instead of the misleading string `"NaN"`. (3) Test: added `isPlanExpired` case for a weeks plan that has not yet started. (4) Feature: the logging-adherence bar (already in HistoryPage since pass 54) is now also shown on TodayPage below the 7-day activity strip.
+
+2. **Highest confidence:** The `useToday()` swap in `useActivePlan` — removes a latent stale-date bug with a one-line hook substitution and zero behaviour change during normal operation. The NaN display guard — purely additive single-condition check.
+
+3. **What is risky:** Nothing in this pass is risky. All changes are additive or narrow substitutions. The logged rate bar is new JSX with no data model changes.
+
+4. **What to review first:** Commit 1 (`useActivePlan`) — confirm that using `useToday()` does not create a circular dependency (it doesn't: `useToday` imports nothing from the plan or history layers). Then check that the logged rate bar renders appropriately for a newly-activated plan (it should be hidden since `computeLoggedRate` returns null until the plan has at least one past day).
+
+---
+
+### Biggest issues found
+
+1. **`useActivePlan` stale date at midnight** — Any component that consumed the hook's `today` or relied on `todayResolved`/`upcoming` being recalculated at midnight would serve yesterday's data if no store mutation happened after the calendar day changed. Common in background-tab scenarios. Fixed by delegating to `useToday()`.
+
+2. **`ProgramVarsPanel` displayed `"NaN"` for corrupted vars** — A low-probability rendering glitch (requires a var to already contain NaN, which the pass-55 fix prevents for new writes), but still visible for users who had corrupted state in localStorage before that fix landed. Now shows `?`.
+
+---
+
+### Improvements completed
+
+| # | Type | Change | Tests Added |
+|---|------|--------|-------------|
+| 1 | Bug fix | `useActivePlan` — `useToday()` swap to fix midnight stale date | 0 (hook behaviour) |
+| 2 | Bug fix | `ProgramVarsPanel` — NaN/Infinity display guard | 0 (display guard) |
+| 3 | Test | `isPlanExpired` pre-start weeks plan anchor | 1 |
+| 4 | Feature | Logged-rate bar on TodayPage | 0 (UI, tested via historyStats) |
+
+**Test delta: 844 → 845**
+
+---
+
+### Feature: Logged-rate bar on TodayPage
+
+- Imported `computeLoggedRate` (already in `historyStats.ts` since pass 54, fully tested with 11 cases).
+- Added `const loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)` computation in the render path.
+- Added a thin `<div>` below `<WeeklyActivityStrip>` with a sky-500/50 filled bar and a `"X% logged"` label.
+- Visibility: hidden when `loggedRate === null` (plan started today or in the future). Always shown otherwise.
+- **Definitely keep** — additive, uses well-tested existing function, provides daily visibility into logging consistency.
+
+---
+
+### Issues considered but not acted on
+
+- **`computeWorkoutTypeBreakdown` multi-slot attribution** — still credits only `slots[0]`. Changing semantics requires deciding whether a 2-slot day should count twice; carried forward again.
+- **`loggingUpcoming` stale `ResolvedDay`** — still stores a full snapshot; refactoring to store `calendarDate` only is non-trivial across the 1,240-line TodayPage. Carried forward.
+- **`getFutureProjection` in `calendarProjection.ts`** — marked "currently unused" in its own JSDoc. Kept as a convenience wrapper; no active caller means its deletion is safe but adds no user value. Noted for a future cleanup pass.
+
+---
+
+### Keep / revise / reject
+
+| Item | Recommendation |
+|------|---------------|
+| `useActivePlan` midnight fix | **Definitely keep** |
+| ProgramVarsPanel NaN guard | **Definitely keep** |
+| `isPlanExpired` pre-start test | **Definitely keep** |
+| Logged-rate bar on TodayPage | **Definitely keep** |
+
+### Open questions for me
+
+1. Should the logged-rate bar have a threshold (e.g. hide when at 100%)?  The current behaviour shows it always. Showing "100% logged" is positive reinforcement; hiding it removes visual clutter. Your call.
+2. Should the logged-rate bar only appear on plans active ≥ N days? Currently it appears the moment the plan has any past day. A 1-day-old plan at 100% is noise; a 30-day plan at 70% is signal.
+
+### Known issues / incomplete work
+
+- None introduced in this pass.
+
+### Dependencies added
+
+- None.
+
+---
+
 ## 2026-06-12 (fifty-fifth pass) — branch `claude/dreamy-mccarthy-wh71fb`
 
 ### Executive summary

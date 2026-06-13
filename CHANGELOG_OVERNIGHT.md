@@ -1,3 +1,73 @@
+# Overnight Changelog — 2026-06-13
+
+## [1] Fix: `useActivePlan` stale date at midnight
+
+**Summary**: Replaced the bare `format(new Date(), 'yyyy-MM-dd')` call in `useActivePlan` with the `useToday()` hook.
+
+**Why it matters**: `useToday()` sets a `setTimeout` to fire at the exact millisecond of the next calendar midnight and updates the date string via `useState`. Without this, `useActivePlan` only recomputed `today` when one of its Zustand store dependencies changed. On a day when the user left the app open overnight without any store event, `todayResolved` and `upcoming` would still reference yesterday's date until the next user interaction.
+
+**Before**: `const today = format(new Date(), 'yyyy-MM-dd')` — recomputed on every render but never reactively updated at midnight.
+**After**: `const today = useToday()` — holds state in `useState`, auto-refreshes at midnight.
+
+**Files changed**: `src/hooks/useActivePlan.ts` (2 lines changed)
+
+**Risks / tradeoffs**: `useToday` uses `useState` + `useEffect`, so every component that calls `useActivePlan` now re-renders at midnight. This is the correct and expected behaviour — it is exactly what the rest of TodayPage already did via its own `useToday` call.
+
+**Rollback**: revert the import and replace `useToday()` with `format(new Date(), 'yyyy-MM-dd')`.
+
+---
+
+## [2] Fix: ProgramVarsPanel NaN/Infinity display
+
+**Summary**: Added a `Number.isFinite(value)` guard in the `ProgramVarsPanel` component that formats program variable values for display.
+
+**Why it matters**: If a program variable holds NaN or Infinity (possible for vars written before the pass-55 `evaluateUpdates` guard was added), the old formatting path called `value.toFixed(2)` on NaN, which renders as the string `"NaN"`. Now non-finite values render as `"?"`, which is an honest sentinel that doesn't look like a number.
+
+**Before**: `Number.isInteger(value) ? value : value.toFixed(2).replace(/\.?0+$/, '')`
+**After**: `!Number.isFinite(value) ? '?' : Number.isInteger(value) ? value : value.toFixed(2).replace(/\.?0+$/, '')`
+
+**Files changed**: `src/pages/TodayPage.tsx` (1 line changed)
+
+**Risks / tradeoffs**: Zero — the guard fires only for NaN/Infinity, which are invalid program variable values.
+
+**Rollback**: remove the `!Number.isFinite(value) ? '?' :` prefix.
+
+---
+
+## [3] Test: `isPlanExpired` returns false for pre-start weeks plan
+
+**Summary**: Added a test case in the `isPlanExpired` / `weeks-based duration` describe block for the scenario where today < plan.startDate.
+
+**Why it matters**: The weeks expiry logic computes `endDate = startDate + value*7` and returns `today >= endDate`. When today is before startDate it is always before endDate too — the function correctly returns false. The test pins this invariant so future changes to the comparison direction (e.g. accidentally flipping `<` to `>`) are caught immediately.
+
+**Files changed**: `src/engine/__tests__/rotationEngine.test.ts` (+10 lines, 1 test)
+
+**Risks / tradeoffs**: None — pure test addition.
+
+**Rollback**: delete the added test case.
+
+---
+
+## [4] Feature: Plan logging-adherence bar on TodayPage
+
+**Summary**: Surfaced `computeLoggedRate` on TodayPage as a thin horizontal progress bar below the 7-day activity strip. Shows "X% logged" with a sky-blue fill proportional to the rate.
+
+**Why it matters**: The streak, 7-day count, and total-done stats on TodayPage are all about workout completion. None of them answer "what fraction of my plan days have I actually recorded?" — a user who sometimes forgets to log gets no signal about their logging gaps other than the stall nudge (which is scoped to the last 7 days). The logged rate bar shows the full-plan picture and is a gentle motivational reminder to keep the log current.
+
+`computeLoggedRate` was added in pass 54 and is already well-tested. HistoryPage already shows it per-plan. This commit makes it accessible on the daily-use screen where it provides immediate feedback.
+
+**Visibility rules** (inherited from `computeLoggedRate`):
+- Returns `null` when the plan started today or in the future → bar is hidden
+- Returns 0–100 integer → bar always shown when the plan has past days
+
+**Files changed**: `src/pages/TodayPage.tsx` (+1 import, +5 computation lines, +14 JSX lines)
+
+**Risks / tradeoffs**: Purely additive JSX; no data model or store changes. The element adds one thin row to the TodayPage layout and may feel slightly redundant for users who never forget to log (they'd see 100% perpetually). No action or dismissal needed — it is a read-only indicator.
+
+**Rollback**: remove the `loggedRate` computation line and the JSX block between the WeeklyActivityStrip and the unlogged-days nudge.
+
+---
+
 # Overnight Changelog — 2026-06-12
 
 ## [1] Fix: NaN/Infinity guard in `evaluateUpdates` (`expressionEval.ts`)
