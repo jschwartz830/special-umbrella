@@ -1,5 +1,58 @@
 # Implementation Plan
 
+## Pass 56 — 2026-06-13 (branch `claude/dreamy-mccarthy-qvt8m6`)
+
+### Observations on entry
+
+- Baseline on entry: **844 passing, 0 failing** — clean exit from pass 55.
+- Pass 55 fixed NaN propagation in `evaluateUpdates`, fixed `updateEntryDate` dedup collision, and persisted `filterPlanId` in sessionStorage.
+- Full codebase audit performed this pass.
+
+### Architecture summary (unchanged from pass 55)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,240 lines), CalendarPage (~950 lines), HistoryPage (~985 lines)
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `useActivePlan` computed `today` with a bare `format(new Date())` call — no midnight refresh if no store event fires | **Fixed** |
+| Low | `ProgramVarsPanel` rendered 'NaN'/'Infinity' for corrupted program var values | **Fixed** |
+| Low | No test for `isPlanExpired` when today < plan.startDate (pre-start plan) | **Fixed** |
+| Low | `computeLoggedRate` surfaced in HistoryPage but not TodayPage, where users check daily | **Fixed** (feature) |
+| Info | `computeWorkoutTypeBreakdown` credits only `slots[0]` per plan day | Documented (carry-forward) |
+| Info | `loggingUpcoming` stores a stale `ResolvedDay` snapshot | Documented (carry-forward) |
+
+### Prioritized plan
+
+1. ✅ **Fix `useActivePlan` stale date** — swap bare `format(new Date())` for `useToday()` hook; TodayPage and any future hook consumers now refresh at midnight without an intervening store event
+2. ✅ **Fix `ProgramVarsPanel` NaN/Infinity display** — renders '?' for non-finite values; defensive against any vars that slipped past the pass-55 evaluateUpdates guard
+3. ✅ **Test: `isPlanExpired` pre-start plan** — documents the invariant that a weeks-plan with today < startDate returns false
+4. ✅ **Feature: logged-rate bar on TodayPage** — `computeLoggedRate` was added to `historyStats` in pass 54 and surfaced in HistoryPage; now also visible on TodayPage below the weekly activity strip
+
+### Rationale for sequencing
+
+Bug fixes first (midnight stale date is the most impactful), then display fix (NaN), then test anchor, then the feature. Feature last because it is purely additive and never blocks the fixes.
+
+### Carried-forward risks
+
+- `TodayPage.tsx` (~1,240 lines) and `CalendarPage.tsx` (~950 lines) are large.
+- `outcomeStore` cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder.
+- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay` (should store just `calendarDate`).
+- `computeWorkoutTypeBreakdown` credits only `slots[0]` type for multi-slot plan days.
+
+---
+
 ## Pass 55 — 2026-06-12 (branch `claude/dreamy-mccarthy-wh71fb`)
 
 ### Observations on entry

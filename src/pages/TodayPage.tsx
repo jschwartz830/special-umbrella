@@ -37,7 +37,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak, computeConsecutiveSkips } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak, computeConsecutiveSkips, computeLoggedRate } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
@@ -134,7 +134,7 @@ function ProgramVarsPanel({ vars }: { vars: Record<string, number> }) {
             <div key={name} className="flex items-baseline justify-between gap-2 min-w-0">
               <span className="text-xs text-slate-500 truncate font-mono">{name}</span>
               <span className="text-xs font-semibold text-slate-200 tabular-nums flex-shrink-0">
-                {Number.isInteger(value) ? value : value.toFixed(2).replace(/\.?0+$/, '')}
+                {!Number.isFinite(value) ? '?' : Number.isInteger(value) ? value : value.toFixed(2).replace(/\.?0+$/, '')}
               </span>
             </div>
           ))}
@@ -305,6 +305,10 @@ export function TodayPage() {
 
   // Collect recent past days with no entry — used to show the stall nudge and quick catch-up.
   const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today)
+
+  // Logging adherence rate — shown after plan has been active ≥ 7 days so the
+  // percentage is meaningful. null for new plans or when the plan started today.
+  const loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)
 
   // Rotation cycle progress — for rotations-duration plans only
   const cycleProgress = computeRotationCycleProgress(plan, planEntries, today)
@@ -602,6 +606,21 @@ export function TodayPage() {
 
       {/* 7-day activity strip */}
       <WeeklyActivityStrip planEntries={planEntries} planExtras={planExtras} today={today} />
+
+      {/* Logging adherence bar — visible once the plan has ≥7 past days to measure */}
+      {loggedRate !== null && (
+        <div className="flex items-center gap-2 px-1">
+          <div className="flex-1 h-1 rounded-full bg-slate-700/60 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-sky-500/50 transition-all"
+              style={{ width: `${loggedRate}%` }}
+            />
+          </div>
+          <span className="text-[10px] text-slate-500 flex-shrink-0 tabular-nums">
+            {loggedRate}% logged
+          </span>
+        </div>
+      )}
 
       {/* Unlogged past days nudge — shown when the rotation may be stalled */}
       {!planExpired && unloggedDates.length > 0 && (

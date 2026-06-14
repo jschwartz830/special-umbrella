@@ -1,5 +1,36 @@
 # Test Results
 
+## 2026-06-13 (fifty-sixth pass) — branch `claude/dreamy-mccarthy-qvt8m6`
+
+**Result: 845 passing, 0 failing** (+1 test vs entry baseline of 844)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 20 (unchanged) |
+| Tests on entry | 844 |
+| Tests on exit | 845 |
+| Delta | +1 |
+| Failures | 0 |
+
+### Tests reviewed
+
+All 20 test files were confirmed clean on entry. No pre-existing failures. The test suite runs in ~2s with vitest.
+
+### Tests added
+
+**`src/engine/__tests__/rotationEngine.test.ts`** — 1 new case in `describe('isPlanExpired') / describe('weeks-based duration')`:
+
+- `'is not expired when today is before plan startDate (future-start plan)'` — pins the invariant that `isPlanExpired` returns false when a plan has not yet begun (today < plan.startDate). The weeks-plan expiry check computes `endDate = startDate + value*7` and evaluates `today >= endDate`; today being before startDate guarantees today is also before endDate, so the function returns false. Explicit test prevents accidental comparison flip.
+
+### Areas still untested
+
+- `useActivePlan` midnight refresh behaviour — requires fake timers in a hook test environment; not attempted this pass.
+- `ProgramVarsPanel` NaN/Infinity rendering — component test would require a React testing setup; the logic is a simple ternary, so the guard is validated by code inspection.
+- `buildMonthGrid` (calendarProjection) — 437-line test file already covers this well.
+- `getFutureProjection` (calendarProjection) — marked unused in JSDoc; tested indirectly via `getUpcomingDays` coverage.
+
+---
+
 ## 2026-06-12 (fifty-fifth pass) — branch `claude/dreamy-mccarthy-wh71fb`
 
 **Result: 836 passing, 0 failing** (+4 tests vs entry baseline of 832)
