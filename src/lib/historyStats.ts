@@ -702,6 +702,96 @@ export function isoWeekStart(date: string): string {
   return shiftDay(date, mondayOffset)
 }
 
+// ── Activity calendar (heatmap data) ─────────────────────────────────────────
+
+/**
+ * Activity level for a single day, intended for a contribution-style heatmap.
+ *
+ *   0 — no activity logged
+ *   1 — day_off or skip only (acknowledged, not trained)
+ *   2 — rotation workout completed
+ *   3 — rotation workout completed AND at least one extra (double-day)
+ */
+export type ActivityLevel = 0 | 1 | 2 | 3
+
+export interface ActivityCalendarDay {
+  date: string           // YYYY-MM-DD
+  level: ActivityLevel
+  /** True when at least one extra workout was logged on this date. */
+  hasExtra: boolean
+  /** The rotation entry action for this date, or null if no entry exists. */
+  action: import('../types').ActionType | null
+}
+
+/**
+ * Generate per-day activity data for a date range, suitable for a
+ * GitHub-style contribution heatmap.
+ *
+ * - `entries` and `extras` may be pre-filtered by planId or passed
+ *   unfiltered; pass `planId` to scope the output to a single plan.
+ * - Days outside the range are excluded.
+ * - Future days (date > today) are always level 0 (not yet acted on).
+ * - The returned array is sorted by date ascending.
+ *
+ * Level assignment:
+ *   3 — complete + at least one extra
+ *   2 — complete (no extra)
+ *   1 — day_off or skip only
+ *   0 — no entry on this date
+ */
+export function computeActivityCalendar(
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  fromDate: string,
+  toDate: string,
+  planId?: string,
+): ActivityCalendarDay[] {
+  // Build lookup maps scoped to planId (if provided)
+  const entryByDate = new Map<string, import('../types').ActionType>()
+  for (const e of entries) {
+    if (planId && e.planId !== planId) continue
+    if (e.calendarDate < fromDate || e.calendarDate > toDate) continue
+    const existing = entryByDate.get(e.calendarDate)
+    // 'complete' takes priority over 'skip' or 'day_off'; 'skip' over 'day_off'
+    if (!existing || actionRank(e.action) > actionRank(existing)) {
+      entryByDate.set(e.calendarDate, e.action)
+    }
+  }
+
+  const extraDates = new Set<string>()
+  for (const x of extras) {
+    if (planId && x.planId !== planId) continue
+    if (x.calendarDate < fromDate || x.calendarDate > toDate) continue
+    extraDates.add(x.calendarDate)
+  }
+
+  const result: ActivityCalendarDay[] = []
+  const days = dateDiffDays(fromDate, toDate) + 1
+  for (let i = 0; i < days; i++) {
+    const date = shiftDay(fromDate, i)
+    const action = entryByDate.get(date) ?? null
+    const hasExtra = extraDates.has(date)
+    let level: ActivityLevel = 0
+    if (action === 'complete') {
+      level = hasExtra ? 3 : 2
+    } else if (action === 'skip' || action === 'day_off') {
+      level = 1
+    } else if (hasExtra) {
+      // Extra workout logged with no rotation entry — still an active day
+      level = 2
+    }
+    result.push({ date, level, hasExtra, action })
+  }
+  return result
+}
+
+/** Numeric rank for deduplication: complete > skip > day_off */
+function actionRank(action: import('../types').ActionType): number {
+  if (action === 'complete') return 2
+  if (action === 'skip') return 1
+  return 0
+}
+
 /**
  * Fill any ISO-week gaps in a `computeWeeklyBreakdown` result array with
  * zero-count placeholder rows. Gaps are filled only between the first and

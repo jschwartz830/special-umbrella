@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, computeActivityCalendar } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -2031,6 +2031,177 @@ describe('computeLoggedRate', () => {
     ]
     const result = computeLoggedRate('plan-1', entries, '2026-06-08', '2026-06-11')
     expect(result).not.toBeGreaterThan(100)
+  })
+})
+
+// ── computeActivityCalendar ───────────────────────────────────────────────────
+
+function acEntry(
+  date: string,
+  action: HistoryEntry['action'],
+  planId = 'plan-1',
+): HistoryEntry {
+  return {
+    id: `ac-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    planDayIndex: action === 'day_off' ? undefined : 0,
+    action,
+    createdAt: `${date}T12:00:00Z`,
+  }
+}
+
+function acExtra(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+  return {
+    id: `acx-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    workoutType: 'yoga',
+    workoutName: 'Yoga',
+    createdAt: `${date}T13:00:00Z`,
+  }
+}
+
+describe('computeActivityCalendar', () => {
+  const FROM = '2026-06-01'
+  const TO = '2026-06-05'
+
+  it('returns one entry per day in the range, sorted by date', () => {
+    const result = computeActivityCalendar([], [], FROM, TO)
+    expect(result).toHaveLength(5)
+    expect(result.map(d => d.date)).toEqual([
+      '2026-06-01', '2026-06-02', '2026-06-03', '2026-06-04', '2026-06-05',
+    ])
+  })
+
+  it('returns level=0 for all days when no activity is logged', () => {
+    const result = computeActivityCalendar([], [], FROM, TO)
+    expect(result.every(d => d.level === 0)).toBe(true)
+    expect(result.every(d => !d.hasExtra)).toBe(true)
+    expect(result.every(d => d.action === null)).toBe(true)
+  })
+
+  it('level=2 for a completed rotation day (no extra)', () => {
+    const entries = [acEntry('2026-06-01', 'complete')]
+    const result = computeActivityCalendar(entries, [], FROM, TO)
+    const day = result.find(d => d.date === '2026-06-01')!
+    expect(day.level).toBe(2)
+    expect(day.action).toBe('complete')
+    expect(day.hasExtra).toBe(false)
+  })
+
+  it('level=3 for a completed rotation day that also has an extra', () => {
+    const entries = [acEntry('2026-06-01', 'complete')]
+    const extras = [acExtra('2026-06-01')]
+    const result = computeActivityCalendar(entries, extras, FROM, TO)
+    const day = result.find(d => d.date === '2026-06-01')!
+    expect(day.level).toBe(3)
+    expect(day.hasExtra).toBe(true)
+  })
+
+  it('level=1 for a skipped day', () => {
+    const entries = [acEntry('2026-06-02', 'skip')]
+    const result = computeActivityCalendar(entries, [], FROM, TO)
+    const day = result.find(d => d.date === '2026-06-02')!
+    expect(day.level).toBe(1)
+    expect(day.action).toBe('skip')
+  })
+
+  it('level=1 for a day_off day', () => {
+    const entries = [acEntry('2026-06-03', 'day_off')]
+    const result = computeActivityCalendar(entries, [], FROM, TO)
+    const day = result.find(d => d.date === '2026-06-03')!
+    expect(day.level).toBe(1)
+    expect(day.action).toBe('day_off')
+  })
+
+  it('level=2 for an extra-only day (no rotation entry)', () => {
+    const extras = [acExtra('2026-06-04')]
+    const result = computeActivityCalendar([], extras, FROM, TO)
+    const day = result.find(d => d.date === '2026-06-04')!
+    expect(day.level).toBe(2)
+    expect(day.action).toBeNull()
+    expect(day.hasExtra).toBe(true)
+  })
+
+  it('complete takes priority over skip when multiple entries exist for the same date', () => {
+    const entries = [
+      { ...acEntry('2026-06-01', 'skip'), id: 'e1', createdAt: '2026-06-01T08:00:00Z' },
+      { ...acEntry('2026-06-01', 'complete'), id: 'e2', createdAt: '2026-06-01T16:00:00Z' },
+    ]
+    const result = computeActivityCalendar(entries, [], FROM, TO)
+    const day = result.find(d => d.date === '2026-06-01')!
+    expect(day.level).toBe(2)
+    expect(day.action).toBe('complete')
+  })
+
+  it('skip takes priority over day_off when multiple entries exist', () => {
+    const entries = [
+      { ...acEntry('2026-06-01', 'day_off'), id: 'e1' },
+      { ...acEntry('2026-06-01', 'skip'), id: 'e2' },
+    ]
+    const result = computeActivityCalendar(entries, [], FROM, TO)
+    const day = result.find(d => d.date === '2026-06-01')!
+    expect(day.level).toBe(1)
+    expect(day.action).toBe('skip')
+  })
+
+  it('scopes to planId when provided — ignores entries for other plans', () => {
+    const entries = [
+      acEntry('2026-06-01', 'complete', 'plan-2'), // different plan
+      acEntry('2026-06-02', 'complete', 'plan-1'), // target plan
+    ]
+    const result = computeActivityCalendar(entries, [], FROM, TO, 'plan-1')
+    expect(result.find(d => d.date === '2026-06-01')!.level).toBe(0)
+    expect(result.find(d => d.date === '2026-06-02')!.level).toBe(2)
+  })
+
+  it('scopes extras to planId when provided', () => {
+    const extras = [
+      acExtra('2026-06-01', 'plan-2'), // different plan
+      acExtra('2026-06-02', 'plan-1'), // target plan
+    ]
+    const result = computeActivityCalendar([], extras, FROM, TO, 'plan-1')
+    expect(result.find(d => d.date === '2026-06-01')!.hasExtra).toBe(false)
+    expect(result.find(d => d.date === '2026-06-02')!.hasExtra).toBe(true)
+  })
+
+  it('excludes entries outside the date range', () => {
+    const entries = [
+      acEntry('2026-05-31', 'complete'), // before range
+      acEntry('2026-06-03', 'complete'), // inside range
+      acEntry('2026-06-06', 'complete'), // after range
+    ]
+    const result = computeActivityCalendar(entries, [], FROM, TO)
+    expect(result.find(d => d.date === '2026-06-03')!.level).toBe(2)
+    // Dates outside range are not included in result at all
+    expect(result.find(d => d.date === '2026-05-31')).toBeUndefined()
+    expect(result.find(d => d.date === '2026-06-06')).toBeUndefined()
+  })
+
+  it('handles a single-day range', () => {
+    const entries = [acEntry('2026-06-03', 'complete')]
+    const result = computeActivityCalendar(entries, [], '2026-06-03', '2026-06-03')
+    expect(result).toHaveLength(1)
+    expect(result[0].date).toBe('2026-06-03')
+    expect(result[0].level).toBe(2)
+  })
+
+  it('returns all levels in a mixed week correctly', () => {
+    const entries = [
+      acEntry('2026-06-01', 'complete'),
+      acEntry('2026-06-02', 'skip'),
+      acEntry('2026-06-03', 'day_off'),
+      // 06-04: extra only
+      // 06-05: no activity
+    ]
+    const extras = [acExtra('2026-06-04')]
+    const result = computeActivityCalendar(entries, extras, FROM, TO)
+    expect(result[0].level).toBe(2) // complete
+    expect(result[1].level).toBe(1) // skip
+    expect(result[2].level).toBe(1) // day_off
+    expect(result[3].level).toBe(2) // extra only
+    expect(result[4].level).toBe(0) // no activity
   })
 })
 
