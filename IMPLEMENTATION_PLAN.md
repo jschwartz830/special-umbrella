@@ -1,5 +1,58 @@
 # Implementation Plan
 
+## Pass 56 — 2026-06-14 (branch `claude/dreamy-mccarthy-n2l94q`)
+
+### Observations on entry
+
+- Baseline on entry: **844 passing, 0 failing** — clean exit from pass 55.
+- Pass 55 fixed `evaluateUpdates` NaN/Infinity guard, `updateEntryDate` deduplication, and persisted HistoryPage filter state.
+- Full codebase audit performed: all source files, stores, pages, engine, lib utilities, and all test files.
+
+### Architecture summary (unchanged from pass 55)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,192 lines), CalendarPage (~927 lines), HistoryPage (~985 lines)
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Low | `rotationEngine.ts` re-exported `nanoid` from `lib/utils` as an unnecessary relay for `programParser.ts` | **Fixed** |
+| Low | `computeHistoryStats.currentStreak` had no explicit test for future-dated entries not inflating it | **Fixed** (2 new tests) |
+| Low | No activity heatmap utility for long-range history overview | **Implemented** (new `computeActivityCalendar`) |
+| Info | `clearExtraEntriesForDate` deletes ALL extras for a date (not just `double_day` sourced) | Documented — safe because no page currently calls it; TodayPage uses targeted `removeExtraEntry(id)` |
+| Info | `isPlanExpired` uses `complete + skip` for rotation count; `computeCurrentDayIndex` advances for `day_off` | Documented intentional inconsistency |
+| Info | TodayPage (1192 LOC) and CalendarPage (927 LOC) are large | Carried forward |
+
+### Prioritized plan
+
+1. ✅ **Remove nanoid re-export from rotationEngine** — clean, zero behavior change
+2. ✅ **Add currentStreak edge-case tests** — safety net for future modification
+3. ✅ **Add `computeActivityCalendar` feature + 15 tests** — useful, testable, non-destructive
+
+### Rationale for sequencing
+
+Cleanup first (nanoid re-export), then test coverage (low risk), then the new feature (purely additive). Large page refactors excluded — they require UI browser verification and carry regression risk.
+
+### Carried-forward risks (unchanged from pass 55)
+
+- `TodayPage.tsx` (~1,192 lines) and `CalendarPage.tsx` (~927 lines) are large.
+- `clearExtraEntriesForDate` is aggressive (deletes all extras for a date) but safely unused in UI — add source filter before wiring to any page.
+- `outcomeStore` cross-store calls inside `logOutcomeWithProgression`.
+- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay` (should store just `calendarDate`).
+- CSV import has no user feedback for skipped/rejected entries.
+
+---
+
 ## Pass 55 — 2026-06-12 (branch `claude/dreamy-mccarthy-wh71fb`)
 
 ### Observations on entry
