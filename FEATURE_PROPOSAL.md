@@ -1,5 +1,47 @@
 # Feature Proposals
 
+## Pass 56 — 2026-06-14 (branch `claude/dreamy-mccarthy-n2l94q`)
+
+### Feature selected
+
+**`computeActivityCalendar` — per-day activity heatmap data utility in `historyStats.ts`**
+
+### Why it was selected
+
+The codebase had several per-plan aggregate stats (`computeHistoryStats`, `computeLoggedRate`, `computePlanStreak`, etc.) but no function that produced _per-day activity density_ across a date range. This gap means any future heatmap or contribution-calendar view in HistoryPage would need to hand-roll the same aggregation logic in the component. Extracting it as a tested, pure utility follows the existing pattern of the `historyStats.ts` module and makes the logic available without any UI commitment.
+
+Features evaluated and rejected:
+
+| Candidate | Reason not selected |
+|-----------|---------------------|
+| Exercise PR timeline (per-exercise heat bars) | Would require `outcomeStore` data joins; more complex |
+| "Missed day" notification hook | Requires timing/browser API; not unit-testable |
+| Streak calendar overlay | UI wiring; needs React component work |
+
+### What was proposed
+
+A pure function `computeActivityCalendar(entries, extras, fromDate, toDate, planId?)` that:
+
+1. Accepts the same `HistoryEntry[]` and `ExtraWorkoutEntry[]` arrays already available in every HistoryPage `useMemo`.
+2. Returns one `ActivityCalendarDay` per day in `[fromDate, toDate]`, sorted by date.
+3. Assigns an `ActivityLevel` (0–3) per day:
+   - 0 = no activity
+   - 1 = skip or day_off only
+   - 2 = rotation complete (no extra) OR extra-only day
+   - 3 = rotation complete + at least one extra
+4. Exposes `hasExtra` and `action` fields for callers that need richer rendering.
+
+### Scope
+
+- **In scope:** `historyStats.ts` function, type exports, 15 unit tests
+- **Out of scope:** Any React component or heatmap UI, any new store state
+
+### Risk
+
+Zero. Purely additive, not wired to any page.
+
+---
+
 ## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
 
 ### Feature selected

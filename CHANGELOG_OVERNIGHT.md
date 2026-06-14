@@ -1,3 +1,81 @@
+# Overnight Changelog — Pass 56 (2026-06-14)
+
+## Change 1 — Fix: Remove nanoid relay from rotationEngine
+
+**Commit:** `7234d17`
+**Files changed:** `src/engine/rotationEngine.ts`, `src/engine/programParser.ts`
+
+### What changed
+
+`rotationEngine.ts` had a bare re-export of `nanoid` from `../lib/utils`. `programParser.ts` imported `nanoid` via that relay. Both lines were removed/updated so `programParser.ts` imports directly from `'../lib/utils'`.
+
+**Why it matters:** The re-export created a false coupling: a plan parser depended on the rotation engine purely to get a utility function. Removing it makes both files' dependency graphs accurate and eliminates a confusing indirect import.
+
+**Risk:** Zero behaviour change. Verified by running the full test suite (844 → 844 pass).
+
+**Rollback:** `git revert 7234d17`
+
+---
+
+## Change 2 — Test: Add currentStreak future-entry guard tests
+
+**Commit:** `e08fee3`
+**Files changed:** `src/lib/__tests__/historyStats.test.ts`
+
+Two new unit tests added to the `computeHistoryStats → currentStreak` section:
+
+1. **Future-dated entries don't inflate streak** — Documents that the backward walk from `today` never reaches future entries, even if they exist in the data.
+2. **Extra on same day as skip counts the day once** — Verifies Set-based deduplication prevents double-counting when a rotation skip and an extra both land on the same date.
+
+**Why it matters:** These tests nail down subtle invariants the code already satisfies but had no explicit regression guards for.
+
+**Risk:** Test-only change; no source code modified.
+
+**Rollback:** `git revert e08fee3`
+
+---
+
+## Change 3 — Feature: computeActivityCalendar utility
+
+**Commit:** `e1395b0`
+**Files changed:** `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts`
+
+Added three exported symbols:
+
+- **`ActivityLevel`** — union type `0 | 1 | 2 | 3`
+- **`ActivityCalendarDay`** — shape `{ date, level, hasExtra, action }`
+- **`computeActivityCalendar(entries, extras, fromDate, toDate, planId?)`** — pure function mapping a date range to one `ActivityCalendarDay` per day
+
+| Level | Meaning |
+|-------|---------|
+| 0 | No activity |
+| 1 | Skip or day_off only |
+| 2 | Rotation complete (no extra) OR extra-only day |
+| 3 | Rotation complete + at least one extra ("double-day") |
+
+Added private helper `actionRank` for deduplication priority when multiple rotation entries exist for one date: `complete(2) > skip(1) > day_off(0)`.
+
+Added **15 unit tests** covering: empty range, all-zero days, each level individually, priority deduplication, planId scoping, date-range boundary exclusion, single-day range, and a mixed-week integration case.
+
+**Why it matters:** No existing utility produced per-day activity density across a calendar range. This is a clean building block for a HistoryPage heatmap/contribution graph. Purely additive — reads existing store data, not wired to any page yet.
+
+**Risk:** Additive only. Existing exports unchanged.
+
+**Rollback:** `git revert e1395b0`
+
+---
+
+## Test baseline
+
+| Moment | Tests |
+|--------|-------|
+| On entry (from pass 55) | 844 pass, 0 fail |
+| After change 1 (nanoid fix) | 844 pass, 0 fail |
+| After change 2 (streak tests) | 846 pass, 0 fail |
+| After change 3 (activity calendar) | 860 pass, 0 fail |
+
+---
+
 # Overnight Changelog — 2026-06-12
 
 ## [1] Fix: NaN/Infinity guard in `evaluateUpdates` (`expressionEval.ts`)

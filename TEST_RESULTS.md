@@ -1,5 +1,71 @@
 # Test Results
 
+## 2026-06-14 (fifty-sixth pass) — branch `claude/dreamy-mccarthy-n2l94q`
+
+**Result: 860 passing, 0 failing** (+16 tests vs entry baseline of 844)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 20 (unchanged) |
+| Tests on entry | 844 |
+| Tests on exit | 860 |
+| Delta | +16 |
+| Failures | 0 |
+
+### Tests reviewed
+
+All 20 test files confirmed clean on entry. No pre-existing failures.
+
+### Tests added
+
+**`src/lib/__tests__/historyStats.test.ts`** — 16 new tests
+
+*currentStreak edge cases (+2):*
+
+| Test | What it asserts |
+|------|----------------|
+| `currentStreak is not inflated by future-dated entries in the streakable set` | Backward walk from today never reaches a tomorrow extra; streak stays at 1, not 2 |
+| `currentStreak with an extra on the same day as a skip counts the day once` | Set deduplication prevents same-date double-counting; streak stays at 1 |
+
+*computeActivityCalendar (+14, in new describe block):*
+
+| Test | What it asserts |
+|------|----------------|
+| returns one entry per day in range, sorted by date | Correct length and ordering |
+| level 0 for all days when no activity | All-zero baseline |
+| level 2 for a completed rotation day with no extra | complete → level 2 |
+| level 3 for a completed rotation day with an extra | complete + extra → level 3 |
+| level 1 for a skipped rotation day | skip → level 1 |
+| level 1 for a day_off rotation day | day_off → level 1 |
+| level 2 for an extra-only day (no rotation entry) | extra only → level 2 |
+| complete takes priority over skip (multiple entries same date) | actionRank: complete(2) > skip(1) |
+| skip takes priority over day_off (multiple entries same date) | actionRank: skip(1) > day_off(0) |
+| scopes to planId when provided — ignores entries for other plans | Plan isolation |
+| scopes extras to planId when provided | Extra isolation |
+| excludes entries outside the date range | Boundary correctness |
+| handles a single-day range | Edge case: 1 day |
+| returns all levels correctly in a mixed week | Integration: 7-day scenario with all levels |
+
+### Command run
+
+```
+./node_modules/.bin/vitest run
+```
+
+All 860 tests passed. No skipped tests.
+
+### Important areas still untested
+
+| Area | Risk | Notes |
+|------|------|-------|
+| `TodayPage.tsx` | Medium | Double-day flow, undo, active tracker — integration-test candidates |
+| `CalendarPage.tsx` | Medium | DayDetailModal behavior, slot fallback path |
+| `HistoryPage.tsx` filter sessionStorage | Low | UI-layer; cannot be tested without jsdom + React Testing Library |
+| `useToday` hook | Low | Timeout-dependent; would need `vi.useFakeTimers()` + jsdom environment |
+| `computeActivityCalendar` heatmap UI | None yet | Function is tested; component wiring is a future step |
+
+---
+
 ## 2026-06-12 (fifty-fifth pass) — branch `claude/dreamy-mccarthy-wh71fb`
 
 **Result: 836 passing, 0 failing** (+4 tests vs entry baseline of 832)

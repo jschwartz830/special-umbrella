@@ -1,5 +1,34 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-14 (fifty-sixth pass) — branch `claude/dreamy-mccarthy-n2l94q`
+
+### Executive summary
+
+1. **What changed:** Three commits. (1) Cleanup: removed a spurious `nanoid` re-export from `rotationEngine.ts` that `programParser.ts` was using as an import relay — both files now have accurate dependency graphs. (2) Tests: added two edge-case unit tests to `computeHistoryStats.currentStreak` documenting that future-dated entries don't inflate the streak and that an extra+skip on the same day is deduplicated correctly. (3) Feature: added `computeActivityCalendar` + `ActivityLevel` + `ActivityCalendarDay` to `historyStats.ts` with 15 unit tests — a pure utility for per-day activity heatmap data, not yet wired to any UI.
+
+2. **Highest confidence:** All three changes. The nanoid fix is a pure import path change with zero runtime impact. The streak tests are additive test-only. The activity calendar is purely additive, completely self-contained, and thoroughly tested.
+
+3. **Risky changes:** None. This was a low-risk pass. No stores modified, no pages modified, no existing functions touched.
+
+4. **What to review first:** The `computeActivityCalendar` implementation in `src/lib/historyStats.ts` — specifically the level semantics (0/1/2/3) and the `actionRank` deduplication helper. These define the contract for any future heatmap UI.
+
+### Changes in detail
+
+| # | Type | Files | Risk |
+|---|------|-------|------|
+| 1 | Cleanup | `rotationEngine.ts`, `programParser.ts` | None |
+| 2 | Tests | `historyStats.test.ts` | None |
+| 3 | Feature | `historyStats.ts`, `historyStats.test.ts` | None (additive) |
+
+### Key design decisions (pass 56)
+
+- **Activity level 2 for both `complete-no-extra` and `extra-only`:** Both represent meaningful training activity without a "bonus" session, so they share a level. This gives the heatmap a natural three-tier density: inactive → light → moderate → intense.
+- **`actionRank` dedup priority:** When multiple rotation entries exist for the same date (shouldn't happen in normal use, can happen via CSV import or bugs), `complete` wins. This matches the rotation engine's own deduplication semantics.
+- **`planId` filter is optional:** `computeActivityCalendar` works for cross-plan views (e.g., a global heatmap) by omitting `planId`. The caller controls scope.
+- **Not wired to UI yet:** Intentional. The function is proven correct in isolation; adding the heatmap component is a separate, reviewable UI change.
+
+---
+
 ## 2026-06-12 (fifty-fifth pass) — branch `claude/dreamy-mccarthy-wh71fb`
 
 ### Executive summary

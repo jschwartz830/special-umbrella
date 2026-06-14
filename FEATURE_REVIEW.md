@@ -1,5 +1,41 @@
 # Feature Reviews
 
+## Pass 56 — 2026-06-14 (branch `claude/dreamy-mccarthy-n2l94q`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+`computeActivityCalendar(entries, extras, fromDate, toDate, planId?): ActivityCalendarDay[]` in `src/lib/historyStats.ts`.
+
+- Exported types: `ActivityLevel = 0 | 1 | 2 | 3`, `ActivityCalendarDay = { date, level, hasExtra, action }`
+- Private helper: `actionRank(action): number` for deduplication when multiple rotation entries share a date
+- 15 unit tests covering: empty range, all-zero days, each level in isolation, deduplication priority, planId scoping, boundary exclusion, single-day range, and a mixed-week integration case
+
+### Does it match the proposal?
+
+Yes. Exactly what was scoped. No UI wiring, no new dependencies, no store changes.
+
+### Quality assessment
+
+**Correctness:** All 15 tests pass. Edge cases covered: duplicate entries, planId isolation, boundary dates, empty inputs.
+
+**Clarity:** The level semantics are explicit in the implementation and documented in FEATURE_PROPOSAL.md. The `actionRank` helper makes the deduplication priority self-documenting.
+
+**Fit with codebase:** The function follows the exact same pattern as `computeLoggedRate`, `computeHistoryStats`, and other pure utilities in `historyStats.ts`. It uses the same `dateDiffDays`/`shiftDay` helpers already in the file.
+
+### Potential future work
+
+1. **Heatmap component** — A 52-week SVG/div grid with one cell per day, coloured by level. The data contract is fully defined by `ActivityCalendarDay`.
+2. **Tooltip on hover** — `action` and `hasExtra` fields are already exposed for rich tooltip content.
+3. **Multi-plan heatmap** — Omit `planId` to get cross-plan density; currently supported but untested end-to-end with mixed plans (unit test uses single-plan isolation).
+
+### Should this be reverted?
+
+No. It is purely additive; nothing calls it yet; 15 tests guard the contract. Keep it and wire to UI when desired.
+
+---
+
 ## Pass 54 — 2026-06-11 (branch `claude/dreamy-mccarthy-q8dj7t`)
 
 ### Classification: **Keep**
