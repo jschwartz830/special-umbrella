@@ -289,6 +289,29 @@ describe('computeHistoryStats', () => {
     expect(s.totalLogged).toBe(2)
     expect(s.totalCompleted).toBe(1)
   })
+
+  it('currentStreak is not inflated by future-dated entries in the streakable set', () => {
+    // The backward walk starts at today and cannot reach future-dated entries.
+    // Verify that a future entry doesn't inflate currentStreak even when
+    // the streakable Set technically contains it (the walk never reaches it).
+    const entries = [entry('2026-04-17', 'complete')]
+    const extras = [extra('2026-04-18'), extra('2026-04-19')]
+    const s = computeHistoryStats(entries, extras, '2026-04-17')
+    // Only today qualifies; future extras are not walked over
+    expect(s.currentStreak).toBe(1)
+  })
+
+  it('currentStreak with an extra on the same day as a skip counts the day once', () => {
+    // A skip + extra on the same date: the extra makes the date streakable.
+    // The backward walk should count this day once, not twice.
+    const entries = [
+      entry('2026-04-16', 'skip'),
+      entry('2026-04-17', 'complete'),
+    ]
+    const extras = [extra('2026-04-16')]
+    const s = computeHistoryStats(entries, extras, '2026-04-17')
+    expect(s.currentStreak).toBe(2)
+  })
 })
 
 // ── computePlanProgress ───────────────────────────────────────────────────────
