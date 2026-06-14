@@ -1,6 +1,5 @@
 import { format, addDays, parseISO, differenceInCalendarDays } from 'date-fns'
 import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay, DayStatus } from '../types'
-export { nanoid } from '../lib/utils'
 
 /** Symmetric modulo — handles negative values from go_back */
 export function mod(n: number, m: number): number {

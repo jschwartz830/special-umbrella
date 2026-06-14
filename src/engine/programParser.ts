@@ -1,6 +1,6 @@
 import { load as yamlLoad } from 'js-yaml'
 import { format } from 'date-fns'
-import { nanoid } from './rotationEngine'
+import { nanoid } from '../lib/utils'
 import type { Plan, WorkoutSlot, PlanDay, WorkoutType } from '../types'
 import type {
   ExerciseSpec,
