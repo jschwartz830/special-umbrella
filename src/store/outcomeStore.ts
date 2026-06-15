@@ -116,19 +116,25 @@ export const useOutcomeStore = create<OutcomeState>()(
           progressionRecommendation: recommendation,
         })
 
-        // 2. Evaluate legacy run progression (runConfig-based)
+        // 2. Evaluate legacy run progression (runConfig-based).
+        // Wrapped in try/catch: a bug in the progression engine must never
+        // prevent the outcome from being persisted or the modal from closing.
         const groupId = slot.runConfig?.progressionGroupId
         if (slot.runConfig?.progressionEligible && groupId) {
-          const prevState = get().progressionStates[groupId] ?? null
-          const decision = evaluateRunProgression(slot, outcome, prevState)
-          if (decision.action !== 'none') {
-            const nextState = applyRunProgressionDecision(
-              outcome.workoutInstanceId,
-              groupId,
-              decision,
-              prevState,
-            )
-            get().setProgressionState(nextState)
+          try {
+            const prevState = get().progressionStates[groupId] ?? null
+            const decision = evaluateRunProgression(slot, outcome, prevState)
+            if (decision.action !== 'none') {
+              const nextState = applyRunProgressionDecision(
+                outcome.workoutInstanceId,
+                groupId,
+                decision,
+                prevState,
+              )
+              get().setProgressionState(nextState)
+            }
+          } catch (err) {
+            console.error('[outcomeStore] run-progression evaluation failed (outcome already saved):', err)
           }
         }
 
@@ -236,7 +242,11 @@ export const useOutcomeStore = create<OutcomeState>()(
         })
       },
     }),
-    { name: 'wpt_outcomes' },
+    {
+      name: 'wpt_outcomes',
+      version: 1,
+      migrate: (persisted: unknown) => persisted as OutcomeState,
+    },
   ),
 )
 
