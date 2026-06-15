@@ -1,3 +1,45 @@
+# Overnight Changelog — 2026-06-15
+
+## [1] Fix: guard run-progression calls with try/catch in `logOutcomeWithProgression`
+
+**Summary**: Wrapped the `evaluateRunProgression` / `applyRunProgressionDecision` block in `outcomeStore.logOutcomeWithProgression` in a try/catch that logs the error and swallows it.
+
+**Why it matters**: `setOutcome` fires first (step 1), so the outcome data is always persisted. But without a guard, any exception in the progression engine propagates back to TodayPage's `handleOutcomeConfirm`. That function has no try/catch, so an exception would: leave the outcome modal open, skip the rotation advance (`actions.advance()`), and abort the double-day bonus flow — even though the workout data was already saved. The fix mirrors the existing guard in `programStore.applyProgressionRule` (added in pass 50).
+
+**Files changed**: `src/store/outcomeStore.ts` (lines 119–133, ~10 lines changed)
+
+**Risks / tradeoffs**: Errors in the progression engine are now silent (console.error only). A future run-progression bug would be harder to notice. This is the correct trade-off for a UI critical path: the outcome is already saved and the user shouldn't see an error screen for a background computation.
+
+**Rollback**: Revert to the version without the try/catch. No data was at risk.
+
+---
+
+## [2] Fix: add persist `version: 1` to `outcomeStore`
+
+**Summary**: Added `version: 1` and an identity `migrate` function to the `wpt_outcomes` Zustand persist config.
+
+**Why it matters**: Without a version field, adding one in future would cause Zustand to wipe the store for all users (it clears the store when `storedVersion < currentVersion` and there is no `migrate` function). The `historyStore` and `planStore` both already have versioned persist configs. This change brings `outcomeStore` into alignment and establishes a safe baseline for future schema changes.
+
+**Files changed**: `src/store/outcomeStore.ts` (4 lines added)
+
+**Risks / tradeoffs**: When users first open the app with this change, Zustand detects stored version 0 < current version 1 and calls the migrate function. Since the function is an identity (`(persisted) => persisted as OutcomeState`), all existing outcomes are preserved unchanged. The only side effect is writing `version: 1` into localStorage. This is safe and idempotent.
+
+**Rollback**: Remove `version` and `migrate` from the persist config. Users who have already received version 1 will have Zustand downgrade silently (stored version 1 > current version 0 is treated as "ahead of expected version" — Zustand returns the stored state unchanged in this case).
+
+---
+
+## [3] Test: verify `logOutcomeWithProgression` recovers from run-progression errors
+
+**Summary**: Added a new test file `src/store/__tests__/outcomeStoreProgressionErrorRecovery.test.ts` with 3 tests that mock `evaluateRunProgression` to throw and assert safe behavior.
+
+**Why it matters**: Guards the try/catch fix. Confirms that: (1) the function does not propagate the error to the caller, (2) the outcome is still persisted, and (3) no progression state is written when the engine throws before returning a decision.
+
+**Files changed**: `src/store/__tests__/outcomeStoreProgressionErrorRecovery.test.ts` (new file, 112 lines)
+
+**Risks / tradeoffs**: None. The test file uses `vi.mock` for module-level isolation and does not affect other test files.
+
+---
+
 # Overnight Changelog — 2026-06-13
 
 ## [1] Fix: `useActivePlan` stale date at midnight

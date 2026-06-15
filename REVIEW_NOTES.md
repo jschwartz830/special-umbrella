@@ -1,5 +1,75 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-15 (fifty-seventh pass) — branch `claude/dreamy-mccarthy-vqeg2i`
+
+### Executive summary
+
+1. **What changed:** Two bug fixes and one new test file. (1) Bug fix: `logOutcomeWithProgression` step 2 is now wrapped in try/catch so a progression-engine error never prevents the modal from closing or the rotation from advancing. (2) Bug fix: `outcomeStore` now has `version: 1` in its persist config, establishing a migration baseline to prevent future accidental store wipes. (3) Test: 3 new tests verify error recovery behavior by mocking `evaluateRunProgression` to throw.
+
+2. **Highest confidence:** The try/catch fix — the pattern is already present in `programStore.applyProgressionRule`; this is applying it consistently to the only other uncovered progression call site. The version field — a 4-line change with an identity migrate that cannot lose data.
+
+3. **What is risky:** Nothing in this pass is risky. The try/catch changes error-swallowing behavior (errors become console.error instead of propagating), which is the correct trade-off for a UI critical path. The version migration is an identity that preserves all existing outcomes.
+
+4. **What to review first:** The `logOutcomeWithProgression` change in `outcomeStore.ts` — confirm the try/catch scope is correct (wraps only the run-progression block, not the YAML-progression block which already has its own guard in `programStore.applyProgressionRule`). Then check the new test file confirms error recovery end-to-end.
+
+### Biggest issues found
+
+- **`logOutcomeWithProgression` missing try/catch** — now fixed. The uncaught exception would have left TodayPage in a broken state (modal open, rotation not advanced) even though the outcome was saved. Real-world trigger: any future bug in `evaluateRunProgression` or `applyRunProgressionDecision`.
+- **`outcomeStore` unversioned** — now fixed. Pre-existing latent risk; would have caused silent data loss if anyone added `version` later without a `migrate`.
+
+### Improvements completed
+
+| Item | Files | Confidence |
+|------|-------|------------|
+| try/catch in `logOutcomeWithProgression` | `outcomeStore.ts` | High |
+| `version: 1` + migrate in `outcomeStore` | `outcomeStore.ts` | High |
+| Error recovery tests | `__tests__/outcomeStoreProgressionErrorRecovery.test.ts` | High |
+
+### Small features added
+
+None this pass. See feature decision in IMPLEMENTATION_PLAN.md.
+
+### Medium-complexity features
+
+None this pass.
+
+### Definitely keep
+
+- All three changes in this pass.
+
+### Probably keep but tweak
+
+- Nothing flagged.
+
+### Do not keep
+
+- Nothing.
+
+### Recommendations only (not implemented)
+
+1. **`runConfig` deep clone in `duplicatePlan`** — `runConfig` is an object shared between original and copy after `duplicatePlan`. Currently safe (not mutated in-place), but adds a latent risk for any future in-place mutation. Fix: add `...(slot.runConfig ? { runConfig: { ...slot.runConfig } } : {})` in `deepCloneWorkoutSlot`.
+
+2. **CalendarPage silent overwrite on date change** — when moving a rotation entry to a new date that already has an outcome, the existing outcome is replaced without warning. Should warn the user and offer to keep both or replace.
+
+3. **Per-page error boundaries** — only one `ErrorBoundary` exists at the app root. A render error in one page crashes the entire app. Adding per-route boundaries would isolate crashes to the affected page.
+
+4. **Extract TodayPage / CalendarPage modals** — both files are >900 lines. Extracting modal sub-flows into separate component files would improve testability and readability.
+
+### Open questions
+
+- Should the try/catch in `logOutcomeWithProgression` emit any user-visible signal (e.g. a toast "Workout saved — progression tracking skipped")? Currently it only logs to console. This is the conservative choice but may be too silent for debugging.
+- For the `outcomeStore` version field: should the identity migrate also normalize any known historic edge cases in stored outcomes (e.g., outcomes with missing `completedAt`)? Currently it does nothing.
+
+### Known issues or incomplete work
+
+None — this pass is complete and self-contained.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-06-13 (fifty-sixth pass) — branch `claude/dreamy-mccarthy-qvt8m6`
 
 ### Executive summary
