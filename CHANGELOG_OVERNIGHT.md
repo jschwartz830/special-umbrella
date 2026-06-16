@@ -1,3 +1,53 @@
+# Overnight Changelog — 2026-06-16
+
+## [1] Fix: deduplicate entries by date in `isPlanExpired` rotations path
+
+**Summary**: `isPlanExpired` (rotations mode) now counts unique calendar dates via `new Set(...).size` instead of raw entry count. This matches the deduplication contract already in `computeCurrentDayIndex`, which uses a Map to keep only the newest entry per date.
+
+**Why it matters**: The history store's `addEntry()` prevents exact duplicates, but nothing prevents two entries on the same date with different `createdAt` timestamps. Without deduplication, those two entries would count as two separate rotation completions, potentially expiring a plan prematurely (e.g., a 2-day plan with both entries on day 1 would register as 1 full rotation after a single day). The fix is defensive hardening that aligns `isPlanExpired` with the rest of the engine.
+
+**Files changed**: `src/engine/rotationEngine.ts` (~3 lines), `src/engine/__tests__/rotationEngine.test.ts` (+12 lines, 1 new test)
+
+**Rollback**: `git revert 9832df2`
+
+---
+
+## [2] Refactor: extract `getStreakDatesSet` helper, eliminate duplicated logic
+
+**Summary**: Extracted a new exported function `getStreakDatesSet(entries, extras, planId?)` from the inline Set-building logic that was duplicated in both `computeHistoryStats` and `computePlanStreak`. Both functions now call the helper.
+
+**Why it matters**: The definition of "streakable" (complete/day_off entries + all extra workouts) was encoded in two separate places, 470 lines apart. Adding a new action type (e.g., a future "partial" action) would require updating both independently. The extracted helper is the single source of truth.
+
+**Files changed**: `src/lib/historyStats.ts` (+16 lines, 2 call-site simplifications), `src/lib/__tests__/historyStats.test.ts` (+80 lines, 12 new tests)
+
+**Rollback**: `git revert 9e7924c`
+
+---
+
+## [3] Docs: clarify single-slot attribution in `computeWorkoutTypeBreakdown`
+
+**Summary**: Added an inline comment at the `slots[0]` usage in `computeWorkoutTypeBreakdown` explaining that only the primary (first) slot's type is attributed for dual-slot days.
+
+**Why it matters**: Dual-slot plan days (e.g., weights + run on the same day) only have their first slot counted toward the workout type breakdown. This was documented in the test file but not at the usage site, leaving future readers to guess at the intent.
+
+**Files changed**: `src/lib/historyStats.ts` (+2 comment lines)
+
+**Rollback**: `git revert 997428f`
+
+---
+
+## [4] Feature: `computeCurrentStreakDates` for calendar streak highlighting
+
+**Summary**: Added a new exported function `computeCurrentStreakDates(entries, extras, today, planId?)` that returns `Set<string>` of consecutive streak dates ending on or including today, by walking backward through `getStreakDatesSet`. Fully tested with 9 cases.
+
+**Why it matters**: Calendar views that want to highlight streak days currently have no way to get the set of dates forming the active streak without re-implementing the backward walk. This function provides that utility. It also validates the `getStreakDatesSet` refactor — any regression in the helper would be caught by these tests.
+
+**Files changed**: `src/lib/historyStats.ts` (+18 lines), `src/lib/__tests__/historyStats.test.ts` (+80 lines, 9 new tests)
+
+**Rollback**: `git revert a0cfce7`
+
+---
+
 # Overnight Changelog — 2026-06-15
 
 ## [1] Fix: guard run-progression calls with try/catch in `logOutcomeWithProgression`
