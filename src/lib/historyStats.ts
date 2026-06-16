@@ -55,11 +55,7 @@ export function computeHistoryStats(
     entries.filter(e => e.action === 'complete' && inWindow(e.calendarDate, d30)).length +
     extras.filter(e => inWindow(e.calendarDate, d30)).length
 
-  const streakable = new Set<string>()
-  for (const e of entries) {
-    if (e.action === 'complete' || e.action === 'day_off') streakable.add(e.calendarDate)
-  }
-  for (const e of extras) streakable.add(e.calendarDate)
+  const streakable = getStreakDatesSet(entries, extras)
 
   let currentStreak = 0
   let cursor = today
@@ -501,6 +497,41 @@ export function computePersonalRecords(
   return [...byExercise.values()].sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
 }
 
+// ── Streakable dates set ──────────────────────────────────────────────────────
+
+/**
+ * Build the set of calendar dates (YYYY-MM-DD) that qualify as "streakable" —
+ * i.e. days that count toward a consecutive-day streak.
+ *
+ * A date qualifies when it has at least one of:
+ *   - a `complete` or `day_off` rotation entry, OR
+ *   - any extra workout entry.
+ *
+ * `skip` entries alone do NOT count — that is the deliberate rule shared by
+ * `computeHistoryStats` (global streak) and `computePlanStreak` (plan streak).
+ *
+ * @param entries  History entries to inspect.
+ * @param extras   Extra workout entries to inspect.
+ * @param planId   When provided, only entries/extras for this plan are included.
+ *                 When `null` / omitted, all entries are included (global streak).
+ */
+export function getStreakDatesSet(
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  planId?: string | null,
+): Set<string> {
+  const streakable = new Set<string>()
+  for (const e of entries) {
+    if (planId != null && e.planId !== planId) continue
+    if (e.action === 'complete' || e.action === 'day_off') streakable.add(e.calendarDate)
+  }
+  for (const e of extras) {
+    if (planId != null && e.planId !== planId) continue
+    streakable.add(e.calendarDate)
+  }
+  return streakable
+}
+
 // ── Plan-scoped streak ────────────────────────────────────────────────────────
 
 /**
@@ -522,14 +553,7 @@ export function computePlanStreak(
   extras: ExtraWorkoutEntry[],
   today: string,
 ): number {
-  const streakable = new Set<string>()
-  for (const e of entries) {
-    if (e.planId !== planId) continue
-    if (e.action === 'complete' || e.action === 'day_off') streakable.add(e.calendarDate)
-  }
-  for (const e of extras) {
-    if (e.planId === planId) streakable.add(e.calendarDate)
-  }
+  const streakable = getStreakDatesSet(entries, extras, planId)
 
   let streak = 0
   let cursor = today
