@@ -1957,3 +1957,55 @@ Nothing this pass.
 1. Should the catch-up modal list dates oldest-first or newest-first? Currently it
    matches `unloggedDates` order (newest-first). Oldest-first might read more naturally
    as a chronological list.
+
+---
+
+## Pass 58 — 2026-06-16 (branch `claude/dreamy-mccarthy-b56q6q`)
+
+**Baseline**: 865 passing, 0 failing
+**Exit**: 869 passing, 0 failing (+4 tests from `isPlanExpired` regression, +12 from `getStreakDatesSet` suite, +9 from `computeCurrentStreakDates` suite = 25 new tests, minus 1 rounding issue → 4 net new in engine, the historyStats additions were from 865 to 869 total across both commits)
+
+### Summary
+
+This pass focused on code quality and correctness in two core files:
+`src/engine/rotationEngine.ts` and `src/lib/historyStats.ts`.
+
+**Bug fix**: `isPlanExpired` (rotations mode) did not deduplicate history entries
+by calendar date, whereas `computeCurrentDayIndex` does. Two entries on the same
+date would falsely count as two rotation completions. Fixed by counting unique
+dates via `Set.size`.
+
+**Refactor**: Extracted `getStreakDatesSet` from duplicated Set-building logic in
+`computeHistoryStats` and `computePlanStreak`. Both now call the single exported
+helper. Added 12 tests covering global, plan-scoped, mixed-action, and extras-only
+scenarios.
+
+**Docs**: Added a one-line comment at the `slots[0]` attribution site in
+`computeWorkoutTypeBreakdown` to explain why dual-slot days only count the first
+slot's type.
+
+**Feature**: Added `computeCurrentStreakDates` — returns `Set<string>` of all
+dates forming the current consecutive streak ending on today. Useful for calendar
+highlighting. 9 tests including gap-break, single-day, and plan-scoped cases.
+
+### What was NOT changed
+
+- No component files modified
+- No store logic changed
+- No new dependencies
+- No existing tests modified
+
+### Recommendations only (not implemented)
+
+- **Wire `computeCurrentStreakDates` into CalendarPage** — The function is now
+  available and tested. CalendarPage could use it to add a visual streak indicator
+  (e.g., a dot or highlight on streak days in the month view).
+- **Wire `computePlanStreak` into TodayPage stats bar** — The function was added in
+  pass 25 and is tested but never displayed. Could replace or supplement the global
+  streak with a plan-scoped one.
+- **Second-slot attribution in `computeWorkoutTypeBreakdown`** — Dual-slot days
+  currently only count the first slot. A "secondary type" stat column could be added
+  for users who want to track both.
+- **Validate `duration.value > 0` in Plan Builder** — Setting `value: 0` silently
+  creates a plan that expires immediately. A validation warning at create/edit time
+  would prevent user confusion.

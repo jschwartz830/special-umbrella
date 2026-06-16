@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -2008,6 +2008,235 @@ describe('computeLoggedRate', () => {
     ]
     const result = computeLoggedRate('plan-1', entries, '2026-06-08', '2026-06-11')
     expect(result).not.toBeGreaterThan(100)
+  })
+})
+
+// ── getStreakDatesSet ─────────────────────────────────────────────────────────
+
+describe('getStreakDatesSet', () => {
+  function se(date: string, action: HistoryEntry['action'], planId = 'plan-1'): HistoryEntry {
+    return {
+      id: `se-${planId}-${date}`,
+      planId,
+      calendarDate: date,
+      planDayIndex: action === 'day_off' ? undefined : 0,
+      action,
+      createdAt: `${date}T12:00:00Z`,
+    }
+  }
+
+  function sx(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+    return {
+      id: `sx-${planId}-${date}`,
+      planId,
+      calendarDate: date,
+      workoutType: 'yoga',
+      workoutName: 'Yoga',
+      createdAt: `${date}T13:00:00Z`,
+    }
+  }
+
+  it('returns empty set for empty inputs', () => {
+    expect(getStreakDatesSet([], []).size).toBe(0)
+  })
+
+  it('includes dates with complete entries', () => {
+    const s = getStreakDatesSet([se('2026-06-10', 'complete')], [])
+    expect(s.has('2026-06-10')).toBe(true)
+  })
+
+  it('includes dates with day_off entries', () => {
+    const s = getStreakDatesSet([se('2026-06-10', 'day_off')], [])
+    expect(s.has('2026-06-10')).toBe(true)
+  })
+
+  it('does NOT include dates with skip-only entries', () => {
+    const s = getStreakDatesSet([se('2026-06-10', 'skip')], [])
+    expect(s.has('2026-06-10')).toBe(false)
+  })
+
+  it('includes dates with extra entries', () => {
+    const s = getStreakDatesSet([], [sx('2026-06-10')])
+    expect(s.has('2026-06-10')).toBe(true)
+  })
+
+  it('a date with only a skip entry becomes streakable when an extra exists for the same date', () => {
+    const s = getStreakDatesSet([se('2026-06-10', 'skip')], [sx('2026-06-10')])
+    expect(s.has('2026-06-10')).toBe(true)
+  })
+
+  it('without planId filter, includes entries from all plans', () => {
+    const entries = [se('2026-06-10', 'complete', 'plan-1'), se('2026-06-11', 'complete', 'plan-2')]
+    const s = getStreakDatesSet(entries, [])
+    expect(s.has('2026-06-10')).toBe(true)
+    expect(s.has('2026-06-11')).toBe(true)
+  })
+
+  it('with planId filter, only includes entries for that plan', () => {
+    const entries = [se('2026-06-10', 'complete', 'plan-1'), se('2026-06-11', 'complete', 'plan-2')]
+    const s = getStreakDatesSet(entries, [], 'plan-1')
+    expect(s.has('2026-06-10')).toBe(true)
+    expect(s.has('2026-06-11')).toBe(false)
+  })
+
+  it('with planId filter, only includes extras for that plan', () => {
+    const extras = [sx('2026-06-10', 'plan-1'), sx('2026-06-11', 'plan-2')]
+    const s = getStreakDatesSet([], extras, 'plan-2')
+    expect(s.has('2026-06-10')).toBe(false)
+    expect(s.has('2026-06-11')).toBe(true)
+  })
+
+  it('deduplicates same date from multiple entries (Set semantics)', () => {
+    const entries = [
+      { ...se('2026-06-10', 'complete'), id: 'a' },
+      { ...se('2026-06-10', 'day_off'), id: 'b' },
+    ]
+    const s = getStreakDatesSet(entries, [])
+    // Only one entry in the Set for the same date
+    expect(s.has('2026-06-10')).toBe(true)
+    expect(s.size).toBe(1)
+  })
+
+  it('null planId behaves the same as omitting planId (includes all plans)', () => {
+    const entries = [se('2026-06-10', 'complete', 'plan-1'), se('2026-06-11', 'complete', 'plan-2')]
+    const sNull = getStreakDatesSet(entries, [], null)
+    const sOmit = getStreakDatesSet(entries, [])
+    expect(sNull.size).toBe(sOmit.size)
+    expect([...sNull].sort()).toEqual([...sOmit].sort())
+  })
+
+  it('result is consistent with computePlanStreak behavior (same dates included)', () => {
+    // Verify the extraction did not change computePlanStreak semantics.
+    const TODAY = '2026-06-15'
+    const entries = [
+      se('2026-06-13', 'complete'),
+      se('2026-06-14', 'day_off'),
+      se(TODAY, 'complete'),
+    ]
+    const streakDates = getStreakDatesSet(entries, [], 'plan-1')
+    // All three dates should be in the set
+    expect(streakDates.has('2026-06-13')).toBe(true)
+    expect(streakDates.has('2026-06-14')).toBe(true)
+    expect(streakDates.has(TODAY)).toBe(true)
+    // And computePlanStreak should walk them correctly → streak of 3
+    const streak = computePlanStreak('plan-1', entries, [], TODAY)
+    expect(streak).toBe(3)
+  })
+})
+
+// ── computeCurrentStreakDates ─────────────────────────────────────────────────
+
+describe('computeCurrentStreakDates', () => {
+  const TODAY = '2026-06-15'
+
+  function cse(date: string, action: HistoryEntry['action'], planId = 'plan-1'): HistoryEntry {
+    return {
+      id: `cse-${planId}-${date}`,
+      planId,
+      calendarDate: date,
+      planDayIndex: action === 'day_off' ? undefined : 0,
+      action,
+      createdAt: `${date}T12:00:00Z`,
+    }
+  }
+
+  function csx(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+    return {
+      id: `csx-${planId}-${date}`,
+      planId,
+      calendarDate: date,
+      workoutType: 'run',
+      workoutName: 'Run',
+      createdAt: `${date}T13:00:00Z`,
+    }
+  }
+
+  it('returns empty set when today has no qualifying activity', () => {
+    const result = computeCurrentStreakDates([], [], TODAY)
+    expect(result.size).toBe(0)
+  })
+
+  it('returns a set containing only today when streak is 1', () => {
+    const result = computeCurrentStreakDates([cse(TODAY, 'complete')], [], TODAY)
+    expect(result.size).toBe(1)
+    expect(result.has(TODAY)).toBe(true)
+  })
+
+  it('returns all consecutive streak dates back from today', () => {
+    const entries = [
+      cse('2026-06-13', 'complete'),
+      cse('2026-06-14', 'day_off'),
+      cse(TODAY, 'complete'),
+    ]
+    const result = computeCurrentStreakDates(entries, [], TODAY)
+    expect(result.size).toBe(3)
+    expect(result.has('2026-06-13')).toBe(true)
+    expect(result.has('2026-06-14')).toBe(true)
+    expect(result.has(TODAY)).toBe(true)
+  })
+
+  it('stops at a gap (day with no qualifying entry)', () => {
+    // Jun 12 has no entry → gap → streak starts Jun 13
+    const entries = [
+      cse('2026-06-11', 'complete'),
+      // Jun 12: gap
+      cse('2026-06-13', 'complete'),
+      cse('2026-06-14', 'complete'),
+      cse(TODAY, 'complete'),
+    ]
+    const result = computeCurrentStreakDates(entries, [], TODAY)
+    expect(result.size).toBe(3)
+    expect(result.has('2026-06-13')).toBe(true)
+    expect(result.has('2026-06-14')).toBe(true)
+    expect(result.has(TODAY)).toBe(true)
+    // Jun 11 is before the gap — not in the current streak
+    expect(result.has('2026-06-11')).toBe(false)
+  })
+
+  it('streak count equals size of returned set', () => {
+    const entries = [
+      cse('2026-06-13', 'complete'),
+      cse('2026-06-14', 'complete'),
+      cse(TODAY, 'complete'),
+    ]
+    const streakCount = computePlanStreak('plan-1', entries, [], TODAY)
+    const streakDates = computeCurrentStreakDates(entries, [], TODAY, 'plan-1')
+    expect(streakDates.size).toBe(streakCount)
+  })
+
+  it('extras extend the streak into the returned set', () => {
+    const extras = [csx('2026-06-14'), csx(TODAY)]
+    const result = computeCurrentStreakDates([], extras, TODAY)
+    expect(result.has('2026-06-14')).toBe(true)
+    expect(result.has(TODAY)).toBe(true)
+    expect(result.size).toBe(2)
+  })
+
+  it('respects planId scope when provided', () => {
+    const entries = [
+      cse('2026-06-14', 'complete', 'plan-1'),
+      cse(TODAY, 'complete', 'plan-1'),
+      cse('2026-06-13', 'complete', 'plan-2'),
+      cse('2026-06-14', 'complete', 'plan-2'),
+      cse(TODAY, 'complete', 'plan-2'),
+    ]
+    const plan1Dates = computeCurrentStreakDates(entries, [], TODAY, 'plan-1')
+    expect(plan1Dates.size).toBe(2)
+    expect(plan1Dates.has('2026-06-13')).toBe(false)
+
+    const plan2Dates = computeCurrentStreakDates(entries, [], TODAY, 'plan-2')
+    expect(plan2Dates.size).toBe(3)
+    expect(plan2Dates.has('2026-06-13')).toBe(true)
+  })
+
+  it('without planId, includes all plans in the streak', () => {
+    const entries = [
+      cse(TODAY, 'complete', 'plan-1'),
+      cse(TODAY, 'complete', 'plan-2'), // same date, different plan — deduped to one date
+    ]
+    const result = computeCurrentStreakDates(entries, [], TODAY)
+    expect(result.size).toBe(1)
+    expect(result.has(TODAY)).toBe(true)
   })
 })
 

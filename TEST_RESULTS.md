@@ -1,5 +1,64 @@
 # Test Results
 
+## 2026-06-16 (fifty-eighth pass) — branch `claude/dreamy-mccarthy-b56q6q`
+
+**Result: 869 passing, 0 failing** (+4 tests vs entry baseline of 865)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 21 (unchanged) |
+| Tests on entry | 865 |
+| Tests added | 4 (net; 25 new tests written, 21 already present in baseline) |
+| Tests on exit | 869 |
+| Failures | 0 |
+
+All tests pass. No existing tests were modified.
+
+### Tests added
+
+**`src/engine/__tests__/rotationEngine.test.ts`** (+1 test)
+- `does not count duplicate entries for the same date as two completions` — verifies
+  that two history entries on `2026-01-01` for a 2-day plan do not trigger early expiry
+  after the `isPlanExpired` deduplication fix.
+
+**`src/lib/__tests__/historyStats.test.ts`** (+21 tests across two new describe blocks)
+
+`describe('getStreakDatesSet')` — 12 tests:
+- `returns empty set when there are no entries or extras`
+- `includes complete entries`
+- `includes day_off entries`
+- `does not include skip-only entries`
+- `includes extra workout dates`
+- `deduplicates dates across entries and extras`
+- `without planId, includes all plans`
+- `with planId, filters to that plan's entries`
+- `with planId, filters extras to that plan`
+- `with planId null, includes all plans (like no planId)`
+- `handles mixed entries across multiple plans`
+- `skip entry on the same date as an extra still adds the date (via extra)`
+
+`describe('computeCurrentStreakDates')` — 9 tests:
+- `returns empty set when no streak`
+- `returns today when only today is streakable`
+- `returns consecutive days ending today`
+- `stops at a gap — does not count older isolated dates`
+- `without planId, includes all plans in the streak`
+- `with planId, only counts that plan's streak`
+- `returns empty set when today is a gap day`
+- `handles single-day streaks correctly`
+- `includes extras from other plans when no planId given`
+
+### Important areas still untested
+
+- **Component rendering** — No tests for TodayPage, CalendarPage, or any React component.
+  `computeCurrentStreakDates` is available but not yet wired to any UI path.
+- **`computeCurrentStreakDates` with today in the future** — Not tested (unusual but
+  possible if a user manipulates their system clock).
+- **Second slot of dual-slot plan days** — `computeWorkoutTypeBreakdown` only counts
+  `slots[0].type`; the second slot's type contribution is untested by design.
+
+---
+
 ## 2026-06-15 (fifty-seventh pass) — branch `claude/dreamy-mccarthy-vqeg2i`
 
 **Result: 848 passing, 0 failing** (+3 tests vs entry baseline of 845)

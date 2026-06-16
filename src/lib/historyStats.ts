@@ -55,11 +55,7 @@ export function computeHistoryStats(
     entries.filter(e => e.action === 'complete' && inWindow(e.calendarDate, d30)).length +
     extras.filter(e => inWindow(e.calendarDate, d30)).length
 
-  const streakable = new Set<string>()
-  for (const e of entries) {
-    if (e.action === 'complete' || e.action === 'day_off') streakable.add(e.calendarDate)
-  }
-  for (const e of extras) streakable.add(e.calendarDate)
+  const streakable = getStreakDatesSet(entries, extras)
 
   let currentStreak = 0
   let cursor = today
@@ -401,6 +397,8 @@ export function computeWorkoutTypeBreakdown(
     if (e.action === 'day_off') continue
     if (e.planDayIndex === undefined || !planDaysById) continue
 
+    // Only the primary (first) slot type is attributed — dual-slot days
+    // (e.g. weights + run) contribute to the first slot's type only.
     const type = planDaysById.get(e.planDayIndex)?.slots[0]?.type ?? null
     if (!type) continue
 
@@ -501,6 +499,41 @@ export function computePersonalRecords(
   return [...byExercise.values()].sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
 }
 
+// ── Streakable dates set ──────────────────────────────────────────────────────
+
+/**
+ * Build the set of calendar dates (YYYY-MM-DD) that qualify as "streakable" —
+ * i.e. days that count toward a consecutive-day streak.
+ *
+ * A date qualifies when it has at least one of:
+ *   - a `complete` or `day_off` rotation entry, OR
+ *   - any extra workout entry.
+ *
+ * `skip` entries alone do NOT count — that is the deliberate rule shared by
+ * `computeHistoryStats` (global streak) and `computePlanStreak` (plan streak).
+ *
+ * @param entries  History entries to inspect.
+ * @param extras   Extra workout entries to inspect.
+ * @param planId   When provided, only entries/extras for this plan are included.
+ *                 When `null` / omitted, all entries are included (global streak).
+ */
+export function getStreakDatesSet(
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  planId?: string | null,
+): Set<string> {
+  const streakable = new Set<string>()
+  for (const e of entries) {
+    if (planId != null && e.planId !== planId) continue
+    if (e.action === 'complete' || e.action === 'day_off') streakable.add(e.calendarDate)
+  }
+  for (const e of extras) {
+    if (planId != null && e.planId !== planId) continue
+    streakable.add(e.calendarDate)
+  }
+  return streakable
+}
+
 // ── Plan-scoped streak ────────────────────────────────────────────────────────
 
 /**
@@ -522,14 +555,7 @@ export function computePlanStreak(
   extras: ExtraWorkoutEntry[],
   today: string,
 ): number {
-  const streakable = new Set<string>()
-  for (const e of entries) {
-    if (e.planId !== planId) continue
-    if (e.action === 'complete' || e.action === 'day_off') streakable.add(e.calendarDate)
-  }
-  for (const e of extras) {
-    if (e.planId === planId) streakable.add(e.calendarDate)
-  }
+  const streakable = getStreakDatesSet(entries, extras, planId)
 
   let streak = 0
   let cursor = today
@@ -538,6 +564,37 @@ export function computePlanStreak(
     cursor = shiftDay(cursor, -1)
   }
   return streak
+}
+
+// ── Current streak date set ───────────────────────────────────────────────────
+
+/**
+ * Return the set of YYYY-MM-DD dates that form the current consecutive streak.
+ *
+ * Walks backward from `today` (inclusive) through `getStreakDatesSet` dates
+ * until a gap is found, collecting each date. The result is the same set of
+ * dates that `computePlanStreak` counts; this variant surfaces the dates
+ * themselves so callers can highlight them in a calendar view.
+ *
+ * The same plan-scoping rules as `getStreakDatesSet` / `computePlanStreak`
+ * apply: pass `planId` to scope to one plan, or omit for the global streak.
+ *
+ * Returns an empty set when today has no qualifying activity.
+ */
+export function computeCurrentStreakDates(
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  today: string,
+  planId?: string | null,
+): Set<string> {
+  const streakable = getStreakDatesSet(entries, extras, planId)
+  const result = new Set<string>()
+  let cursor = today
+  while (streakable.has(cursor)) {
+    result.add(cursor)
+    cursor = shiftDay(cursor, -1)
+  }
+  return result
 }
 
 // ── Consecutive-skip counter ─────────────────────────────────────────────────

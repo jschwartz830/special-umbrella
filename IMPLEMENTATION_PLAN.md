@@ -1,5 +1,48 @@
 # Implementation Plan
 
+## Pass 58 — 2026-06-16 (branch `claude/dreamy-mccarthy-b56q6q`)
+
+### Observations on entry
+
+- Baseline: **865 passing, 0 failing** — clean baseline inherited from pass 57.
+- **`isPlanExpired` rotations path did not deduplicate**: Two history entries on the
+  same calendar date (which the store allows transiently) would count as two rotation
+  completions, potentially expiring a plan prematurely. `computeCurrentDayIndex` correctly
+  deduplicates via a Map; `isPlanExpired` did not.
+- **Duplicated "streakable dates" logic**: Both `computeHistoryStats` (~L58–62) and
+  `computePlanStreak` (~L525–532) built nearly identical Sets from `entries` and `extras`.
+  DRY violation — two places to update if the streakable-action definition ever changes.
+- **Multi-slot attribution undocumented in source**: `computeWorkoutTypeBreakdown` only
+  counts `slots[0].type` for plan days, but this was only documented in the test file,
+  not at the usage site.
+- **No exported utility for streak date enumeration**: Callers wanting to highlight
+  streak days on a calendar had to re-implement the streak walk inline.
+
+### Decisions
+
+1. **Fix `isPlanExpired` deduplication** (BUG FIX): Count unique calendar dates
+   via `new Set(...).size` instead of raw `.length`. Matches the deduplication
+   contract of `computeCurrentDayIndex`.
+
+2. **Extract `getStreakDatesSet` helper** (REFACTOR): Single source of truth for
+   which dates qualify as "streakable" (`complete` / `day_off` entries + all extras).
+   Optional `planId` param handles both global and plan-scoped use cases.
+
+3. **Document single-slot attribution** (DOCS): Add an inline comment at the
+   `slots[0]` reference in `computeWorkoutTypeBreakdown`.
+
+4. **Add `computeCurrentStreakDates`** (FEATURE): Returns `Set<string>` of all
+   consecutive streak dates ending on (or including) today. Callers can use this
+   for calendar highlighting without re-implementing the backward walk.
+
+### Risk assessment
+
+All changes are confined to `src/lib/historyStats.ts` and `src/engine/rotationEngine.ts`
+plus their test files. No component files were touched. All changes are additive (new
+exports) or narrowing fixes (dedup). Zero new dependencies.
+
+---
+
 ## Pass 57 — 2026-06-15 (branch `claude/dreamy-mccarthy-vqeg2i`)
 
 ### Observations on entry

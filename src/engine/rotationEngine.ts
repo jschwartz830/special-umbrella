@@ -272,9 +272,15 @@ export function isPlanExpired(
     return today >= endDate
   }
   if (plan.days.length === 0) return false
-  const completeSkip = entries.filter(
-    e => e.planId === plan.id && e.calendarDate <= today && (e.action === 'complete' || e.action === 'skip'),
+  // Count unique calendar dates with a complete/skip entry, matching the rotation
+  // engine's one-advancement-per-date rule (duplicate entries for the same date
+  // must not inflate the rotation count).
+  const completedDates = new Set(
+    entries
+      .filter(e => e.planId === plan.id && e.calendarDate <= today &&
+        (e.action === 'complete' || e.action === 'skip'))
+      .map(e => e.calendarDate),
   )
-  return Math.floor(completeSkip.length / plan.days.length) >= value
+  return Math.floor(completedDates.size / plan.days.length) >= value
 }
 
