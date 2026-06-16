@@ -1,5 +1,71 @@
 # Implementation Plan
 
+## Pass 57 — 2026-06-15 (branch `claude/dreamy-mccarthy-vqeg2i`)
+
+### Observations on entry
+
+- Baseline on entry: **845 passing, 0 failing** — clean exit from pass 56.
+- Pass 56 fixed `useActivePlan` stale date, `ProgramVarsPanel` NaN display, added `isPlanExpired` pre-start test, and surfaced `computeLoggedRate` bar on TodayPage.
+- Full codebase audit performed this pass.
+
+### Architecture summary (unchanged from pass 56)
+
+**Workout Plan Tracker** — React 18 + TypeScript + Zustand, Vite + Tailwind, deployed to GitHub Pages as a PWA.
+
+**Core data flow:**
+1. `planStore` — plan CRUD
+2. `historyStore` — rotation entries, overrides, extras
+3. `outcomeStore` — per-workout outcomes keyed by `workoutInstanceId`
+4. `programStore` — YAML plan progression variables
+5. `exerciseHistoryStore` — per-exercise session records
+6. `rotationEngine.ts` — pure functions computing today's workout
+
+**Key pages:** TodayPage (~1,212 lines), CalendarPage (~927 lines), HistoryPage (~985 lines)
+
+### What appears strong
+
+- `rotationEngine.ts` is pure functions, thoroughly tested, handles all edge cases
+- Plan CRUD migration is robust (historyStore v1, planStore v2)
+- All prior audit carry-forwards are handled well; the codebase has improved each pass
+- 845 tests across 20 files is substantial coverage for a client-only app of this complexity
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `logOutcomeWithProgression` step 2 has no try/catch — a progression-engine error propagates to TodayPage, leaving the outcome modal open and skipping the rotation advance | **Fixed** |
+| Low | `outcomeStore` has no `version` field in persist config — adding one in future without migrate would wipe all outcomes | **Fixed** |
+| Low | `deepCloneWorkoutSlot` shallow-clones `runConfig` object (not an array, but still a shared reference) | Recommendation only |
+| Low | CalendarPage retroactive date change silently overwrites outcome at target date with no warning | Recommendation only |
+| Info | TodayPage (1,212 lines), CalendarPage (927 lines) are large single files | Carry-forward |
+| Info | `loggingUpcoming` stores a stale `ResolvedDay` snapshot (should store just `calendarDate`) | Carry-forward |
+
+### Prioritized plan
+
+1. ✅ **try/catch in `logOutcomeWithProgression` step 2** — wrap run-progression calls so a bug in the engine never prevents modal close or rotation advance
+2. ✅ **Add `version: 1` to `outcomeStore` persist** — establishes migration baseline; safe no-op migration
+3. ✅ **Test: progression error recovery** — 3 new tests confirm outcome is saved and function does not throw when engine throws
+
+### Feature decision
+
+No feature added this pass. The audit found a concrete reliability gap (the try/catch issue) warranting focused attention. Codebase is already feature-rich. Candidate features for the next pass:
+1. "New PR" badge after logging a weights session (compare pre/post exercise records)
+2. Per-page error boundaries (low risk, high resilience gain)
+3. `runConfig` deep clone in `duplicatePlan` (small code change)
+
+### Rationale for sequencing
+
+Bug fix first (try/catch), then migration baseline (version field), then tests that guard the fix. No feature: audit findings indicated stabilization over growth for this pass.
+
+### Carried-forward risks
+
+- `TodayPage.tsx` (~1,212 lines) and `CalendarPage.tsx` (~927 lines) are large
+- `outcomeStore` cross-store calls inside `logOutcomeWithProgression`; coupling makes unit-testing harder
+- `loggingUpcoming` state in TodayPage stores a stale `ResolvedDay` (should store just `calendarDate`)
+- `computeWorkoutTypeBreakdown` credits only `slots[0]` per plan day
+
+---
+
 ## Pass 56 — 2026-06-13 (branch `claude/dreamy-mccarthy-qvt8m6`)
 
 ### Observations on entry

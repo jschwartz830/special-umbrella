@@ -1,5 +1,40 @@
 # Test Results
 
+## 2026-06-15 (fifty-seventh pass) — branch `claude/dreamy-mccarthy-vqeg2i`
+
+**Result: 848 passing, 0 failing** (+3 tests vs entry baseline of 845)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 21 (+1 new file) |
+| Tests on entry | 845 |
+| Tests on exit | 848 |
+| Delta | +3 |
+| Failures | 0 |
+
+### Tests reviewed
+
+All 20 existing test files confirmed clean on entry (845 passing). No pre-existing failures.
+
+### Tests added
+
+**`src/store/__tests__/outcomeStoreProgressionErrorRecovery.test.ts`** — new file, 3 tests:
+
+- `'saves the outcome even when run-progression evaluation throws'` — mocks `evaluateRunProgression` to throw, calls `logOutcomeWithProgression`, asserts the function does not propagate the error and the outcome is persisted.
+- `'does not create a progression state when the engine throws'` — same mock setup; asserts `progressionStates` remains empty (engine threw before `applyRunProgressionDecision` could produce a state).
+- `'saves the outcome with a progression recommendation even when run-progression throws'` — confirms step-1 (`buildProgressionRecommendation` → `setOutcome`) completes before the try/catch block is entered; outcome has correct `completionState`.
+
+These tests use `vi.mock('../../modules/run-adaptation/engine', ...)` to inject a throwing implementation. Module-level mocking is isolated to this file.
+
+### Areas still untested
+
+- `useActivePlan` midnight refresh — requires fake timers + hook test environment; not attempted.
+- `ProgramVarsPanel` NaN rendering — trivial ternary; validated by code inspection.
+- CalendarPage modal flows — require React Testing Library; component tests not in scope.
+- TodayPage `handleOutcomeConfirm` with a progression error — the new tests exercise the store in isolation; the full page integration path remains untested (would require mocking the store and rendering the page).
+
+---
+
 ## 2026-06-13 (fifty-sixth pass) — branch `claude/dreamy-mccarthy-qvt8m6`
 
 **Result: 845 passing, 0 failing** (+1 test vs entry baseline of 844)
