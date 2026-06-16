@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -2121,6 +2121,122 @@ describe('getStreakDatesSet', () => {
     // And computePlanStreak should walk them correctly → streak of 3
     const streak = computePlanStreak('plan-1', entries, [], TODAY)
     expect(streak).toBe(3)
+  })
+})
+
+// ── computeCurrentStreakDates ─────────────────────────────────────────────────
+
+describe('computeCurrentStreakDates', () => {
+  const TODAY = '2026-06-15'
+
+  function cse(date: string, action: HistoryEntry['action'], planId = 'plan-1'): HistoryEntry {
+    return {
+      id: `cse-${planId}-${date}`,
+      planId,
+      calendarDate: date,
+      planDayIndex: action === 'day_off' ? undefined : 0,
+      action,
+      createdAt: `${date}T12:00:00Z`,
+    }
+  }
+
+  function csx(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+    return {
+      id: `csx-${planId}-${date}`,
+      planId,
+      calendarDate: date,
+      workoutType: 'run',
+      workoutName: 'Run',
+      createdAt: `${date}T13:00:00Z`,
+    }
+  }
+
+  it('returns empty set when today has no qualifying activity', () => {
+    const result = computeCurrentStreakDates([], [], TODAY)
+    expect(result.size).toBe(0)
+  })
+
+  it('returns a set containing only today when streak is 1', () => {
+    const result = computeCurrentStreakDates([cse(TODAY, 'complete')], [], TODAY)
+    expect(result.size).toBe(1)
+    expect(result.has(TODAY)).toBe(true)
+  })
+
+  it('returns all consecutive streak dates back from today', () => {
+    const entries = [
+      cse('2026-06-13', 'complete'),
+      cse('2026-06-14', 'day_off'),
+      cse(TODAY, 'complete'),
+    ]
+    const result = computeCurrentStreakDates(entries, [], TODAY)
+    expect(result.size).toBe(3)
+    expect(result.has('2026-06-13')).toBe(true)
+    expect(result.has('2026-06-14')).toBe(true)
+    expect(result.has(TODAY)).toBe(true)
+  })
+
+  it('stops at a gap (day with no qualifying entry)', () => {
+    // Jun 12 has no entry → gap → streak starts Jun 13
+    const entries = [
+      cse('2026-06-11', 'complete'),
+      // Jun 12: gap
+      cse('2026-06-13', 'complete'),
+      cse('2026-06-14', 'complete'),
+      cse(TODAY, 'complete'),
+    ]
+    const result = computeCurrentStreakDates(entries, [], TODAY)
+    expect(result.size).toBe(3)
+    expect(result.has('2026-06-13')).toBe(true)
+    expect(result.has('2026-06-14')).toBe(true)
+    expect(result.has(TODAY)).toBe(true)
+    // Jun 11 is before the gap — not in the current streak
+    expect(result.has('2026-06-11')).toBe(false)
+  })
+
+  it('streak count equals size of returned set', () => {
+    const entries = [
+      cse('2026-06-13', 'complete'),
+      cse('2026-06-14', 'complete'),
+      cse(TODAY, 'complete'),
+    ]
+    const streakCount = computePlanStreak('plan-1', entries, [], TODAY)
+    const streakDates = computeCurrentStreakDates(entries, [], TODAY, 'plan-1')
+    expect(streakDates.size).toBe(streakCount)
+  })
+
+  it('extras extend the streak into the returned set', () => {
+    const extras = [csx('2026-06-14'), csx(TODAY)]
+    const result = computeCurrentStreakDates([], extras, TODAY)
+    expect(result.has('2026-06-14')).toBe(true)
+    expect(result.has(TODAY)).toBe(true)
+    expect(result.size).toBe(2)
+  })
+
+  it('respects planId scope when provided', () => {
+    const entries = [
+      cse('2026-06-14', 'complete', 'plan-1'),
+      cse(TODAY, 'complete', 'plan-1'),
+      cse('2026-06-13', 'complete', 'plan-2'),
+      cse('2026-06-14', 'complete', 'plan-2'),
+      cse(TODAY, 'complete', 'plan-2'),
+    ]
+    const plan1Dates = computeCurrentStreakDates(entries, [], TODAY, 'plan-1')
+    expect(plan1Dates.size).toBe(2)
+    expect(plan1Dates.has('2026-06-13')).toBe(false)
+
+    const plan2Dates = computeCurrentStreakDates(entries, [], TODAY, 'plan-2')
+    expect(plan2Dates.size).toBe(3)
+    expect(plan2Dates.has('2026-06-13')).toBe(true)
+  })
+
+  it('without planId, includes all plans in the streak', () => {
+    const entries = [
+      cse(TODAY, 'complete', 'plan-1'),
+      cse(TODAY, 'complete', 'plan-2'), // same date, different plan — deduped to one date
+    ]
+    const result = computeCurrentStreakDates(entries, [], TODAY)
+    expect(result.size).toBe(1)
+    expect(result.has(TODAY)).toBe(true)
   })
 })
 

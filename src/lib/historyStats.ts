@@ -566,6 +566,37 @@ export function computePlanStreak(
   return streak
 }
 
+// ── Current streak date set ───────────────────────────────────────────────────
+
+/**
+ * Return the set of YYYY-MM-DD dates that form the current consecutive streak.
+ *
+ * Walks backward from `today` (inclusive) through `getStreakDatesSet` dates
+ * until a gap is found, collecting each date. The result is the same set of
+ * dates that `computePlanStreak` counts; this variant surfaces the dates
+ * themselves so callers can highlight them in a calendar view.
+ *
+ * The same plan-scoping rules as `getStreakDatesSet` / `computePlanStreak`
+ * apply: pass `planId` to scope to one plan, or omit for the global streak.
+ *
+ * Returns an empty set when today has no qualifying activity.
+ */
+export function computeCurrentStreakDates(
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  today: string,
+  planId?: string | null,
+): Set<string> {
+  const streakable = getStreakDatesSet(entries, extras, planId)
+  const result = new Set<string>()
+  let cursor = today
+  while (streakable.has(cursor)) {
+    result.add(cursor)
+    cursor = shiftDay(cursor, -1)
+  }
+  return result
+}
+
 // ── Consecutive-skip counter ─────────────────────────────────────────────────
 
 /**
