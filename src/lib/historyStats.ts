@@ -397,6 +397,8 @@ export function computeWorkoutTypeBreakdown(
     if (e.action === 'day_off') continue
     if (e.planDayIndex === undefined || !planDaysById) continue
 
+    // Only the primary (first) slot type is attributed — dual-slot days
+    // (e.g. weights + run) contribute to the first slot's type only.
     const type = planDaysById.get(e.planDayIndex)?.slots[0]?.type ?? null
     if (!type) continue
 
