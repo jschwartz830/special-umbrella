@@ -568,6 +568,21 @@ describe('isPlanExpired', () => {
       ]
       expect(isPlanExpired(plan, entries, '2026-01-02')).toBe(true)
     })
+
+    it('does not count duplicate entries for the same date as two completions', () => {
+      // If two entries share the same calendarDate (e.g. after an unusual import),
+      // only one rotation slot should be credited — matching the rotation engine's
+      // one-advancement-per-date rule. A 2-day plan needing 1 rotation = 2 unique
+      // dates required; one date with two entries must not satisfy the requirement.
+      const plan = makePlan(2, { duration: { type: 'rotations', value: 1 } })
+      const entries: HistoryEntry[] = [
+        // Two entries for Jan 1 — should count as one completed date
+        { id: 'e1', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T08:00:00Z' },
+        { id: 'e2', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T18:00:00Z' },
+      ]
+      // Only 1 unique date completed out of 2 needed → not expired
+      expect(isPlanExpired(plan, entries, '2026-01-02')).toBe(false)
+    })
   })
 })
 
