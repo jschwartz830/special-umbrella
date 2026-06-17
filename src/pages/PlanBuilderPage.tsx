@@ -613,6 +613,18 @@ function SlotEditor({
                       <p className="text-[10px] text-slate-400 uppercase tracking-wide">Progression</p>
                     </div>
 
+                    {/* Superset group */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500">Superset group (optional)</label>
+                      <input
+                        type="text"
+                        value={ex.supersetGroupId ?? ''}
+                        onChange={e => updateExercise(i, { supersetGroupId: e.target.value.trim() || undefined })}
+                        placeholder="e.g. A  — same label pairs exercises"
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                      />
+                    </div>
+
                     {/* Progression type selector */}
                     <div className="space-y-1">
                       <div className="flex gap-2 items-end">

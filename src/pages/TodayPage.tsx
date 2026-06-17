@@ -933,6 +933,7 @@ export function TodayPage() {
           calendarDate={today}
           planDay={primaryPlanDay}
           previousSetsByExercise={previousSetsByExercise}
+          isFromActiveWorkout={!!activeTrackedExercises}
           existingOutcome={
             activeTrackedExercises
               ? {
