@@ -1,4 +1,42 @@
-# Overnight Changelog — 2026-06-16
+# Overnight Changelog — 2026-06-17
+
+## [1] Fix: deduplicate same-date entries in `computePlanProgress` (rotations)
+
+**Summary**: `computePlanProgress` for rotation-based plans now counts unique calendar dates via `new Set(...)` before dividing by `plan.days.length`, matching the deduplication contract already in `isPlanExpired` (fixed in pass 58).
+
+**Why it matters**: `isPlanExpired` uses `Set`-based deduplication so that two entries on the same date (e.g. from a re-imported CSV) count as one rotation advancement. `computePlanProgress` was still using `planEntries.length` (raw count), creating an inconsistency: progress % could appear higher than what the engine would consider "completed." For a 2-day plan with 4 entries but only 3 unique dates, the old code produced `floor(4/2) = 2` rotations (100%), while `isPlanExpired` correctly computed `floor(3/2) = 1` rotation (50%).
+
+**Files changed**: `src/lib/historyStats.ts` (~6 lines), `src/lib/__tests__/historyStats.test.ts` (+15 lines, 1 new test)
+
+**Rollback**: `git revert <sha>` on the "fix computePlanProgress deduplication" commit
+
+---
+
+## [2] Docs: fix misleading JSDoc in `resolveQuantityString` for `"10m"`
+
+**Summary**: The `resolveQuantityString` JSDoc incorrectly stated that `"10m"` returns `{ unit: 'min' }` (minutes). The regex `mi|km|m|s|min|h` matches `'m'` first (before `'min'`), so `"10m"` always returns `{ unit: 'm' }` (meters). Updated comment and noted that `"10min"` is required for minutes.
+
+**Why it matters**: Any caller relying on the documented behavior for `"10m"` → minutes would be surprised at runtime. The corrected documentation prevents misuse of the API.
+
+**Files changed**: `src/lib/expressionEval.ts` (1 comment line), `src/lib/__tests__/expressionEval.test.ts` (+4 lines, 1 new test)
+
+**Rollback**: `git revert <sha>` on the "fix resolveQuantityString doc" commit
+
+---
+
+## [3] Feature: add `findBestWeek` utility to `historyStats.ts`
+
+**Summary**: New exported function `findBestWeek(planId, entries, extras)` returns the `WeeklyBreakdown` with the highest `completed + extras` count across all recorded weeks for a given plan. Returns `null` if there are no entries. Delegates week computation to the existing `computeWeeklyBreakdown`.
+
+**Why it matters**: The weekly breakdown table already exists on the History page but there is no programmatic way to surface "your best week" for stats displays, motivational banners, or future PR-style callouts. This function fills that gap as a pure utility with no side effects.
+
+**Files changed**: `src/lib/historyStats.ts` (+26 lines), `src/lib/__tests__/historyStats.test.ts` (+120 lines, 11 new tests)
+
+**Rollback**: `git revert <sha>` on the "add findBestWeek utility" commit — purely additive, no callers to update.
+
+---
+
+## Pass 58 — 2026-06-16
 
 ## [1] Fix: deduplicate entries by date in `isPlanExpired` rotations path
 

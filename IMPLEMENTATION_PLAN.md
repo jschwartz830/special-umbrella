@@ -1,5 +1,47 @@
 # Implementation Plan
 
+## Pass 59 — 2026-06-17 (branch `claude/dreamy-mccarthy-b5jqs3`)
+
+### Observations on entry
+
+- Baseline on entry: **869 passing, 0 failing** — clean baseline inherited from pass 58.
+- Pass 58 fixed `isPlanExpired` deduplication, extracted `getStreakDatesSet` helper, added `computeCurrentStreakDates`. No new issues introduced.
+- Full codebase audit performed: all stores, lib utilities, test files, and the YAML expression evaluator.
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `computePlanProgress` for rotations used `planEntries.length` (raw count) but `isPlanExpired` uses `new Set().size` (unique dates). Duplicate entries for the same date would inflate progress counter. | **Fixed** |
+| Low | `resolveQuantityString` JSDoc claimed `"10m"` returns `unit: 'min'` (minutes). The regex `mi|km|m|s|min|h` matches `'m'` first (meters). Misleading doc. | **Fixed** |
+| — | No `findBestWeek` utility for surfacing the user's best training week in stats/UI. | **Added** |
+
+### Decisions
+
+1. **Fix `computePlanProgress` deduplication** (BUG FIX): Use `new Set(...)` to deduplicate calendar dates before counting rotation completions, mirroring `isPlanExpired`. Duplicate entries for the same date (e.g. from re-imported CSV) now no longer inflate the counter.
+
+2. **Fix `resolveQuantityString` JSDoc** (DOCS): Correct the comment to say `"10m"` returns `{ unit: 'm' }` (meters), and add a note that `"10min"` is required for minutes.
+
+3. **Add `findBestWeek` utility** (FEATURE): Pure function in `historyStats.ts` returning the `WeeklyBreakdown` with the highest `completed + extras` count across all recorded weeks for a given plan. Additive, no existing callers changed. 11 tests covering edge cases.
+
+4. **Add regression tests** (TESTS): 
+   - Deduplication test for `computePlanProgress` (4 raw entries, 3 unique dates → 1 rotation, not 2)
+   - `"10m"` unit test confirming `resolveQuantityString('10m') → { unit: 'm' }`
+   - 11 tests for `findBestWeek`
+
+### Risk assessment
+
+All changes are confined to `src/lib/historyStats.ts`, `src/lib/expressionEval.ts`, and their test files. No component files touched. All changes are additive (new exports, doc fixes, test coverage). Zero new dependencies.
+
+| Change | Risk | Rollback |
+|--------|------|---------|
+| `computePlanProgress` dedup fix | Low — only affects plans with duplicate same-date entries (unusual) | `git revert <sha>` |
+| JSDoc comment fix | None — comment only | `git revert <sha>` |
+| `findBestWeek` new export | None — additive, no existing callers modified | `git revert <sha>` |
+| New tests | None | `git revert <sha>` |
+
+---
+
 ## Pass 58 — 2026-06-16 (branch `claude/dreamy-mccarthy-b56q6q`)
 
 ### Observations on entry

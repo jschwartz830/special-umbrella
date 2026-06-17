@@ -1,5 +1,38 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-17 (fifty-ninth pass) — branch `claude/dreamy-mccarthy-b5jqs3`
+
+### Executive summary
+
+1. **What changed:** One bug fix, one doc correction, one new utility, and 13 new tests. (1) Bug fix: `computePlanProgress` for rotations now uses Set-based date deduplication, consistent with `isPlanExpired`. (2) Doc fix: `resolveQuantityString` JSDoc corrected — `"10m"` returns meters not minutes. (3) Feature: `findBestWeek` pure function added to `historyStats.ts`. (4) Tests: 13 new tests (1 dedup regression, 1 `"10m"` unit test, 11 `findBestWeek` scenarios).
+
+2. **Highest confidence:** The `computePlanProgress` dedup fix — it is a 1-to-1 mirror of the same fix applied to `isPlanExpired` in pass 58. The inconsistency between these two functions was the primary audit finding. The `resolveQuantityString` doc fix is trivially verifiable by reading the regex.
+
+3. **What is risky:** Nothing in this pass is risky. The `computePlanProgress` fix only changes the result for plans where duplicate same-date entries exist (unusual in practice; only reachable via re-imported CSV or a transient store edge case). `findBestWeek` has no callers yet, so it cannot break anything.
+
+4. **What to review first:** The `computePlanProgress` change in `historyStats.ts` — confirm the Set filter uses the same predicate as `isPlanExpired` (action `complete` or `skip`, calendarDate ≤ today). Then check the deduplication regression test to confirm the before/after values match the expected math.
+
+### Biggest issues found
+
+- **`computePlanProgress` / `isPlanExpired` inconsistency** — now fixed. The two functions agreed on the rotation total (plan.days.length × rotations) but disagreed on how to count completions. `isPlanExpired` deduplicated same-date entries; `computePlanProgress` counted raw entries. After a re-import, progress could display 100% while the engine still considered the plan active.
+
+### Improvements completed
+
+| Change | Classification | File(s) |
+|--------|---------------|---------|
+| Fix `computePlanProgress` rotation dedup | **Keep** | `src/lib/historyStats.ts` |
+| Fix `resolveQuantityString` JSDoc | **Keep** | `src/lib/expressionEval.ts` |
+| Add `findBestWeek` utility | **Keep** | `src/lib/historyStats.ts` |
+| Add regression + feature tests | **Keep** | `src/lib/__tests__/historyStats.test.ts`, `src/lib/__tests__/expressionEval.test.ts` |
+
+### Not implemented (documented carry-forwards)
+
+- **`buildWeightsRecommendation` uses only `exercises[0].progressionMode`** — for multi-exercise plans with mixed progression modes, the wrong mode may be applied to some exercises. Medium-complexity fix requiring a per-exercise recommendation; deferred.
+- **`duplicatePlan` returns `''` on not-found instead of `null`** — fragile caller contract. Deferred (API change).
+- **`addExtraEntry` source field not enforced** — v0→v1 migration handles pre-existing extras; new extras must set source explicitly. Low risk; document-only.
+
+---
+
 ## 2026-06-15 (fifty-seventh pass) — branch `claude/dreamy-mccarthy-vqeg2i`
 
 ### Executive summary
