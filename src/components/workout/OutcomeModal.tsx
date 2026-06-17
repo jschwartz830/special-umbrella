@@ -39,6 +39,7 @@ interface Props {
   existingOutcome?: WorkoutOutcome | null
   workoutInstanceId?: string
   previousSetsByExercise?: Record<string, LoggedSetActual[]>
+  isFromActiveWorkout?: boolean
   onConfirm: (outcome: WorkoutOutcome) => void
   onClose: () => void
 }
@@ -104,6 +105,12 @@ function resolveRepsFromVars(
   // Only resolve pure identifiers — not ranges ("6-10"), AMRAP ("5+"), or literals ("8")
   if (/^[a-zA-Z_]\w*$/.test(trimmed) && trimmed in vars) return vars[trimmed]
   return reps
+}
+
+function autoDetectCompletionState(exercises: LoggedExerciseActual[]): WorkoutCompletionState {
+  if (!exercises.length) return 'completed'
+  const allComplete = exercises.every(ex => ex.sets.every(s => s.completed))
+  return allComplete ? 'completed' : 'partially_completed'
 }
 
 function parseNumericLoad(load?: string): number | null {
@@ -184,6 +191,7 @@ export function OutcomeModal({
   existingOutcome,
   workoutInstanceId,
   previousSetsByExercise,
+  isFromActiveWorkout = false,
   onConfirm,
   onClose,
 }: Props) {
@@ -198,11 +206,15 @@ export function OutcomeModal({
   const hasSwim = swimSlot != null
 
   const existingState = existingOutcome?.completionState
+  const autoState = isFromActiveWorkout && existingOutcome?.weightsActual?.exercises?.length
+    ? autoDetectCompletionState(existingOutcome.weightsActual.exercises)
+    : null
   const [completionState, setCompletionState] = useState<WorkoutCompletionState>(
-    existingState === 'completed' || existingState === 'partially_completed'
+    autoState ?? (existingState === 'completed' || existingState === 'partially_completed'
       ? existingState
-      : 'completed',
+      : 'completed'),
   )
+  const [showEditSets, setShowEditSets] = useState(false)
   const [effort, setEffort] = useState<PerceivedEffort | null>(existingOutcome?.perceivedEffort ?? null)
   const [durationMin, setDurationMin] = useState<string>(existingOutcome?.durationActualMin?.toString() ?? '')
   const [notes, setNotes] = useState<string>(existingOutcome?.notes ?? '')
@@ -356,57 +368,108 @@ export function OutcomeModal({
 
         {hasWeights && (
           <div className="space-y-3 border border-slate-700 rounded-xl p-3">
-            <p className="text-xs text-slate-500 uppercase tracking-wide font-medium flex items-center gap-1">
-              <Dumbbell size={11} /> Weights Set Tracking
-            </p>
-            <p className="text-xs text-slate-400">Completed sets: {completedWeightSets}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium flex items-center gap-1">
+                <Dumbbell size={11} /> Weights
+              </p>
+              {isFromActiveWorkout && (
+                <button
+                  onClick={() => setShowEditSets(v => !v)}
+                  className="text-[10px] text-slate-400 underline underline-offset-2 hover:text-slate-200"
+                >
+                  {showEditSets ? 'Hide details' : 'Edit sets'}
+                </button>
+              )}
+            </div>
 
-            {weightExercises.map((exercise, exIndex) => (
-              <div key={exercise.exercise + exIndex} className="space-y-2 bg-slate-800/40 rounded-lg p-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm text-slate-200 font-medium">{exercise.exercise}</p>
-                </div>
-
-                <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
-                  <span className="col-span-1 text-center">#</span>
-                  <span className="col-span-3 text-center">Prev</span>
-                  <span className="col-span-3 text-center">Reps</span>
-                  <span className="col-span-3 text-center">Lbs</span>
-                  <span className="col-span-3 text-center">Done</span>
-                </div>
-
-                {exercise.sets.map((set, setIndex) => {
-                  const prev = previousSetsByExercise?.[exercise.exercise]?.[setIndex]
-                  const prevText = prev && prev.actualReps != null && prev.actualLoad != null
-                    ? `${prev.actualReps} x ${prev.actualLoad}lb`
-                    : '-'
+            {isFromActiveWorkout && !showEditSets ? (
+              // Summary view for post-active-workout
+              <div className="space-y-2">
+                {weightExercises.map((exercise, exIndex) => {
+                  const doneSets = exercise.sets.filter(s => s.completed).length
+                  const totalSets = exercise.sets.length
+                  const loads = exercise.sets.filter(s => s.completed && s.actualLoad != null).map(s => s.actualLoad!)
+                  const minLoad = loads.length ? Math.min(...loads) : null
+                  const maxLoad = loads.length ? Math.max(...loads) : null
+                  const loadStr = minLoad != null
+                    ? (minLoad === maxLoad ? `${minLoad}lb` : `${minLoad}–${maxLoad}lb`)
+                    : null
+                  const repsArr = exercise.sets.filter(s => s.completed && s.actualReps != null).map(s => s.actualReps!)
+                  const minReps = repsArr.length ? Math.min(...repsArr) : null
+                  const maxReps = repsArr.length ? Math.max(...repsArr) : null
+                  const repsStr = minReps != null
+                    ? (minReps === maxReps ? `${minReps} reps` : `${minReps}–${maxReps} reps`)
+                    : null
                   return (
-                  <div key={setIndex} className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 items-center text-xs">
-                    <span className="col-span-1 text-center text-slate-400">{setIndex + 1}</span>
-                    <span className="col-span-3 text-center text-slate-500 text-[10px]">{prevText}</span>
-                    <NumericInputField
-                      value={set.actualReps ?? null}
-                      onChange={v => updateSet(exIndex, setIndex, { actualReps: v })}
-                      placeholder={String(set.targetReps ?? 'reps')}
-                      integerOnly
-                      className="col-span-3"
-                    />
-                    <NumericInputField
-                      value={set.actualLoad ?? null}
-                      onChange={v => updateSet(exIndex, setIndex, { actualLoad: v })}
-                      placeholder={parseNumericLoad(set.targetLoad ?? undefined)?.toString() ?? 'lbs'}
-                      className="col-span-3"
-                    />
-                    <button
-                      onClick={() => updateSet(exIndex, setIndex, { completed: !set.completed })}
-                      className={`col-span-3 px-1.5 py-1 rounded border ${set.completed ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-slate-700 border-slate-600 text-slate-400'}`}
-                    >
-                      {set.completed ? 'Completed' : 'Mark'}
-                    </button>
-                  </div>
-                )})}
+                    <div key={exercise.exercise + exIndex} className="flex items-center gap-2 bg-slate-800/40 rounded-lg px-2.5 py-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-200 font-medium truncate">{exercise.exercise}</p>
+                        {repsStr && loadStr && (
+                          <p className="text-[11px] text-slate-400 mt-0.5">{repsStr} @ {loadStr}</p>
+                        )}
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${doneSets === totalSets ? 'text-emerald-300 bg-emerald-500/15' : 'text-yellow-300 bg-yellow-500/15'}`}>
+                        {doneSets}/{totalSets} sets
+                      </span>
+                    </div>
+                  )
+                })}
+                <p className="text-xs text-slate-500 text-center pt-0.5">
+                  {completedWeightSets} of {weightExercises.flatMap(e => e.sets).length} sets completed
+                </p>
               </div>
-            ))}
+            ) : (
+              // Full editable set table
+              <>
+                <p className="text-xs text-slate-400">Completed sets: {completedWeightSets}</p>
+                {weightExercises.map((exercise, exIndex) => (
+                  <div key={exercise.exercise + exIndex} className="space-y-2 bg-slate-800/40 rounded-lg p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-slate-200 font-medium">{exercise.exercise}</p>
+                    </div>
+
+                    <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
+                      <span className="col-span-1 text-center">#</span>
+                      <span className="col-span-3 text-center">Prev</span>
+                      <span className="col-span-3 text-center">Reps</span>
+                      <span className="col-span-3 text-center">Lbs</span>
+                      <span className="col-span-3 text-center">Done</span>
+                    </div>
+
+                    {exercise.sets.map((set, setIndex) => {
+                      const prev = previousSetsByExercise?.[exercise.exercise]?.[setIndex]
+                      const prevText = prev && prev.actualReps != null && prev.actualLoad != null
+                        ? `${prev.actualReps} x ${prev.actualLoad}lb`
+                        : '-'
+                      return (
+                      <div key={setIndex} className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 items-center text-xs">
+                        <span className="col-span-1 text-center text-slate-400">{setIndex + 1}</span>
+                        <span className="col-span-3 text-center text-slate-500 text-[10px]">{prevText}</span>
+                        <NumericInputField
+                          value={set.actualReps ?? null}
+                          onChange={v => updateSet(exIndex, setIndex, { actualReps: v })}
+                          placeholder={String(set.targetReps ?? 'reps')}
+                          integerOnly
+                          className="col-span-3"
+                        />
+                        <NumericInputField
+                          value={set.actualLoad ?? null}
+                          onChange={v => updateSet(exIndex, setIndex, { actualLoad: v })}
+                          placeholder={parseNumericLoad(set.targetLoad ?? undefined)?.toString() ?? 'lbs'}
+                          className="col-span-3"
+                        />
+                        <button
+                          onClick={() => updateSet(exIndex, setIndex, { completed: !set.completed })}
+                          className={`col-span-3 px-1.5 py-1 rounded border ${set.completed ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300' : 'bg-slate-700 border-slate-600 text-slate-400'}`}
+                        >
+                          {set.completed ? 'Completed' : 'Mark'}
+                        </button>
+                      </div>
+                    )})}
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
 

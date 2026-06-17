@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight } from 'lucide-react'
+import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2 } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
 import type { ExerciseSpec, WarmupRampSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
@@ -27,6 +27,8 @@ interface ExerciseTrackState {
   sets: SetTrackState[]
   previousSets?: LoggedSetActual[]
   addedDuringWorkout?: boolean
+  progressionMode?: string
+  supersetGroupId?: string
 }
 
 
@@ -51,6 +53,34 @@ function warmupRepsForIndex(warmup: ExerciseSpec['warmup'], index: number): numb
   const explicit = warmupRampObject(warmup)?.reps?.[index]
   if (explicit != null) return explicit
   return [8, 5, 3, 2, 1][index] ?? 1
+}
+
+function deriveProgressionMode(progressionType?: string, hasProgressRule?: boolean): string | undefined {
+  if (!progressionType && !hasProgressRule) return undefined
+  if (progressionType === 'double' || progressionType === 'dynamic_double') return 'double'
+  if (progressionType === 'triple') return 'volume'
+  if (progressionType === 'step_loading') return 'maintenance'
+  return 'single'
+}
+
+function parseRepRange(reps: number | string | null | undefined): { low: number; high: number } | null {
+  if (reps == null || typeof reps === 'number') return null
+  const m = reps.match(/^\s*(\d+)\s*[-–]\s*(\d+)\s*$/)
+  if (!m) return null
+  return { low: parseInt(m[1]), high: parseInt(m[2]) }
+}
+
+function resolveDoubleProgressionTarget(
+  reps: number | string | null | undefined,
+  prevReps: number | null | undefined,
+): number | string | null {
+  if (reps == null) return null
+  const range = parseRepRange(reps)
+  if (!range) return typeof reps === 'string' ? reps : reps
+  const { low, high } = range
+  if (prevReps == null) return low
+  if (prevReps >= high) return low
+  return Math.min(prevReps + 1, high)
 }
 
 function resolveActualReps(actualReps: number | null, targetReps: number | string | null): number | null {
@@ -210,7 +240,10 @@ function ExercisePicker({
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-slate-900">
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-slate-800">
+      <div
+        className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 border-b border-slate-800"
+        style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}
+      >
         <button
           onClick={onClose}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
@@ -275,7 +308,7 @@ function ExercisePicker({
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }}>
         {!showCustom ? (
           <button
             onClick={() => setShowCustom(true)}
@@ -378,6 +411,7 @@ export function ActiveWorkoutTracker({
   const [setTimerCountdown, setSetTimerCountdown] = useState<{ exIdx: number; setIdx: number; remaining: number } | null>(null)
   const [suppressedExercises, setSuppressedExercises] = useState<Set<number>>(() => new Set())
   const [revealedSets, setRevealedSets] = useState<Set<string>>(() => new Set())
+  const [supersetPicker, setSupersetPicker] = useState<number | null>(null) // exIdx being assigned
 
   const hasVars = Object.keys(programVars).length > 0
   const evalCtx: EvalContext = { vars: programVars }
@@ -405,6 +439,13 @@ export function ActiveWorkoutTracker({
       setSetTimerCountdown(null)
       activeSetRef.current = { exIdx, setIdx }
       setActiveSetTimer({ exIdx, setIdx })
+      // Play a "go" chirp — two ascending tones signal the start of the set
+      const ctx = getAudioContext()
+      if (ctx) {
+        const now = ctx.currentTime + 0.02
+        scheduleTone(ctx, 880, now, 0.08, 0.55, 'triangle')
+        scheduleTone(ctx, 1174, now + 0.09, 0.1, 0.55, 'triangle')
+      }
       return
     }
     const id = setTimeout(() => {
@@ -447,17 +488,25 @@ export function ActiveWorkoutTracker({
       const prevEx = previousSetsByExercise?.[ex.exercise]
         ?? previousOutcome?.weightsActual?.exercises?.find(e => e.exercise === ex.exercise)?.sets
 
-      function buildSet(load?: string | null, reps?: number | string | null, rest?: string | null): SetTrackState {
+      const progressionMode = ex.__isWarmup
+        ? undefined
+        : deriveProgressionMode(ex.progressionType, ex.progress != null)
+      const isDouble = progressionMode === 'double'
+
+      function buildSet(load?: string | null, reps?: number | string | null, rest?: string | null, workSetIndex?: number): SetTrackState {
         const resolvedLoadLbs = hasVars
           ? (resolveLoad(load ?? undefined, evalCtx) ?? parseNumericLoad(load))
           : parseNumericLoad(load)
         const validLoad = resolvedLoadLbs != null && resolvedLoadLbs > 0 ? resolvedLoadLbs : null
+        // For double progression, resolve a specific rep target from previous performance
+        const prevReps = workSetIndex != null ? prevEx?.[workSetIndex + (warmupSets?.length ?? 0)]?.actualReps : undefined
+        const effectiveReps = isDouble ? resolveDoubleProgressionTarget(reps, prevReps) : reps
         return {
           setElapsedSeconds: 0,
           completed: false,
-          actualReps: typeof reps === 'number' ? reps : null,
+          actualReps: typeof effectiveReps === 'number' ? effectiveReps : null,
           actualLoad: validLoad,
-          targetReps: reps ?? null,
+          targetReps: effectiveReps ?? null,
           targetLoad: load ?? null,
           restSeconds: parseRestSecs(rest),
           actualRestSeconds: null,
@@ -465,6 +514,7 @@ export function ActiveWorkoutTracker({
         }
       }
 
+      // Build warmup sets first so we know the offset for work set index lookup
       const warmupSets: SetTrackState[] = !ex.__isWarmup && ex.load
         ? parseWarmupPercentages(ex.warmup).map((pct, i) => buildSet(
             `${pct / 100} * (${ex.load})`,
@@ -476,7 +526,7 @@ export function ActiveWorkoutTracker({
       let sets: SetTrackState[]
       if (Array.isArray(ex.sets) && ex.sets.length > 0) {
         const workSets = ex.sets.map((s, i) => {
-          const base = buildSet(s.load ?? ex.load, s.reps ?? ex.reps, s.rest ?? ex.rest)
+          const base = buildSet(s.load ?? ex.load, s.reps ?? ex.reps, s.rest ?? ex.rest, i)
           const prev = prevEx?.[i + warmupSets.length]
           return {
             ...base,
@@ -488,7 +538,7 @@ export function ActiveWorkoutTracker({
       } else {
         const n = typeof ex.sets === 'number' ? ex.sets : 3
         const workSets = Array.from({ length: n }, (_, i) => {
-          const base = buildSet(ex.load, ex.reps, ex.rest)
+          const base = buildSet(ex.load, ex.reps, ex.rest, i)
           const prev = prevEx?.[i + warmupSets.length]
           return {
             ...base,
@@ -504,6 +554,8 @@ export function ActiveWorkoutTracker({
         isWarmup: ex.__isWarmup,
         sets,
         previousSets: prevEx,
+        progressionMode,
+        supersetGroupId: ex.supersetGroupId,
       }
     })
   })
@@ -710,14 +762,14 @@ export function ActiveWorkoutTracker({
 
     if (targetSeconds > 15 && remainingToWoodBlock > 0) {
       // Single wood-block: percussive transient with a touch of layered timbre for body.
-      nodes.push(scheduleTone(ctx, 880, base + remainingToWoodBlock, 0.045, 0.28, 'triangle'))
-      nodes.push(scheduleTone(ctx, 440, base + remainingToWoodBlock + 0.005, 0.04, 0.14, 'triangle'))
+      nodes.push(scheduleTone(ctx, 880, base + remainingToWoodBlock, 0.045, 0.55, 'triangle'))
+      nodes.push(scheduleTone(ctx, 440, base + remainingToWoodBlock + 0.005, 0.04, 0.28, 'triangle'))
     }
     if (remainingToEnd > 0) {
-      nodes.push(scheduleTone(ctx, 920, base + remainingToEnd, 0.2, 0.22, 'square'))
-      nodes.push(scheduleTone(ctx, 1380, base + remainingToEnd, 0.05, 0.08, 'triangle'))
-      nodes.push(scheduleTone(ctx, 1046.5, base + remainingToEnd + 0.24, 0.28, 0.16))
-      nodes.push(scheduleTone(ctx, 1568, base + remainingToEnd + 0.40, 0.38, 0.14))
+      nodes.push(scheduleTone(ctx, 920, base + remainingToEnd, 0.2, 0.44, 'square'))
+      nodes.push(scheduleTone(ctx, 1380, base + remainingToEnd, 0.05, 0.16, 'triangle'))
+      nodes.push(scheduleTone(ctx, 1046.5, base + remainingToEnd + 0.24, 0.28, 0.32))
+      nodes.push(scheduleTone(ctx, 1568, base + remainingToEnd + 0.40, 0.38, 0.28))
     }
     scheduledRestNodesRef.current = nodes
 
@@ -735,8 +787,8 @@ export function ActiveWorkoutTracker({
       const ctx = getAudioContext()
       if (ctx) {
         const now = ctx.currentTime + 0.02
-        scheduleTone(ctx, 880, now, 0.045, 0.28, 'triangle')
-        scheduleTone(ctx, 440, now + 0.025, 0.04, 0.14, 'triangle')
+        scheduleTone(ctx, 880, now, 0.045, 0.55, 'triangle')
+        scheduleTone(ctx, 440, now + 0.025, 0.04, 0.28, 'triangle')
       }
     }
     if (elapsedSeconds >= targetSeconds && !restAlertedRef.current) {
@@ -744,10 +796,10 @@ export function ActiveWorkoutTracker({
       const ctx = getAudioContext()
       if (ctx) {
         const now = ctx.currentTime + 0.02
-        scheduleTone(ctx, 920, now, 0.2, 0.22, 'square')
-        scheduleTone(ctx, 1380, now, 0.05, 0.08, 'triangle')
-        scheduleTone(ctx, 1046.5, now + 0.24, 0.28, 0.16)
-        scheduleTone(ctx, 1568, now + 0.40, 0.38, 0.14)
+        scheduleTone(ctx, 920, now, 0.2, 0.44, 'square')
+        scheduleTone(ctx, 1380, now, 0.05, 0.16, 'triangle')
+        scheduleTone(ctx, 1046.5, now + 0.24, 0.28, 0.32)
+        scheduleTone(ctx, 1568, now + 0.40, 0.38, 0.28)
       }
     }
   }
@@ -814,25 +866,12 @@ export function ActiveWorkoutTracker({
     return () => clearInterval(id)
   }, [])
 
-  // On resume from background/lock, reconcile timers against system clock rather than
-  // relying on throttled setInterval ticks. While hidden, re-arm the alert flags so any
-  // pre-scheduled tones that didn't actually fire (iOS suspends AudioContext when hidden
-  // unless audio is actively playing) can still be picked up by maybeAlertForRest on resume.
+  // On resume from background/lock, reconcile timers against the system clock rather than
+  // relying on throttled setInterval ticks. We do NOT reset the alert flags on hide —
+  // scheduleRestAudio already set them to true and the audio keepalive keeps the AudioContext
+  // alive so the pre-scheduled tones fire in the background. Resetting the flags would cause
+  // the fallback to double-fire when the user tabs back in.
   useEffect(() => {
-    const onVisibility = () => {
-      if (document.hidden) {
-        if (restRunRef.current) {
-          // Only reset alert flags if we haven't yet reached those thresholds — avoids
-          // double-firing when the pre-scheduled AudioContext tone already played in background
-          const elapsed = restElapsedRef.current ?? 0
-          const target = restTargetRef.current ?? 0
-          if (elapsed < target - 15) restWarningAlertedRef.current = false
-          if (elapsed < target) restAlertedRef.current = false
-        }
-        return
-      }
-      reconcileTimers()
-    }
     const reconcileTimers = () => {
       if (workoutRunRef.current) {
         const { elapsed, time } = workoutWallBaseRef.current
@@ -846,15 +885,15 @@ export function ActiveWorkoutTracker({
         restElapsedRef.current = actual
         restWallBaseRef.current = { elapsed: actual, time: Date.now() }
         setRestElapsed(actual)
-        maybeAlertForRest(actual)
         void acquireWakeLock()
       }
     }
+    const onVisibility = () => {
+      if (!document.hidden) reconcileTimers()
+    }
     document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('focus', reconcileTimers)
     return () => {
       document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('focus', reconcileTimers)
     }
   }, [])
 
@@ -982,6 +1021,45 @@ export function ActiveWorkoutTracker({
     recordRestElapsed()
   }
 
+  const SUPERSET_COLORS = ['amber', 'sky', 'purple', 'emerald', 'rose', 'orange'] as const
+  type SupersetColor = typeof SUPERSET_COLORS[number]
+
+  const supersetGroups = useMemo(() => {
+    const map = new Map<string, { label: string; color: SupersetColor }>()
+    exercises.forEach(ex => {
+      if (ex.supersetGroupId && !map.has(ex.supersetGroupId)) {
+        const idx = map.size % SUPERSET_COLORS.length
+        const label = String.fromCharCode(65 + map.size) // A, B, C...
+        map.set(ex.supersetGroupId, { label, color: SUPERSET_COLORS[idx] })
+      }
+    })
+    return map
+  }, [exercises])
+
+  function assignSuperset(exIdx: number, groupId: string | null) {
+    setExercises(prev => prev.map((ex, ei) =>
+      ei !== exIdx ? ex : { ...ex, supersetGroupId: groupId ?? undefined }
+    ))
+    setSupersetPicker(null)
+  }
+
+  function createAndAssignSuperset(exIdx: number) {
+    const newId = `ss_${Date.now()}`
+    assignSuperset(exIdx, newId)
+  }
+
+  function getColorClasses(color: SupersetColor): { border: string; badge: string; text: string } {
+    const map: Record<SupersetColor, { border: string; badge: string; text: string }> = {
+      amber:   { border: 'border-amber-500/40',   badge: 'bg-amber-500/15 text-amber-300',   text: 'text-amber-300' },
+      sky:     { border: 'border-sky-500/40',     badge: 'bg-sky-500/15 text-sky-300',       text: 'text-sky-300' },
+      purple:  { border: 'border-purple-500/40',  badge: 'bg-purple-500/15 text-purple-300', text: 'text-purple-300' },
+      emerald: { border: 'border-emerald-500/40', badge: 'bg-emerald-500/15 text-emerald-300', text: 'text-emerald-300' },
+      rose:    { border: 'border-rose-500/40',    badge: 'bg-rose-500/15 text-rose-300',     text: 'text-rose-300' },
+      orange:  { border: 'border-orange-500/40',  badge: 'bg-orange-500/15 text-orange-300', text: 'text-orange-300' },
+    }
+    return map[color]
+  }
+
   function handleSetTimerToggle(exIdx: number, setIdx: number) {
     if (!workoutRunning || !isActiveSet(exIdx, setIdx)) return
     const set = exercises[exIdx]?.sets[setIdx]
@@ -1104,8 +1182,23 @@ export function ActiveWorkoutTracker({
 
   function getProgressionPreview(ex: ExerciseTrackState): string[] | null {
     if (ex.isWarmup) return null
+    if (!ex.progressionMode) return null
     const workingSets = ex.sets.filter(s => !s.isWarmup)
     if (workingSets.length === 0 || !workingSets.every(s => s.completed)) return null
+
+    // Only show progression if the user actually met the target load and reps on every set
+    const allMetTarget = workingSets.every(s => {
+      const targetLoad = s.resolvedLoadLbs
+      if (targetLoad != null && targetLoad > 0) {
+        if (s.actualLoad == null || s.actualLoad < targetLoad) return false
+      }
+      if (typeof s.targetReps === 'number' && s.targetReps > 0) {
+        if (s.actualReps == null || s.actualReps < s.targetReps) return false
+      }
+      return true
+    })
+    if (!allMetTarget) return null
+
     const lines = workingSets.map((s, i) => {
       const load = s.resolvedLoadLbs ?? s.actualLoad
       const step = progressionStep(load)
@@ -1323,7 +1416,7 @@ export function ActiveWorkoutTracker({
 
     const result: LoggedExerciseActual[] = finalExercises.map((ex, exIdx) => ({
       exercise: ex.exercise,
-      progressionMode: 'single',
+      progressionMode: (ex.progressionMode as LoggedExerciseActual['progressionMode']) ?? 'single',
       sets: ex.sets.map(s => ({
         targetReps: s.targetReps,
         targetLoad: s.targetLoad,
@@ -1450,18 +1543,70 @@ export function ActiveWorkoutTracker({
             <p className="text-xs text-slate-600 mt-2">Tap "Done — Log Workout" when finished.</p>
           </div>
         ) : (
-          exercises.map((ex, exIdx) => (
-            <div key={ex.exercise + exIdx} className="bg-slate-800/60 rounded-xl p-3 space-y-2">
+          exercises.map((ex, exIdx) => {
+            const ssInfo = ex.supersetGroupId ? supersetGroups.get(ex.supersetGroupId) : undefined
+            const ssColors = ssInfo ? getColorClasses(ssInfo.color) : null
+            return (
+            <div key={ex.exercise + exIdx} className={`bg-slate-800/60 rounded-xl p-3 space-y-2 border ${ssColors ? ssColors.border : 'border-transparent'}`}>
+              {ssInfo && (
+                <div className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider ${ssColors!.text}`}>
+                  <Link2 size={10} />
+                  <span>Superset {ssInfo.label}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between min-w-0">
                 <p className="text-sm font-semibold text-white leading-tight truncate flex-1">{ex.exercise}</p>
-                <button
-                  onClick={() => setExercisePicker({ mode: 'replace', exIdx })}
-                  className="ml-2 p-1 rounded text-slate-600 hover:text-slate-300 hover:bg-slate-700 transition-colors flex-shrink-0"
-                  title="Replace exercise"
-                >
-                  <ArrowLeftRight size={13} />
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  <button
+                    onClick={() => setSupersetPicker(supersetPicker === exIdx ? null : exIdx)}
+                    className={`p-1 rounded transition-colors ${ssInfo ? ssColors!.text + ' hover:bg-slate-700' : 'text-slate-600 hover:text-slate-300 hover:bg-slate-700'}`}
+                    title="Superset group"
+                  >
+                    <Link2 size={13} />
+                  </button>
+                  <button
+                    onClick={() => setExercisePicker({ mode: 'replace', exIdx })}
+                    className="p-1 rounded text-slate-600 hover:text-slate-300 hover:bg-slate-700 transition-colors"
+                    title="Replace exercise"
+                  >
+                    <ArrowLeftRight size={13} />
+                  </button>
+                </div>
               </div>
+              {supersetPicker === exIdx && (
+                <div className="rounded-lg border border-slate-700 bg-slate-800 p-2 space-y-1">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold px-1 mb-1.5">Superset group</p>
+                  {ex.supersetGroupId && (
+                    <button
+                      onClick={() => assignSuperset(exIdx, null)}
+                      className="w-full text-left px-2 py-1.5 rounded text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                    >
+                      Remove from group
+                    </button>
+                  )}
+                  {Array.from(supersetGroups.entries())
+                    .filter(([id]) => id !== ex.supersetGroupId)
+                    .map(([id, info]) => {
+                      const c = getColorClasses(info.color)
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => assignSuperset(exIdx, id)}
+                          className={`w-full text-left px-2 py-1.5 rounded text-xs ${c.badge} hover:opacity-80 transition-opacity`}
+                        >
+                          Add to Superset {info.label}
+                        </button>
+                      )
+                    })
+                  }
+                  <button
+                    onClick={() => createAndAssignSuperset(exIdx)}
+                    className="w-full text-left px-2 py-1.5 rounded text-xs text-slate-300 hover:bg-slate-700 transition-colors border border-dashed border-slate-600"
+                  >
+                    + New superset group
+                  </button>
+                </div>
+              )}
 
               <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
                 <span className="col-span-1 text-center">#</span>
@@ -1599,7 +1744,8 @@ export function ActiveWorkoutTracker({
                 Add set
               </button>
             </div>
-          ))
+            )
+          })
         )}
 
         <button

@@ -67,6 +67,7 @@ export interface ExerciseSpec {
   synergist?: string[]
   progress?: ProgressionRule
   progressionType?: ProgressionType
+  supersetGroupId?: string
 }
 
 // ── Run segments ─────────────────────────────────────────────────────────────
