@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -431,6 +431,29 @@ describe('computePlanProgress', () => {
       const plan = makePlan({ duration: { type: 'rotations', value: 0 } })
       const result = computePlanProgress(plan, [], '2026-01-10')
       expect(result).toEqual({ completed: 0, total: 0, percentComplete: 0 })
+    })
+
+    it('deduplicates same-date entries (consistent with isPlanExpired)', () => {
+      // Two entries with the same calendarDate should count as ONE completed day,
+      // not two. This mirrors the one-advancement-per-date rule in the rotation
+      // engine and isPlanExpired's Set-based deduplication.
+      const twoDayPlan = makePlan({
+        days: [
+          { id: 'd0', label: 'Day 1', slots: [{ id: 's0', type: 'weightlifting', name: 'Lift' }] },
+          { id: 'd1', label: 'Day 2', slots: [{ id: 's1', type: 'yoga', name: 'Yoga' }] },
+        ],
+        duration: { type: 'rotations', value: 2 },
+      })
+      // 4 raw entries, but only 3 unique dates → floor(3 / 2) = 1 rotation, not floor(4 / 2) = 2
+      const entries: HistoryEntry[] = [
+        { ...completeEntry('2026-01-01'), id: 'e1', createdAt: '2026-01-01T10:00:00Z' },
+        { ...completeEntry('2026-01-01'), id: 'e2', createdAt: '2026-01-01T18:00:00Z' }, // duplicate
+        completeEntry('2026-01-02'),
+        completeEntry('2026-01-03'),
+      ]
+      const result = computePlanProgress(twoDayPlan, entries, '2026-01-05')
+      expect(result.completed).toBe(1)
+      expect(result.percentComplete).toBe(50)
     })
   })
 
@@ -2263,5 +2286,136 @@ describe('computeWorkoutTypeBreakdown — multi-slot plan days', () => {
     expect(result.weights?.completed).toBe(1)
     // run is not attributed because slots[0] is weights
     expect(result.run).toBeUndefined()
+  })
+})
+
+// ── findBestWeek ──────────────────────────────────────────────────────────────
+
+function bwEntry(date: string, action: HistoryEntry['action'], planId = 'plan-1'): HistoryEntry {
+  return {
+    id: `bw-${planId}-${date}-${action}`,
+    planId,
+    calendarDate: date,
+    planDayIndex: action === 'day_off' ? undefined : 0,
+    action,
+    createdAt: `${date}T12:00:00Z`,
+  }
+}
+
+function bwExtra(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+  return {
+    id: `bwx-${planId}-${date}`,
+    planId,
+    calendarDate: date,
+    workoutType: 'yoga',
+    workoutName: 'Yoga',
+    createdAt: `${date}T13:00:00Z`,
+  }
+}
+
+describe('findBestWeek', () => {
+  it('returns null when there are no entries or extras', () => {
+    expect(findBestWeek('plan-1', [], [])).toBeNull()
+  })
+
+  it('returns null when only other plans have entries', () => {
+    const entries = [bwEntry('2026-01-05', 'complete', 'plan-2')]
+    expect(findBestWeek('plan-1', entries, [])).toBeNull()
+  })
+
+  it('returns null when only other plans have extras', () => {
+    const extras = [bwExtra('2026-01-05', 'plan-2')]
+    expect(findBestWeek('plan-1', [], extras)).toBeNull()
+  })
+
+  it('returns the single week when there is only one', () => {
+    const entries = [
+      bwEntry('2026-01-05', 'complete'),
+      bwEntry('2026-01-06', 'complete'),
+    ]
+    const result = findBestWeek('plan-1', entries, [])
+    expect(result).not.toBeNull()
+    expect(result!.weekStart).toBe('2026-01-05')
+    expect(result!.completed).toBe(2)
+  })
+
+  it('returns the week with the most completed rotation entries', () => {
+    const entries = [
+      bwEntry('2026-01-05', 'complete'), // week of Jan 5: 1 completed
+      bwEntry('2026-01-12', 'complete'), // week of Jan 12: 3 completed
+      bwEntry('2026-01-13', 'complete'),
+      bwEntry('2026-01-14', 'complete'),
+    ]
+    const result = findBestWeek('plan-1', entries, [])
+    expect(result!.weekStart).toBe('2026-01-12')
+    expect(result!.completed).toBe(3)
+  })
+
+  it('includes extras in the best-week score', () => {
+    const entries = [
+      bwEntry('2026-01-05', 'complete'),  // week 1: 1 completed
+      bwEntry('2026-01-12', 'complete'),  // week 2: 1 completed + 2 extras = 3 active
+    ]
+    const extras = [bwExtra('2026-01-13'), bwExtra('2026-01-14')]
+    const result = findBestWeek('plan-1', entries, extras)
+    expect(result!.weekStart).toBe('2026-01-12')
+    expect(result!.extras).toBe(2)
+    expect(result!.completed).toBe(1)
+  })
+
+  it('breaks ties by returning the earliest week', () => {
+    // Two weeks tied at 1 active — earlier week wins (reduce keeps first on equality)
+    const entries = [
+      bwEntry('2026-01-05', 'complete'),
+      bwEntry('2026-01-12', 'complete'),
+    ]
+    const result = findBestWeek('plan-1', entries, [])
+    expect(result!.weekStart).toBe('2026-01-05')
+  })
+
+  it('ignores skips and day-offs when scoring (only active workouts count)', () => {
+    // Week 1 has 2 logged (skip + day_off) but 0 active; week 2 has 1 active
+    const entries = [
+      bwEntry('2026-01-05', 'skip'),
+      bwEntry('2026-01-06', 'day_off'),
+      bwEntry('2026-01-12', 'complete'),
+    ]
+    const result = findBestWeek('plan-1', entries, [])
+    expect(result!.weekStart).toBe('2026-01-12')
+    expect(result!.completed).toBe(1)
+  })
+
+  it('ignores entries for other plans', () => {
+    // plan-2 has a big week; plan-1 only has one entry
+    const entries = [
+      bwEntry('2026-01-05', 'complete', 'plan-1'),
+      bwEntry('2026-01-12', 'complete', 'plan-2'),
+      bwEntry('2026-01-13', 'complete', 'plan-2'),
+      bwEntry('2026-01-14', 'complete', 'plan-2'),
+    ]
+    const result = findBestWeek('plan-1', entries, [])
+    expect(result!.completed).toBe(1) // only plan-1's entry counts
+  })
+
+  it('works when the plan only has extras (no rotation entries)', () => {
+    const extras = [bwExtra('2026-01-12'), bwExtra('2026-01-13'), bwExtra('2026-01-14')]
+    const result = findBestWeek('plan-1', [], extras)
+    expect(result).not.toBeNull()
+    expect(result!.extras).toBe(3)
+    expect(result!.completed).toBe(0)
+  })
+
+  it('spans multiple weeks and picks the correct one across year/month boundaries', () => {
+    // Cross-month range: Dec and Jan
+    const entries = [
+      bwEntry('2025-12-29', 'complete'), // week of 2025-12-29 (Mon): 1
+      bwEntry('2025-12-30', 'complete'),
+      bwEntry('2026-01-05', 'complete'), // week of 2026-01-05 (Mon): 3
+      bwEntry('2026-01-06', 'complete'),
+      bwEntry('2026-01-07', 'complete'),
+    ]
+    const result = findBestWeek('plan-1', entries, [])
+    expect(result!.weekStart).toBe('2026-01-05')
+    expect(result!.completed).toBe(3)
   })
 })
