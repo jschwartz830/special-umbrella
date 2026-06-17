@@ -1,5 +1,40 @@
 # Test Results
 
+## 2026-06-17 (fifty-ninth pass) — branch `claude/dreamy-mccarthy-b5jqs3`
+
+**Result: 882 passing, 0 failing** (+13 tests vs entry baseline of 869)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 21 (unchanged) |
+| Tests on entry | 869 |
+| Tests added | 13 |
+| Tests on exit | 882 |
+| Failures | 0 |
+
+All tests pass. No existing tests were modified.
+
+### Tests added
+
+**`src/lib/__tests__/historyStats.test.ts`** (+12 tests)
+- `deduplicates same-date entries (consistent with isPlanExpired)` — regression test verifying that 4 raw entries with 3 unique dates produce 1 rotation (not 2)
+- `returns null for empty plan (no entries)` — findBestWeek
+- `returns null when entries belong to a different plan` — findBestWeek isolation
+- `returns the only week for a single-week plan` — findBestWeek base case
+- `returns the week with the most completions` — findBestWeek selection
+- `factors extras into the score` — findBestWeek with extra workouts
+- `returns the earlier week on tie` — findBestWeek tie-breaking
+- `skips do not count toward best-week score` — findBestWeek skip exclusion
+- `day_off entries are not counted` — findBestWeek day-off exclusion
+- `works with only extras (no plan entries)` — findBestWeek extras-only edge case
+- `handles entries that span a month boundary` — findBestWeek cross-month
+- `handles entries that span a year boundary` — findBestWeek cross-year
+
+**`src/lib/__tests__/expressionEval.test.ts`** (+1 test)
+- `parses "10m" as meters not minutes` — verifies `resolveQuantityString('10m')` returns `{ value: 10, unit: 'm' }`
+
+---
+
 ## 2026-06-16 (fifty-eighth pass) — branch `claude/dreamy-mccarthy-b56q6q`
 
 **Result: 869 passing, 0 failing** (+4 tests vs entry baseline of 865)

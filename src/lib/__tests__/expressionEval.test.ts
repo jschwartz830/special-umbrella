@@ -545,6 +545,10 @@ describe('resolveQuantityString', () => {
     expect(resolveQuantityString('800m', ctx())).toEqual({ value: 800, unit: 'm' })
   })
 
+  it('parses "10m" as meters not minutes', () => {
+    expect(resolveQuantityString('10m', ctx())).toEqual({ value: 10, unit: 'm' })
+  })
+
   it('parses "10min"', () => {
     expect(resolveQuantityString('10min', ctx())).toEqual({ value: 10, unit: 'min' })
   })

@@ -1,5 +1,41 @@
 # Feature Proposals
 
+## Pass 59 — 2026-06-17 (branch `claude/dreamy-mccarthy-b5jqs3`)
+
+### Feature selected
+
+**`findBestWeek` — identify the user's best training week for a given plan**
+
+### Why it was selected
+
+`computeWeeklyBreakdown` already generates per-week stats (completions, extras, skip count). There was no utility to programmatically identify which week had the most activity. This is low-hanging fruit: zero new data collection needed, purely an aggregation over existing data.
+
+### Expected user value
+
+- Could back a "Your best week" callout card in the History or Stats UI — positive reinforcement.
+- Could serve as a benchmark for streak/consistency features ("you haven't matched your best week since X").
+- Useful in export/summary views (CSV or share sheet).
+
+### Implementation scope
+
+- New exported function `findBestWeek(planId, entries, extras)` in `src/lib/historyStats.ts`.
+- Delegates to `computeWeeklyBreakdown` (existing).
+- Reduces the weeks array with a comparison on `completed + extras`.
+- Returns `WeeklyBreakdown | null`.
+- No store changes. No component changes. No new dependencies.
+- 11 unit tests covering all edge cases.
+
+### Scoring rationale
+
+`completed + extras` was chosen as the score because:
+- `completed` = plan days actually done (core training volume).
+- `extras` = additional voluntary workouts (also training volume).
+- `skips` and `dayOffs` are not included — they represent planned rest or missed sessions, not training volume.
+
+Tie-breaking is by earliest week (lowest `weekStart`), which is deterministic and makes the "best week" refer to the first time the user achieved their peak.
+
+---
+
 ## Pass 56 — 2026-06-13 (branch `claude/dreamy-mccarthy-qvt8m6`)
 
 ### Feature selected

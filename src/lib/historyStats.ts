@@ -121,10 +121,15 @@ export function computePlanProgress(
     const weeksElapsed = Math.max(0, Math.floor(daysElapsed / 7))
     completed = Math.min(weeksElapsed, total)
   } else {
-    const planEntries = entries.filter(
-      e => e.planId === plan.id && e.calendarDate <= today && (e.action === 'complete' || e.action === 'skip'),
+    // Deduplicate by calendarDate — mirrors isPlanExpired, which uses the same
+    // one-advancement-per-date rule as the rotation engine. Duplicate entries for
+    // the same date (e.g. from a re-imported CSV) must not inflate the count.
+    const completedDates = new Set(
+      entries
+        .filter(e => e.planId === plan.id && e.calendarDate <= today && (e.action === 'complete' || e.action === 'skip'))
+        .map(e => e.calendarDate),
     )
-    const rotationsFinished = Math.floor(planEntries.length / plan.days.length)
+    const rotationsFinished = Math.floor(completedDates.size / plan.days.length)
     completed = Math.min(rotationsFinished, total)
   }
 
@@ -797,4 +802,44 @@ export function padWeekGaps(weeks: WeeklyBreakdown[]): WeeklyBreakdown[] {
   }
 
   return result
+}
+
+// ── Best week ─────────────────────────────────────────────────────────────────
+
+/**
+ * Return the week (from `computeWeeklyBreakdown`) with the highest number of
+ * active workouts: completed rotation entries plus any extra workouts.
+ *
+ * Skips and day-off entries are not counted because they don't represent
+ * training output — this matches what the streak logic considers qualifying.
+ *
+ * Returns `null` when no entries or extras exist for the given plan.
+ * When multiple weeks tie, the earliest is returned.
+ *
+ * @param planId  Plan to query.
+ * @param entries All history entries (unfiltered; function filters by plan).
+ * @param extras  All extra workout entries (unfiltered).
+ */
+export function findBestWeek(
+  planId: string,
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+): WeeklyBreakdown | null {
+  const planEntries = entries.filter(e => e.planId === planId)
+  const planExtras = extras.filter(e => e.planId === planId)
+  if (planEntries.length === 0 && planExtras.length === 0) return null
+
+  const allDates = [
+    ...planEntries.map(e => e.calendarDate),
+    ...planExtras.map(e => e.calendarDate),
+  ]
+  const fromDate = allDates.reduce((a, b) => (a < b ? a : b))
+  const toDate = allDates.reduce((a, b) => (a > b ? a : b))
+
+  const weeks = computeWeeklyBreakdown(planId, entries, extras, fromDate, toDate)
+  if (weeks.length === 0) return null
+
+  return weeks.reduce((best, w) =>
+    w.completed + w.extras > best.completed + best.extras ? w : best,
+  )
 }

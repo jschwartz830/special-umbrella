@@ -1,5 +1,38 @@
 # Feature Reviews
 
+## Pass 59 — 2026-06-17 (branch `claude/dreamy-mccarthy-b5jqs3`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+A single exported function `findBestWeek(planId, entries, extras)` added at the end of `src/lib/historyStats.ts`. It:
+1. Filters entries and extras to the given plan.
+2. Short-circuits with `null` if there is no data.
+3. Computes the full date range (earliest to latest calendar date across both sets).
+4. Calls `computeWeeklyBreakdown` to get per-ISO-week stats.
+5. Reduces to the single best week by `completed + extras`.
+
+No new files, no component changes, no store changes, no new dependencies.
+
+### What assumptions were encoded
+
+- **Score = completed + extras**: Treats a voluntary extra workout as equally valuable to a plan completion for "best week" purposes. An alternative (extras weighted differently) could be parameterized later.
+- **Tie-breaking = earliest week**: If two weeks have the same score, the earlier one wins. This is deterministic and encourages "when did I first peak?" semantics over "most recent peak."
+- **Skips and day-offs excluded from score**: They represent missed or planned-rest sessions, not training volume. If a user wants "most days with any logged action," that is a different query.
+
+### What worked well
+
+- `computeWeeklyBreakdown` already handles all the date/ISO-week math, so `findBestWeek` is 15 lines of pure reduction logic.
+- 11 test scenarios cover the full decision surface: null, isolation, single-week, multi-week selection, extras influence, tie-breaking, skip/day-off exclusion, extras-only, cross-month, cross-year.
+
+### What is still missing / limitations
+
+- No UI consumer yet — the function is exported but not wired to any component. The PR leaves this for the next pass or a targeted UI change.
+- Does not support "best week by duration/load/distance" for run or swim plans — only count-based scoring. A future extension could accept a scoring callback.
+
+---
+
 ## Pass 56 — 2026-06-13 (branch `claude/dreamy-mccarthy-qvt8m6`)
 
 ### Classification: **Keep**
