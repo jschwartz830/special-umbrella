@@ -381,7 +381,7 @@ export function resolveLoad(loadExpr: string | undefined, ctx: EvalContext): num
  * Resolve a distance/duration expression to its numeric part.
  * "easy_miles mi" → { value: ctx.vars.easy_miles, unit: 'mi' }
  * "800m"          → { value: 800, unit: 'm' }
- * "10m"           → { value: 10, unit: 'min' }  (ambiguity: context-dependent)
+ * "10m"           → { value: 10, unit: 'm' }  (meters, not minutes — use "10min" for minutes)
  * "interval_reps" → { value: ctx.vars.interval_reps, unit: '' }
  */
 export function resolveQuantityString(
