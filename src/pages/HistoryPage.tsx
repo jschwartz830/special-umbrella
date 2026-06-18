@@ -23,7 +23,7 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv, personalRecordsToCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate, findBestWeek } from '../lib/historyStats'
 import type { PersonalRecord, WeeklyBreakdown, WorkoutTypeBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -221,6 +221,11 @@ export function HistoryPage() {
     // Fill gap weeks so training breaks are visible rather than silently skipped.
     return padWeekGaps(active).reverse()
   }, [filterPlanId, filteredEntries, filteredExtras, today])
+
+  const bestWeek = useMemo(
+    () => (filterPlanId === 'all' ? null : findBestWeek(filterPlanId, filteredEntries, filteredExtras)),
+    [filterPlanId, filteredEntries, filteredExtras],
+  )
 
   function openEdit(entry: HistoryEntry) {
     setNotesText(entry.notes ?? '')
@@ -451,6 +456,12 @@ export function HistoryPage() {
               <StatTile label="30-day" value={stats.last30Completed} />
               <StatTile label="Total" value={stats.totalCompleted} />
             </div>
+            {bestWeek && (
+              <p className="text-xs text-slate-500 text-center">
+                Best week: <span className="text-slate-300 font-medium">{bestWeek.completed} workouts</span>
+                {' '}(week of {format(parseISO(bestWeek.weekStart), 'MMM d')})
+              </p>
+            )}
             {typeMixLabel && (
               <p className="text-xs text-slate-500 text-center">{typeMixLabel}</p>
             )}

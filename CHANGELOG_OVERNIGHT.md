@@ -1,3 +1,41 @@
+# Overnight Changelog — 2026-06-18
+
+## [1] Fix: NaN in reps/weight inputs of ActiveWorkoutTracker
+
+**Summary**: Added `parseInputNumber` helper and used it in both the reps and weight `onChange` handlers in `ActiveWorkoutTracker`. Previously, `Number('abc') === NaN`, which is truthy in a `value ? Number(value) : null` check, so non-numeric text produced `NaN` stored silently in `actualReps`/`actualLoad`.
+
+**Why it matters**: `NaN` is a number in JavaScript (`typeof NaN === 'number'`), so the truthy check `value ? Number(value) : null` passes through NaN without filtering it. This silently stored NaN into outcome data where downstream consumers (progression, display) might receive `NaN`. Desktop is the primary concern since iOS's numeric keyboard prevents alpha input, but other surfaces (desktop paste, autofill, unit suffixes) can trigger it.
+
+**Files changed**: `src/components/workout/ActiveWorkoutTracker.tsx` (+5 lines for helper, 2 handler lines changed)
+
+**Rollback**: `git revert <sha>` on the "fix NaN in reps/weight input handlers" commit
+
+---
+
+## [2] Tests: add `moveOutcome` coverage to outcomeStore test suite
+
+**Summary**: Added 5 new tests for the `moveOutcome` action in `src/store/__tests__/outcomeStore.test.ts`, covering: key change, `workoutInstanceId` field update, no-op for missing key, field preservation, and `exerciseHistoryStore` delegation.
+
+**Why it matters**: `moveOutcome` is called by `HistoryPage` for every retroactive date change on a rotation entry. The action re-keys the outcome map and delegates to `exerciseHistoryStore.moveByWorkoutInstance`. This delegation path had zero tests, meaning a refactor could silently break exercise history continuity for moved entries.
+
+**Files changed**: `src/store/__tests__/outcomeStore.test.ts` (+55 lines, 5 new tests)
+
+**Rollback**: `git revert <sha>` on the "add moveOutcome tests" commit
+
+---
+
+## [3] Feature: display best-week stat in HistoryPage
+
+**Summary**: Imported `findBestWeek` into `HistoryPage` and added a `bestWeek` useMemo. When viewing a single plan (not 'all'), a "Best week: N workouts (week of MMM d)" line now appears below the stats grid.
+
+**Why it matters**: `findBestWeek` was added in pass 59 as a pure utility with no callers. This change wires it to the UI for the first time, giving users a motivational reference point. The display is a single text line guarded by `bestWeek &&`, so it is invisible when there is no history.
+
+**Files changed**: `src/pages/HistoryPage.tsx` (+8 lines: import, useMemo, and display)
+
+**Rollback**: `git revert <sha>` on the "wire findBestWeek into HistoryPage" commit
+
+---
+
 # Overnight Changelog — 2026-06-17
 
 ## [1] Fix: deduplicate same-date entries in `computePlanProgress` (rotations)

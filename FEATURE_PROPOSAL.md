@@ -1,5 +1,34 @@
 # Feature Proposals
 
+## Pass 60 — 2026-06-18 (branch `claude/dreamy-mccarthy-xqu6si`)
+
+### Feature selected
+
+**Wire `findBestWeek` into HistoryPage — surface the user's best training week**
+
+### Why it was selected
+
+`findBestWeek` was added as a pure utility in pass 59 with no callers. Wiring it into `HistoryPage` is the minimal useful slice: import the function, add one `useMemo`, render one line of text. No new data, no new stores, no new components.
+
+### Expected user value
+
+- Shows a motivational reference point ("Best week: 5 workouts, week of Jan 6") in the History stats area.
+- Anchored to the currently filtered plan, so it's contextually relevant.
+- Invisible (renders nothing) when there is no history data.
+
+### Implementation scope
+
+- Import `findBestWeek` into `HistoryPage.tsx` (already imported from the same module).
+- Add one `useMemo` computing `bestWeek` — null for the "all plans" view, otherwise calls `findBestWeek(filterPlanId, filteredEntries, filteredExtras)`.
+- Add one conditional `<p>` line below the stats grid (4 stat tiles) displaying the best week count and start date.
+- No store changes. No new components. No new dependencies.
+
+### Scoring rationale
+
+Selected because: (a) the utility already exists and is tested, (b) the implementation is 8 lines, (c) the rollback is a single `git revert`, (d) it closes the gap between a new utility and its first user-facing use.
+
+---
+
 ## Pass 59 — 2026-06-17 (branch `claude/dreamy-mccarthy-b5jqs3`)
 
 ### Feature selected

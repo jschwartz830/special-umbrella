@@ -142,6 +142,12 @@ function parseNumericLoad(load?: string | null): number | null {
   return m ? Number(m[1]) : null
 }
 
+function parseInputNumber(v: string): number | null {
+  if (!v.trim()) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
 interface TimerColProps {
   label: string
   value: string
@@ -1662,7 +1668,7 @@ export function ActiveWorkoutTracker({
                       inputMode="numeric"
                       value={s.actualReps ?? ''}
                       onChange={e => updateSet(exIdx, setIdx, {
-                        actualReps: e.target.value ? Number(e.target.value) : null,
+                        actualReps: parseInputNumber(e.target.value),
                       })}
                       onFocus={e => { handleFieldFocus(exIdx, setIdx, 'reps'); e.target.select() }}
                       onBlur={handleFieldBlur}
@@ -1674,7 +1680,7 @@ export function ActiveWorkoutTracker({
                       inputMode="decimal"
                       value={s.actualLoad ?? ''}
                       onChange={e => updateSet(exIdx, setIdx, {
-                        actualLoad: e.target.value ? Number(e.target.value) : null,
+                        actualLoad: parseInputNumber(e.target.value),
                       })}
                       onFocus={e => { handleFieldFocus(exIdx, setIdx, 'weight'); e.target.select() }}
                       onBlur={handleFieldBlur}

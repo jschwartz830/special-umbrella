@@ -1,5 +1,30 @@
 # Test Results
 
+## 2026-06-18 (sixtieth pass) — branch `claude/dreamy-mccarthy-xqu6si`
+
+**Result: 887 passing, 0 failing** (+5 tests vs entry baseline of 882)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 21 (unchanged) |
+| Tests on entry | 882 |
+| Tests added | 5 |
+| Tests on exit | 887 |
+| Failures | 0 |
+
+All tests pass. No existing tests were modified.
+
+### Tests added
+
+**`src/store/__tests__/outcomeStore.test.ts`** (+5 tests, new `moveOutcome` describe block)
+- `re-keys the outcome to the new instanceId` — primary happy path: old key gone, new key present
+- `updates workoutInstanceId inside the moved record` — field on the record itself is updated
+- `is a no-op when the old instanceId does not exist` — stable state when key is missing
+- `preserves all other fields on the moved outcome` — perceivedEffort, durationActualMin, completionState survive
+- `delegates exercise history move to exerciseHistoryStore` — verifies exerciseHistory record re-keyed by workoutInstanceId
+
+---
+
 ## 2026-06-17 (fifty-ninth pass) — branch `claude/dreamy-mccarthy-b5jqs3`
 
 **Result: 882 passing, 0 failing** (+13 tests vs entry baseline of 869)

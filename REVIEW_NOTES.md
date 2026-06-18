@@ -1,5 +1,37 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-18 (sixtieth pass) — branch `claude/dreamy-mccarthy-xqu6si`
+
+### Executive summary
+
+1. **What changed:** One bug fix, one test addition, one feature wire-up. (1) Bug: NaN could be silently stored in `actualReps`/`actualLoad` from non-numeric keyboard input on desktop. (2) Tests: 5 new tests for `moveOutcome` — a code path used on every retroactive history date change that had no coverage. (3) Feature: `findBestWeek` (added last pass) is now displayed in `HistoryPage` as a "Best week: N workouts (week of MMM d)" line.
+
+2. **Highest confidence:** The NaN fix — it replaces a falsy-based guard (`value ? Number(value) : null`) with an `isFinite`-based guard. The behavior is identical for all valid numeric inputs and correct for non-numeric text. The `moveOutcome` tests simply exercise the existing implementation; they confirm the contract but do not change any logic.
+
+3. **What is risky:** Nothing in this pass is risky. The input handler change is additive (tighter filtering). The new display in HistoryPage is behind a `bestWeek &&` guard — invisible when no history exists.
+
+4. **What to review first:** The `parseInputNumber` helper in `ActiveWorkoutTracker.tsx` (~line 144) and the two `onChange` call sites (~lines 1670, 1683). Confirm `Number.isFinite(NaN) === false` is the correct guard (it is). Then check the `moveOutcome` test for the exercise history delegation case — it verifies the `workoutInstanceId` field on the exercise record is updated, which is the contractual guarantee callers depend on.
+
+### Biggest issues found
+
+- **NaN propagation in `ActiveWorkoutTracker` input handlers** — now fixed. `Number('abc') === NaN` and `NaN` is truthy in `v ? Number(v) : null`. Mobile numeric keyboards prevent alpha input, but desktop paste, autofill, or unit suffixes (`"135lb"`) could trigger it on desktop.
+- **`moveOutcome` had zero test coverage** — now fixed. This action is on the critical path for retroactive date editing in `HistoryPage`.
+
+### Improvements completed
+
+| Change | Classification | File(s) |
+|--------|---------------|---------|
+| Fix NaN in reps/weight input handlers | **Keep** | `src/components/workout/ActiveWorkoutTracker.tsx` |
+| Add `moveOutcome` tests | **Keep** | `src/store/__tests__/outcomeStore.test.ts` |
+| Wire `findBestWeek` into HistoryPage | **Keep** | `src/pages/HistoryPage.tsx` |
+
+### Not implemented (documented carry-forwards)
+
+- **`buildWeightsRecommendation` uses only `exercises[0].progressionMode`** — for multi-exercise plans with mixed progression modes, the wrong mode may be applied to some exercises. Medium-complexity fix requiring a per-exercise recommendation; deferred.
+- **`parseInputNumber` not used in `OutcomeModal` duration/distance inputs** — those fields use a `parseDurationMin` / direct parse path. Not audited this pass; deferred.
+
+---
+
 ## 2026-06-17 (fifty-ninth pass) — branch `claude/dreamy-mccarthy-b5jqs3`
 
 ### Executive summary

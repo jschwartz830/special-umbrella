@@ -429,3 +429,87 @@ describe('importOutcomes', () => {
     expect(useExerciseHistoryStore.getState().records).toHaveLength(0)
   })
 })
+
+// ── moveOutcome ───────────────────────────────────────────────────────────────
+
+describe('moveOutcome', () => {
+  const getState = () => useOutcomeStore.getState()
+
+  beforeEach(() => {
+    useOutcomeStore.setState({ outcomes: {}, progressionStates: {} })
+    useExerciseHistoryStore.setState({ records: [] })
+  })
+
+  it('re-keys the outcome to the new instanceId', () => {
+    const oldId = makeWorkoutInstanceId('plan-1', '2026-02-01')
+    const newId = makeWorkoutInstanceId('plan-1', '2026-02-03')
+    const outcome = makeOutcome('plan-1', '2026-02-01')
+    getState().setOutcome(outcome)
+
+    getState().moveOutcome(oldId, newId)
+
+    expect(getState().getOutcome(oldId)).toBeNull()
+    expect(getState().getOutcome(newId)).not.toBeNull()
+  })
+
+  it('updates workoutInstanceId inside the moved record', () => {
+    const oldId = makeWorkoutInstanceId('plan-1', '2026-02-01')
+    const newId = makeWorkoutInstanceId('plan-1', '2026-02-03')
+    getState().setOutcome(makeOutcome('plan-1', '2026-02-01'))
+
+    getState().moveOutcome(oldId, newId)
+
+    expect(getState().getOutcome(newId)!.workoutInstanceId).toBe(newId)
+  })
+
+  it('is a no-op when the old instanceId does not exist', () => {
+    const before = { ...getState().outcomes }
+    getState().moveOutcome('plan-1_2026-01-01', 'plan-1_2026-01-05')
+    expect(getState().outcomes).toEqual(before)
+  })
+
+  it('preserves all other fields on the moved outcome', () => {
+    const oldId = makeWorkoutInstanceId('plan-1', '2026-02-01')
+    const newId = makeWorkoutInstanceId('plan-1', '2026-02-04')
+    const outcome = makeOutcome('plan-1', '2026-02-01', { perceivedEffort: 4, durationActualMin: 60 })
+    getState().setOutcome(outcome)
+
+    getState().moveOutcome(oldId, newId)
+
+    const moved = getState().getOutcome(newId)!
+    expect(moved.perceivedEffort).toBe(4)
+    expect(moved.durationActualMin).toBe(60)
+    expect(moved.completionState).toBe('completed')
+  })
+
+  it('delegates exercise history move to exerciseHistoryStore', () => {
+    const oldId = makeWorkoutInstanceId('plan-1', '2026-02-01')
+    const newId = makeWorkoutInstanceId('plan-1', '2026-02-04')
+    const outcome: WorkoutOutcome = {
+      ...makeOutcome('plan-1', '2026-02-01'),
+      weightsActual: {
+        exercises: [
+          {
+            exercise: 'Bench',
+            sets: [{ targetReps: 5, actualReps: 5, actualLoad: 185, completed: true }],
+          },
+        ],
+      },
+    }
+    getState().setOutcome(outcome)
+
+    const recordBefore = useExerciseHistoryStore.getState().records.find(
+      r => r.workoutInstanceId === oldId,
+    )
+    expect(recordBefore).toBeDefined()
+
+    getState().moveOutcome(oldId, newId)
+
+    expect(
+      useExerciseHistoryStore.getState().records.find(r => r.workoutInstanceId === oldId),
+    ).toBeUndefined()
+    expect(
+      useExerciseHistoryStore.getState().records.find(r => r.workoutInstanceId === newId),
+    ).toBeDefined()
+  })
+})

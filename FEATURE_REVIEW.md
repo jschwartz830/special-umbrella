@@ -1,5 +1,36 @@
 # Feature Reviews
 
+## Pass 60 — 2026-06-18 (branch `claude/dreamy-mccarthy-xqu6si`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+- Added `findBestWeek` to the existing import on line 26 of `HistoryPage.tsx`.
+- Added a `bestWeek` useMemo after `weeklyBreakdown`: returns null when `filterPlanId === 'all'`, otherwise calls `findBestWeek(filterPlanId, filteredEntries, filteredExtras)`.
+- Added a conditional `<p>` element immediately before the `typeMixLabel` line displaying: `Best week: N workouts (week of MMM d)` when `bestWeek` is non-null.
+
+Total: 8 lines changed/added in `HistoryPage.tsx`. No other files.
+
+### What assumptions were encoded
+
+- **Single-plan view only**: Best week is not shown for the "all plans" aggregation view because the function takes a single planId. A future cross-plan version would need a different aggregation function.
+- **Display position**: Placed above the `typeMixLabel` row (type mix) because it answers a different question (volume peak) and naturally belongs with the count-based stats above it.
+- **Date format**: `format(parseISO(bestWeek.weekStart), 'MMM d')` — uses the Monday start of the ISO week from `computeWeeklyBreakdown`.
+
+### What worked well
+
+- The `useMemo` dependency array (`[filterPlanId, filteredEntries, filteredExtras]`) matches `weeklyBreakdown`'s deps exactly, so both memos invalidate together.
+- `findBestWeek` is already null-safe — it returns null for no-history state, so the conditional render just works.
+
+### What is still missing / limitations
+
+- **Cross-plan best week** not supported in this pass.
+- **No "tie" disclosure** — if multiple weeks tie for first, the earlier one is shown silently (by `findBestWeek`'s design). This is acceptable for a first version.
+- **Not shown in "all plans" view** — intentional for now; would need a new aggregation function.
+
+---
+
 ## Pass 59 — 2026-06-17 (branch `claude/dreamy-mccarthy-b5jqs3`)
 
 ### Classification: **Keep**

@@ -1,5 +1,38 @@
 # Implementation Plan
 
+## Pass 60 — 2026-06-18 (branch `claude/dreamy-mccarthy-xqu6si`)
+
+### Observations on entry
+
+- Baseline on entry: **882 passing, 0 failing** — clean baseline inherited from pass 59.
+- Full codebase audit performed: stores, lib utilities, components, type files, and test files.
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `ActiveWorkoutTracker` input handlers: `Number('abc') === NaN`, and `typeof NaN === 'number'` is truthy, so non-numeric text typed into the reps or weight fields produced `NaN` stored in `actualReps`/`actualLoad`. NaN propagates silently into the saved `WorkoutOutcome`. | **Fixed** |
+| Low | `moveOutcome` action in `outcomeStore` has zero test coverage. It is used in `HistoryPage` for retroactive date changes on history entries, delegating to `exerciseHistoryStore.moveByWorkoutInstance`. | **Fixed (tests added)** |
+| — | `findBestWeek` (added in pass 59) had no callers — its result was never surfaced in the UI. | **Wired into HistoryPage** |
+
+### Decisions
+
+1. **Fix NaN propagation in input handlers** (BUG FIX): Add `parseInputNumber` helper — a 4-line function that calls `Number.isFinite()` after `Number()`. Replace both inline `e.target.value ? Number(e.target.value) : null` expressions in `ActiveWorkoutTracker`'s reps and weight `onChange` handlers.
+
+2. **Add `moveOutcome` tests** (TESTS): Five new test cases in `src/store/__tests__/outcomeStore.test.ts` covering: key change, `workoutInstanceId` field mutation, no-op for missing key, field preservation, and `exerciseHistoryStore` delegation.
+
+3. **Wire `findBestWeek` into HistoryPage** (FEATURE): Import `findBestWeek`, compute `bestWeek` useMemo (null for 'all' plan filter), display a "Best week: N workouts (week of MMM d)" line below the stats grid when available for single-plan view.
+
+### Risk assessment
+
+| Change | Risk | Rollback |
+|--------|------|---------|
+| `parseInputNumber` NaN fix | Low — only affects non-numeric text input; numeric-only mobile keyboards are unaffected | `git revert <sha>` |
+| `moveOutcome` tests | None — test-only | `git revert <sha>` |
+| `findBestWeek` display in HistoryPage | Low — single-line display, guarded by `bestWeek &&` | `git revert <sha>` |
+
+---
+
 ## Pass 59 — 2026-06-17 (branch `claude/dreamy-mccarthy-b5jqs3`)
 
 ### Observations on entry
