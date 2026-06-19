@@ -194,6 +194,51 @@ describe('updateEntryAction', () => {
   })
 })
 
+// ── addOverride ───────────────────────────────────────────────────────────────
+
+describe('addOverride', () => {
+  it('appends an override with a generated id and the given type', () => {
+    getState().addOverride({ planId: 'plan-1', type: 'advance' })
+    expect(getState().overrides).toHaveLength(1)
+    expect(getState().overrides[0].type).toBe('advance')
+    expect(typeof getState().overrides[0].id).toBe('string')
+    expect(getState().overrides[0].id.length).toBeGreaterThan(0)
+  })
+
+  it('uses the provided appliedAt when given (calendar back-dating)', () => {
+    const backdated = '2026-01-10T08:00:00.000Z'
+    getState().addOverride({ planId: 'plan-1', type: 'jump', appliedAt: backdated, targetDayIndex: 2 })
+    expect(getState().overrides[0].appliedAt).toBe(backdated)
+  })
+
+  it('defaults appliedAt to now (ISO string) when not provided', () => {
+    const before = new Date().toISOString()
+    getState().addOverride({ planId: 'plan-1', type: 'advance' })
+    const after = new Date().toISOString()
+    const recorded = getState().overrides[0].appliedAt
+    expect(recorded >= before).toBe(true)
+    expect(recorded <= after).toBe(true)
+  })
+
+  it('stores targetDayIndex for jump overrides', () => {
+    getState().addOverride({ planId: 'plan-1', type: 'jump', targetDayIndex: 3 })
+    expect(getState().overrides[0].targetDayIndex).toBe(3)
+  })
+
+  it('accumulates multiple overrides without replacing earlier ones', () => {
+    getState().addOverride({ planId: 'plan-1', type: 'advance' })
+    getState().addOverride({ planId: 'plan-1', type: 'go_back' })
+    expect(getState().overrides).toHaveLength(2)
+  })
+
+  it('each generated id is unique across multiple adds', () => {
+    getState().addOverride({ planId: 'plan-1', type: 'advance' })
+    getState().addOverride({ planId: 'plan-1', type: 'advance' })
+    const ids = getState().overrides.map(o => o.id)
+    expect(new Set(ids).size).toBe(2)
+  })
+})
+
 // ── removeRetroJumpForDate ────────────────────────────────────────────────────
 
 describe('removeRetroJumpForDate', () => {
