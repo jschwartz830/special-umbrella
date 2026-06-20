@@ -1049,6 +1049,21 @@ describe('computeRotationCycleProgress', () => {
     const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
     expect(result!.doneInCycle).toBe(2)
   })
+
+  it('does not double-count duplicate entries for the same calendarDate', () => {
+    // Two complete entries on the same date (e.g. from a CSV re-import) must be
+    // treated as a single rotation advancement — matching isPlanExpired behaviour.
+    const dupEntries: HistoryEntry[] = [
+      { id: 'e1', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T08:00:00Z' },
+      { id: 'e2', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T18:00:00Z' },
+      { id: 'e3', planId: 'plan-1', calendarDate: '2026-01-02', planDayIndex: 1, action: 'complete', createdAt: '2026-01-02T12:00:00Z' },
+    ]
+    // 2 unique dates → doneInCycle = 2 % 3 = 2 (not 3 from three raw entries)
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, dupEntries)
+    expect(result!.doneInCycle).toBe(2)
+    expect(result!.remaining).toBe(1)
+    expect(result!.justCompletedRotation).toBe(false)
+  })
 })
 
 // ── countPlanDayCompletions ───────────────────────────────────────────────────
@@ -1465,6 +1480,17 @@ describe('computeRotationPlanRemaining', () => {
     ]
     // All 2 entries counted → 12 - 2 = 10
     expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(10)
+  })
+
+  it('does not double-count duplicate entries for the same calendarDate', () => {
+    // Two complete entries on the same date (e.g. from a CSV re-import) must be
+    // treated as one completed slot — matching isPlanExpired behaviour.
+    const entries: HistoryEntry[] = [
+      { id: 'e1', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T08:00:00Z' },
+      { id: 'e2', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T18:00:00Z' },
+    ]
+    // Only 1 unique date completed out of 12 needed → 11 remaining (not 10)
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(11)
   })
 })
 

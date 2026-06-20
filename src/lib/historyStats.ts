@@ -165,12 +165,16 @@ export function computeRotationCycleProgress(
 ): RotationCycleProgress | null {
   if (plan.duration.type !== 'rotations' || plan.days.length === 0) return null
 
-  const planEntries = entries.filter(
-    e => e.planId === plan.id &&
-      (today === undefined || e.calendarDate <= today) &&
-      (e.action === 'complete' || e.action === 'skip'),
+  // Deduplicate by calendarDate — mirrors isPlanExpired's one-advancement-per-date
+  // rule so that duplicate entries from CSV re-imports don't inflate the cycle counter.
+  const doneDates = new Set(
+    entries
+      .filter(e => e.planId === plan.id &&
+        (today === undefined || e.calendarDate <= today) &&
+        (e.action === 'complete' || e.action === 'skip'))
+      .map(e => e.calendarDate),
   )
-  const totalDone = planEntries.length
+  const totalDone = doneDates.size
   const rotationLength = plan.days.length
   const doneInCycle = totalDone % rotationLength
   const remaining = rotationLength - doneInCycle
@@ -207,11 +211,15 @@ export function computeRotationPlanRemaining(
   ) return null
 
   const totalNeeded = plan.duration.value * plan.days.length
-  const done = entries.filter(
-    e => e.planId === plan.id &&
-      (today === undefined || e.calendarDate <= today) &&
-      (e.action === 'complete' || e.action === 'skip'),
-  ).length
+  // Deduplicate by calendarDate — mirrors isPlanExpired and computeRotationCycleProgress
+  // so that duplicate entries from CSV re-imports don't deflate the remaining count.
+  const done = new Set(
+    entries
+      .filter(e => e.planId === plan.id &&
+        (today === undefined || e.calendarDate <= today) &&
+        (e.action === 'complete' || e.action === 'skip'))
+      .map(e => e.calendarDate),
+  ).size
   return Math.max(0, totalNeeded - done)
 }
 
