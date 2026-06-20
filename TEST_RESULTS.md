@@ -1,5 +1,39 @@
 # Test Results
 
+## 2026-06-20 (sixty-first pass) — branch `claude/dreamy-mccarthy-8j8xif`
+
+**Result: 895 passing, 0 failing** (+8 tests vs entry baseline of 887)
+
+| Metric | Value |
+|--------|-------|
+| Test files | 21 (unchanged) |
+| Tests on entry | 887 |
+| Tests added | 8 |
+| Tests on exit | 895 |
+| Failures | 0 |
+
+All tests pass. No existing tests were modified.
+
+### Tests added
+
+**`src/lib/__tests__/historyStats.test.ts`** (+8 tests across two describe blocks)
+
+`computeRotationCycleProgress` (+1):
+- `does not double-count duplicate entries for the same calendarDate` — 3 raw entries for 2 unique dates → doneInCycle=2, remaining=1, justCompletedRotation=false
+
+`computeRotationPlanRemaining` (+1):
+- `does not double-count duplicate entries for the same calendarDate` — 2 raw entries for 1 unique date → remaining=11 (not 10)
+
+`computeWeeklyBreakdown` (+6):
+- `avgEffort is null when no outcomes are passed` — backward-compat: missing param → null
+- `avgEffort is null when outcomes are passed but none have perceivedEffort` — outcomes without effort data → null
+- `computes avgEffort from completed rotation entries with outcomes` — mean across matching outcomes
+- `includes extras effort in avgEffort calculation` — extra workout outcomes counted alongside rotation outcomes
+- `skip entries do not contribute to avgEffort` — skip entries excluded from effort average
+- `rounds avgEffort to one decimal place` — (1+2+2)/3 = 1.666... → 1.7
+
+---
+
 ## 2026-06-18 (sixtieth pass) — branch `claude/dreamy-mccarthy-xqu6si`
 
 **Result: 887 passing, 0 failing** (+5 tests vs entry baseline of 882)

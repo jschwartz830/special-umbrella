@@ -1,5 +1,40 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-20 (sixty-first pass) — branch `claude/dreamy-mccarthy-8j8xif`
+
+### Executive summary
+
+1. **What changed:** One bug fix with tests, one feature with tests. (1) Bug: `computeRotationCycleProgress` and `computeRotationPlanRemaining` used raw entry count where `isPlanExpired` (the reference function) used Set-based date deduplication — fixed to match. (2) Feature: `WeeklyBreakdown` extended with `avgEffort: number | null`; `computeWeeklyBreakdown` now accepts an optional `outcomes` record and computes per-week mean perceived effort; `HistoryPage` surfaces this in the weekly context string.
+
+2. **Highest confidence:** The deduplication bug fix. The inconsistency was clear (three functions, one using Set, two using length), the fix is mechanical (6 lines), and two regression tests anchor it. The avgEffort feature is additive (optional param, null default, backward-compatible interface extension) with 6 tests covering the key paths.
+
+3. **What is risky:** Nothing is risky. The bug fix only affects users who have duplicate entries for the same calendar date (CSV re-import scenario). The feature is purely additive — existing callers that don't pass `outcomes` receive `avgEffort: null` and the HistoryPage context string simply omits the effort segment.
+
+4. **What to review first:** `src/lib/historyStats.ts` — the `computeRotationCycleProgress` and `computeRotationPlanRemaining` functions for the deduplication fix (compare with `isPlanExpired` on ~line 87 to verify consistency), then `computeWeeklyBreakdown` for the `trackEffort` helper and `effortByWeek` Map (look for the `outcomes` param at the function signature). In `HistoryPage.tsx`, check that `outcomes` is now in the `computeWeeklyBreakdown` call and in the `useMemo` dependency array.
+
+### Biggest issues found
+
+- **`computeRotationCycleProgress` / `computeRotationPlanRemaining` count inconsistency** — now fixed. Both functions counted `planEntries.length` while `isPlanExpired` (the canonical reference) counted `new Set(dates).size`. A CSV re-import could silently inflate the cycle counter and deflate the remaining counter.
+- **No per-week effort data in the History weekly table** — now addressed. The `WeeklyBreakdown` structure had completions/skips/extras/dayOffs but no effort dimension. Users wanting to understand training load variation week-over-week had to open individual workout records.
+
+### Improvements completed
+
+| Change | Classification | File(s) |
+|--------|---------------|---------|
+| Fix dedup in rotation cycle/remaining counters | **Keep** | `src/lib/historyStats.ts` |
+| Regression tests for dedup fix | **Keep** | `src/lib/__tests__/historyStats.test.ts` |
+| avgEffort in WeeklyBreakdown | **Keep** | `src/lib/historyStats.ts`, `src/pages/HistoryPage.tsx` |
+| Tests for avgEffort computation | **Keep** | `src/lib/__tests__/historyStats.test.ts` |
+
+### Not implemented (documented carry-forwards)
+
+- **`buildWeightsRecommendation` uses only `exercises[0].progressionMode`** — for multi-exercise plans with mixed progression modes, the wrong mode may be applied to some exercises. Medium-complexity fix; deferred.
+- **`loggingUpcoming` stores a stale `ResolvedDay` snapshot** — should store just `calendarDate` to avoid stale slot data. Carry-forward from pass 57.
+- **`TodayPage.tsx` / `CalendarPage.tsx` size** — both files exceed 900 lines. Refactor into sub-components deferred (large scope, requires browser testing of every flow).
+- **CalendarPage retroactive date change overwrites outcome at target date without warning** — rare UX edge case; deferred.
+
+---
+
 ## 2026-06-18 (sixtieth pass) — branch `claude/dreamy-mccarthy-xqu6si`
 
 ### Executive summary

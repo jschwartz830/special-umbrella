@@ -1,3 +1,51 @@
+# Overnight Changelog — 2026-06-20
+
+## [1] Fix: deduplicate calendar dates in rotation cycle/remaining counters
+
+**Summary**: `computeRotationCycleProgress` and `computeRotationPlanRemaining` used raw `planEntries.length` to count how many rotation slots had been completed. The reference function `isPlanExpired` correctly used `new Set(...entries.map(e => e.calendarDate)).size`. The two stat functions now use the same Set-based deduplication.
+
+**Why it matters**: Duplicate `HistoryEntry` records for the same calendar date are a real (if rare) occurrence — CSV re-imports and the brief window during retroactive logging can create them. Before this fix, a re-imported plan would show an inflated "N/M done" cycle counter and a deflated "N remaining" counter. The bug was visually obvious to a user who had just re-imported history.
+
+**Files changed**: `src/lib/historyStats.ts` (2 functions, ~6 lines changed)
+
+**Rollback**: `git revert 60bd392`
+
+---
+
+## [2] Tests: deduplication regression tests for rotation counters
+
+**Summary**: Added 2 new tests to `src/lib/__tests__/historyStats.test.ts` covering the duplicate-entry case for `computeRotationCycleProgress` and `computeRotationPlanRemaining`.
+
+**Files changed**: `src/lib/__tests__/historyStats.test.ts` (+30 lines)
+
+**Rollback**: `git revert 60bd392`
+
+---
+
+## [3] Feature: per-week average effort in History weekly breakdown
+
+**Summary**: Extended `WeeklyBreakdown` with `avgEffort: number | null`. Added an optional `outcomes` parameter to `computeWeeklyBreakdown` that accumulates `perceivedEffort` values per ISO week and computes the mean (rounded to 1 decimal place). `HistoryPage` now passes `outcomes` to the function and displays `effort X.X` in the weekly context string when data is available.
+
+**Why it matters**: The weekly breakdown table already showed completions, skips, extras, and day-offs per week. Average perceived effort is the complementary "how hard was this week?" dimension — useful for spotting deload weeks or periods of excessive fatigue without opening individual workout records.
+
+**Files changed**:
+- `src/lib/historyStats.ts` (interface + function, ~25 lines)
+- `src/pages/HistoryPage.tsx` (useMemo dep + context string, ~6 lines)
+
+**Rollback**: `git revert 15f6118`
+
+---
+
+## [4] Tests: avgEffort computation in computeWeeklyBreakdown
+
+**Summary**: Added 6 new tests covering avgEffort: null when no outcomes given, null when outcomes have no effort data, correct mean from rotation entries, extras included in mean, skip entries excluded, and rounding to 1 decimal.
+
+**Files changed**: `src/lib/__tests__/historyStats.test.ts` (+100 lines)
+
+**Rollback**: `git revert 15f6118`
+
+---
+
 # Overnight Changelog — 2026-06-18
 
 ## [1] Fix: NaN in reps/weight inputs of ActiveWorkoutTracker

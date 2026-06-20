@@ -1,5 +1,41 @@
 # Implementation Plan
 
+## Pass 61 — 2026-06-20 (branch `claude/dreamy-mccarthy-8j8xif`)
+
+### Observations on entry
+
+- Baseline on entry: **887 passing, 0 failing** — clean baseline inherited from pass 60.
+- Pass 60 fixed NaN propagation in `ActiveWorkoutTracker` input handlers, added `moveOutcome` test coverage, and wired `findBestWeek` into `HistoryPage`.
+- Full codebase audit performed this pass.
+
+### Key issues found in this audit
+
+| Priority | Issue | Status |
+|----------|-------|--------|
+| Medium | `computeRotationCycleProgress` and `computeRotationPlanRemaining` counted raw `planEntries.length` while `isPlanExpired` (the reference implementation) used `new Set(dates).size`. CSV re-imports creating duplicate same-date entries would silently inflate the cycle counter and deflate the remaining counter. | **Fixed** |
+| Low | No per-week effort aggregation in `WeeklyBreakdown` — the weekly table showed volume (completions/skips/extras) but not the "how hard was this week?" dimension available from `perceivedEffort` in the outcome store. | **Fixed (feature)** |
+
+### Decisions
+
+1. **Fix deduplication inconsistency in rotation stat functions** (BUG FIX): Both functions now build a `Set<string>` of unique `calendarDate` values before counting, matching `isPlanExpired`. Two regression tests anchor the fix.
+
+2. **Add `avgEffort` to `WeeklyBreakdown`** (FEATURE): Optional `outcomes` param on `computeWeeklyBreakdown`; backward-compatible. HistoryPage passes `outcomes` and displays `effort X.X` in the weekly context string.
+
+### Risk assessment
+
+| Change | Risk | Rollback |
+|--------|------|---------|
+| Dedup fix in rotation counters | Low — only affects users with duplicate same-date entries | `git revert 60bd392` |
+| Dedup regression tests | None — test-only | `git revert 60bd392` |
+| avgEffort in WeeklyBreakdown | Low — optional param, null fallback, additive interface extension | `git revert 15f6118` |
+| avgEffort tests | None — test-only | `git revert 15f6118` |
+
+### Final test count
+
+887 baseline → 895 total (+8 new tests, all passing)
+
+---
+
 ## Pass 60 — 2026-06-18 (branch `claude/dreamy-mccarthy-xqu6si`)
 
 ### Observations on entry

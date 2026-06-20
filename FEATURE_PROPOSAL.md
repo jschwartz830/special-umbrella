@@ -1,5 +1,41 @@
 # Feature Proposals
 
+## Pass 61 — 2026-06-20 (branch `claude/dreamy-mccarthy-8j8xif`)
+
+### Feature selected
+
+**Per-week average perceived effort in the History weekly breakdown**
+
+### Why it was selected
+
+The `WeeklyBreakdown` interface already aggregated completions, skips, extras, and day-offs per ISO week. The `outcomes` store (already imported in `HistoryPage`) holds `perceivedEffort` (1–5 integer) on every `WorkoutOutcome`. Adding `avgEffort: number | null` closes the "load dimension" gap: users can now see not just *how many* workouts they did each week but also *how hard* those weeks felt — without navigating to individual entries.
+
+The implementation is additive: the `outcomes` param is optional so all existing callers and all 887 pre-change tests continue to work with zero modification.
+
+### Expected user value
+
+- A row like "effort 3.5" in the weekly context string gives a week-level RPE summary.
+- Users tracking perceived fatigue over time can spot deload weeks (low effort) or overreach periods (consistently high effort) at a glance.
+- Especially useful for plan-level views where multiple workout types are mixed — the effort signal aggregates across run and weights sessions into a single number.
+
+### Implementation scope
+
+| Item | Lines |
+|------|-------|
+| `WeeklyBreakdown` interface extension (`avgEffort` field) | 1 |
+| `computeWeeklyBreakdown` signature change (optional `outcomes` param) | 1 |
+| `trackEffort` helper and `effortByWeek` Map accumulation | ~12 |
+| Post-loop avgEffort resolution per week | ~8 |
+| `padWeekGaps` synthesized row update | 1 |
+| `HistoryPage` useMemo + dep array + context string | ~6 |
+| **Total** | **~29** |
+
+### Risks
+
+- None. Optional param with null fallback; UI segment filtered out when null. Backward-compatible interface extension (TypeScript structural typing means existing consumers can ignore the new field).
+
+---
+
 ## Pass 60 — 2026-06-18 (branch `claude/dreamy-mccarthy-xqu6si`)
 
 ### Feature selected

@@ -1,5 +1,40 @@
 # Feature Reviews
 
+## Pass 61 — 2026-06-20 (branch `claude/dreamy-mccarthy-8j8xif`)
+
+### Classification: **Keep**
+
+### What was actually built
+
+**`src/lib/historyStats.ts`**
+- `WeeklyBreakdown` interface: added `avgEffort: number | null` field
+- `computeWeeklyBreakdown` signature: added optional `outcomes?: Record<string, WorkoutOutcome>` third parameter
+- `getOrCreate` helper inside the function: initialized `avgEffort: null` on each new week object
+- Added `effortByWeek: Map<string, number[]>` accumulator and `trackEffort` inner function that resolves the `workoutInstanceId` for a given planId+calendarDate (rotation entries) or from an `ExtraWorkoutEntry.workoutInstanceId` (extra entries), looks up the outcome, and pushes `perceivedEffort` when non-null
+- Called `trackEffort` in both the rotation entry loop and the extra entry loop
+- After both loops: resolved `avgEffort` per week: `Math.round(mean * 10) / 10` or `null` when no effort data
+- `padWeekGaps` synthesized rows: added `avgEffort: null` to the placeholder object
+
+**`src/pages/HistoryPage.tsx`**
+- `weeklyBreakdown` useMemo: added `outcomes` as third argument to `computeWeeklyBreakdown`; added `outcomes` to the dependency array
+- Weekly context string: added `w.avgEffort !== null ? \`effort ${w.avgEffort.toFixed(1)}\` : ''` segment (filtered and joined with ` · ` alongside the existing skips/dayOffs/extras segments)
+
+Total: ~35 lines changed/added across 2 files.
+
+### What assumptions were encoded
+
+- **Effort is per-workout-instance**: one `perceivedEffort` value per `workoutInstanceId`. If a user logs multiple outcomes for the same instance (unusual), the first one found wins (Map insertion order).
+- **Skips excluded**: skip entries do not look up outcomes because `perceivedEffort` on a skipped workout would be meaningless load data. Only `complete` and `day_off` entries trigger the lookup.
+- **Rounding**: `Math.round(x * 10) / 10` rather than `toFixed(1)` at computation time — keeps the stored value a `number` so callers can do further arithmetic if needed.
+- **Display position**: appended after extras in the context string (`· effort 3.5`). Could alternatively go first, but effort feels like a secondary qualifier to the volume counts.
+
+### What was NOT built (and why)
+
+- **Per-type effort breakdown** (e.g., "run effort 2.5, weights effort 4.0"): more informative for mixed-type weeks but significantly more complex display logic. The single aggregate number is the useful minimum.
+- **Effort trend arrow** (↑↓→ vs previous week): would require comparing consecutive weeks; out of scope for this pass.
+
+---
+
 ## Pass 60 — 2026-06-18 (branch `claude/dreamy-mccarthy-xqu6si`)
 
 ### Classification: **Keep**
