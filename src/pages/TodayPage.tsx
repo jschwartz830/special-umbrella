@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Play,
   ChevronDown,
+  Copy,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
@@ -41,6 +42,7 @@ import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress
 import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
+import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
@@ -222,6 +224,7 @@ export function TodayPage() {
 
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
+  const [workoutCopied, setWorkoutCopied] = useState(false)
   const [showJump, setShowJump] = useState(false)
   const [showCatchupConfirm, setShowCatchupConfirm] = useState(false)
   const [doubleDay, setDoubleDay] = useState(false)
@@ -460,6 +463,17 @@ export function TodayPage() {
   function handleSkip() {
     if (!todayResolved) return
     actions.skip(todayResolved.planDayIndex)
+  }
+
+  function handleCopyWorkout() {
+    const dateLabel = format(parseISO(today), 'EEE, MMM d')
+    const text = formatWorkoutForClipboard(primaryPlanDay, plan!.name, dateLabel)
+    navigator.clipboard.writeText(text).then(() => {
+      setWorkoutCopied(true)
+      setTimeout(() => setWorkoutCopied(false), 2000)
+    }).catch(() => {
+      // Clipboard access denied — silently no-op
+    })
   }
 
   function handleEditOutcome() {
@@ -796,15 +810,29 @@ export function TodayPage() {
         </div>
       )}
 
-      {/* Start Workout button — only when pending and no active session */}
+      {/* Start Workout button + Copy Workout shortcut */}
       {isPending && activeWorkoutState === 'hidden' && (
-        <button
-          onClick={() => setActiveWorkoutState('open')}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors active:scale-[0.98]"
-        >
-          <Play size={18} />
-          Start Workout
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveWorkoutState('open')}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors active:scale-[0.98]"
+          >
+            <Play size={18} />
+            Start Workout
+          </button>
+          <button
+            onClick={handleCopyWorkout}
+            aria-label="Copy workout to clipboard"
+            title="Copy workout"
+            className={`flex items-center justify-center px-3.5 py-3.5 rounded-xl border text-sm transition-colors ${
+              workoutCopied
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 active:scale-[0.96]'
+            }`}
+          >
+            <Copy size={18} />
+          </button>
+        </div>
       )}
 
       {/* Double-day toggle — only when pending and there's a next workout */}
