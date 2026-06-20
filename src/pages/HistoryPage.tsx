@@ -217,10 +217,10 @@ export function HistoryPage() {
   const weeklyBreakdown = useMemo<WeeklyBreakdown[]>(() => {
     if (filterPlanId === 'all') return []
     const from = format(addDays(new Date(), -55), 'yyyy-MM-dd')
-    const active = computeWeeklyBreakdown(filterPlanId, filteredEntries, filteredExtras, from, today)
+    const active = computeWeeklyBreakdown(filterPlanId, filteredEntries, filteredExtras, from, today, outcomes)
     // Fill gap weeks so training breaks are visible rather than silently skipped.
     return padWeekGaps(active).reverse()
-  }, [filterPlanId, filteredEntries, filteredExtras, today])
+  }, [filterPlanId, filteredEntries, filteredExtras, today, outcomes])
 
   const bestWeek = useMemo(
     () => (filterPlanId === 'all' ? null : findBestWeek(filterPlanId, filteredEntries, filteredExtras)),
@@ -1030,6 +1030,7 @@ function WeeklyActivitySection({ weeks }: { weeks: WeeklyBreakdown[] }) {
                   w.skipped > 0 ? `${w.skipped} skip` : '',
                   w.dayOffs > 0 ? `${w.dayOffs} off` : '',
                   w.extras > 0 ? `+${w.extras} extra` : '',
+                  w.avgEffort !== null ? `effort ${w.avgEffort.toFixed(1)}` : '',
                 ].filter(Boolean).join(' · ')
 
             return (

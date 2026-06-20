@@ -702,6 +702,12 @@ export interface WeeklyBreakdown {
   extras: number
   /** completed + skipped + dayOffs + extras */
   totalLogged: number
+  /**
+   * Average perceived effort (1–5) across completed workouts (rotation + extras)
+   * that have an outcome with perceivedEffort set. null when no effort data is available
+   * or when `outcomes` was not passed to `computeWeeklyBreakdown`.
+   */
+  avgEffort: number | null
   /** True when this row was synthesised by `padWeekGaps` to fill a gap; all counts are 0. */
   isEmpty?: boolean
 }
@@ -724,8 +730,10 @@ export function computeWeeklyBreakdown(
   extras: ExtraWorkoutEntry[],
   fromDate: string,
   toDate: string,
+  outcomes?: Record<string, WorkoutOutcome>,
 ): WeeklyBreakdown[] {
   const weekMap = new Map<string, WeeklyBreakdown>()
+  const effortByWeek = new Map<string, { sum: number; count: number }>()
 
   function getOrCreate(weekStart: string): WeeklyBreakdown {
     if (!weekMap.has(weekStart)) {
@@ -737,27 +745,56 @@ export function computeWeeklyBreakdown(
         dayOffs: 0,
         extras: 0,
         totalLogged: 0,
+        avgEffort: null,
       })
     }
     return weekMap.get(weekStart)!
   }
 
+  function trackEffort(weekStart: string, effort: number | null | undefined) {
+    if (effort == null) return
+    const cur = effortByWeek.get(weekStart) ?? { sum: 0, count: 0 }
+    cur.sum += effort
+    cur.count++
+    effortByWeek.set(weekStart, cur)
+  }
+
   for (const e of entries) {
     if (e.planId !== planId) continue
     if (e.calendarDate < fromDate || e.calendarDate > toDate) continue
-    const week = getOrCreate(isoWeekStart(e.calendarDate))
-    if (e.action === 'complete') week.completed++
-    else if (e.action === 'skip') week.skipped++
-    else if (e.action === 'day_off') week.dayOffs++
+    const weekStart = isoWeekStart(e.calendarDate)
+    const week = getOrCreate(weekStart)
+    if (e.action === 'complete') {
+      week.completed++
+      if (outcomes) {
+        trackEffort(weekStart, outcomes[makeWorkoutInstanceId(planId, e.calendarDate)]?.perceivedEffort)
+      }
+    } else if (e.action === 'skip') {
+      week.skipped++
+    } else if (e.action === 'day_off') {
+      week.dayOffs++
+    }
     week.totalLogged++
   }
 
   for (const e of extras) {
     if (e.planId !== planId) continue
     if (e.calendarDate < fromDate || e.calendarDate > toDate) continue
-    const week = getOrCreate(isoWeekStart(e.calendarDate))
+    const weekStart = isoWeekStart(e.calendarDate)
+    const week = getOrCreate(weekStart)
     week.extras++
     week.totalLogged++
+    if (outcomes) {
+      trackEffort(weekStart, outcomes[makeExtraWorkoutInstanceId(planId, e.calendarDate, e.id)]?.perceivedEffort)
+    }
+  }
+
+  // Resolve average effort per week from the collected sums
+  for (const [weekStart, week] of weekMap) {
+    const effortData = effortByWeek.get(weekStart)
+    week.avgEffort = effortData && effortData.count > 0
+      ? Math.round(effortData.sum / effortData.count * 10) / 10
+      : null
   }
 
   return [...weekMap.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart))
@@ -804,6 +841,7 @@ export function padWeekGaps(weeks: WeeklyBreakdown[]): WeeklyBreakdown[] {
       dayOffs: 0,
       extras: 0,
       totalLogged: 0,
+      avgEffort: null,
       isEmpty: true,
     })
     cursor = shiftDay(cursor, 7)

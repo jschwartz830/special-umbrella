@@ -1667,6 +1667,95 @@ describe('computeWeeklyBreakdown', () => {
     expect(result).toHaveLength(1)
     expect(result[0].completed).toBe(1)
   })
+
+  it('avgEffort is null when no outcomes are passed', () => {
+    const entries = [weekEntry('2026-01-05', 'complete')]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result[0].avgEffort).toBeNull()
+  })
+
+  it('avgEffort is null when outcomes are passed but none have perceivedEffort', () => {
+    const entries = [weekEntry('2026-01-05', 'complete')]
+    const outcomes: Record<string, WorkoutOutcome> = {}
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31', outcomes)
+    expect(result[0].avgEffort).toBeNull()
+  })
+
+  it('computes avgEffort from completed rotation entries with outcomes', () => {
+    const entries = [
+      weekEntry('2026-01-05', 'complete'),
+      weekEntry('2026-01-06', 'complete'),
+    ]
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-01-05': {
+        workoutInstanceId: 'plan-1_2026-01-05',
+        completionState: 'completed',
+        perceivedEffort: 3,
+        completedAt: '2026-01-05T12:00:00Z',
+        notes: null,
+      } as WorkoutOutcome,
+      'plan-1_2026-01-06': {
+        workoutInstanceId: 'plan-1_2026-01-06',
+        completionState: 'completed',
+        perceivedEffort: 5,
+        completedAt: '2026-01-06T12:00:00Z',
+        notes: null,
+      } as WorkoutOutcome,
+    }
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31', outcomes)
+    expect(result[0].avgEffort).toBe(4) // (3 + 5) / 2
+  })
+
+  it('includes extras effort in avgEffort calculation', () => {
+    const extras = [weekExtra('2026-01-05')]
+    const extraId = extras[0].id
+    const outcomes: Record<string, WorkoutOutcome> = {
+      [`plan-1_2026-01-05_extra_${extraId}`]: {
+        workoutInstanceId: `plan-1_2026-01-05_extra_${extraId}`,
+        completionState: 'completed',
+        perceivedEffort: 2,
+        completedAt: '2026-01-05T12:00:00Z',
+        notes: null,
+      } as WorkoutOutcome,
+    }
+    const result = computeWeeklyBreakdown('plan-1', [], extras, '2026-01-01', '2026-01-31', outcomes)
+    expect(result[0].avgEffort).toBe(2)
+  })
+
+  it('skip entries do not contribute to avgEffort', () => {
+    const entries = [
+      weekEntry('2026-01-05', 'complete'),
+      weekEntry('2026-01-06', 'skip'),
+    ]
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-01-05': {
+        workoutInstanceId: 'plan-1_2026-01-05',
+        completionState: 'completed',
+        perceivedEffort: 4,
+        completedAt: '2026-01-05T12:00:00Z',
+        notes: null,
+      } as WorkoutOutcome,
+    }
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31', outcomes)
+    // Only the complete entry's effort should count
+    expect(result[0].avgEffort).toBe(4)
+  })
+
+  it('rounds avgEffort to one decimal place', () => {
+    const entries = [
+      weekEntry('2026-01-05', 'complete'),
+      weekEntry('2026-01-06', 'complete'),
+      weekEntry('2026-01-07', 'complete'),
+    ]
+    const outcomes: Record<string, WorkoutOutcome> = {
+      'plan-1_2026-01-05': { workoutInstanceId: 'plan-1_2026-01-05', completionState: 'completed', perceivedEffort: 1, completedAt: '2026-01-05T12:00:00Z', notes: null } as WorkoutOutcome,
+      'plan-1_2026-01-06': { workoutInstanceId: 'plan-1_2026-01-06', completionState: 'completed', perceivedEffort: 2, completedAt: '2026-01-06T12:00:00Z', notes: null } as WorkoutOutcome,
+      'plan-1_2026-01-07': { workoutInstanceId: 'plan-1_2026-01-07', completionState: 'completed', perceivedEffort: 2, completedAt: '2026-01-07T12:00:00Z', notes: null } as WorkoutOutcome,
+    }
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31', outcomes)
+    // (1 + 2 + 2) / 3 = 1.666... → rounds to 1.7
+    expect(result[0].avgEffort).toBe(1.7)
+  })
 })
 
 // ── getUnloggedPastDates ──────────────────────────────────────────────────────
