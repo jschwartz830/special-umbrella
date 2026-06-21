@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -2417,5 +2417,124 @@ describe('findBestWeek', () => {
     const result = findBestWeek('plan-1', entries, [])
     expect(result!.weekStart).toBe('2026-01-05')
     expect(result!.completed).toBe(3)
+  })
+})
+
+// ── countTotalUnloggedDays ────────────────────────────────────────────────────
+
+describe('countTotalUnloggedDays', () => {
+  const TODAY = '2026-04-28'
+  const START = '2026-04-01'
+
+  it('returns 0 when plan starts today', () => {
+    expect(countTotalUnloggedDays('p1', [], TODAY, TODAY)).toBe(0)
+  })
+
+  it('returns 0 when plan starts in the future', () => {
+    expect(countTotalUnloggedDays('p1', [], '2026-05-01', TODAY)).toBe(0)
+  })
+
+  it('returns full active-day count when nothing is logged', () => {
+    // 27 days: Apr 1 (inclusive) → Apr 28 (exclusive)
+    expect(countTotalUnloggedDays('plan-1', [], START, TODAY)).toBe(27)
+  })
+
+  it('subtracts logged dates from the active-day count', () => {
+    const entries = [
+      entry('2026-04-01', 'complete'),
+      entry('2026-04-05', 'skip'),
+      entry('2026-04-10', 'day_off'),
+    ]
+    // 27 active days, 3 logged → 24 unlogged
+    expect(countTotalUnloggedDays('plan-1', entries, START, TODAY)).toBe(24)
+  })
+
+  it('does not count today as an active past day', () => {
+    // today's entry must NOT reduce the unlogged count (today is excluded)
+    const entries = [entry(TODAY, 'complete')]
+    expect(countTotalUnloggedDays('plan-1', entries, START, TODAY)).toBe(27)
+  })
+
+  it('ignores entries before plan start date', () => {
+    const entries = [entry('2026-03-31', 'complete')]
+    expect(countTotalUnloggedDays('plan-1', entries, START, TODAY)).toBe(27)
+  })
+
+  it('ignores entries for a different plan', () => {
+    const entries = [entry('2026-04-10', 'complete', 'other-plan')]
+    expect(countTotalUnloggedDays('plan-1', entries, START, TODAY)).toBe(27)
+  })
+
+  it('deduplicates multiple entries for the same date (one logged day)', () => {
+    const entries: HistoryEntry[] = [
+      { ...entry('2026-04-10', 'complete'), id: 'e1', createdAt: '2026-04-10T10:00:00Z' },
+      { ...entry('2026-04-10', 'skip'), id: 'e2', createdAt: '2026-04-10T12:00:00Z' },
+    ]
+    // 27 active days, 1 unique logged date → 26 unlogged
+    expect(countTotalUnloggedDays('plan-1', entries, START, TODAY)).toBe(26)
+  })
+
+  it('returns 0 when every past day is logged', () => {
+    const entries = Array.from({ length: 27 }, (_, i) => {
+      const d = String(i + 1).padStart(2, '0')
+      return entry(`2026-04-${d}`, 'complete')
+    })
+    expect(countTotalUnloggedDays('plan-1', entries, START, TODAY)).toBe(0)
+  })
+})
+
+// ── deduplication consistency: computeRotationCycleProgress ──────────────────
+
+describe('computeRotationCycleProgress deduplication', () => {
+  it('treats duplicate entries on the same date as one completion (mirrors isPlanExpired)', () => {
+    const plan = makePlan({ duration: { type: 'rotations', value: 4 } })
+    const entries: HistoryEntry[] = [
+      { id: 'e1', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T10:00:00Z' },
+      { id: 'e2', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T12:00:00Z' },
+      { id: 'e3', planId: 'plan-1', calendarDate: '2026-01-02', planDayIndex: 1, action: 'complete', createdAt: '2026-01-02T12:00:00Z' },
+    ]
+    // 3 entries but only 2 unique dates → doneInCycle=2, not 3
+    const result = computeRotationCycleProgress(plan, entries)
+    expect(result!.doneInCycle).toBe(2)
+    expect(result!.remaining).toBe(1)
+  })
+})
+
+// ── deduplication consistency: computeRotationPlanRemaining ──────────────────
+
+describe('computeRotationPlanRemaining deduplication', () => {
+  it('treats duplicate entries on the same date as one completion (mirrors isPlanExpired)', () => {
+    const plan = makePlan({ duration: { type: 'rotations', value: 4 } }) // 12 total needed
+    const entries: HistoryEntry[] = [
+      { id: 'e1', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T10:00:00Z' },
+      { id: 'e2', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T12:00:00Z' },
+    ]
+    // 2 entries but only 1 unique date → 12 - 1 = 11 remaining
+    expect(computeRotationPlanRemaining(plan, entries)).toBe(11)
+  })
+})
+
+// ── getUnloggedPastDates: 14-day window surfacing ────────────────────────────
+
+describe('getUnloggedPastDates 14-day window', () => {
+  it('surfaces gaps beyond 7 days when lookbackDays=14', () => {
+    const today = '2026-04-28'
+    const start = '2026-04-01'
+    // Only the last 7 days are logged; 8–14 days ago are unlogged
+    const entries: HistoryEntry[] = [
+      entry('2026-04-27', 'complete'),
+      entry('2026-04-26', 'complete'),
+      entry('2026-04-25', 'complete'),
+      entry('2026-04-24', 'complete'),
+      entry('2026-04-23', 'complete'),
+      entry('2026-04-22', 'complete'),
+      entry('2026-04-21', 'complete'),
+    ]
+    const gaps7 = getUnloggedPastDates('plan-1', entries, start, today, 7)
+    const gaps14 = getUnloggedPastDates('plan-1', entries, start, today, 14)
+    expect(gaps7).toHaveLength(0)  // last 7 are all logged
+    expect(gaps14).toHaveLength(7) // days 8–14 ago are unlogged
+    expect(gaps14[0]).toBe('2026-04-20') // newest first
+    expect(gaps14[6]).toBe('2026-04-14') // oldest last
   })
 })
