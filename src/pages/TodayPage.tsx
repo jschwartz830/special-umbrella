@@ -19,6 +19,7 @@ import {
   Play,
   ChevronDown,
   Copy,
+  Trophy,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
@@ -38,7 +39,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak, computeConsecutiveSkips, computeLoggedRate } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak, computeConsecutiveSkips, computeLoggedRate } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
@@ -224,6 +225,7 @@ export function TodayPage() {
 
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
+  const [newPRs, setNewPRs] = useState<string[] | null>(null)
   const [workoutCopied, setWorkoutCopied] = useState(false)
   const [showJump, setShowJump] = useState(false)
   const [showCatchupConfirm, setShowCatchupConfirm] = useState(false)
@@ -307,7 +309,12 @@ export function TodayPage() {
   const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
 
   // Collect recent past days with no entry — used to show the stall nudge and quick catch-up.
-  const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today)
+  // Looks back 14 days so a two-week gap is fully surfaced and catch-up-able.
+  const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today, 14)
+
+  // Count unlogged days outside the 14-day window (older gaps the catch-up won't fix).
+  const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, plan.startDate, today)
+  const olderUnloggedCount = Math.max(0, totalUnlogged - unloggedDates.length)
 
   // Logging adherence rate — shown after plan has been active ≥ 7 days so the
   // percentage is meaningful. null for new plans or when the plan started today.
@@ -380,6 +387,11 @@ export function TodayPage() {
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
     setActiveTrackedExercises(null)
     setActiveTrackedDurationMin(null)
+
+    // Snapshot pre-workout PR baselines before the store updates so we can
+    // detect which exercises hit a new personal record this session.
+    const preWorkoutMaxLoad = { ...maxLoadByExercise }
+
     const completedDate = outcome.completedAt
       ? format(new Date(outcome.completedAt), 'yyyy-MM-dd')
       : today
@@ -408,6 +420,19 @@ export function TodayPage() {
       logOutcomeWithProgression(outcome, primarySlot)
     } else {
       useOutcomeStore.getState().setOutcome(outcome)
+    }
+
+    // Detect new personal records: compare today's loads against the pre-workout
+    // all-time max. Only fires for completed sets with a numeric load.
+    if (outcome.weightsActual?.exercises?.length) {
+      const prs = outcome.weightsActual.exercises.flatMap(ex => {
+        const prevMax = preWorkoutMaxLoad[ex.exercise] ?? 0
+        const todayMax = (ex.sets ?? [])
+          .filter(s => s.actualLoad != null && s.completed)
+          .reduce((m, s) => Math.max(m, s.actualLoad!), 0)
+        return todayMax > 0 && todayMax > prevMax ? [ex.exercise] : []
+      })
+      if (prs.length > 0) setNewPRs(prs)
     }
 
     // Double-day: persist the bonus workout as an ExtraWorkoutEntry on today's
@@ -637,24 +662,36 @@ export function TodayPage() {
       )}
 
       {/* Unlogged past days nudge — shown when the rotation may be stalled */}
-      {!planExpired && unloggedDates.length > 0 && (
-        <div className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-700/50 border border-slate-600/50">
-          <Info size={13} className="text-slate-400 flex-shrink-0" />
-          <p className="flex-1 text-xs text-slate-400">
-            {unloggedDates.length} day{unloggedDates.length === 1 ? '' : 's'} in the past week without entries — rotation may be stalled.
-          </p>
-          <button
-            onClick={() => setShowCatchupConfirm(true)}
-            className="text-xs text-amber-400 font-medium flex-shrink-0 hover:text-amber-300 transition-colors"
-          >
-            Mark {unloggedDates.length === 1 ? 'as' : `${unloggedDates.length} as`} Day Off
-          </button>
-          <button
-            onClick={() => navigate('/calendar')}
-            className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
-          >
-            Calendar →
-          </button>
+      {!planExpired && (unloggedDates.length > 0 || olderUnloggedCount > 0) && (
+        <div className="w-full flex flex-col gap-1.5 px-3 py-2.5 rounded-xl bg-slate-700/50 border border-slate-600/50">
+          <div className="flex items-center gap-2">
+            <Info size={13} className="text-slate-400 flex-shrink-0" />
+            <p className="flex-1 text-xs text-slate-400">
+              {unloggedDates.length > 0
+                ? `${unloggedDates.length} unlogged day${unloggedDates.length === 1 ? '' : 's'} in the past 2 weeks — rotation may be stalled.`
+                : `${olderUnloggedCount} older unlogged day${olderUnloggedCount === 1 ? '' : 's'} — check Calendar.`
+              }
+            </p>
+            {unloggedDates.length > 0 && (
+              <button
+                onClick={() => setShowCatchupConfirm(true)}
+                className="text-xs text-amber-400 font-medium flex-shrink-0 hover:text-amber-300 transition-colors"
+              >
+                Mark {unloggedDates.length === 1 ? 'as' : `${unloggedDates.length} as`} Day Off
+              </button>
+            )}
+            <button
+              onClick={() => navigate('/calendar')}
+              className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
+            >
+              Calendar →
+            </button>
+          </div>
+          {unloggedDates.length > 0 && olderUnloggedCount > 0 && (
+            <p className="text-[10px] text-slate-500 ml-5">
+              + {olderUnloggedCount} older gap{olderUnloggedCount === 1 ? '' : 's'} not shown — use Calendar to review.
+            </p>
+          )}
         </div>
       )}
 
@@ -755,6 +792,26 @@ export function TodayPage() {
             </button>
           ))}
         </section>
+      )}
+
+      {/* Personal record celebration — shown briefly after a workout is logged */}
+      {newPRs && newPRs.length > 0 && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25">
+          <Trophy size={14} className="text-amber-400 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-amber-300">New personal record{newPRs.length > 1 ? 's' : ''}!</p>
+            <p className="text-xs text-amber-400/70 mt-0.5 truncate">
+              {newPRs.slice(0, 3).join(', ')}{newPRs.length > 3 ? ` +${newPRs.length - 3} more` : ''}
+            </p>
+          </div>
+          <button
+            onClick={() => setNewPRs(null)}
+            className="text-amber-400/50 hover:text-amber-200 flex-shrink-0 transition-colors"
+            aria-label="Dismiss"
+          >
+            <X size={13} />
+          </button>
+        </div>
       )}
 
       {/* Today's workout — or rest card if day off */}
@@ -884,6 +941,7 @@ export function TodayPage() {
                   removeExtraEntry(ex.id)
                 }
               }
+              setNewPRs(null)
             }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 text-xs font-medium transition-colors"
           >
@@ -1136,7 +1194,7 @@ export function TodayPage() {
         <Modal title="Mark as Day Off?" onClose={() => setShowCatchupConfirm(false)}>
           <div className="space-y-4">
             <p className="text-sm text-slate-400">
-              The following {unloggedDates.length} day{unloggedDates.length === 1 ? '' : 's'} will be marked as Day Off.
+              The following {unloggedDates.length} day{unloggedDates.length === 1 ? '' : 's'} (past 2 weeks) will be marked as Day Off.
               The rotation will continue from today.
             </p>
             <div className="space-y-1 max-h-48 overflow-y-auto">
