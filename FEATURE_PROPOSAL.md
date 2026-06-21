@@ -113,3 +113,88 @@ Use `navigator.share({ title, text, url })` to open the native iOS/Android share
 
 **Complexity**: Low. Wrap the existing `formatWorkoutForClipboard` output in a `navigator.share` call with a `navigator.clipboard` fallback.
 **Priority**: Medium — better UX on mobile vs. raw clipboard.
+
+---
+
+## Pass 62 — 2026-06-21 (branch `claude/dreamy-mccarthy-zu4z6a`)
+
+---
+
+### Proposal: Personal record celebration banner on TodayPage
+
+**Status**: Implemented in this pass.
+
+---
+
+#### Problem
+
+The app tracks personal records via `exerciseHistoryStore` (per-exercise max load and max reps). This data surfaces in HistoryPage's PR table, and the pre-workout hint shows "· PB" next to the previous session summary. However, there is no feedback at the moment of achievement — the user logs their workout and sees nothing special even if they just broke a record they'd been chasing for months.
+
+---
+
+#### User value
+
+Immediate, in-context positive reinforcement at the highest emotional peak of the interaction loop (just after logging a hard workout). This is the moment when the user is most receptive to celebrating progress and most likely to feel the app "gets it." Without this, the PR is only visible if the user navigates to HistoryPage — a step most users skip.
+
+---
+
+#### Implementation scope for this run
+
+A stateless, dismissible amber banner in TodayPage that:
+1. Detects PRs in `handleOutcomeConfirm` by comparing today's logged loads against the pre-workout all-time max
+2. Shows up to 3 exercise names in the banner (truncates with "+ N more" if needed)
+3. Dismisses on X click or Undo
+4. Shows no banner if no weights were logged or no PR was achieved
+
+---
+
+#### Assumptions
+
+- PR detection compares `actualLoad` (from `LoggedSetActual`) against `maxLoadByExercise` (computed from `exerciseHistoryStore.records`).
+- Only completed sets (`s.completed === true`) with a numeric `actualLoad` count.
+- Reps PRs are NOT detected — only load PRs. Reps PRs are less common to celebrate and harder to compare (different exercise, different day).
+- The `maxLoadByExercise` snapshot is taken at the START of `handleOutcomeConfirm`, BEFORE `logOutcomeWithProgression` runs. This ensures we're comparing against the previous all-time max, not the current session's logged value.
+
+---
+
+#### Open product / UX decisions
+
+1. **Persistence**: The banner is ephemeral React state — it disappears on page reload. Should PRs be stored so the banner can re-appear if the user closes and reopens the app on the same day?
+2. **Edit flow**: If the user edits an existing workout and increases a load, the banner will appear again. Is this correct behaviour or noise?
+3. **Banner position**: Currently shown between the "Completed today" section and the workout card. Should it be shown above everything else, as a modal, or as a toast at the bottom?
+4. **Multi-PR threshold**: If 10 exercises hit PRs, should all be shown (potentially a very long banner)? Currently capped at 3 + "N more".
+
+---
+
+#### Architecture / schema impact
+
+None. Fully stateless — no new store state, no localStorage keys, no schema changes. The `newPRs` state is `useState<string[] | null>` local to TodayPage.
+
+---
+
+#### Risks
+
+- False positive on edit: a user re-logging an old session with higher corrected values will see the PR banner even if they didn't actually do a PR today.
+- The `maxLoadByExercise` memo includes ALL historical exercise records. For a first-time user logging their first workout, `prevMax=0` so any load will be a PR. This seems correct (first session IS a PR) but may feel unexpected.
+
+---
+
+#### Rollback strategy
+
+Single commit revert of `src/pages/TodayPage.tsx`:
+- Remove `newPRs` state
+- Remove detection block in `handleOutcomeConfirm`
+- Remove banner JSX
+- Remove `Trophy` from lucide import
+
+No data migrations, no schema changes.
+
+---
+
+#### What is intentionally NOT being built yet
+
+- Reps PRs
+- PR persistence across reloads
+- Toast-style notification (bottom of screen)
+- Modal celebration (too disruptive for routine logging)
+- PR history / streak ("3rd week in a row hitting a PR on Bench Press")

@@ -87,3 +87,101 @@ Focused on:
 - The copy button in TodayPage follows the same conditional render pattern as the existing Start Workout / Skip buttons — consistent with the surrounding code.
 - No new dependencies introduced in this pass.
 - All new test files follow the existing Vitest + `describe`/`it`/`expect` conventions used across the codebase.
+
+---
+
+## 2026-06-21 (sixty-second pass) — branch `claude/dreamy-mccarthy-zu4z6a`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 3 bug fixes + 1 small feature (PR celebration banner). Tests added for all fixes. Documentation added for timezone convention.
+2. **Highest confidence**: The deduplication fix and the 14-day window extension — both are well-tested, low-risk, and correct the core issues found in audit.
+3. **What is risky**: The PR celebration banner (medium confidence). The detection logic is correct but the edge case of editing an existing workout with an inflated load could show a false PR banner. Acceptable for v1.
+4. **Review first**: Start with the `computeRotationCycleProgress` / `computeRotationPlanRemaining` deduplication fix — it's the most invisible bug and most important to verify.
+
+---
+
+### Audit Findings
+
+#### Finding 1 — catch-up nudge only scanned 7 days (addressed)
+
+**File**: `src/pages/TodayPage.tsx`, `src/lib/historyStats.ts`  
+**Risk**: Medium — users returning after > 7 days got a partial stall diagnosis. The catch-up action would mark 7 days as Day Off, but the rotation pointer could still be wrong for older gaps.  
+**Action**: Extended lookback to 14 days + added `olderUnloggedCount` display for gaps beyond 14.  
+**Status**: Fixed.
+
+---
+
+#### Finding 2 — computeRotationCycleProgress / computeRotationPlanRemaining didn't deduplicate (addressed)
+
+**File**: `src/lib/historyStats.ts`  
+**Risk**: Low (store auto-deduplicates), but inconsistent with `isPlanExpired`.  
+**Action**: Both functions now use a Set of calendarDate values, matching the dedup strategy used by `isPlanExpired`.  
+**Status**: Fixed.
+
+---
+
+#### Finding 3 — Timezone convention undocumented (addressed)
+
+**File**: `src/engine/rotationEngine.ts`  
+**Risk**: Low — consistent behavior within a single timezone, but a subtle bug if a user travels and logs workouts in different timezones.  
+**Action**: Added a block comment explaining the convention and its limitation.  
+**Status**: Documented.
+
+---
+
+#### Finding 4 — No PR feedback on workout completion (feature, addressed)
+
+**File**: `src/pages/TodayPage.tsx`  
+**Observation**: PRs were tracked and shown in HistoryPage but not surfaced in the moment of achievement on TodayPage.  
+**Action**: Added PR detection in `handleOutcomeConfirm` and dismissible amber banner.  
+**Status**: Implemented (see FEATURE_REVIEW.md).
+
+---
+
+#### Finding 5 — No cross-store transaction guarantees (not addressed)
+
+**File**: `src/store/outcomeStore.ts` + `src/store/historyStore.ts`  
+**Risk**: If `logOutcomeWithProgression` fails mid-way, entry and outcome may be partially inconsistent.  
+**Decision**: Too complex to fix safely in an overnight pass. Existing try/catch prevents crashes. Recommend future work.  
+**Status**: Documented only.
+
+---
+
+#### Finding 6 — Component/integration tests absent (not addressed)
+
+**Files**: TodayPage, CalendarPage, OutcomeModal  
+**Risk**: Key user flows (log workout → see calendar → check stats) have no automated coverage.  
+**Decision**: Requires test infrastructure setup (RTL or Playwright). Out of scope.  
+**Status**: Documented only.
+
+---
+
+### Keep / Revise / Reject Guide
+
+| Change | Recommendation |
+|---|---|
+| Deduplication fix (cycleProgress + remaining) | **Definitely keep** — correctness fix, no risk |
+| 14-day catch-up window + older gap count | **Definitely keep** — clear UX improvement, well-tested |
+| Timezone documentation comment | **Definitely keep** — improves contributor understanding |
+| 12 new tests | **Definitely keep** — all pass, no false positives |
+| PR celebration banner | **Probably keep** — good UX, minor edge case on edit flow |
+
+---
+
+### Recommendations Not Implemented
+
+1. **Show progression errors in HistoryPage** — If a YAML progression rule fails to evaluate, it's currently silent. Add a `progressionError?: string` field to `WorkoutOutcome` and display a warning badge in the History or TodayPage when set.
+2. **Cross-store consistency check** — Consider a one-time migration/audit that finds `HistoryEntry` records without a corresponding `WorkoutOutcome` and flags them, so users can re-log or dismiss the orphan.
+3. **Component tests** — Adding RTL tests for TodayPage's key flows (complete workout, undo, double-day) would prevent regressions across the many edge cases in that component.
+4. **Extended catch-up (> 14 days)** — The Calendar page is the right tool for older gaps. Consider adding a "bulk mark as Day Off" from CalendarPage month view to make this less manual.
+
+---
+
+### Open Questions
+
+1. Should the PR banner persist across page navigations (stored in `sessionStorage`) or is ephemeral state (resets on reload) acceptable?
+2. The 14-day catch-up window was chosen as a reasonable "two weeks" boundary. Is there a specific real-world user scenario that would require a longer window (e.g., injury recovery)?
+3. Should `computeRotationCycleProgress` and `computeRotationPlanRemaining` also guard against `planDayIndex` being out of bounds (i.e., entries created when a plan had more days)? Currently they count all entries with matching planId, even if the index no longer exists in the plan.

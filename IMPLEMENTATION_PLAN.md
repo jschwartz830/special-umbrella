@@ -117,3 +117,60 @@ Added `addOverride` describe block (6 tests) — this action had no direct test 
 | Multi-slot day copy (each slot's share text) | Scoped to single-call formatter; multi-slot is handled naturally in the loop. |
 | Service-worker offline caching audit | Out of scope for overnight pass; no regressions observed. |
 | New dependency (e.g. `share-api-polyfill`) | Rejected — Web Share API is good on mobile, clipboard fallback is sufficient and already in-browser. |
+
+---
+
+## Pass 62 — 2026-06-21 (branch `claude/dreamy-mccarthy-zu4z6a`)
+
+### Observations on entry
+
+- Branch starts at `d1b9a24` (merged PR #150 from pass 61).
+- 923 tests passing across 24 test files before any changes.
+- Codebase quality: 8/10. No critical bugs. Core rotation logic is sound.
+- Key issues identified: 7-day stall detection cap, deduplication inconsistency in two stat functions, undocumented timezone convention, and no in-context PR feedback.
+
+---
+
+### Work Completed
+
+#### 1. Fix: align deduplication across rotation stat functions
+
+`computeRotationCycleProgress` and `computeRotationPlanRemaining` counted raw `entries.length` — unlike `isPlanExpired` which used a Set of unique calendarDate values. Fixed both to use `new Set(…dates)`, making all three consistent.
+
+Risk of the original: a malformed CSV import could produce two entries on the same date. `isPlanExpired` would not count the date twice, but the cycle/remaining counters would — producing a stale display.
+
+#### 2. Fix: extend catch-up window from 7 to 14 days
+
+The stall-detection nudge on TodayPage now looks back 14 days instead of 7. Also added a secondary indicator showing how many unlogged days exist beyond the 14-day window ("+ N older gaps — use Calendar to review").
+
+New utility: `countTotalUnloggedDays(planId, entries, planStartDate, today)` — full-history scan with no lookback cap.
+
+#### 3. Docs: timezone convention
+
+Added a block comment to `rotationEngine.ts` explaining that all calendarDate values are local-timezone YYYY-MM-DD strings, and documenting the known limitation for users who travel across time zones.
+
+#### 4. Feature: personal record celebration banner
+
+After logging a workout with weight sets, the app detects if any exercise exceeded its previous all-time max load and shows a dismissible amber banner: "New personal record! Bench Press, Squat". Clears on dismiss or Undo.
+
+See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md for the full breakdown.
+
+#### 5. Tests: 12 new test cases
+
+Added to `src/lib/__tests__/historyStats.test.ts`:
+- 9 tests for `countTotalUnloggedDays`
+- 1 test for `computeRotationCycleProgress` deduplication
+- 1 test for `computeRotationPlanRemaining` deduplication
+- 1 test for 14-day `getUnloggedPastDates` window
+
+---
+
+### What was NOT done (and why)
+
+| Considered | Decision |
+|---|---|
+| Cross-store transaction safety | Too risky for an overnight pass; existing try/catch adequate |
+| Progression error display in HistoryPage | Medium-risk schema change; documented as recommendation |
+| Component/integration tests (RTL/Playwright) | Requires infrastructure setup; out of scope |
+| Performance: memoize allOutcomes lookup | Low priority; app is single-user and data sets are small |
+| Bulk mark-as-Day-Off from CalendarPage | Would extend the catch-up to handle old gaps too; larger feature |
