@@ -2,6 +2,14 @@ import { format, addDays, parseISO, differenceInCalendarDays } from 'date-fns'
 import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay, DayStatus } from '../types'
 export { nanoid } from '../lib/utils'
 
+// Date convention: all calendar dates are YYYY-MM-DD strings in the user's LOCAL
+// timezone. `format()` from date-fns uses local time, so entries created at
+// "2026-06-20T23:30 UTC-8" (local midnight approaching) get date "2026-06-20".
+// Override `appliedAt` is stored as UTC ISO but converted to local date via
+// `format(new Date(ov.appliedAt), 'yyyy-MM-dd')` before comparison. This means
+// the app behaves correctly for a single timezone but date strings will shift
+// if the user travels across time zones and logs workouts in both.
+
 /** Symmetric modulo — handles negative values from go_back */
 export function mod(n: number, m: number): number {
   return ((n % m) + m) % m
