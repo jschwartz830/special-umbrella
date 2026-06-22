@@ -165,12 +165,19 @@ export function computeRotationCycleProgress(
 ): RotationCycleProgress | null {
   if (plan.duration.type !== 'rotations' || plan.days.length === 0) return null
 
-  const planEntries = entries.filter(
-    e => e.planId === plan.id &&
-      (today === undefined || e.calendarDate <= today) &&
-      (e.action === 'complete' || e.action === 'skip'),
+  // Deduplicate by calendarDate — mirrors isPlanExpired / computePlanProgress so
+  // that two entries for the same date (e.g. from an unusual import) count as one
+  // completed rotation slot rather than inflating doneInCycle / justCompletedRotation.
+  const completedDates = new Set(
+    entries
+      .filter(e =>
+        e.planId === plan.id &&
+        (today === undefined || e.calendarDate <= today) &&
+        (e.action === 'complete' || e.action === 'skip'),
+      )
+      .map(e => e.calendarDate),
   )
-  const totalDone = planEntries.length
+  const totalDone = completedDates.size
   const rotationLength = plan.days.length
   const doneInCycle = totalDone % rotationLength
   const remaining = rotationLength - doneInCycle
@@ -207,11 +214,17 @@ export function computeRotationPlanRemaining(
   ) return null
 
   const totalNeeded = plan.duration.value * plan.days.length
-  const done = entries.filter(
-    e => e.planId === plan.id &&
-      (today === undefined || e.calendarDate <= today) &&
-      (e.action === 'complete' || e.action === 'skip'),
-  ).length
+  // Deduplicate by calendarDate — mirrors isPlanExpired / computePlanProgress so
+  // that two entries for the same date count as one completed slot.
+  const done = new Set(
+    entries
+      .filter(e =>
+        e.planId === plan.id &&
+        (today === undefined || e.calendarDate <= today) &&
+        (e.action === 'complete' || e.action === 'skip'),
+      )
+      .map(e => e.calendarDate),
+  ).size
   return Math.max(0, totalNeeded - done)
 }
 

@@ -1049,6 +1049,21 @@ describe('computeRotationCycleProgress', () => {
     const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
     expect(result!.doneInCycle).toBe(2)
   })
+
+  it('does not double-count duplicate entries for the same date', () => {
+    // Two entries sharing a calendarDate (e.g. from an unusual import or CSV re-import)
+    // must count as one completed rotation slot — consistent with isPlanExpired and
+    // computePlanProgress which both deduplicate by calendarDate.
+    const entries: HistoryEntry[] = [
+      { id: 'e1', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T08:00:00Z' },
+      { id: 'e2', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T20:00:00Z' },
+    ]
+    // One unique date out of 3 needed per rotation → doneInCycle=1, justCompletedRotation=false
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
+    expect(result!.doneInCycle).toBe(1)
+    expect(result!.remaining).toBe(2)
+    expect(result!.justCompletedRotation).toBe(false)
+  })
 })
 
 // ── countPlanDayCompletions ───────────────────────────────────────────────────
@@ -1465,6 +1480,17 @@ describe('computeRotationPlanRemaining', () => {
     ]
     // All 2 entries counted → 12 - 2 = 10
     expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(10)
+  })
+
+  it('does not double-count duplicate entries for the same date', () => {
+    // Two entries for the same calendarDate must count as a single completed slot,
+    // consistent with isPlanExpired and computePlanProgress which deduplicate the same way.
+    // 4 rotations × 3 days = 12 needed; 1 unique date completed → 12 - 1 = 11 remaining.
+    const entries: HistoryEntry[] = [
+      { id: 'e1', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T08:00:00Z' },
+      { id: 'e2', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T20:00:00Z' },
+    ]
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(11)
   })
 })
 
