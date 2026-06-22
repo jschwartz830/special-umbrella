@@ -31,6 +31,7 @@ import { useProgramStore } from '../store/programStore'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
+import { computeCurrentStreakDates } from '../lib/historyStats'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -93,6 +94,15 @@ export function CalendarPage() {
   const weeks = useMemo(
     () => buildMonthGrid(year, month, plan, entries, overrides, today),
     [year, month, plan, entries, overrides, today],
+  )
+
+  // Dates that form the current streak (plan-scoped) — used to add a ring to
+  // matching calendar cells so the active streak is visible at a glance.
+  const streakDates = useMemo(
+    () => plan
+      ? computeCurrentStreakDates(entries, extraEntries, today, plan.id)
+      : new Set<string>(),
+    [entries, extraEntries, today, plan],
   )
 
   function prevMonth() {
@@ -358,11 +368,16 @@ export function CalendarPage() {
                                 ? 'bg-slate-800/20 text-slate-600'
                                 : 'bg-slate-800/30 text-slate-600'
 
+                  // Streak cells get a subtle ring so the active run is visible
+                  // without disrupting the background status colors.
+                  const isStreakDate = cell.isCurrentMonth && streakDates.has(cell.date)
+                  const streakRing = isStreakDate && !cell.isToday ? 'ring-1 ring-emerald-500/40' : ''
+
                   return (
                     <button
                       key={cell.date}
                       onClick={() => rd && cell.isCurrentMonth && setSelected(rd)}
-                      className={`rounded-lg aspect-square flex flex-col items-center justify-center transition-colors ${cell.isCurrentMonth ? bgClass : 'text-slate-700'} ${rd && cell.isCurrentMonth ? 'active:scale-95' : 'cursor-default'}`}
+                      className={`rounded-lg aspect-square flex flex-col items-center justify-center transition-colors ${cell.isCurrentMonth ? bgClass : 'text-slate-700'} ${rd && cell.isCurrentMonth ? 'active:scale-95' : 'cursor-default'} ${streakRing}`}
                     >
                       <span className="text-xs font-semibold leading-none">
                         {new Date(cell.date + 'T00:00').getDate()}
