@@ -1,5 +1,57 @@
 # Implementation Plan
 
+## Pass 62 — 2026-06-22 (branch `claude/dreamy-mccarthy-qo7940`)
+
+### Observations on entry
+
+- Branch is at `main` HEAD (no unreleased changes). 925 tests passing after changes.
+- 923 tests passing across 24 test files before any changes in this pass.
+- Audit found two deduplication bugs in `historyStats.ts` (see below).
+- `computeCurrentStreakDates` was exported and tested but not wired into any UI component.
+- `getFutureProjection` in `calendarProjection.ts` is documented as unused — dead code.
+
+---
+
+### Work Completed
+
+#### 1. Bug fix: `computeRotationCycleProgress` — calendarDate deduplication
+
+**File**: `src/lib/historyStats.ts`
+
+Used `planEntries.length` (raw entry count) instead of counting unique calendar dates. This is inconsistent with `isPlanExpired` and `computePlanProgress`, which both wrap the filtered list in a `Set<string>` of dates. Duplicate entries for the same date — e.g. after a CSV re-import — would inflate `doneInCycle` and could falsely trigger `justCompletedRotation = true`, showing the user a "completed a rotation!" banner when they had not.
+
+Fix: replace raw `.length` with `new Set(entries.map(e => e.calendarDate)).size`.
+
+Added regression test: "does not double-count duplicate entries for the same date" under `computeRotationCycleProgress`.
+
+#### 2. Bug fix: `computeRotationPlanRemaining` — calendarDate deduplication
+
+**File**: `src/lib/historyStats.ts`
+
+Same root cause as (1): used raw `.length` rather than unique dates. Duplicate entries for the same date would under-report remaining workouts, showing `done` as higher than the actual unique-date count. TodayPage surfaces this as "X workouts left."
+
+Fix: wrap in `new Set(...).size`.
+
+Added regression test: "does not double-count duplicate entries for the same date" under `computeRotationPlanRemaining`.
+
+#### 3. Feature: streak-date highlighting in CalendarPage
+
+**File**: `src/pages/CalendarPage.tsx`
+
+`computeCurrentStreakDates` was exported from `historyStats.ts` and had comprehensive tests but was never consumed by any UI component. Added plan-scoped `streakDates` computation (memoized) to CalendarPage and wired it to a `ring-1 ring-emerald-500/40` border on calendar cells that belong to the current streak. The `today` cell (already sky-blue) is exempt. The ring is additive — it does not change background status colors.
+
+---
+
+### What was NOT done (and why)
+
+| Considered | Decision |
+|---|---|
+| Fix `computeConsecutiveSkips` date-conflict behavior | Not fixed. Requires malformed data to trigger (normal usage prevents it). Conservative behavior (break wins) is safer for nudge logic. Documented only. |
+| Remove `getFutureProjection` dead code | Instructions say don't remove functionality. Documented as cleanup recommendation. |
+| E2E / component interaction tests | Out of scope for overnight pass; would require significant test infrastructure work. |
+
+---
+
 ## Pass 61 — 2026-06-19 (branch `claude/dreamy-mccarthy-7ugj5k`)
 
 ### Observations on entry

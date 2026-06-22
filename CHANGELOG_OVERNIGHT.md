@@ -1,3 +1,36 @@
+# Overnight Changelog — 2026-06-22
+
+## [1] fix: deduplicate calendarDate in computeRotationCycleProgress and computeRotationPlanRemaining
+
+**Summary**: Two functions in `historyStats.ts` were counting raw entry length instead of unique calendar dates, making them inconsistent with `isPlanExpired` and `computePlanProgress` which explicitly deduplicate. Duplicate entries (possible after CSV re-import) would inflate `doneInCycle`, falsely trigger `justCompletedRotation`, and under-report remaining workouts on TodayPage.
+
+**Why it matters**: TodayPage displays both cycle progress and "X workouts left." Inflated counts produce a false "you finished a rotation!" banner and incorrect remaining-workouts count when duplicate entries exist.
+
+**Files changed**:
+- `src/lib/historyStats.ts` — replaced `.length` with `new Set(dates).size` in both functions
+- `src/lib/__tests__/historyStats.test.ts` — added 2 regression tests (one per function)
+
+**Risk**: None. Both changes are purely additive in correctness; in normal usage (single entry per date) the behavior is identical.
+
+**Rollback**: `git revert 9855b1d`
+
+---
+
+## [2] feat: streak-date ring highlight in CalendarPage
+
+**Summary**: `computeCurrentStreakDates` was exported and tested but never used in any UI component. Wired it into CalendarPage's calendar grid so cells belonging to the current plan-scoped streak display a subtle `ring-1 ring-emerald-500/40` border, making the active streak visible at a glance without disrupting the existing background color system. The `today` cell is exempt (already highlighted in sky-blue).
+
+**Why it matters**: The streak stat is shown on TodayPage but had no calendar-level visual representation. Users can now see exactly which days form their current run at a glance.
+
+**Files changed**:
+- `src/pages/CalendarPage.tsx` — added `computeCurrentStreakDates` import, `streakDates` useMemo, `streakRing` class in cell render
+
+**Risk**: Very low. Purely additive rendering change. No state, no logic change.
+
+**Rollback**: `git revert e40002b`
+
+---
+
 # Overnight Changelog — 2026-06-19
 
 ## [1] feat: Copy workout to clipboard from TodayPage

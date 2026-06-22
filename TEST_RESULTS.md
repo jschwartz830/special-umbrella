@@ -1,5 +1,41 @@
 # Test Results
 
+## 2026-06-22 (sixty-second pass) — branch `claude/dreamy-mccarthy-qo7940`
+
+### Final run
+
+```
+Test Files  24 passed (24)
+     Tests  925 passed (925)
+  Start at  07:16:10
+  Duration  3.22s
+```
+
+Baseline (pre-changes): 923 tests across 24 files.
+
+### Tests added this pass
+
+| File | Tests added | What they cover |
+|---|---|---|
+| `src/lib/__tests__/historyStats.test.ts` | +2 | `computeRotationCycleProgress` and `computeRotationPlanRemaining` with duplicate entries for the same calendarDate |
+
+### Tests reviewed
+
+- `src/lib/__tests__/historyStats.test.ts` — full review. Comprehensive coverage of all exported functions. No gaps found for the functions changed in this pass.
+- `src/engine/__tests__/rotationEngine.test.ts` — reviewed for dedup-consistency. Already has "does not double-count duplicate entries for the same date" test for `isPlanExpired`. Confirmed the pattern used there matches what we fixed in historyStats.
+- `src/store/__tests__/outcomeStore.test.ts` — reviewed. No issues found related to the changes in this pass.
+
+### Areas still untested (notable gaps)
+
+| Area | Gap |
+|---|---|
+| CalendarPage streak ring | No UI/component test; visual check required manually |
+| `computeConsecutiveSkips` with conflicting multi-entry dates | No test for the edge case where the same date has both a skip and a complete/day_off entry |
+| Component interactions | Modal open/close, form submission workflows — no tests at this layer across the whole app |
+| E2E plan lifecycle | No end-to-end test covering import → activate → log → export |
+
+---
+
 ## 2026-06-19 (sixty-first pass) — branch `claude/dreamy-mccarthy-7ugj5k`
 
 ---
