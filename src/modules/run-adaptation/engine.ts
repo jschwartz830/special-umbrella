@@ -144,7 +144,7 @@ export function applyRunProgressionDecision(
   }
 }
 
-/** Round miles to 2 decimal places to avoid floating-point noise */
+/** Round miles to 2 decimal places, using epsilon to avoid binary representation drift */
 function roundMiles(miles: number): number {
-  return Math.round(miles * 100) / 100
+  return Math.round((miles + Number.EPSILON) * 100) / 100
 }
