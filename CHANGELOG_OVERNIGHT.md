@@ -76,3 +76,51 @@ No new dependencies. Feature is purely additive and independently revertable.
 ---
 
 **Test count**: 887 → 923 (+36 tests across 3 new files + 1 extended file)
+
+---
+
+## Pass 62 — 2026-06-23
+
+### Change 1: Fix discard-changes dialog for new outcome forms
+
+**Summary**: Removed `existingOutcome &&` from `handleClose` in `OutcomeModal`, so the "Discard changes?" confirmation appears whenever the form is dirty — not just when editing an existing outcome.
+
+**Why it matters**: A user who fills in effort, run distance, and notes, then accidentally taps the X button, would previously lose all that data silently. The discard warning should protect any form with unsaved changes, regardless of whether it's a new log or an edit.
+
+**Files changed**: `src/components/workout/OutcomeModal.tsx`
+
+**Risk**: None — the only behavior change is that a new (not existing) dirty form now shows a confirmation before closing.
+
+**Rollback**: Revert the single-line change to `handleClose`.
+
+---
+
+### Change 2: Fix floating-point rounding in run progression distance
+
+**Summary**: Added `Number.EPSILON` to `roundMiles` in the run-adaptation engine: `Math.round((miles + Number.EPSILON) * 100) / 100`.
+
+**Why it matters**: Without epsilon, values exactly at a rounding midpoint (e.g. `1.005`) can round down due to binary floating-point representation: `1.005 * 100 = 100.4999...`. This is correct defensive practice for any function that rounds decimal values derived from arithmetic.
+
+**Files changed**: `src/modules/run-adaptation/engine.ts`
+
+**Risk**: Negligible. With the default 0.5-mile step, this fix produces no change in observable behavior. Only custom sub-0.5-mile step sizes could expose the underlying issue.
+
+**Rollback**: Revert the comment + epsilon change to `roundMiles`.
+
+---
+
+### Change 3: Previous session notes hint in OutcomeModal
+
+**Summary**: Added an optional `prevNotes` prop to `OutcomeModal`. When logging a *new* (not editing) workout, if the previous session for the same plan day had notes, they appear as a read-only italic hint above the notes textarea: _Last time: "felt tight in the hips"_.
+
+**Why it matters**: Users often don't remember what they wrote last session. The hint surfaces this context at exactly the right moment — while they're filling in today's notes — without requiring navigation away.
+
+**Files changed**: `src/components/workout/OutcomeModal.tsx`, `src/pages/TodayPage.tsx`
+
+**Risk**: Additive-only. The prop is optional; CalendarPage and HistoryPage are unaffected. The hint is hidden when `prevNotes` is empty or when editing an existing outcome.
+
+**Rollback**: Remove the `prevNotes` prop from OutcomeModal's interface/destructuring, remove the hint JSX block, and remove `prevNotes={...}` from TodayPage's OutcomeModal call.
+
+---
+
+**Test count**: 923 → 923 (no change — existing 923 tests still pass; changes were to runtime behavior, not new logic branches requiring new tests)

@@ -113,3 +113,49 @@ Revert is a single commit touching 2 files:
 - Revert `src/pages/TodayPage.tsx` (remove Copy button, `workoutCopied` state, `handleCopyWorkout`, `Copy` import)
 
 No data migrations, no store schema changes, no localStorage keys affected.
+
+---
+
+## Pass 62 Feature Review — Previous Session Notes Hint
+
+### What Was Built
+
+An optional `prevNotes` prop on `OutcomeModal` that renders a read-only italic hint above the notes textarea when logging a new (not editing) workout. The hint shows: _Last time: "[previous notes text]"_ clamped to 2 lines.
+
+Wired to TodayPage's primary OutcomeModal call via `prevSessionOutcome?.notes`. CalendarPage and HistoryPage modals are unchanged.
+
+### Assumptions Encoded
+
+1. Previous notes are always plain text — rendered directly as JSX text content.
+2. `line-clamp-2` is sufficient; no "show more" needed.
+3. The hint should be hidden during edits to avoid confusion between what they wrote "last time" vs. what they're currently editing.
+4. TodayPage-only scope is sufficient for the first iteration.
+
+### What Worked Well
+
+- Implementation was minimal (5 lines of JSX + 1 prop type + 1 caller change).
+- The existing `prevSessionOutcome` computation in TodayPage required no changes.
+- No new stores, hooks, or dependencies added.
+- All 923 tests continue to pass.
+
+### What Feels Risky or Incomplete
+
+- **Calendar/History page gap**: Users logging retroactively via CalendarPage won't see the hint. For someone catching up on a missed workout from 3 days ago, this context would be equally valuable.
+- **Long notes truncation**: `line-clamp-2` hides content without telling the user there's more. A faint "..." indicator (which CSS does provide) is the only signal.
+- **No test coverage**: The hint's presence/absence can't be verified without React Testing Library.
+
+### What to Evaluate Tomorrow
+
+1. Open the app and log a workout after a previous session that had notes — does the hint appear correctly?
+2. Try editing an existing outcome — confirm the hint is NOT shown (as intended).
+3. Check on CalendarPage — confirm no hint appears there (expected: no change).
+
+### Recommended Next Steps
+
+1. Extend to CalendarPage: pass `prevSessionOutcome` into CalendarPage's OutcomeModal call.
+2. Add a collapsed/expandable "show more" for notes longer than 2 lines.
+3. Consider showing previous effort rating alongside notes for richer context.
+
+### Classification
+
+**Keep** — Clean, minimal, zero risk. Clearly improves the new-log flow.

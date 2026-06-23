@@ -87,3 +87,90 @@ Focused on:
 - The copy button in TodayPage follows the same conditional render pattern as the existing Start Workout / Skip buttons — consistent with the surrounding code.
 - No new dependencies introduced in this pass.
 - All new test files follow the existing Vitest + `describe`/`it`/`expect` conventions used across the codebase.
+
+---
+
+## Pass 62 — 2026-06-23
+
+### Executive Summary
+
+Three targeted changes: one high-value UX bug fix, one defensive low-level fix, and one small adjacent feature. All 923 tests continue to pass. The codebase is in excellent shape — this pass was about removing friction, not structural repair.
+
+---
+
+### What Changed
+
+| # | Type | Summary |
+|---|------|---------|
+| 1 | Bug fix | OutcomeModal now shows "Discard changes?" when closing a dirty *new* log form |
+| 2 | Bug fix | `roundMiles` uses `Number.EPSILON` to avoid midpoint rounding-down |
+| 3 | Feature | Previous session notes shown as hint inside OutcomeModal while logging |
+
+---
+
+### Biggest Issues Found
+
+**Only one real bug** of user-visible consequence:
+
+- **OutcomeModal close without save** (`OutcomeModal.tsx:249`): Users filling in a new workout outcome can accidentally close the modal and lose all entered data — effort rating, run distance, notes, sets. The fix removes the `existingOutcome &&` guard so the confirmation fires on any dirty form.
+
+The floating-point rounding issue (`roundMiles`) is a latent bug that won't manifest with the current default step size but is correct to fix.
+
+---
+
+### Improvements Completed
+
+1. **Discard warning for new outcomes** — single-line fix, zero risk.
+2. **`roundMiles` epsilon** — defensive fix, observable only with sub-0.5-mile custom step sizes.
+3. **Previous notes hint in OutcomeModal** — additive feature, optional prop, no impact on Calendar/History pages.
+
+---
+
+### Definitely Keep
+
+- OutcomeModal discard warning fix (clear bug, zero risk)
+- roundMiles epsilon fix (correct defensive practice)
+
+### Probably Keep, But Tweak
+
+- Previous notes hint: the content and styling are conservative. Consider:
+  - Expanding to 3 lines (currently `line-clamp-2`)
+  - Also showing it when editing an existing outcome for additional context
+
+### Do Not Keep
+
+_(nothing from this pass falls in this category)_
+
+---
+
+### Recommendations Only (Not Implemented)
+
+1. **`console.warn` for division by zero in `expressionEval`** — YAML authors have no signal that `x / 0` silently resolves to `0`. A warning log would help debug broken progression rules. Requires product decision about surfacing errors to users.
+
+2. **`key={planDay.id}` on OutcomeModal callers** — Forces remount when `planDay` changes, making the stale-state risk in `weightExercises` initialization impossible. Low urgency since remounting already happens in practice.
+
+3. **Plan creation validation** — `createPlan` should throw when `days.length === 0` (or at minimum warn). The engine handles it defensively, but silent misconfiguration is hard to debug.
+
+4. **Exhaustiveness check in `makeSlot()`** — The `else { defaults.name = 'Other' }` fallback swallows new `WorkoutType` values without TypeScript catching it. Add a `_exhaustive: never = type` guard.
+
+---
+
+### Open Questions for You
+
+1. **Previous notes hint scope**: Should the hint show on Calendar/History page modals too, or stay TodayPage-only? Those pages don't currently compute `prevSessionOutcome`, so it would require some work.
+
+2. **Division by zero feedback**: Do you want users to see progression rule errors? If so, how — inline in the outcome modal, a toast, or just console logs that a developer would check?
+
+3. **Custom step sizes**: Are sub-0.5-mile step sizes (e.g. 0.1 mi) a planned feature? If so, the `roundMiles` fix becomes more important and deserves a test.
+
+---
+
+### Known Issues / Incomplete Work
+
+- No new tests added this pass. The bug fixes are logic changes that require React Testing Library or Playwright to test properly (modal open/close behavior). The `roundMiles` fix affects a private function only testable through integration.
+
+---
+
+### Dependencies Added
+
+None.

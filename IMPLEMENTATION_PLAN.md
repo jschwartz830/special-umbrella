@@ -117,3 +117,51 @@ Added `addOverride` describe block (6 tests) — this action had no direct test 
 | Multi-slot day copy (each slot's share text) | Scoped to single-call formatter; multi-slot is handled naturally in the loop. |
 | Service-worker offline caching audit | Out of scope for overnight pass; no regressions observed. |
 | New dependency (e.g. `share-api-polyfill`) | Rejected — Web Share API is good on mobile, clipboard fallback is sufficient and already in-browser. |
+
+---
+
+## Pass 62 — 2026-06-23 (branch `claude/dreamy-mccarthy-10u0dq`)
+
+### Observations on Entry
+
+- Branch starts at `3061d86` (merged PR #150 from pass 61).
+- 923 tests passing across 24 test files before any changes (+36 tests from pass 61).
+- Codebase is architecturally sound — pure engine layer, good type safety, thorough test coverage.
+- Audit found one high-confidence UX bug in `OutcomeModal.tsx` and one low-risk floating-point issue in `run-adaptation/engine.ts`.
+- All major stats/streaks/UI features are already implemented; no critical gaps found.
+
+### Key Audit Findings
+
+**Confirmed Bugs:**
+1. `OutcomeModal.tsx:249` — `handleClose` guard `if (existingOutcome && isDirtyRef.current)` prevents the discard warning from showing when creating a *new* outcome. Users lose data if they accidentally close.
+2. `run-adaptation/engine.ts:148` — `roundMiles` omits `Number.EPSILON`, meaning values like 1.005 → 1.00 instead of 1.01 (benign with default 0.5-mile steps but could manifest with custom step sizes).
+
+**Documented Risks (not fixed this pass):**
+- `weightExercises` state in OutcomeModal is not re-synced if `planDay` prop changes while mounted (low risk; modal is always remounted between days in practice).
+- Division by zero in `expressionEval.ts` silently returns 0 (intentional, tested behavior, but hard to debug for users).
+- `deduplicateByDate` key separator `__` could collide if planIds contained `__` (nanoids don't, so safe).
+
+### Work Completed
+
+1. **fix: OutcomeModal discard warning for new outcomes** (`src/components/workout/OutcomeModal.tsx`)
+   - Removed `existingOutcome &&` from `handleClose` condition
+   - Now fires for both new logs and edits when form is dirty
+
+2. **fix: roundMiles floating-point epsilon** (`src/modules/run-adaptation/engine.ts`)
+   - Added `Number.EPSILON` before multiply to prevent rounding-down at exact .5 boundaries
+   - e.g. `1.005 * 100 = 100.4999...` without epsilon → rounds to 1.00; with epsilon → 1.01
+
+3. **feat: previous session notes hint in OutcomeModal** (`src/components/workout/OutcomeModal.tsx`, `src/pages/TodayPage.tsx`)
+   - Added optional `prevNotes` prop to OutcomeModal
+   - Shows "Last time: ..." in italic above the notes textarea when logging a new outcome
+   - Wired via `prevSessionOutcome?.notes` in TodayPage's primary modal call
+
+### What Was NOT Done (and why)
+
+| Considered | Decision |
+|---|---|
+| Add `console.warn` for division by zero in expressionEval | Behavior is intentional and explicitly tested. Would need UX design for surfacing errors to users — out of scope. |
+| Add `key={planDay.id}` to OutcomeModal callers | The stale-state risk is theoretical only; remounting is guaranteed by existing conditional rendering. Deferred. |
+| Plan creation validation (days ≥ 1) | No bug manifested; silent empty-plan behavior was intentional per engine design. Deferred as a recommendation. |
+| Exhaustiveness check in makeSlot() | WorkoutType enum is stable; no new types planned. Low value right now. |
+| Tests for roundMiles fix | `roundMiles` is private; the epsilon fix only matters for non-default step sizes; tests would be artificial. |

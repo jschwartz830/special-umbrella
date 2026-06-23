@@ -113,3 +113,46 @@ Use `navigator.share({ title, text, url })` to open the native iOS/Android share
 
 **Complexity**: Low. Wrap the existing `formatWorkoutForClipboard` output in a `navigator.share` call with a `navigator.clipboard` fallback.
 **Priority**: Medium — better UX on mobile vs. raw clipboard.
+
+---
+
+## Pass 62 Feature — Previous Session Notes Hint in OutcomeModal
+
+**Feature Selected**: Show the previous session's workout notes as a read-only italic hint inside the OutcomeModal's notes section when logging a new workout.
+
+**Why Selected**:
+- Adjacent to existing infrastructure: `prevSessionOutcome` is already computed in TodayPage, and `findPreviousSessionForPlanDay` already returns the previous outcome.
+- Narrow slice: one new optional prop, a few lines of UI, no new computation.
+- Clear user value: users forget what they noted last time (what felt hard, what to adjust). Surfacing this at exactly the logging moment is the right time.
+- Non-breaking: CalendarPage and HistoryPage modals are unaffected.
+
+**Expected User Value**:
+- When logging today's bench press session, user sees: _Last time: "right shoulder clicked on set 3"_ — reminds them to watch form.
+- When logging a run, user sees: _Last time: "legs felt heavy, kept it easy"_ — context for today's effort rating.
+
+**Implementation Scope**:
+1. Add `prevNotes?: string | null` prop to `OutcomeModal` interface.
+2. Render a read-only `<p>` block with `line-clamp-2` and italic styling above the notes `<textarea>`.
+3. Guard: only show when `prevNotes` is non-empty AND `!existingOutcome` (new log).
+4. Pass `prevSessionOutcome?.notes ?? null` from TodayPage.
+
+**Assumptions**:
+- The `prevNotes` is always a plain string (no markdown/HTML); safe to render as text.
+- Two-line clamp is sufficient — long notes are abbreviated without a "show more" toggle.
+- Showing only on TodayPage (not CalendarPage/HistoryPage) is the right scope for now.
+
+**Open Product/UX Decisions**:
+- Should the hint be truncatable/expandable? Currently hard-capped at 2 lines.
+- Should it also show when *editing* an existing outcome? Excluded for now to avoid confusion.
+- Should CalendarPage and HistoryPage also show this hint? Requires wiring `findPreviousSessionForPlanDay` into those pages — deferred.
+
+**Architecture Impact**: None. Additive prop only, no store changes, no new hooks.
+
+**Risks**: None. The prop is optional; pages that don't pass it render identically to before.
+
+**Rollback**: Remove `prevNotes` prop from OutcomeModal interface, the hint JSX block (~5 lines), and the `prevNotes={...}` from TodayPage's OutcomeModal call.
+
+**What's Intentionally Not Built Yet**:
+- "Show more" expand for long previous notes
+- Showing previous notes on Calendar/History page modals
+- Showing other previous outcome data (pace, effort) as separate hints

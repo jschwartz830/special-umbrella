@@ -115,3 +115,41 @@ New `addOverride` describe block:
 | *(all others)* | — |
 
 All pre-existing tests continue to pass without modification.
+
+---
+
+## Pass 62 — 2026-06-23
+
+### Tests Reviewed
+
+Ran full test suite at start of pass: **923 tests across 24 files — all passing**.
+
+Key files audited for coverage gaps:
+- `src/lib/__tests__/expressionEval.test.ts` — very thorough; already covers div-by-zero (line 85), unknown functions, NaN/Infinity guards.
+- `src/lib/__tests__/historyStats.test.ts` — 2421 lines; covers all exported functions including `computeCurrentStreakDates` and `findBestWeek`.
+- `src/engine/__tests__/rotationEngine.test.ts` — covers all public functions; override, jump, go_back scenarios.
+- `src/modules/run-adaptation/__tests__/engine.test.ts` — covers all progression paths (progress/hold/regress/none).
+
+### Tests Added/Updated
+
+None added this pass.
+
+**Reason**: The two bug fixes involve React component behavior (modal close/discard flow) that requires React Testing Library or Playwright to test meaningfully. The `roundMiles` fix is on a private function only verifiable through integration. Adding unit tests would require either:
+- Extracting `roundMiles` as an exported function
+- Adding RTL to the project
+Neither was deemed worth the scope increase for this pass.
+
+### Results
+
+| Before | After |
+|--------|-------|
+| 923 tests, 24 files, all passing | 923 tests, 24 files, all passing |
+
+### Important Areas Still Untested
+
+| Area | Gap | Severity |
+|------|-----|----------|
+| OutcomeModal close behavior | No test for discard warning triggering on new vs. edit | Medium (React component) |
+| `roundMiles` with sub-0.5 steps | Private function; epsilon fix not directly testable | Low |
+| CalendarPage retroactive logging flow | End-to-end scenario not covered by unit tests | Medium |
+| HistoryPage outcome editing flow | Same — requires integration/e2e | Medium |
