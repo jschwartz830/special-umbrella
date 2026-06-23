@@ -962,6 +962,7 @@ export function TodayPage() {
           planDay={primaryPlanDay}
           previousSetsByExercise={previousSetsByExercise}
           isFromActiveWorkout={!!activeTrackedExercises}
+          prevNotes={prevSessionOutcome?.notes ?? null}
           existingOutcome={
             activeTrackedExercises
               ? {

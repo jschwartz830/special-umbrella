@@ -40,6 +40,8 @@ interface Props {
   workoutInstanceId?: string
   previousSetsByExercise?: Record<string, LoggedSetActual[]>
   isFromActiveWorkout?: boolean
+  /** Notes from the previous session for this workout — shown as a read-only hint. */
+  prevNotes?: string | null
   onConfirm: (outcome: WorkoutOutcome) => void
   onClose: () => void
 }
@@ -192,6 +194,7 @@ export function OutcomeModal({
   workoutInstanceId,
   previousSetsByExercise,
   isFromActiveWorkout = false,
+  prevNotes,
   onConfirm,
   onClose,
 }: Props) {
@@ -557,6 +560,11 @@ export function OutcomeModal({
 
         <div>
           <label className="text-xs text-slate-500 uppercase tracking-wide font-medium block mb-2">Notes</label>
+          {prevNotes && !existingOutcome && (
+            <p className="text-[11px] text-slate-500 italic mb-1.5 px-0.5 line-clamp-2">
+              Last time: "{prevNotes}"
+            </p>
+          )}
           <textarea value={notes} onChange={e => { markDirty(); setNotes(e.target.value) }} placeholder="How did it feel? Any notes..." rows={3} className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none" />
         </div>
       </div>
