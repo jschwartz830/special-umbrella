@@ -246,7 +246,7 @@ export function OutcomeModal({
   function markDirty() { isDirtyRef.current = true }
 
   function handleClose() {
-    if (existingOutcome && isDirtyRef.current) {
+    if (isDirtyRef.current) {
       setShowCloseConfirm(true)
     } else {
       onClose()
