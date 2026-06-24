@@ -76,3 +76,52 @@ No new dependencies. Feature is purely additive and independently revertable.
 ---
 
 **Test count**: 887 → 923 (+36 tests across 3 new files + 1 extended file)
+
+---
+
+# Overnight Changelog — 2026-06-24
+
+## [1] fix: deduplicate calendarDate in computeRotationCycleProgress
+
+**Summary**: Fixed a stat-computation inconsistency where `computeRotationCycleProgress` counted raw entry array length instead of unique calendar dates, causing the cycle counter to inflate when duplicate entries exist for the same day.
+
+**Files changed**:
+- `src/lib/historyStats.ts` — replaced `.length` with `new Set(...calendarDate).size`
+
+**Why it matters**: Every other rotation-count function in the codebase (`computePlanProgress`, `isPlanExpired`, `computeCurrentDayIndex`) deduplicates by calendar date. This function was the only exception. A re-imported CSV with two entries for the same day would cause `justCompletedRotation` to fire a cycle too early and `doneInCycle`/`remaining` to display wrong values in TodayPage stats.
+
+**Risks / tradeoffs**: None — the fix makes this function consistent with all peer functions. No store shape or API surface changes.
+
+**Rollback**: `git revert` this commit. The stat will return to the over-counting behaviour.
+
+---
+
+## [2] fix: deduplicate calendarDate in computeRotationPlanRemaining
+
+**Summary**: Same dedup fix applied to `computeRotationPlanRemaining`. The `done` count was inflated by duplicate entries, making the "workouts remaining" display show fewer sessions than the user actually needs to complete the plan.
+
+**Files changed**:
+- `src/lib/historyStats.ts` — replaced `.filter(...).length` with `new Set(...calendarDate).size`
+
+**Why it matters**: If a user's remaining count is under-reported, they might think they're nearly done with a plan when they aren't. Low frequency but real impact.
+
+**Risks / tradeoffs**: Same as above — pure alignment with existing pattern, no API change.
+
+**Rollback**: `git revert` this commit.
+
+---
+
+## [3] test: regression tests for calendarDate dedup in rotation stats
+
+**Summary**: Added 2 tests to `historyStats.test.ts` — one per fixed function — that confirm duplicate entries for the same date are counted as one, not two.
+
+**Files changed**:
+- `src/lib/__tests__/historyStats.test.ts` — 2 new `it` blocks
+
+**Why it matters**: Both tests explicitly fail against the pre-fix code and pass after. They act as regression guards so this class of inconsistency can't creep back in.
+
+**Risks**: None — purely additive test coverage.
+
+---
+
+**Test count**: 923 → 925 (+2 tests in 1 extended file)

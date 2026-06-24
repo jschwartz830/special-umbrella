@@ -115,3 +115,56 @@ New `addOverride` describe block:
 | *(all others)* | — |
 
 All pre-existing tests continue to pass without modification.
+
+---
+
+## 2026-06-24 (sixty-second pass) — branch `claude/dreamy-mccarthy-uan3ll`
+
+---
+
+### Final run
+
+```
+Test Files  24 passed (24)
+     Tests  925 passed (925)
+  Start at  07:12:46
+  Duration  2.45s (transform 1.31s, setup 0ms, import 2.53s, tests 501ms, environment 3ms)
+```
+
+All 925 tests pass. Zero failures. Zero skipped.
+
+---
+
+### Delta from pass 61
+
+| Metric | Pass 61 | Pass 62 | Delta |
+|--------|---------|---------|-------|
+| Test files | 24 | 24 | 0 |
+| Tests | 923 | 925 | +2 |
+| Failures | 0 | 0 | — |
+
+---
+
+### Modified test files
+
+#### `src/lib/__tests__/historyStats.test.ts` (+2 tests)
+
+New tests added to existing `describe` blocks:
+
+```
+computeRotationCycleProgress:
+  ✓ deduplicates multiple entries for the same date — only one counted per day
+
+computeRotationPlanRemaining:
+  ✓ deduplicates multiple entries for the same date — only one counted per day
+```
+
+Both tests fail against the pre-fix code (confirming the bug) and pass after the fix (confirming the correction).
+
+**Test scenario**: Two `HistoryEntry` objects with the same `planId + calendarDate` but different `id` and `createdAt` values — as would occur after a CSV re-import or data corruption. Before fix: counted as 2 workouts. After fix: counted as 1.
+
+---
+
+### Pre-existing test files (all passing)
+
+All 24 test files unchanged and passing. No regressions introduced.

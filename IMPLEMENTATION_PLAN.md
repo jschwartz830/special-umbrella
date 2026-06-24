@@ -117,3 +117,86 @@ Added `addOverride` describe block (6 tests) — this action had no direct test 
 | Multi-slot day copy (each slot's share text) | Scoped to single-call formatter; multi-slot is handled naturally in the loop. |
 | Service-worker offline caching audit | Out of scope for overnight pass; no regressions observed. |
 | New dependency (e.g. `share-api-polyfill`) | Rejected — Web Share API is good on mobile, clipboard fallback is sufficient and already in-browser. |
+
+---
+
+## Pass 62 — 2026-06-24 (branch `claude/dreamy-mccarthy-uan3ll`)
+
+### Observations on entry
+
+- Branch is at main (923 tests passing across 24 files before any changes).
+- Full codebase audit performed: read all source files in `src/`, all test files, all config.
+- Rotation engine, stores, and progression modules are in excellent shape.
+- Two stat-computation functions in `historyStats.ts` have a consistency bug with the rest of the codebase around duplicate-entry handling.
+
+---
+
+### Bugs Found and Fixed
+
+#### Bug 1 — `computeRotationCycleProgress` doesn't deduplicate entries by calendarDate
+
+**File**: `src/lib/historyStats.ts`, line 173 (before fix)
+
+The function computed `totalDone = planEntries.length`, which counts raw array entries. Every other function in the same file that computes a rotation count — `computePlanProgress` (line 127) and `isPlanExpired` in `rotationEngine.ts` (line 279) — deduplicates by first building a `Set` of `calendarDate` values, then using `.size`. The rotation engine's own `computeCurrentDayIndex` also deduplicates per-date.
+
+**Impact**: If a user's `wpt_history` localStorage contains duplicate entries for the same `(planId, calendarDate)` — which can happen after a partial CSV re-import or a historical migration edge case — the cycle counter inflates. With a 3-day plan, two entries on the same day make `totalDone=3` instead of `totalDone=2`, causing `justCompletedRotation` to fire a cycle early and `doneInCycle`/`remaining` to be wrong.
+
+**Fix**: Replaced `.length` with a `Set<string>` of calendarDates, mirroring the pattern in `computePlanProgress`.
+
+#### Bug 2 — `computeRotationPlanRemaining` doesn't deduplicate entries by calendarDate
+
+**File**: `src/lib/historyStats.ts`, line 214 (before fix)
+
+Same pattern. `done` was computed via `.filter(...).length`. Duplicate entries inflate `done`, making the remaining count appear smaller than it is (the user thinks they need fewer workouts than they actually do).
+
+**Fix**: Same `Set<string>` pattern.
+
+---
+
+### Work Completed
+
+#### 1. Fix `computeRotationCycleProgress` dedup (`src/lib/historyStats.ts`)
+
+Replaced:
+```ts
+const planEntries = entries.filter(...)
+const totalDone = planEntries.length
+```
+With:
+```ts
+const qualifyingDates = new Set(
+  entries.filter(...).map(e => e.calendarDate),
+)
+const totalDone = qualifyingDates.size
+```
+
+#### 2. Fix `computeRotationPlanRemaining` dedup (`src/lib/historyStats.ts`)
+
+Replaced:
+```ts
+const done = entries.filter(...).length
+```
+With:
+```ts
+const done = new Set(entries.filter(...).map(e => e.calendarDate)).size
+```
+
+#### 3. Regression tests for both fixes (`src/lib/__tests__/historyStats.test.ts`)
+
+Added 2 test cases:
+
+- `computeRotationCycleProgress`: two entries for the same date should count as one cycle step, not two
+- `computeRotationPlanRemaining`: two entries for the same date should count as one workout toward the total, not two
+
+Both tests fail against the un-patched code and pass after the fix.
+
+---
+
+### What Was NOT Done (and why)
+
+| Considered | Decision |
+|---|---|
+| Refactor `allSetsHitTarget` to remove redundant first check | Harmless extra guard; changing it risks subtle regression in sets-with-mixed-completed-states edge case. Not worth the diff. |
+| Extract `sortedOverrides` helper in `rotationEngine.ts` | Cosmetic; 3-line dedup across 3 functions. No correctness impact. |
+| Decompose `TodayPage.tsx` (1240 lines) | No current stability risk. Defer until growth makes it painful. |
+| Feature work | Skipped — codebase is healthy but the dedup inconsistency was a signal to prefer stabilisation over expansion this pass. |
