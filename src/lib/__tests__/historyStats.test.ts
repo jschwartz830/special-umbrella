@@ -1049,6 +1049,20 @@ describe('computeRotationCycleProgress', () => {
     const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
     expect(result!.doneInCycle).toBe(2)
   })
+
+  it('deduplicates multiple entries for the same date — only one counted per day', () => {
+    // Two entries for 2026-01-01 (could happen after a CSV re-import or data corruption).
+    // Without dedup, totalDone=3 and doneInCycle=0 (looks like rotation just finished).
+    // With dedup, totalDone=2 and doneInCycle=2 (still in cycle).
+    const entries: HistoryEntry[] = [
+      { ...entry('2026-01-01', 'complete'), id: 'e1a', createdAt: '2026-01-01T08:00:00Z' },
+      { ...entry('2026-01-01', 'complete'), id: 'e1b', createdAt: '2026-01-01T18:00:00Z' },
+      entry('2026-01-02', 'complete'),
+    ]
+    const result = computeRotationCycleProgress(THREE_DAY_PLAN, entries)
+    expect(result!.doneInCycle).toBe(2)
+    expect(result!.justCompletedRotation).toBe(false)
+  })
 })
 
 // ── countPlanDayCompletions ───────────────────────────────────────────────────
@@ -1465,6 +1479,16 @@ describe('computeRotationPlanRemaining', () => {
     ]
     // All 2 entries counted → 12 - 2 = 10
     expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(10)
+  })
+
+  it('deduplicates multiple entries for the same date — only one counted per day', () => {
+    // Two entries for 2026-01-01 (could happen after a CSV re-import or data corruption).
+    // Without dedup, done=2 so remaining=10; with dedup, done=1 so remaining=11.
+    const entries: HistoryEntry[] = [
+      { ...completeEntry('2026-01-01'), id: 'e1a', createdAt: '2026-01-01T08:00:00Z' },
+      { ...completeEntry('2026-01-01'), id: 'e1b', createdAt: '2026-01-01T18:00:00Z' },
+    ]
+    expect(computeRotationPlanRemaining(FOUR_ROTATION_PLAN, entries)).toBe(11)
   })
 })
 
