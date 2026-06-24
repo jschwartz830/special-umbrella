@@ -165,12 +165,16 @@ export function computeRotationCycleProgress(
 ): RotationCycleProgress | null {
   if (plan.duration.type !== 'rotations' || plan.days.length === 0) return null
 
-  const planEntries = entries.filter(
-    e => e.planId === plan.id &&
-      (today === undefined || e.calendarDate <= today) &&
-      (e.action === 'complete' || e.action === 'skip'),
+  // Deduplicate by calendarDate — mirrors isPlanExpired so cycle counts stay
+  // consistent when the same date has multiple entries (e.g. after CSV import).
+  const completedDates = new Set(
+    entries
+      .filter(e => e.planId === plan.id &&
+        (today === undefined || e.calendarDate <= today) &&
+        (e.action === 'complete' || e.action === 'skip'))
+      .map(e => e.calendarDate),
   )
-  const totalDone = planEntries.length
+  const totalDone = completedDates.size
   const rotationLength = plan.days.length
   const doneInCycle = totalDone % rotationLength
   const remaining = rotationLength - doneInCycle
@@ -207,12 +211,16 @@ export function computeRotationPlanRemaining(
   ) return null
 
   const totalNeeded = plan.duration.value * plan.days.length
-  const done = entries.filter(
-    e => e.planId === plan.id &&
-      (today === undefined || e.calendarDate <= today) &&
-      (e.action === 'complete' || e.action === 'skip'),
-  ).length
-  return Math.max(0, totalNeeded - done)
+  // Deduplicate by calendarDate — mirrors isPlanExpired so the remaining count
+  // stays consistent with the expiry check (one advancement per calendar day).
+  const doneDates = new Set(
+    entries
+      .filter(e => e.planId === plan.id &&
+        (today === undefined || e.calendarDate <= today) &&
+        (e.action === 'complete' || e.action === 'skip'))
+      .map(e => e.calendarDate),
+  )
+  return Math.max(0, totalNeeded - doneDates.size)
 }
 
 // ── Logged rate ───────────────────────────────────────────────────────────────
@@ -323,6 +331,33 @@ export function getUnloggedPastDates(
     if (!entryDates.has(date)) dates.push(date)
   }
   return dates
+}
+
+/**
+ * Count ALL unlogged days for a plan from `planStartDate` up to (not including)
+ * `today`. Unlike `countPastUnloggedDays`, this is not capped by a lookback
+ * window — it scans the full history so callers can surface the true scope of
+ * any rotation stall (e.g. "14 recent + 6 older unlogged days").
+ *
+ * Multiple entries for the same date count as one logged day.
+ * Only days on or after `planStartDate` and strictly before `today` are counted.
+ * Returns 0 when the plan started today or in the future.
+ */
+export function countTotalUnloggedDays(
+  planId: string,
+  entries: HistoryEntry[],
+  planStartDate: string,
+  today: string,
+): number {
+  const activeDays = dateDiffDays(planStartDate, today)
+  if (activeDays <= 0) return 0
+
+  const loggedDates = new Set(
+    entries
+      .filter(e => e.planId === planId && e.calendarDate >= planStartDate && e.calendarDate < today)
+      .map(e => e.calendarDate),
+  )
+  return Math.max(0, activeDays - loggedDates.size)
 }
 
 // ── Workout type breakdown ────────────────────────────────────────────────────
