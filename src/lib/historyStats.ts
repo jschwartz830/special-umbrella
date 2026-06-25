@@ -707,13 +707,18 @@ export function countPlanDayCompletions(
   entries: HistoryEntry[],
   excludeDate?: string,
 ): number {
-  return entries.filter(
-    e =>
-      e.planId === planId &&
-      e.planDayIndex === planDayIndex &&
-      e.action === 'complete' &&
-      e.calendarDate !== excludeDate,
-  ).length
+  const dates = new Set(
+    entries
+      .filter(
+        e =>
+          e.planId === planId &&
+          e.planDayIndex === planDayIndex &&
+          e.action === 'complete' &&
+          e.calendarDate !== excludeDate,
+      )
+      .map(e => e.calendarDate),
+  )
+  return dates.size
 }
 
 // ── Weekly breakdown ──────────────────────────────────────────────────────────

@@ -174,3 +174,45 @@ Added to `src/lib/__tests__/historyStats.test.ts`:
 | Component/integration tests (RTL/Playwright) | Requires infrastructure setup; out of scope |
 | Performance: memoize allOutcomes lookup | Low priority; app is single-user and data sets are small |
 | Bulk mark-as-Day-Off from CalendarPage | Would extend the catch-up to handle old gaps too; larger feature |
+
+---
+
+## Pass 63 — 2026-06-25 (branch `claude/dreamy-mccarthy-nmt6dy`)
+
+### Observations on entry
+
+- Branch starts at `6daa617` (merged PR #152 from pass 62).
+- 935 tests passing across 24 test files before any changes.
+- Codebase quality: 8.5/10. Core logic is sound; test suite is comprehensive.
+- Full audit of all key modules: rotation engine, historyStats, expressionEval, run-adaptation engine, outcomeStore, historyStore, workoutInstanceId, sessionSummary, progressionRecommendation.
+
+### Key finding
+
+Every counting function in `historyStats.ts` that produces a user-visible stat deduplicates by `calendarDate` using a `Set` — **except `countPlanDayCompletions`**. This is the function powering the "Session N" label shown in TodayPage when a user starts a workout. If a CSV import creates a duplicate entry for the same date and planDayIndex, the count inflates (e.g. "Session 8" instead of "Session 7").
+
+No other genuine correctness bugs were found. All other audit items were either already correctly handled or were non-issues given the single-device PWA context.
+
+---
+
+### Work Completed
+
+#### 1. Fix: deduplicate `countPlanDayCompletions` by calendarDate
+
+`src/lib/historyStats.ts` — changed to collect unique calendarDates via `new Set()` before counting. Now consistent with `isPlanExpired`, `computeRotationCycleProgress`, `computeRotationPlanRemaining`, `countTotalUnloggedDays`, and all other counting functions in the module.
+
+#### 2. Test: deduplication regression test
+
+`src/lib/__tests__/historyStats.test.ts` — added one test: two `complete` entries for the same date+planDayIndex (as would happen after a CSV re-import) now count as 1, not 2.
+
+Test count: 935 → 936.
+
+---
+
+### What was NOT done (and why)
+
+| Considered | Decision |
+|---|---|
+| Feature: copy-workout button on CalendarPage | TodayPage already has it (pass 61); extending to CalendarPage requires wiring `formatWorkoutForClipboard` through the slot → planDay lookup, medium scope for low usage |
+| historyStore `removeRetroJumpForDate` timezone | Same conclusion as pass 61: consistent round-trip in a single-device PWA, not a real bug |
+| expressionEval: fuzz testing | Current test suite already covers all operator paths, NaN/Infinity guards, and nested parens |
+| Progression state UI exposure | Schema change needed; medium risk; deferred to a dedicated pass |

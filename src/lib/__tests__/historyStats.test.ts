@@ -1094,6 +1094,17 @@ describe('countPlanDayCompletions', () => {
     expect(countPlanDayCompletions('plan-1', 0, entries)).toBe(1)
     expect(countPlanDayCompletions('plan-1', 1, entries)).toBe(1)
   })
+
+  it('deduplicates by calendarDate — two entries for the same date count as one', () => {
+    // Simulate CSV-import creating a duplicate complete entry for the same date
+    const entries: HistoryEntry[] = [
+      { id: 'a', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T08:00:00Z' },
+      { id: 'b', planId: 'plan-1', calendarDate: '2026-01-01', planDayIndex: 0, action: 'complete', createdAt: '2026-01-01T09:00:00Z' },
+      { id: 'c', planId: 'plan-1', calendarDate: '2026-01-03', planDayIndex: 0, action: 'complete', createdAt: '2026-01-03T08:00:00Z' },
+    ]
+    // Should be 2 unique dates, not 3
+    expect(countPlanDayCompletions('plan-1', 0, entries)).toBe(2)
+  })
 })
 
 // ── computePersonalRecords ────────────────────────────────────────────────────
