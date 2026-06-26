@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format, addDays, parseISO } from 'date-fns'
+import { format, addDays, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
   SkipForward,
   Coffee,
@@ -319,6 +319,7 @@ export function TodayPage() {
   // Logging adherence rate — shown after plan has been active ≥ 7 days so the
   // percentage is meaningful. null for new plans or when the plan started today.
   const loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)
+  const planActiveDays = differenceInCalendarDays(parseISO(today), parseISO(plan.startDate))
 
   // Rotation cycle progress — for rotations-duration plans only
   const cycleProgress = computeRotationCycleProgress(plan, planEntries, today)
@@ -647,7 +648,7 @@ export function TodayPage() {
       <WeeklyActivityStrip planEntries={planEntries} planExtras={planExtras} today={today} />
 
       {/* Logging adherence bar — visible once the plan has ≥7 past days to measure */}
-      {loggedRate !== null && (
+      {loggedRate !== null && planActiveDays >= 7 && (
         <div className="flex items-center gap-2 px-1">
           <div className="flex-1 h-1 rounded-full bg-slate-700/60 overflow-hidden">
             <div

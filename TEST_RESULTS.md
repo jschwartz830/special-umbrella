@@ -1,5 +1,42 @@
 # Test Results
 
+## 2026-06-26 (sixty-fourth pass) — branch `claude/dreamy-mccarthy-fxnzht`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  24 passed (24)
+     Tests  936 passed (936)
+  Duration  ~2.7s
+```
+
+### Final run (after fix)
+
+```
+Test Files  24 passed (24)
+     Tests  936 passed (936)
+  Duration  ~2.7s
+```
+
+No new tests added this pass — the fixed code path is a UI display condition with no
+testable pure-function equivalent (TodayPage is a React component, not covered by the
+Vitest node suite).
+
+TypeScript: `tsc --noEmit` exits clean with no errors.
+
+---
+
+### Changes verified
+
+The adherence bar fix in `TodayPage.tsx` adds a `differenceInCalendarDays` call from
+date-fns (already a project dependency). TypeScript confirms the import is valid and
+the new variable type is `number`, compatible with the `>= 7` comparison. No regressions
+in the existing test suite.
+
+---
+
 ## 2026-06-25 (sixty-third pass) — branch `claude/dreamy-mccarthy-nmt6dy`
 
 ---

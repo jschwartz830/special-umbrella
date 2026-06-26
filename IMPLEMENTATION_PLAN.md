@@ -216,3 +216,42 @@ Test count: 935 → 936.
 | historyStore `removeRetroJumpForDate` timezone | Same conclusion as pass 61: consistent round-trip in a single-device PWA, not a real bug |
 | expressionEval: fuzz testing | Current test suite already covers all operator paths, NaN/Infinity guards, and nested parens |
 | Progression state UI exposure | Schema change needed; medium risk; deferred to a dedicated pass |
+
+---
+
+## Pass 64 — 2026-06-26 (branch `claude/dreamy-mccarthy-fxnzht`)
+
+### Observations on entry
+
+- Branch starts at `6daa617` (merged PR #152 from pass 62; pass 63 was committed on the same upstream).
+- 936 tests passing across 24 test files before any changes.
+- Codebase quality: 8.5/10. No critical bugs. Core logic is sound.
+- Full re-audit of TodayPage, historyStats, historyStore, outcomeStore, rotationEngine, workoutInstanceId.
+
+### Key finding
+
+**Adherence bar 7-day threshold was undocumented but missing** (`src/pages/TodayPage.tsx`):
+
+The comment on the `loggedRate` declaration explicitly states the bar is "shown after plan has been active ≥ 7 days so the percentage is meaningful." However, `computeLoggedRate` returns `0` (not `null`) once `activeDays >= 1`, so the null-check guard would let the bar appear after just 2 calendar days. The 7-day guard existed in the comment but not in the code.
+
+**Fix**: Added `planActiveDays >= 7` alongside the existing `loggedRate !== null` condition.
+
+No other genuine correctness bugs were found. All other audit items were either already correctly handled (including the deduplication fixes from pass 63) or were non-issues.
+
+---
+
+### Work Completed
+
+#### 1. Fix: enforce 7-day minimum before showing adherence bar
+
+`src/pages/TodayPage.tsx` — added `differenceInCalendarDays` import and `planActiveDays >= 7` guard so the adherence bar only appears once the plan has at least a week of history. The bar showed on day 2 before this change; now it correctly waits until day 7.
+
+---
+
+### What was NOT done (and why)
+
+| Considered | Decision |
+|---|---|
+| Redundant `removeEntry` before `updateEntryDate` in `handleOutcomeConfirm` | Harmless — `updateEntryDate` already removes collisions internally; no bug, no impact, not worth touching |
+| Feature: last-session summary on upcoming cards | Medium complexity; TodayPage already shows this for today's card via `prevSessionOutcome`; extending to the upcoming list is a larger UI change |
+| Component/integration tests | Requires jsdom or Playwright setup; out of scope for a targeted overnight pass |

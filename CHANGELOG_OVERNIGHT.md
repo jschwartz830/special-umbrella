@@ -1,3 +1,26 @@
+# Overnight Changelog — 2026-06-26
+
+## [1] fix: enforce 7-day minimum before showing adherence bar
+
+**Problem**: The comment on `loggedRate` in `TodayPage.tsx` stated the adherence bar
+was "shown after plan has been active ≥ 7 days so the percentage is meaningful."
+However, `computeLoggedRate` returns `0` (not `null`) once `activeDays >= 1`, so
+the existing `loggedRate !== null` guard allowed the bar to appear after just 2
+calendar days. The 7-day threshold was documented but not enforced in code.
+
+**Fix**: Added `differenceInCalendarDays` import and a `planActiveDays >= 7` guard
+alongside the existing null check so the implementation matches the documented intent.
+
+**Files changed**:
+- `src/pages/TodayPage.tsx` — `differenceInCalendarDays` import; `planActiveDays`
+  computed from `parseISO(today) - parseISO(plan.startDate)`; display condition changed
+  from `loggedRate !== null` to `loggedRate !== null && planActiveDays >= 7`
+
+**Risk**: Low. UI-only change; no state mutations, no data model changes. The bar
+simply becomes visible later than before (day 7 instead of day 2). Easily reverted.
+
+---
+
 # Overnight Changelog — 2026-06-25
 
 ## [1] fix: deduplicate `countPlanDayCompletions` by calendarDate
