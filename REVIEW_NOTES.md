@@ -1,5 +1,58 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-26 (sixty-fourth pass) — branch `claude/dreamy-mccarthy-fxnzht`
+
+---
+
+### Audit scope
+
+Full re-read of key modules:
+- `src/pages/TodayPage.tsx`
+- `src/engine/rotationEngine.ts`
+- `src/lib/historyStats.ts`
+- `src/store/historyStore.ts`
+- `src/store/outcomeStore.ts`
+- `src/types/index.ts`
+- All corresponding test files
+
+Test suite on entry: **936 tests passing** across 24 test files.
+
+---
+
+### Findings
+
+#### Bug: adherence bar shown after 2 days instead of 7 (FIXED)
+
+**Location**: `src/pages/TodayPage.tsx:650`
+
+**Issue**: The comment at line 319 explicitly documents that the adherence bar is "shown after plan has been active ≥ 7 days so the percentage is meaningful." However, `computeLoggedRate` returns `0` (not `null`) once `activeDays >= 1`, so the guard `loggedRate !== null` was satisfied as soon as one past day existed (i.e., from day 2 of the plan). The bar showed a 0% reading with only one or two data points — not meaningful.
+
+**Fix**: Added `differenceInCalendarDays(parseISO(today), parseISO(plan.startDate)) >= 7` to the display condition.
+
+---
+
+### Non-issues confirmed
+
+| Item | Verdict |
+|---|---|
+| Redundant `removeEntry` before `updateEntryDate` in `handleOutcomeConfirm` | Harmless — `updateEntryDate` removes collisions internally; double removal is a no-op. |
+| Dual streak computation (`stats.currentStreak` + `planStreak`) | Equivalent values (entries pre-filtered); extra computation is negligible; not worth removing. |
+| `countPlanDayCompletions` deduplication | Fixed in pass 63 — verified still correct. |
+| `clearPlanOutcomes` startsWith safety | Verified safe as in pass 63. |
+| All historyStats deduplication functions | Consistent Set usage across all counting paths. |
+
+---
+
+### Recommendations for future passes
+
+1. **Progression state UI** — `RunProgressionState.lastResult` stored but never surfaced in HistoryPage. A small indicator chip would make the progression system visible.
+
+2. **CalendarPage copy-workout button** — TodayPage has clipboard copy (pass 61). Extending to CalendarPage lets users share historical/future workouts.
+
+3. **Component/integration test layer** — Unit coverage is excellent. Thin RTL or Playwright smoke tests over key flows (log, skip, day off, undo) would round out quality.
+
+---
+
 ## 2026-06-25 (sixty-third pass) — branch `claude/dreamy-mccarthy-nmt6dy`
 
 ---
