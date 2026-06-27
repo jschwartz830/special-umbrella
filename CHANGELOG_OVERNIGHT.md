@@ -1,3 +1,42 @@
+# Overnight Changelog — 2026-06-27
+
+## [1] fix: Undo after double-day now removes the advance override
+
+**Problem**: When a user logs a double-day workout, the flow adds an `advance` override to
+the history store (to shift the rotation pointer forward) alongside a `double_day`
+`ExtraWorkoutEntry`. The Undo button on TodayPage correctly removed the primary entry,
+outcome, and double-day extras, but did NOT remove the `advance` override. After pressing
+Undo, the rotation pointer remained one step ahead permanently — the user would see the
+day-after-next as "upcoming" instead of the correct next day.
+
+**Root cause**: The `advance` override is appended to `historyStore.overrides` by
+`actions.advance()` inside the double-day branch of `handleOutcomeConfirm`. The Undo
+handler had no mechanism to remove a specific override by type — only
+`removeRetroJumpForDate` (date-scoped jump removal) and `clearPlanHistory` (destructive)
+existed.
+
+**Fix**:
+- Added `removeLastOverrideByType(planId, type)` to `HistoryState` interface and
+  implemented it in the Zustand store. It sorts matching overrides by `appliedAt`
+  descending and removes only the most recent one — the minimum intervention to undo
+  a single double-day's advance.
+- Updated the Undo handler to track whether any `double_day` extras were removed, and
+  call `removeLastOverrideByType(plan.id, 'advance')` when they were.
+
+**Files changed**:
+- `src/store/historyStore.ts` — `HistoryState` interface: added `removeLastOverrideByType`
+  signature; `create()` body: added implementation
+- `src/pages/TodayPage.tsx` — added `removeLastOverrideByType` store selector; updated
+  Undo `onClick` to track `removedDoubleDay` flag and call the new action
+- `src/store/__tests__/historyStore.test.ts` — 7 new tests covering the new action
+
+**Risk**: Low. `removeLastOverrideByType` is a targeted filter — it cannot affect entries
+or extras, and only touches the most recent override of the named type. The Undo handler
+only calls it when it already confirmed a double_day extra was removed, so the code path
+is strictly narrower than before. Easily reverted.
+
+---
+
 # Overnight Changelog — 2026-06-26
 
 ## [1] fix: enforce 7-day minimum before showing adherence bar

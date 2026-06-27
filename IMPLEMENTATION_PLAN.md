@@ -1,5 +1,55 @@
 # Implementation Plan
 
+## Pass 65 — 2026-06-27 (branch `claude/dreamy-mccarthy-zak0k0`)
+
+### Observations on entry
+
+- Branch is at `7115f6f` (merged PR #157 from pass 64).
+- 936 tests passing across 24 test files before any changes.
+- Found a clear data-integrity bug: Undo after a double-day workout leaves a stale `advance`
+  override in `historyStore.overrides`, permanently shifting the rotation pointer forward by one.
+  The fix is surgical — add `removeLastOverrideByType` to historyStore and call it from the Undo handler.
+
+---
+
+### Audit findings
+
+#### Bug (HIGH): Undo after double-day leaves stale advance override
+
+**Location**: `src/pages/TodayPage.tsx` — Undo `onClick` handler (~line 924)
+
+**Mechanism**: When a user does a double-day workout, `handleOutcomeConfirm` calls:
+1. `addExtraEntry(...)` — bonus `ExtraWorkoutEntry` with `source: 'double_day'`
+2. `actions.advance()` → `logOverride(planId, 'advance', { delta: 1 })` — rotation pointer +1
+
+The Undo handler (line 933–945) correctly removes the primary `HistoryEntry`, the outcome,
+and any `double_day` extras. But it does NOT remove the `advance` override. After Undo,
+the rotation is one step ahead of where it should be. The user sees the day after next
+instead of the day after, permanently, until they use the Override panel to correct it manually.
+
+**Fix**: Add `removeLastOverrideByType(planId, type)` to `historyStore` and call it in
+the Undo handler whenever at least one `double_day` extra was removed.
+
+#### Non-issues confirmed this pass
+
+| Item | Verdict |
+|---|---|
+| `migrateHistoryState` v0→v1 migration for `source` field | Correct — sets undefined → 'history' conservatively |
+| `deduplicateByDate` in `importEntries` | Correct — sorts by createdAt ascending, last-wins |
+| `clearPlanOutcomes` prefix matching | Safe — nanoid is alphanumeric + hyphen, no collisions |
+| `buildVars()` bool-to-0/1 conversion for progression context | Correct |
+| Override accumulation semantics | Correct — `addOverride` always appends, dedup is caller's responsibility |
+
+---
+
+### Work plan
+
+1. **[HIGH] Fix Undo override leak** — add `removeLastOverrideByType` to `historyStore` (interface + implementation), update TodayPage Undo handler, add 7 new unit tests.
+
+No feature work this pass — the bug fix warranted full attention and there's no adjacent feature that's both high-confidence and low-risk enough given the existing scope.
+
+---
+
 ## Pass 61 — 2026-06-19 (branch `claude/dreamy-mccarthy-7ugj5k`)
 
 ### Observations on entry
