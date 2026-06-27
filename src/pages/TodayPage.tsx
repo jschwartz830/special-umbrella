@@ -32,6 +32,7 @@ import { WorkoutDayCard } from '../components/workout/WorkoutDayCard'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { ActiveWorkoutTracker } from '../components/workout/ActiveWorkoutTracker'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
+import { CardioWorkoutTracker } from '../components/workout/CardioWorkoutTracker'
 import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
@@ -245,6 +246,9 @@ export function TodayPage() {
   // Exercises tracked during active session — used to pre-fill OutcomeModal
   const [activeTrackedExercises, setActiveTrackedExercises] = useState<LoggedExerciseActual[] | null>(null)
   const [activeTrackedDurationMin, setActiveTrackedDurationMin] = useState<number | null>(null)
+  // Cardio phase state: shown after weights (or as standalone for run-only days)
+  const [cardioState, setCardioState] = useState<'hidden' | 'prompt' | 'open' | 'minimized'>('hidden')
+  const [cardioTrackedDurationMin, setCardioTrackedDurationMin] = useState<number | null>(null)
 
   if (!plan || !todayResolved) {
     return (
@@ -379,10 +383,56 @@ export function TodayPage() {
     )
   }, [plan, upcoming, planEntries])
 
+  function estimateRunDurationMin(slot: { durationMin?: number; runConfig?: { targetDurationMin?: number | null; targetDistanceMiles?: number | null }; segments?: Array<{ type?: string; duration?: string; distance?: string }> }): number {
+    if (slot.durationMin) return slot.durationMin
+    if (slot.runConfig?.targetDurationMin) return slot.runConfig.targetDurationMin
+    let totalMin = 0
+    for (const seg of slot.segments ?? []) {
+      if (seg.duration) {
+        const mMatch = seg.duration.match(/^(\d+(?:\.\d+)?)\s*m(?:in)?$/)
+        if (mMatch) { totalMin += parseFloat(mMatch[1]); continue }
+      }
+      if (seg.distance) {
+        const resolved = seg.distance.replace(/\b([a-zA-Z_]\w*)\b/g, (m: string) =>
+          planProgramVars[m] !== undefined ? String(planProgramVars[m]) : m,
+        )
+        const miles = parseFloat(resolved)
+        if (!isNaN(miles)) {
+          const minPerMile = seg.type === 'tempo' ? 8 : seg.type === 'warmup' || seg.type === 'cooldown' ? 12 : 11
+          totalMin += miles * minPerMile
+        }
+      }
+    }
+    if (totalMin > 0) return Math.ceil(totalMin)
+    const dist = slot.runConfig?.targetDistanceMiles
+    if (dist) return Math.ceil(dist * 11)
+    return 20
+  }
+
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
+    const elapsedMin = Math.round(meta.totalElapsedSeconds / 60) || null
     setActiveTrackedExercises(exercises)
-    setActiveTrackedDurationMin(Math.round(meta.totalElapsedSeconds / 60) || null)
+    setActiveTrackedDurationMin(elapsedMin)
     setActiveWorkoutState('hidden')
+
+    const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
+    if (runSlot) {
+      const runEstimate = estimateRunDurationMin(runSlot)
+      const totalEstimate = (elapsedMin ?? 0) + runEstimate
+      setCardioState(totalEstimate < 60 ? 'open' : 'prompt')
+    } else {
+      setShowOutcomeModal(true)
+    }
+  }
+
+  function handleCardioComplete(durationMin: number) {
+    setCardioTrackedDurationMin(durationMin)
+    setCardioState('hidden')
+    setShowOutcomeModal(true)
+  }
+
+  function handleCardioCancel() {
+    setCardioState('hidden')
     setShowOutcomeModal(true)
   }
 
@@ -873,7 +923,14 @@ export function TodayPage() {
       {isPending && activeWorkoutState === 'hidden' && (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveWorkoutState('open')}
+            onClick={() => {
+              const firstSlot = primaryPlanDay.slots[0]
+              if (firstSlot && isRunType(firstSlot.type)) {
+                setCardioState('open')
+              } else {
+                setActiveWorkoutState('open')
+              }
+            }}
             className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors active:scale-[0.98]"
           >
             <Play size={18} />
@@ -1027,19 +1084,24 @@ export function TodayPage() {
           calendarDate={today}
           planDay={primaryPlanDay}
           previousSetsByExercise={previousSetsByExercise}
-          isFromActiveWorkout={!!activeTrackedExercises}
+          isFromActiveWorkout={!!(activeTrackedExercises || cardioTrackedDurationMin !== null)}
           existingOutcome={
-            activeTrackedExercises
+            (activeTrackedExercises || cardioTrackedDurationMin !== null)
               ? {
                   workoutInstanceId: makeWorkoutInstanceId(plan.id, today),
                   completionState: 'completed',
                   completedAt: new Date().toISOString(),
-                  durationActualMin: activeTrackedDurationMin,
+                  durationActualMin:
+                    (activeTrackedDurationMin ?? 0) + (cardioTrackedDurationMin ?? 0) || null,
                   perceivedEffort: null,
                   notes: null,
-                  runActual: null,
+                  runActual: cardioTrackedDurationMin !== null
+                    ? { actualDurationMin: cardioTrackedDurationMin }
+                    : null,
                   swimActual: null,
-                  weightsActual: { exercises: activeTrackedExercises },
+                  weightsActual: activeTrackedExercises
+                    ? { exercises: activeTrackedExercises }
+                    : null,
                 }
               : existingOutcome
           }
@@ -1048,6 +1110,7 @@ export function TodayPage() {
             setShowOutcomeModal(false)
             setActiveTrackedExercises(null)
             setActiveTrackedDurationMin(null)
+            setCardioTrackedDurationMin(null)
           }}
         />
       )}
@@ -1071,6 +1134,61 @@ export function TodayPage() {
             onResume={() => setActiveWorkoutState('open')}
             onCancel={() => setActiveWorkoutState('hidden')}
             onComplete={handleActiveWorkoutComplete}
+          />
+        )
+      })()}
+
+      {/* Cardio prompt — shown after weights when total expected time >= 60 min */}
+      {cardioState === 'prompt' && (() => {
+        const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
+        if (!runSlot) return null
+        const runEst = estimateRunDurationMin(runSlot)
+        return (
+          <Modal title="Nice work on the lifts!" onClose={handleCardioCancel}>
+            <div className="space-y-4">
+              <div className="rounded-xl bg-slate-800 border border-slate-700 p-4 space-y-1">
+                <p className="text-sm font-semibold text-slate-200">{runSlot.name}</p>
+                <p className="text-xs text-slate-400">~{runEst} min · scheduled cardio for today</p>
+                {runSlot.runConfig?.targetDistanceMiles && (
+                  <p className="text-xs text-slate-500">{runSlot.runConfig.targetDistanceMiles} mi target</p>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">
+                Your session is already at {activeTrackedDurationMin ?? '?'} min.
+                Start the run now, or skip it and log the lifts.
+              </p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setCardioState('open')}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors"
+                >
+                  <Play size={16} /> Start {runSlot.name}
+                </button>
+                <button
+                  onClick={handleCardioCancel}
+                  className="w-full py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium transition-colors"
+                >
+                  Skip run — log lifts only
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )
+      })()}
+
+      {/* Cardio workout tracker — kept mounted while open or minimized so timer keeps running */}
+      {cardioState !== 'hidden' && cardioState !== 'prompt' && (() => {
+        const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
+        if (!runSlot) return null
+        return (
+          <CardioWorkoutTracker
+            slot={runSlot}
+            programVars={planProgramVars}
+            minimized={cardioState === 'minimized'}
+            onMinimize={() => setCardioState('minimized')}
+            onResume={() => setCardioState('open')}
+            onComplete={handleCardioComplete}
+            onCancel={handleCardioCancel}
           />
         )
       })()}
