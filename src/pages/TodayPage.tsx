@@ -177,6 +177,7 @@ export function TodayPage() {
   const updateExtraEntryDate = useHistoryStore(s => s.updateExtraEntryDate)
   const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
   const markDaysAsOff = useHistoryStore(s => s.markDaysAsOff)
+  const removeLastOverrideByType = useHistoryStore(s => s.removeLastOverrideByType)
   const extraEntries = useHistoryStore(s => s.extraEntries)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const getOutcome = useOutcomeStore(s => s.getOutcome)
@@ -932,6 +933,7 @@ export function TodayPage() {
               // leaving orphaned extras behind on upgrade.
               removeEntry(plan.id, today)
               removeOutcome(makeWorkoutInstanceId(plan.id, today))
+              let removedDoubleDay = false
               for (const ex of extraEntries) {
                 if (
                   ex.planId === plan.id &&
@@ -940,8 +942,13 @@ export function TodayPage() {
                 ) {
                   removeOutcome(makeExtraWorkoutInstanceId(plan.id, today, ex.id))
                   removeExtraEntry(ex.id)
+                  if (ex.source === 'double_day') removedDoubleDay = true
                 }
               }
+              // The double-day flow adds an 'advance' override alongside the
+              // bonus extra entry. Roll that back so the rotation pointer
+              // returns to the same position it was before logging.
+              if (removedDoubleDay) removeLastOverrideByType(plan.id, 'advance')
               setNewPRs(null)
             }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 text-xs font-medium transition-colors"

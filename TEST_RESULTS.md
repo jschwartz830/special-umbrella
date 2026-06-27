@@ -1,5 +1,43 @@
 # Test Results
 
+## 2026-06-27 (sixty-fifth pass) — branch `claude/dreamy-mccarthy-zak0k0`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  24 passed (24)
+     Tests  936 passed (936)
+  Duration  ~2.7s
+```
+
+### New tests added: `removeLastOverrideByType` (7 tests)
+
+File: `src/store/__tests__/historyStore.test.ts`
+
+| Test | Covers |
+|---|---|
+| removes the most recently added advance override | basic happy path |
+| only removes the newest by appliedAt, not all matching | N-override accumulation case |
+| removes a single matching override and leaves store empty | single-item edge case |
+| does not remove overrides of other types | type isolation |
+| does not touch overrides for other plans | plan isolation |
+| is a no-op when there are no matching overrides | missing type |
+| is a no-op when the store is empty | empty state |
+
+### Final run (after changes)
+
+```
+Test Files  24 passed (24)
+     Tests  943 passed (943)
+  Duration  ~2.4s
+```
+
+All 7 new tests pass. No regressions in existing suite.
+
+---
+
 ## 2026-06-26 (sixty-fourth pass) — branch `claude/dreamy-mccarthy-fxnzht`
 
 ---

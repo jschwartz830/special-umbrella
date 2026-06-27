@@ -911,3 +911,67 @@ describe('migrateHistoryState', () => {
     expect(result.extraEntries).toEqual([])
   })
 })
+
+// ── removeLastOverrideByType ──────────────────────────────────────────────────
+
+describe('removeLastOverrideByType', () => {
+  it('removes the most recently added advance override for the plan', () => {
+    getState().addOverride(makeOverride('2026-01-10T08:00:00Z', 'advance'))
+    getState().addOverride(makeOverride('2026-01-10T09:00:00Z', 'advance'))
+    expect(getState().overrides).toHaveLength(2)
+
+    getState().removeLastOverrideByType('plan-1', 'advance')
+    expect(getState().overrides).toHaveLength(1)
+    expect(getState().overrides[0].appliedAt).toBe('2026-01-10T08:00:00Z')
+  })
+
+  it('only removes the newest override by appliedAt, not all matching ones', () => {
+    getState().addOverride(makeOverride('2026-01-10T08:00:00Z', 'advance'))
+    getState().addOverride(makeOverride('2026-01-10T10:00:00Z', 'advance'))
+    getState().addOverride(makeOverride('2026-01-10T12:00:00Z', 'advance'))
+
+    getState().removeLastOverrideByType('plan-1', 'advance')
+    expect(getState().overrides).toHaveLength(2)
+    expect(getState().overrides.map(o => o.appliedAt)).not.toContain('2026-01-10T12:00:00Z')
+  })
+
+  it('removes a single matching override and leaves the store empty', () => {
+    getState().addOverride(makeOverride('2026-01-10T08:00:00Z', 'advance'))
+    getState().removeLastOverrideByType('plan-1', 'advance')
+    expect(getState().overrides).toHaveLength(0)
+  })
+
+  it('does not remove overrides of other types', () => {
+    getState().addOverride(makeOverride('2026-01-10T08:00:00Z', 'go_back'))
+    getState().addOverride(makeOverride('2026-01-10T09:00:00Z', 'jump', { targetDayIndex: 2 }))
+    getState().addOverride(makeOverride('2026-01-10T10:00:00Z', 'advance'))
+
+    getState().removeLastOverrideByType('plan-1', 'advance')
+    expect(getState().overrides).toHaveLength(2)
+    expect(getState().overrides.some(o => o.type === 'go_back')).toBe(true)
+    expect(getState().overrides.some(o => o.type === 'jump')).toBe(true)
+    expect(getState().overrides.some(o => o.type === 'advance')).toBe(false)
+  })
+
+  it('does not touch overrides for other plans', () => {
+    getState().addOverride(makeOverride('2026-01-10T08:00:00Z', 'advance', { planId: 'plan-1' }))
+    getState().addOverride(makeOverride('2026-01-10T09:00:00Z', 'advance', { planId: 'plan-2' }))
+
+    getState().removeLastOverrideByType('plan-1', 'advance')
+    expect(getState().overrides).toHaveLength(1)
+    expect(getState().overrides[0].planId).toBe('plan-2')
+  })
+
+  it('is a no-op when there are no matching overrides', () => {
+    getState().addOverride(makeOverride('2026-01-10T08:00:00Z', 'go_back'))
+    getState().removeLastOverrideByType('plan-1', 'advance')
+    expect(getState().overrides).toHaveLength(1)
+  })
+
+  it('is a no-op when the store is empty', () => {
+    expect(() => {
+      getState().removeLastOverrideByType('plan-1', 'advance')
+    }).not.toThrow()
+    expect(getState().overrides).toHaveLength(0)
+  })
+})

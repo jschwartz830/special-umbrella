@@ -1,5 +1,47 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-27 (sixty-fifth pass) — branch `claude/dreamy-mccarthy-zak0k0`
+
+---
+
+### Audit scope
+
+Full re-read of:
+- `src/pages/TodayPage.tsx` — full Undo flow, double-day flow, action handlers
+- `src/store/historyStore.ts` — all actions, migration logic
+- `src/store/outcomeStore.ts` — outcome persistence, exercise sync
+- `src/types/index.ts` — HistoryEntry, ExtraWorkoutEntry, OverrideEntry shapes
+- Corresponding test files
+
+Test suite on entry: **936 tests passing** across 24 test files.
+
+---
+
+### Bug fixed: Undo after double-day left stale advance override (HIGH)
+
+**Location**: `src/pages/TodayPage.tsx` Undo handler (~line 924) + `src/store/historyStore.ts`
+
+**Issue**: The double-day flow in `handleOutcomeConfirm` adds both a `double_day`
+`ExtraWorkoutEntry` and an `advance` override (rotation pointer +1). The Undo button
+removed the extra and outcome but silently left the `advance` override in place. After
+Undo, the rotation was permanently one day ahead.
+
+**Fix**: Added `removeLastOverrideByType(planId, type)` to historyStore and called it
+from the Undo handler when a double_day extra was removed. 7 tests added.
+
+---
+
+### Non-issues confirmed
+
+| Item | Verdict |
+|---|---|
+| `migrateHistoryState` v0→v1 source migration | Correct — conservatively sets undefined → 'history' |
+| `clearPlanOutcomes` nanoid prefix matching | Safe — nanoid output is alphanumeric + hyphen only |
+| `buildVars()` boolean-to-0/1 in expressionEval | Correct — confirmed by existing tests |
+| `removeRetroJumpForDate` scope | Correct — date-local, type-scoped, only affects jumps |
+
+---
+
 ## 2026-06-26 (sixty-fourth pass) — branch `claude/dreamy-mccarthy-fxnzht`
 
 ---

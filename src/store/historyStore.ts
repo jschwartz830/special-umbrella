@@ -71,6 +71,13 @@ interface HistoryState {
    * "quick catch-up" flow that marks a streak of unlogged past days at once.
    */
   markDaysAsOff: (planId: string, dates: string[]) => void
+
+  /**
+   * Remove the most recently added override of the given type for a plan.
+   * Used by the Undo handler on TodayPage to roll back an 'advance' override
+   * that was added as part of the double-day flow.
+   */
+  removeLastOverrideByType: (planId: string, type: OverrideType) => void
 }
 
 /** Keep the entry with the newest createdAt for each (planId, calendarDate) pair. */
@@ -282,6 +289,17 @@ export const useHistoryStore = create<HistoryState>()(
             e => !(e.planId === planId && dateSet.has(e.calendarDate)),
           )
           return { entries: [...filtered, ...incoming] }
+        })
+      },
+
+      removeLastOverrideByType(planId, type) {
+        set(s => {
+          const matching = s.overrides
+            .filter(o => o.planId === planId && o.type === type)
+            .sort((a, b) => b.appliedAt.localeCompare(a.appliedAt))
+          if (matching.length === 0) return s
+          const lastId = matching[0].id
+          return { overrides: s.overrides.filter(o => o.id !== lastId) }
         })
       },
     }),
