@@ -767,9 +767,13 @@ export function ActiveWorkoutTracker({
     const remainingToEnd = targetSeconds - fromElapsed
 
     if (targetSeconds > 15 && remainingToWoodBlock > 0) {
-      // Single wood-block: percussive transient with a touch of layered timbre for body.
-      nodes.push(scheduleTone(ctx, 880, base + remainingToWoodBlock, 0.045, 0.55, 'triangle'))
-      nodes.push(scheduleTone(ctx, 440, base + remainingToWoodBlock + 0.005, 0.04, 0.28, 'triangle'))
+      // Double wood-block hit: louder first strike + echo strike 0.2s later.
+      const wb = base + remainingToWoodBlock
+      nodes.push(scheduleTone(ctx, 880, wb, 0.06, 0.9, 'square'))
+      nodes.push(scheduleTone(ctx, 660, wb + 0.005, 0.05, 0.6, 'triangle'))
+      nodes.push(scheduleTone(ctx, 440, wb + 0.01, 0.05, 0.4, 'triangle'))
+      nodes.push(scheduleTone(ctx, 880, wb + 0.22, 0.05, 0.6, 'square'))
+      nodes.push(scheduleTone(ctx, 440, wb + 0.225, 0.04, 0.35, 'triangle'))
     }
     if (remainingToEnd > 0) {
       nodes.push(scheduleTone(ctx, 920, base + remainingToEnd, 0.2, 0.44, 'square'))
@@ -793,8 +797,11 @@ export function ActiveWorkoutTracker({
       const ctx = getAudioContext()
       if (ctx) {
         const now = ctx.currentTime + 0.02
-        scheduleTone(ctx, 880, now, 0.045, 0.55, 'triangle')
-        scheduleTone(ctx, 440, now + 0.025, 0.04, 0.28, 'triangle')
+        scheduleTone(ctx, 880, now, 0.06, 0.9, 'square')
+        scheduleTone(ctx, 660, now + 0.005, 0.05, 0.6, 'triangle')
+        scheduleTone(ctx, 440, now + 0.01, 0.05, 0.4, 'triangle')
+        scheduleTone(ctx, 880, now + 0.22, 0.05, 0.6, 'square')
+        scheduleTone(ctx, 440, now + 0.225, 0.04, 0.35, 'triangle')
       }
     }
     if (elapsedSeconds >= targetSeconds && !restAlertedRef.current) {
@@ -1096,6 +1103,12 @@ export function ActiveWorkoutTracker({
     } else {
       activeSetRef.current = { exIdx, setIdx }
       setActiveSetTimer({ exIdx, setIdx })
+      const ctx = getAudioContext()
+      if (ctx) {
+        const now = ctx.currentTime + 0.02
+        scheduleTone(ctx, 880, now, 0.08, 0.55, 'triangle')
+        scheduleTone(ctx, 1174, now + 0.09, 0.1, 0.55, 'triangle')
+      }
     }
   }
 

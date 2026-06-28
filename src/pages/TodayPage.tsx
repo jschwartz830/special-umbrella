@@ -20,6 +20,8 @@ import {
   ChevronDown,
   Copy,
   Trophy,
+  Plus,
+  Zap,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
@@ -41,9 +43,12 @@ import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak, computeConsecutiveSkips, computeLoggedRate } from '../lib/historyStats'
-import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry } from '../types'
+import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry, WorkoutType, WorkoutSlot, PlanDay } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
+import { MobilityTracker } from '../components/workout/MobilityTracker'
+import { useMobilityStore } from '../store/mobilityStore'
+import { nanoid } from '../lib/utils'
 import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -249,6 +254,22 @@ export function TodayPage() {
   // Cardio phase state: shown after weights (or as standalone for run-only days)
   const [cardioState, setCardioState] = useState<'hidden' | 'prompt' | 'open' | 'minimized'>('hidden')
   const [cardioTrackedDurationMin, setCardioTrackedDurationMin] = useState<number | null>(null)
+  // Ad hoc workout state
+  const [adHocModalOpen, setAdHocModalOpen] = useState(false)
+  const [adHocName, setAdHocName] = useState('')
+  const [adHocType, setAdHocType] = useState<WorkoutType>('weights')
+  const [adHocWorkoutState, setAdHocWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
+  const [adHocExtraId, setAdHocExtraId] = useState<string | null>(null)
+  const [adHocSlot, setAdHocSlot] = useState<WorkoutSlot | null>(null)
+  const [adHocPlanDay, setAdHocPlanDay] = useState<PlanDay | null>(null)
+  const [adHocTrackedExercises, setAdHocTrackedExercises] = useState<LoggedExerciseActual[] | null>(null)
+  const [adHocTrackedDurationMin, setAdHocTrackedDurationMin] = useState<number | null>(null)
+  const [showAdHocOutcome, setShowAdHocOutcome] = useState(false)
+  // Mobility state
+  const mobilityCompletion = useMobilityStore(s => s.completions[today] ?? null)
+  const mobilityRoutine = useMobilityStore(s => s.routine)
+  const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
+  const [showMobilityTracker, setShowMobilityTracker] = useState(false)
 
   if (!plan || !todayResolved) {
     return (
@@ -383,7 +404,7 @@ export function TodayPage() {
     )
   }, [plan, upcoming, planEntries])
 
-  function estimateRunDurationMin(slot: { durationMin?: number; runConfig?: { targetDurationMin?: number | null; targetDistanceMiles?: number | null }; segments?: Array<{ type?: string; duration?: string; distance?: string }> }): number {
+  function estimateRunDurationMin(slot: { durationMin?: number; runConfig?: { targetDurationMin?: number | null; targetDistanceMiles?: number | null } | null; segments?: Array<{ type?: string; duration?: string; distance?: string }> }): number {
     if (slot.durationMin) return slot.durationMin
     if (slot.runConfig?.targetDurationMin) return slot.runConfig.targetDurationMin
     let totalMin = 0
@@ -970,6 +991,20 @@ export function TodayPage() {
         )
       )}
 
+      {/* Ad hoc workout button — always visible when no ad hoc session is running */}
+      {adHocWorkoutState === 'hidden' && !showAdHocOutcome && (
+        <button
+          onClick={() => {
+            setAdHocName('')
+            setAdHocType('weights')
+            setAdHocModalOpen(true)
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
+        >
+          <Plus size={13} /> Start Ad Hoc Workout
+        </button>
+      )}
+
       {/* Resolved actions */}
       {isResolved && (
         <div className="flex gap-2">
@@ -1032,6 +1067,54 @@ export function TodayPage() {
           </button>
         )}
       </div>
+
+      {/* Mobility section */}
+      <section>
+        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Zap size={11} /> Mobility
+        </h2>
+        {mobilityRoutine.length === 0 ? (
+          <button
+            onClick={() => navigate('/mobility')}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-dashed border-slate-700/60 text-slate-600 hover:text-slate-400 hover:border-slate-600 transition-colors text-xs"
+          >
+            <Plus size={13} />
+            Set up daily mobility routine
+          </button>
+        ) : mobilityCompletion ? (
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-teal-500/12 border border-teal-500/30">
+            <CheckCircle2 size={14} className="text-teal-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-teal-200 font-medium">Mobility done</p>
+              <p className="text-xs text-teal-300/60 mt-0.5">
+                {mobilityCompletion.durationMin} min ·{' '}
+                {mobilityCompletion.completedExerciseIds.length}/{mobilityRoutine.length} exercises
+              </p>
+            </div>
+            <button
+              onClick={() => removeMobilityCompletion(today)}
+              className="text-teal-400/50 hover:text-teal-200 transition-colors"
+              aria-label="Undo mobility log"
+            >
+              <RotateCcw size={13} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowMobilityTracker(true)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 hover:bg-slate-800 transition-colors active:scale-[0.99]"
+          >
+            <Zap size={14} className="text-teal-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm text-slate-300 font-medium">Daily Mobility</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {mobilityRoutine.length} exercise{mobilityRoutine.length === 1 ? '' : 's'} · ~{Math.ceil(mobilityRoutine.reduce((s, e) => s + e.durationSec, 0) / 60)} min
+              </p>
+            </div>
+            <Play size={14} className="text-slate-500 flex-shrink-0" />
+          </button>
+        )}
+      </section>
 
       {/* Upcoming */}
       {upcoming.length > 0 && (
@@ -1192,6 +1275,154 @@ export function TodayPage() {
           />
         )
       })()}
+
+      {/* Ad hoc workout tracker */}
+      {adHocWorkoutState !== 'hidden' && adHocExtraId && adHocSlot && adHocPlanDay && plan && (
+        <ActiveWorkoutTracker
+          planId={plan.id}
+          workoutInstanceId={makeExtraWorkoutInstanceId(plan.id, today, adHocExtraId)}
+          planDay={adHocPlanDay}
+          slot={adHocSlot}
+          programVars={{}}
+          previousOutcome={null}
+          resumeOutcome={null}
+          previousSetsByExercise={{}}
+          minimized={adHocWorkoutState === 'minimized'}
+          onMinimize={() => setAdHocWorkoutState('minimized')}
+          onResume={() => setAdHocWorkoutState('open')}
+          onCancel={() => {
+            if (adHocExtraId) removeExtraEntry(adHocExtraId)
+            setAdHocExtraId(null)
+            setAdHocSlot(null)
+            setAdHocPlanDay(null)
+            setAdHocWorkoutState('hidden')
+          }}
+          onComplete={(exercises, meta) => {
+            setAdHocTrackedExercises(exercises)
+            setAdHocTrackedDurationMin(Math.round(meta.totalElapsedSeconds / 60) || null)
+            setAdHocWorkoutState('hidden')
+            setShowAdHocOutcome(true)
+          }}
+        />
+      )}
+
+      {/* Ad hoc outcome modal */}
+      {showAdHocOutcome && adHocExtraId && adHocPlanDay && plan && (() => {
+        const instanceId = makeExtraWorkoutInstanceId(plan.id, today, adHocExtraId)
+        return (
+          <OutcomeModal
+            planId={plan.id}
+            calendarDate={today}
+            planDay={adHocPlanDay}
+            previousSetsByExercise={{}}
+            isFromActiveWorkout={true}
+            existingOutcome={{
+              workoutInstanceId: instanceId,
+              completionState: 'completed',
+              completedAt: new Date().toISOString(),
+              durationActualMin: adHocTrackedDurationMin,
+              perceivedEffort: null,
+              notes: null,
+              runActual: null,
+              swimActual: null,
+              weightsActual: adHocTrackedExercises ? { exercises: adHocTrackedExercises } : null,
+            }}
+            onConfirm={(outcome) => {
+              useOutcomeStore.getState().setOutcome({ ...outcome, workoutInstanceId: instanceId })
+              setShowAdHocOutcome(false)
+              setAdHocExtraId(null)
+              setAdHocSlot(null)
+              setAdHocPlanDay(null)
+              setAdHocTrackedExercises(null)
+              setAdHocTrackedDurationMin(null)
+            }}
+            onClose={() => {
+              setShowAdHocOutcome(false)
+              setAdHocExtraId(null)
+              setAdHocSlot(null)
+              setAdHocPlanDay(null)
+              setAdHocTrackedExercises(null)
+              setAdHocTrackedDurationMin(null)
+            }}
+          />
+        )
+      })()}
+
+      {/* Ad hoc start modal */}
+      {adHocModalOpen && plan && (
+        <Modal title="Ad Hoc Workout" onClose={() => setAdHocModalOpen(false)}>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                Workout name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Upper Body, Garage Workout…"
+                value={adHocName}
+                onChange={e => setAdHocName(e.target.value)}
+                autoFocus
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+                Type
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['weights', 'run', 'other'] as WorkoutType[]).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setAdHocType(t)}
+                    className={`py-2 rounded-lg border text-xs font-medium transition-colors capitalize ${
+                      adHocType === t
+                        ? 'bg-sky-500/20 border-sky-500/50 text-sky-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {t === 'weights' ? 'Weights' : t === 'run' ? 'Cardio' : 'Other'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const name = adHocName.trim() || 'Ad Hoc Workout'
+                const slotId = nanoid()
+                const slot: WorkoutSlot = { id: slotId, type: adHocType, name }
+                const day: PlanDay = { id: nanoid(), label: name, slots: [slot] }
+                const extraId = addExtraEntry({
+                  planId: plan.id,
+                  calendarDate: today,
+                  workoutType: adHocType,
+                  workoutName: name,
+                  source: 'history',
+                })
+                setAdHocSlot(slot)
+                setAdHocPlanDay(day)
+                setAdHocExtraId(extraId)
+                setAdHocModalOpen(false)
+                setAdHocWorkoutState('open')
+              }}
+              className="w-full py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors active:scale-[0.98]"
+            >
+              Start
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Mobility tracker */}
+      {showMobilityTracker && (
+        <MobilityTracker
+          today={today}
+          onClose={() => setShowMobilityTracker(false)}
+          onManageRoutine={() => {
+            setShowMobilityTracker(false)
+            navigate('/mobility')
+          }}
+        />
+      )}
 
       {/* Edit outcome for a completed extra workout (double-day bonus or ad-hoc) */}
       {editingExtra && (() => {
