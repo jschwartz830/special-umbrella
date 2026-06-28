@@ -547,20 +547,23 @@ export function computePersonalRecords(
  *
  * A date qualifies when it has at least one of:
  *   - a `complete` or `day_off` rotation entry, OR
- *   - any extra workout entry.
+ *   - any extra workout entry, OR
+ *   - a date in `additionalDates` (e.g. mobility completions).
  *
  * `skip` entries alone do NOT count — that is the deliberate rule shared by
  * `computeHistoryStats` (global streak) and `computePlanStreak` (plan streak).
  *
- * @param entries  History entries to inspect.
- * @param extras   Extra workout entries to inspect.
- * @param planId   When provided, only entries/extras for this plan are included.
- *                 When `null` / omitted, all entries are included (global streak).
+ * @param entries          History entries to inspect.
+ * @param extras           Extra workout entries to inspect.
+ * @param planId           When provided, only entries/extras for this plan are included.
+ *                         When `null` / omitted, all entries are included (global streak).
+ * @param additionalDates  Optional extra dates to include unconditionally (e.g. mobility).
  */
 export function getStreakDatesSet(
   entries: HistoryEntry[],
   extras: ExtraWorkoutEntry[],
   planId?: string | null,
+  additionalDates?: Set<string>,
 ): Set<string> {
   const streakable = new Set<string>()
   for (const e of entries) {
@@ -570,6 +573,9 @@ export function getStreakDatesSet(
   for (const e of extras) {
     if (planId != null && e.planId !== planId) continue
     streakable.add(e.calendarDate)
+  }
+  if (additionalDates) {
+    for (const d of additionalDates) streakable.add(d)
   }
   return streakable
 }
@@ -582,7 +588,8 @@ export function getStreakDatesSet(
  * Counts backward from `today` (inclusive) while each day has at least one
  * of the following for `planId`:
  *   - a `complete` or `day_off` rotation entry, OR
- *   - any extra workout entry.
+ *   - any extra workout entry, OR
+ *   - a date in `additionalDates` (e.g. mobility completions).
  *
  * A `skip` entry alone does NOT count — the same deliberate rule as the
  * global streak in `computeHistoryStats`.
@@ -594,8 +601,9 @@ export function computePlanStreak(
   entries: HistoryEntry[],
   extras: ExtraWorkoutEntry[],
   today: string,
+  additionalDates?: Set<string>,
 ): number {
-  const streakable = getStreakDatesSet(entries, extras, planId)
+  const streakable = getStreakDatesSet(entries, extras, planId, additionalDates)
 
   let streak = 0
   let cursor = today

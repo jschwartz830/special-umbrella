@@ -1,4 +1,5 @@
-import { CheckCircle2, SkipForward, Coffee } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle2, SkipForward, Coffee, ChevronDown, ChevronUp } from 'lucide-react'
 import type { ResolvedDay } from '../../types'
 import { WORKOUT_META } from '../../lib/constants'
 import { WorkoutSlotDetails } from './WorkoutSlotDetails'
@@ -10,9 +11,12 @@ interface Props {
   /** How many times this plan day has been completed before (excluding today). */
   sessionCount?: number
   onClick?: () => void
+  /** When true, exercise details start collapsed with a toggle to expand. */
+  collapsible?: boolean
 }
 
-export function WorkoutDayCard({ resolved, planId, isToday, sessionCount, onClick }: Props) {
+export function WorkoutDayCard({ resolved, planId, isToday, sessionCount, onClick, collapsible }: Props) {
+  const [expanded, setExpanded] = useState(false)
   const { planDay, status, historyEntry } = resolved
   const meta = WORKOUT_META[planDay.slots[0]?.type ?? 'rest']
 
@@ -32,6 +36,8 @@ export function WorkoutDayCard({ resolved, planId, isToday, sessionCount, onClic
           : 'border-slate-700/50'
 
   const opacity = isSkipped || isDayOff ? 'opacity-50' : ''
+
+  const hasExercises = planDay.slots.some(s => (s.exercises?.length ?? 0) > 0)
 
   return (
     <button
@@ -60,10 +66,25 @@ export function WorkoutDayCard({ resolved, planId, isToday, sessionCount, onClic
           <div className={`space-y-2 mt-1 ${planDay.slots.length > 1 ? 'divide-y divide-slate-700/50' : ''}`}>
             {planDay.slots.map((slot, i) => (
               <div key={slot.id} className={i > 0 ? 'pt-2' : ''}>
-                <WorkoutSlotDetails slot={slot} planId={planId} />
+                <WorkoutSlotDetails
+                  slot={slot}
+                  planId={planId}
+                  collapsed={collapsible && !expanded}
+                />
               </div>
             ))}
           </div>
+
+          {/* Expand/collapse toggle for upcoming cards */}
+          {collapsible && hasExercises && (
+            <div
+              onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
+              className="mt-1.5 flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors cursor-pointer select-none"
+            >
+              {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              {expanded ? 'Hide exercises' : 'Preview exercises'}
+            </div>
+          )}
         </div>
 
         {/* Status icon */}

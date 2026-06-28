@@ -12,6 +12,8 @@ interface Props {
   slot: WorkoutSlot
   planId?: string
   className?: string
+  /** When true, hides exercise lines and slot notes (summary view). */
+  collapsed?: boolean
 }
 
 function formatPaceRange(minSpm: number, maxSpm?: number | null): string {
@@ -100,7 +102,7 @@ function formatExercisePrescription(
   return lines
 }
 
-export function WorkoutSlotDetails({ slot, planId, className }: Props) {
+export function WorkoutSlotDetails({ slot, planId, className, collapsed }: Props) {
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
   const vars = useProgramStore(s => planId ? (s.vars[planId] ?? {}) : {})
 
@@ -174,7 +176,7 @@ export function WorkoutSlotDetails({ slot, planId, className }: Props) {
         <p className="text-[10px] text-slate-500 capitalize mt-1">{slot.subtype.replace(/_/g, ' ')}</p>
       )}
 
-      {exerciseLines.length > 0 && (
+      {!collapsed && exerciseLines.length > 0 && (
         <div className="mt-1.5 space-y-1">
           {exerciseLines.map(line => (
             <p key={line} className="text-[11px] text-slate-400 leading-snug">{line}</p>
@@ -182,7 +184,7 @@ export function WorkoutSlotDetails({ slot, planId, className }: Props) {
         </div>
       )}
 
-      {slot.notes && (
+      {!collapsed && slot.notes && (
         <p className="text-xs text-slate-500 mt-1 italic">{slot.notes}</p>
       )}
     </div>
