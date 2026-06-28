@@ -7,6 +7,7 @@ import { PlansPage } from './pages/PlansPage'
 import { PlanBuilderPage } from './pages/PlanBuilderPage'
 import { ProgramImportPage } from './pages/ProgramImportPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { MobilityPage } from './pages/MobilityPage'
 import { ErrorBoundary } from './components/shared/ErrorBoundary'
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="plans/:id/edit" element={<PlanBuilderPage />} />
         <Route path="plans/import" element={<ProgramImportPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="mobility" element={<MobilityPage />} />
       </Route>
     </Routes>
     </ErrorBoundary>
