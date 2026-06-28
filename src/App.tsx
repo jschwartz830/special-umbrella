@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { AuthGate } from './components/auth/AuthGate'
 import { AppShell } from './components/layout/AppShell'
 import { TodayPage } from './pages/TodayPage'
 import { CalendarPage } from './pages/CalendarPage'
@@ -13,6 +14,7 @@ import { ErrorBoundary } from './components/shared/ErrorBoundary'
 export default function App() {
   return (
     <ErrorBoundary>
+    <AuthGate>
     <Routes>
       <Route path="/" element={<AppShell />}>
         <Route index element={<Navigate to="/today" replace />} />
@@ -27,6 +29,7 @@ export default function App() {
         <Route path="mobility" element={<MobilityPage />} />
       </Route>
     </Routes>
+    </AuthGate>
     </ErrorBoundary>
   )
 }
