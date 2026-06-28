@@ -209,7 +209,8 @@ export function TodayPage() {
   const [adHocTrackedDurationMin, setAdHocTrackedDurationMin] = useState<number | null>(null)
   const [showAdHocOutcome, setShowAdHocOutcome] = useState(false)
   // Mobility state
-  const mobilityCompletion = useMobilityStore(s => s.completions[today] ?? null)
+  const mobilityCompletions = useMobilityStore(s => s.completions)
+  const mobilityCompletion = mobilityCompletions[today] ?? null
   const mobilityRoutine = useMobilityStore(s => s.routine)
   const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
   const [showMobilityTracker, setShowMobilityTracker] = useState(false)
@@ -270,7 +271,9 @@ export function TodayPage() {
 
   // Stats for the compact habit row (scoped to the active plan's history)
   const stats = computeHistoryStats(planEntries, planExtras, today)
-  const planStreak = computePlanStreak(plan.id, planEntries, planExtras, today)
+  // Mobility dates count toward streak — completing mobility on a day keeps the streak alive
+  const mobilityDateSet = useMemo(() => new Set(Object.keys(mobilityCompletions)), [mobilityCompletions])
+  const planStreak = computePlanStreak(plan.id, planEntries, planExtras, today, mobilityDateSet)
   const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
 
   // Collect recent past days with no entry — used to show the stall nudge.
@@ -284,15 +287,20 @@ export function TodayPage() {
     ? computePlanProgress(plan, planEntries, today)
     : null
 
-  const rotationProgress = plan.duration.type === 'rotations' && plan.duration.value > 1
-    ? computePlanProgress(plan, planEntries, today)
-    : null
+  // For rotations plans: use continuous progress (workouts logged / total workouts in plan)
+  // rather than discrete full-rotation count, so the ring fills smoothly.
+  const rotationTotalWorkouts = plan.duration.type === 'rotations' && plan.duration.value > 1
+    ? plan.days.length * plan.duration.value
+    : 0
+  const rotationLoggedCount = rotationTotalWorkouts > 0
+    ? new Set(planEntries.filter(e => e.action === 'complete' || e.action === 'skip').map(e => e.calendarDate)).size
+    : 0
 
   // Plan completion percentage for the ring visual
   const planCompletionPercent = weekProgress !== null && weekProgress.total > 0
     ? Math.round((weekProgress.completed / weekProgress.total) * 100)
-    : rotationProgress !== null && rotationProgress.total > 0
-    ? Math.round((rotationProgress.completed / rotationProgress.total) * 100)
+    : rotationTotalWorkouts > 0
+    ? Math.min(Math.round((rotationLoggedCount / rotationTotalWorkouts) * 100), 100)
     : loggedRate ?? 0
 
   // Previous-session summary — shown inside today's compact card when pending.
@@ -566,18 +574,25 @@ export function TodayPage() {
         <h1 className="text-xl font-bold text-white mt-0.5 leading-snug">{plan.name}</h1>
       </div>
 
-      {/* Compact habit summary row — streak + completion ring */}
-      <div className="flex items-center justify-between px-0.5">
-        <div className="flex items-center gap-2">
+      {/* Compact habit summary row — streak · total workouts · plan % ring */}
+      <div className="flex items-center gap-4 px-0.5">
+        <div className="flex items-center gap-1.5">
           <span className="text-lg leading-none">🔥</span>
           <span className="text-sm font-bold text-white">{planStreak}</span>
           <span className="text-xs text-slate-400">streak</span>
         </div>
-        <CompletedWorkoutsRing
-          count={stats.totalCompleted}
-          percent={planCompletionPercent}
-          accessibilityLabel={`${stats.totalCompleted} workouts completed, ${planCompletionPercent}% of plan`}
-        />
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-bold text-white">{stats.totalCompleted}</span>
+          <span className="text-xs text-slate-400">workouts</span>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <CompletedWorkoutsRing
+            count={planCompletionPercent}
+            percent={planCompletionPercent}
+            accessibilityLabel={`${planCompletionPercent}% of plan complete`}
+          />
+          <span className="text-xs text-slate-500">plan</span>
+        </div>
       </div>
 
       {/* Plan completion / expiry banner */}
@@ -859,46 +874,43 @@ export function TodayPage() {
         </div>
       )}
 
-      {/* Secondary workout-management actions — one compact row */}
+      {/* Secondary workout-management actions */}
       {isPending && activeWorkoutState === 'hidden' && (
-        <div className="flex items-center gap-0 flex-wrap -mt-1">
+        <div className="flex items-center gap-2 flex-wrap">
           {upcoming.length > 0 && (
-            <>
-              <button
-                onClick={() => setDoubleDay(v => !v)}
-                className="text-xs text-slate-500 hover:text-slate-300 transition-colors py-1 pr-2"
-              >
-                {doubleDay ? 'Cancel add-on' : 'Add plan workout'}
-              </button>
-              <span className="text-slate-700 text-xs pr-2">·</span>
-            </>
+            <button
+              onClick={() => setDoubleDay(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
+            >
+              <PlusCircle size={12} />
+              {doubleDay ? 'Cancel add-on' : 'Add plan workout'}
+            </button>
           )}
           {adHocWorkoutState === 'hidden' && !showAdHocOutcome && (
-            <>
-              <button
-                onClick={() => {
-                  setAdHocName('')
-                  setAdHocType('weights')
-                  setAdHocModalOpen(true)
-                }}
-                className="text-xs text-slate-500 hover:text-slate-300 transition-colors py-1 pr-2"
-              >
-                Start ad hoc
-              </button>
-              <span className="text-slate-700 text-xs pr-2">·</span>
-            </>
+            <button
+              onClick={() => {
+                setAdHocName('')
+                setAdHocType('weights')
+                setAdHocModalOpen(true)
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
+            >
+              <ListPlus size={12} />
+              Ad hoc
+            </button>
           )}
           <button
             onClick={() => setShowOverride(true)}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors py-1 pr-2"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
           >
+            <Shuffle size={12} />
             Change workout
           </button>
-          <span className="text-slate-700 text-xs pr-2">·</span>
           <button
             onClick={handleSkip}
-            className="text-xs text-slate-500 hover:text-red-400 transition-colors py-1"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-red-400 hover:border-red-900/50 text-xs font-medium transition-colors active:scale-[0.97]"
           >
+            <SkipForward size={12} />
             Skip
           </button>
         </div>
@@ -1022,6 +1034,7 @@ export function TodayPage() {
                       planId={plan?.id}
                       sessionCount={upcomingSessionCounts[rd.calendarDate]}
                       onClick={() => setLoggingUpcoming({ rd })}
+                      collapsible
                     />
                     {upcomingNote && (
                       <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
