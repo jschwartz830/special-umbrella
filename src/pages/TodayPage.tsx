@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format, addDays, parseISO, differenceInCalendarDays } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import {
   SkipForward,
   Coffee,
@@ -22,15 +22,18 @@ import {
   Trophy,
   Plus,
   Zap,
+  ChevronUp,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
 import { useExpiryDismiss } from '../hooks/useExpiryDismiss'
+import { useStallNudgeDismiss } from '../hooks/useStallNudgeDismiss'
 import { useToday } from '../hooks/useToday'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { useProgramStore } from '../store/programStore'
 import { WorkoutDayCard } from '../components/workout/WorkoutDayCard'
+import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { ActiveWorkoutTracker } from '../components/workout/ActiveWorkoutTracker'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
@@ -42,8 +45,8 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, computePlanProgress, countPlanDayCompletions, computeRotationPlanRemaining, computePlanStreak, computeConsecutiveSkips, computeLoggedRate } from '../lib/historyStats'
-import type { ResolvedDay, ExtraWorkoutEntry, HistoryEntry, WorkoutType, WorkoutSlot, PlanDay } from '../types'
+import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate } from '../lib/historyStats'
+import type { ResolvedDay, ExtraWorkoutEntry, WorkoutType, WorkoutSlot, PlanDay } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { MobilityTracker } from '../components/workout/MobilityTracker'
@@ -55,100 +58,38 @@ import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 import { outcomeSortKey } from '../lib/outcomeSortKey'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
+import { WORKOUT_META } from '../lib/constants'
 
-type ActivityFill = 'complete' | 'day_off' | 'skip' | 'extra' | 'empty'
 
-function WeeklyActivityStrip({
-  planEntries,
-  planExtras,
-  today,
+
+/** Circular completion ring that wraps the total completed workout count. */
+function CompletedWorkoutsRing({
+  count,
+  percent,
+  accessibilityLabel,
 }: {
-  planEntries: HistoryEntry[]
-  planExtras: ExtraWorkoutEntry[]
-  today: string
+  count: number
+  percent: number
+  accessibilityLabel?: string
 }) {
-  const days = useMemo(() => {
-    const result: { date: string; dayLetter: string; isToday: boolean; fill: ActivityFill }[] = []
-    const todayParsed = parseISO(today)
-    for (let i = 6; i >= 0; i--) {
-      const date = format(addDays(todayParsed, -i), 'yyyy-MM-dd')
-      const dateEntries = planEntries.filter(e => e.calendarDate === date)
-      const entry = dateEntries.length > 1
-        ? dateEntries.reduce((best, e) => (e.createdAt > best.createdAt ? e : best))
-        : dateEntries[0]
-      const hasExtra = planExtras.some(e => e.calendarDate === date)
-      const dayLetter = new Date(date + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)
-
-      let fill: ActivityFill
-      if (entry?.action === 'complete') fill = 'complete'
-      else if (entry?.action === 'day_off') fill = 'day_off'
-      else if (entry?.action === 'skip') fill = 'skip'
-      else if (hasExtra) fill = 'extra'
-      else fill = 'empty'
-
-      result.push({ date, dayLetter, isToday: date === today, fill })
-    }
-    return result
-  }, [planEntries, planExtras, today])
-
+  const r = 14
+  const circ = 2 * Math.PI * r
+  const offset = circ - (Math.min(100, Math.max(0, percent)) / 100) * circ
   return (
-    <div className="flex items-end justify-between px-1 py-0.5">
-      {days.map(({ date, dayLetter, isToday, fill }) => {
-        const dotClass =
-          fill === 'complete' ? 'bg-emerald-500'
-          : fill === 'day_off' ? 'bg-amber-400/70'
-          : fill === 'skip' ? 'border border-slate-600 bg-transparent'
-          : fill === 'extra' ? 'bg-sky-500/60'
-          : 'border border-slate-700/50 bg-transparent'
-
-        return (
-          <div key={date} className="flex flex-col items-center gap-1">
-            <span
-              className={`w-2.5 h-2.5 rounded-full transition-colors ${dotClass} ${isToday ? 'ring-2 ring-offset-1 ring-offset-slate-900 ring-sky-400/50' : ''}`}
-            />
-            <span className={`text-[9px] font-medium leading-none ${isToday ? 'text-sky-400' : 'text-slate-600'}`}>
-              {dayLetter}
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-/** Collapsible panel showing current program variable values for YAML plans. */
-function ProgramVarsPanel({ vars }: { vars: Record<string, number> }) {
-  const [open, setOpen] = useState(false)
-  const toggle = useCallback(() => setOpen(v => !v), [])
-  const entries = Object.entries(vars)
-  if (entries.length === 0) return null
-  return (
-    <div className="rounded-xl bg-slate-800/60 border border-slate-700/60 overflow-hidden">
-      <button
-        onClick={toggle}
-        className="w-full flex items-center justify-between px-3 py-2 text-left"
-        aria-expanded={open}
-      >
-        <span className="text-xs font-medium text-slate-400">
-          Program variables ({entries.length})
-        </span>
-        <ChevronDown
-          size={13}
-          className={`text-slate-500 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+    <div
+      className="relative flex items-center justify-center w-10 h-10 flex-shrink-0"
+      aria-label={accessibilityLabel ?? `${count} workouts completed, ${percent}% of plan`}
+      role="img"
+    >
+      <svg className="absolute inset-0 -rotate-90" width="40" height="40" viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r={r} fill="none" stroke="#1e293b" strokeWidth="2.5" />
+        <circle
+          cx="20" cy="20" r={r} fill="none" stroke="#0ea5e9" strokeWidth="2.5"
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+          className="transition-all duration-500"
         />
-      </button>
-      {open && (
-        <div className="px-3 pb-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-slate-700/50 pt-2">
-          {entries.map(([name, value]) => (
-            <div key={name} className="flex items-baseline justify-between gap-2 min-w-0">
-              <span className="text-xs text-slate-500 truncate font-mono">{name}</span>
-              <span className="text-xs font-semibold text-slate-200 tabular-nums flex-shrink-0">
-                {!Number.isFinite(value) ? '?' : Number.isInteger(value) ? value : value.toFixed(2).replace(/\.?0+$/, '')}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      </svg>
+      <span className="text-sm font-bold text-white relative z-10">{count}</span>
     </div>
   )
 }
@@ -192,6 +133,7 @@ export function TodayPage() {
   const moveOutcome = useOutcomeStore(s => s.moveOutcome)
   const today = useToday()
   const { isDismissed: expiryBannerDismissed, dismiss: dismissExpiryBanner } = useExpiryDismiss(plan?.id ?? null)
+  const { isDismissed: stallNudgeDismissed, dismiss: dismissStallNudge } = useStallNudgeDismiss(plan?.id ?? null)
 
   const allOutcomes = useOutcomeStore(s => s.outcomes)
   const programVarsMap = useProgramStore(s => s.vars)
@@ -222,8 +164,7 @@ export function TodayPage() {
     return map
   }, [exerciseRecords])
 
-  // Memoize plan-scoped extras so WeeklyActivityStrip's internal useMemo
-  // only re-runs when extraEntries or the active plan actually changes.
+  // Memoize plan-scoped extras so internal useMemos only re-run when needed.
   const activePlanId = plan?.id ?? null
   const planExtras = useMemo(
     () => extraEntries.filter(e => e.planId === activePlanId),
@@ -245,6 +186,8 @@ export function TodayPage() {
   // ExtraWorkoutEntry id assigned when it was persisted.
   const [bonusOutcome, setBonusOutcome] = useState<{ rd: ResolvedDay; extraId: string } | null>(null)
   const [editingExtra, setEditingExtra] = useState<ExtraWorkoutEntry | null>(null)
+  // Preview toggle for today's workout exercises
+  const [previewExpanded, setPreviewExpanded] = useState(false)
 
   // Active workout tracker state: hidden | open | minimized
   const [activeWorkoutState, setActiveWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
@@ -319,63 +262,45 @@ export function TodayPage() {
     : null
 
   // Difficulty spacing warning (today vs tomorrow) — suppressed in double-day mode
-  // since the user is intentionally stacking workouts
   const tomorrowSlot = upcoming[doubleDay ? 1 : 0]?.planDay?.slots[0]
   const spacingWarning = !doubleDay && generateDifficultySpacingWarning(
     todayResolved.planDay.slots[0]?.difficulty,
     tomorrowSlot?.difficulty,
   )
 
-  // Stats for the compact stats bar (scoped to the active plan's history)
+  // Stats for the compact habit row (scoped to the active plan's history)
   const stats = computeHistoryStats(planEntries, planExtras, today)
-  // Plan-scoped streak (only counts days active for this plan)
   const planStreak = computePlanStreak(plan.id, planEntries, planExtras, today)
-
-  // Consecutive skips ending at today — used to show the skip nudge
   const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
 
-  // Collect recent past days with no entry — used to show the stall nudge and quick catch-up.
-  // Looks back 14 days so a two-week gap is fully surfaced and catch-up-able.
+  // Collect recent past days with no entry — used to show the stall nudge.
   const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today, 14)
-
-  // Count unlogged days outside the 14-day window (older gaps the catch-up won't fix).
   const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, plan.startDate, today)
   const olderUnloggedCount = Math.max(0, totalUnlogged - unloggedDates.length)
 
-  // Logging adherence rate — shown after plan has been active ≥ 7 days so the
-  // percentage is meaningful. null for new plans or when the plan started today.
   const loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)
-  const planActiveDays = differenceInCalendarDays(parseISO(today), parseISO(plan.startDate))
 
-  // Rotation cycle progress — for rotations-duration plans only
-  const cycleProgress = computeRotationCycleProgress(plan, planEntries, today)
-
-  // Total workouts remaining to finish the whole plan (rotations plans only).
-  // Shown only in the final rotation so it doesn't clutter the header during
-  // earlier phases.
-  const rotationPlanRemaining = computeRotationPlanRemaining(plan, planEntries, today)
-
-  // Week progress — for weeks-duration plans only (null for rotations plans)
   const weekProgress = plan.duration.type === 'weeks'
     ? computePlanProgress(plan, planEntries, today)
     : null
 
-  // Overall rotation number for multi-rotation plans (e.g. "Rotation 2 of 4").
-  // Only computed when the plan has more than one rotation; single-rotation plans
-  // have no meaningful "Rotation 1 of 1" to display.
   const rotationProgress = plan.duration.type === 'rotations' && plan.duration.value > 1
     ? computePlanProgress(plan, planEntries, today)
     : null
 
-  // Previous-session summary — shown below today's card when the workout is
-  // pending. Scoped to the same planDayIndex so repeating plans show the
-  // relevant session, not just the most recent weights session.
+  // Plan completion percentage for the ring visual
+  const planCompletionPercent = weekProgress !== null && weekProgress.total > 0
+    ? Math.round((weekProgress.completed / weekProgress.total) * 100)
+    : rotationProgress !== null && rotationProgress.total > 0
+    ? Math.round((rotationProgress.completed / rotationProgress.total) * 100)
+    : loggedRate ?? 0
+
+  // Previous-session summary — shown inside today's compact card when pending.
   const prevSessionOutcome = isPending
     ? findPreviousSessionForPlanDay(plan.id, primaryPlanDayIndex, today, planEntries, allOutcomes)
     : null
   const lastSessionSummary = prevSessionOutcome ? buildLastSessionSummary(prevSessionOutcome, maxLoadByExercise) : null
 
-  // Derive how many calendar days ago the previous session was, for the hint display.
   const prevSessionDate = prevSessionOutcome
     ? parseWorkoutInstanceId(prevSessionOutcome.workoutInstanceId)?.calendarDate ?? null
     : null
@@ -387,13 +312,10 @@ export function TodayPage() {
     return d > 0 ? d : null
   })()
 
-  // How many times this specific plan day has been completed before today.
-  // Shown on the card as "×N done" to give session-over-session context.
   const todaySessionCount = isPending
     ? countPlanDayCompletions(plan.id, primaryPlanDayIndex, planEntries, today)
     : undefined
 
-  // Session counts for each upcoming day — same context shown on upcoming cards.
   const upcomingSessionCounts = useMemo(() => {
     if (!plan) return {} as Record<string, number>
     return Object.fromEntries(
@@ -403,6 +325,14 @@ export function TodayPage() {
       ]),
     )
   }, [plan, upcoming, planEntries])
+
+  // Exercise count and meta for the compact workout card
+  const primarySlot = primaryPlanDay.slots[0]
+  const primarySlotMeta = primarySlot ? WORKOUT_META[primarySlot.type] : null
+  const totalExercises = primaryPlanDay.slots.reduce(
+    (sum, slot) => sum + (slot.exercises?.length ?? 0),
+    0,
+  )
 
   function estimateRunDurationMin(slot: { durationMin?: number; runConfig?: { targetDurationMin?: number | null; targetDistanceMiles?: number | null } | null; segments?: Array<{ type?: string; duration?: string; distance?: string }> }): number {
     if (slot.durationMin) return slot.durationMin
@@ -429,6 +359,15 @@ export function TodayPage() {
     if (dist) return Math.ceil(dist * 11)
     return 20
   }
+
+  // Estimated workout duration for the compact card
+  const estimatedDurationMin: number | null = (() => {
+    if (!primarySlot) return null
+    if (isRunType(primarySlot.type)) return estimateRunDurationMin(primarySlot)
+    if (primarySlot.targetTime != null) return primarySlot.targetTime
+    if ((primarySlot.exercises?.length ?? 0) > 0) return null
+    return null
+  })()
 
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     const elapsedMin = Math.round(meta.totalElapsedSeconds / 60) || null
@@ -461,8 +400,6 @@ export function TodayPage() {
     setActiveTrackedExercises(null)
     setActiveTrackedDurationMin(null)
 
-    // Snapshot pre-workout PR baselines before the store updates so we can
-    // detect which exercises hit a new personal record this session.
     const preWorkoutMaxLoad = { ...maxLoadByExercise }
 
     const completedDate = outcome.completedAt
@@ -479,24 +416,17 @@ export function TodayPage() {
         removeEntry(plan!.id, completedDate)
         updateEntryDate(todayEntry.id, completedDate)
       }
-      // Remove any existing outcome at the target date so its exercise history
-      // records don't become orphaned when the new outcome overwrites the key.
-      // Note: we do NOT call moveOutcome here — the outcome for today hasn't been
-      // written yet (logOutcomeWithProgression runs below), so there is nothing to
-      // move. We patch the instanceId directly so it lands at the right key.
       removeOutcome(makeWorkoutInstanceId(plan!.id, completedDate))
       outcome = { ...outcome, workoutInstanceId: makeWorkoutInstanceId(plan!.id, completedDate) }
     }
 
-    const primarySlot = primaryPlanDay.slots[0]
-    if (primarySlot) {
-      logOutcomeWithProgression(outcome, primarySlot)
+    const primarySlotForLog = primaryPlanDay.slots[0]
+    if (primarySlotForLog) {
+      logOutcomeWithProgression(outcome, primarySlotForLog)
     } else {
       useOutcomeStore.getState().setOutcome(outcome)
     }
 
-    // Detect new personal records: compare today's loads against the pre-workout
-    // all-time max. Only fires for completed sets with a numeric load.
     if (outcome.weightsActual?.exercises?.length) {
       const prs = outcome.weightsActual.exercises.flatMap(ex => {
         const prevMax = preWorkoutMaxLoad[ex.exercise] ?? 0
@@ -508,10 +438,6 @@ export function TodayPage() {
       if (prs.length > 0) setNewPRs(prs)
     }
 
-    // Double-day: persist the bonus workout as an ExtraWorkoutEntry on today's
-    // date (the rotation's HistoryEntry is already taken by the primary), then
-    // open a second OutcomeModal so the user can log the bonus outcome. The
-    // rotation pointer is also advanced so tomorrow projects past the bonus.
     if (doubleDay && upcoming[0]) {
       const bonus = upcoming[0]
       const bonusSlot = bonus.planDay.slots[0]
@@ -552,9 +478,6 @@ export function TodayPage() {
   }
 
   function handleBonusOutcomeDismiss() {
-    // Closing without confirming keeps the ExtraWorkoutEntry (the workout
-    // happened) but leaves the outcome blank — matches how ad-hoc extras
-    // created from the History page behave until the user fills them in.
     setBonusOutcome(null)
   }
 
@@ -579,11 +502,7 @@ export function TodayPage() {
   }
 
   function handleUpcomingLog(rd: ResolvedDay, action: 'complete' | 'skip' | 'day_off') {
-    // A 'complete' on a future-dated upcoming workout records the session on
-    // today — the day it was actually performed — instead of the scheduled date.
     const logDate = action === 'complete' ? today : rd.calendarDate
-    // If today's primary entry is already taken, treat this as an extra
-    // completion (double-day style) so the original primary log is preserved.
     if (action === 'complete' && logDate === today && isResolved) {
       const bonusSlot = rd.planDay.slots[0]
       const extraId = addExtraEntry({
@@ -635,154 +554,31 @@ export function TodayPage() {
     setLoggingUpcoming(null)
   }
 
+  const showStallNudge = !planExpired && !stallNudgeDismissed && (unloggedDates.length > 0 || olderUnloggedCount > 0)
+
   return (
     <div className="px-4 pt-safe space-y-4">
-      {/* Header */}
-      <div className="pt-6 pb-2">
+      {/* Header — date + plan name */}
+      <div className="pt-6 pb-1">
         <p className="text-xs text-slate-500 uppercase tracking-widest font-medium">
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
-        <h1 className="text-2xl font-bold text-white mt-0.5">{plan.name}</h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Day {primaryPlanDayIndex + 1} of {plan.days.length} in rotation
-          {cycleProgress && cycleProgress.doneInCycle > 0 && !planExpired && (
-            <span className="ml-1.5">
-              · <span className="text-slate-400">{cycleProgress.doneInCycle}/{cycleProgress.rotationLength} done</span>
-              {cycleProgress.remaining === 1 && <span className="ml-1 text-emerald-400/80">· last one!</span>}
-            </span>
-          )}
-          {cycleProgress?.justCompletedRotation && !planExpired && (
-            <span className="ml-1.5 text-emerald-400/80">· rotation complete!</span>
-          )}
-          {rotationProgress && rotationProgress.completed < rotationProgress.total && !planExpired && (
-            <span className="ml-1.5">
-              · <span className="text-slate-400">Rotation {rotationProgress.completed + 1} of {rotationProgress.total}</span>
-              {rotationProgress.completed + 1 === rotationProgress.total && (
-                <span className="ml-1 text-emerald-400/80">· last rotation!</span>
-              )}
-            </span>
-          )}
-          {rotationPlanRemaining !== null && rotationPlanRemaining > 0 &&
-           rotationPlanRemaining <= plan.days.length && !planExpired && (
-            <span className="ml-1.5 text-slate-400">
-              · {rotationPlanRemaining} left to finish
-            </span>
-          )}
-          {weekProgress && weekProgress.completed < weekProgress.total && (
-            <span className="ml-1.5">
-              · <span className="text-slate-400">Week {weekProgress.completed + 1} of {weekProgress.total}</span>
-              {weekProgress.completed + 1 === weekProgress.total && (
-                <span className="ml-1 text-emerald-400/80">· last week!</span>
-              )}
-            </span>
-          )}
-        </p>
+        <h1 className="text-xl font-bold text-white mt-0.5 leading-snug">{plan.name}</h1>
       </div>
 
-      {/* Stats bar — streak + this-week count */}
-      <div className="flex gap-3">
-        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/60">
-          <span className="text-base leading-none">🔥</span>
-          <div>
-            <p className="text-xs text-slate-500 leading-none mb-0.5">Streak</p>
-            <p className="text-sm font-bold text-white leading-none">
-              {planStreak}
-              <span className="text-xs font-normal text-slate-400 ml-1">day{planStreak !== 1 ? 's' : ''}</span>
-            </p>
-            {stats.longestStreak > planStreak && (
-              <p className="text-xs text-slate-600 leading-none mt-0.5">Best: {stats.longestStreak}</p>
-            )}
-          </div>
+      {/* Compact habit summary row — streak + completion ring */}
+      <div className="flex items-center justify-between px-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-lg leading-none">🔥</span>
+          <span className="text-sm font-bold text-white">{planStreak}</span>
+          <span className="text-xs text-slate-400">streak</span>
         </div>
-        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/60">
-          <span className="text-base leading-none">📅</span>
-          <div>
-            <p className="text-xs text-slate-500 leading-none mb-0.5">7-day</p>
-            <p className="text-sm font-bold text-white leading-none">
-              {stats.last7Completed}
-              <span className="text-xs font-normal text-slate-400 ml-1">done</span>
-            </p>
-          </div>
-        </div>
-        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/60 border border-slate-700/60">
-          <span className="text-base leading-none">✅</span>
-          <div>
-            <p className="text-xs text-slate-500 leading-none mb-0.5">Total</p>
-            <p className="text-sm font-bold text-white leading-none">
-              {stats.totalCompleted}
-              <span className="text-xs font-normal text-slate-400 ml-1">done</span>
-            </p>
-          </div>
-        </div>
+        <CompletedWorkoutsRing
+          count={stats.totalCompleted}
+          percent={planCompletionPercent}
+          accessibilityLabel={`${stats.totalCompleted} workouts completed, ${planCompletionPercent}% of plan`}
+        />
       </div>
-
-      {/* 7-day activity strip */}
-      <WeeklyActivityStrip planEntries={planEntries} planExtras={planExtras} today={today} />
-
-      {/* Logging adherence bar — visible once the plan has ≥7 past days to measure */}
-      {loggedRate !== null && planActiveDays >= 7 && (
-        <div className="flex items-center gap-2 px-1">
-          <div className="flex-1 h-1 rounded-full bg-slate-700/60 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-sky-500/50 transition-all"
-              style={{ width: `${loggedRate}%` }}
-            />
-          </div>
-          <span className="text-[10px] text-slate-500 flex-shrink-0 tabular-nums">
-            {loggedRate}% logged
-          </span>
-        </div>
-      )}
-
-      {/* Unlogged past days nudge — shown when the rotation may be stalled */}
-      {!planExpired && (unloggedDates.length > 0 || olderUnloggedCount > 0) && (
-        <div className="w-full flex flex-col gap-1.5 px-3 py-2.5 rounded-xl bg-slate-700/50 border border-slate-600/50">
-          <div className="flex items-center gap-2">
-            <Info size={13} className="text-slate-400 flex-shrink-0" />
-            <p className="flex-1 text-xs text-slate-400">
-              {unloggedDates.length > 0
-                ? `${unloggedDates.length} unlogged day${unloggedDates.length === 1 ? '' : 's'} in the past 2 weeks — rotation may be stalled.`
-                : `${olderUnloggedCount} older unlogged day${olderUnloggedCount === 1 ? '' : 's'} — check Calendar.`
-              }
-            </p>
-            {unloggedDates.length > 0 && (
-              <button
-                onClick={() => setShowCatchupConfirm(true)}
-                className="text-xs text-amber-400 font-medium flex-shrink-0 hover:text-amber-300 transition-colors"
-              >
-                Mark {unloggedDates.length === 1 ? 'as' : `${unloggedDates.length} as`} Day Off
-              </button>
-            )}
-            <button
-              onClick={() => navigate('/calendar')}
-              className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
-            >
-              Calendar →
-            </button>
-          </div>
-          {unloggedDates.length > 0 && olderUnloggedCount > 0 && (
-            <p className="text-[10px] text-slate-500 ml-5">
-              + {olderUnloggedCount} older gap{olderUnloggedCount === 1 ? '' : 's'} not shown — use Calendar to review.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Consecutive skips nudge — shown when 3+ workouts in a row were skipped */}
-      {!planExpired && consecutiveSkips >= 3 && (
-        <div className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-          <Info size={13} className="text-amber-400 flex-shrink-0" />
-          <p className="flex-1 text-xs text-amber-300">
-            {consecutiveSkips} workout{consecutiveSkips === 1 ? '' : 's'} skipped in a row — you've got this!
-          </p>
-          <button
-            onClick={() => navigate('/calendar')}
-            className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
-          >
-            Calendar →
-          </button>
-        </div>
-      )}
 
       {/* Plan completion / expiry banner */}
       {planExpired && !expiryBannerDismissed && (
@@ -807,6 +603,58 @@ export function TodayPage() {
             aria-label="Dismiss"
           >
             <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Compact stalled-rotation nudge — dismissible */}
+      {showStallNudge && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-700/50 border border-slate-600/50">
+          <Info size={13} className="text-slate-400 flex-shrink-0" />
+          <p className="flex-1 text-xs text-slate-400 min-w-0">
+            Rotation may be stalled
+            {(unloggedDates.length + olderUnloggedCount) > 0 && (
+              <span className="text-slate-500">
+                {' '}· {unloggedDates.length + olderUnloggedCount} unlogged day{(unloggedDates.length + olderUnloggedCount) === 1 ? '' : 's'}
+              </span>
+            )}
+          </p>
+          {unloggedDates.length > 0 && (
+            <button
+              onClick={() => setShowCatchupConfirm(true)}
+              className="text-xs text-amber-400 font-medium flex-shrink-0 hover:text-amber-300 transition-colors"
+            >
+              Fix
+            </button>
+          )}
+          <button
+            onClick={() => navigate('/calendar')}
+            className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
+          >
+            Review
+          </button>
+          <button
+            onClick={dismissStallNudge}
+            className="text-slate-500 hover:text-slate-300 flex-shrink-0 transition-colors"
+            aria-label="Dismiss"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Consecutive skips nudge */}
+      {!planExpired && consecutiveSkips >= 3 && (
+        <div className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <Info size={13} className="text-amber-400 flex-shrink-0" />
+          <p className="flex-1 text-xs text-amber-300">
+            {consecutiveSkips} workout{consecutiveSkips === 1 ? '' : 's'} skipped in a row — you've got this!
+          </p>
+          <button
+            onClick={() => navigate('/calendar')}
+            className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
+          >
+            Calendar →
           </button>
         </div>
       )}
@@ -867,7 +715,7 @@ export function TodayPage() {
         </section>
       )}
 
-      {/* Personal record celebration — shown briefly after a workout is logged */}
+      {/* Personal record celebration */}
       {newPRs && newPRs.length > 0 && (
         <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25">
           <Trophy size={14} className="text-amber-400 mt-0.5 flex-shrink-0" />
@@ -887,7 +735,7 @@ export function TodayPage() {
         </div>
       )}
 
-      {/* Today's workout — or rest card if day off */}
+      {/* Today's workout — compact card */}
       {todayResolved.status === 'today_day_off' ? (
         <div className="w-full rounded-xl border border-slate-700 bg-slate-800/80 p-4 flex items-center gap-3">
           <Coffee size={22} className="text-slate-500 flex-shrink-0" />
@@ -896,38 +744,77 @@ export function TodayPage() {
             <p className="text-xs text-slate-600 mt-0.5">No workout logged — rotation continues tomorrow</p>
           </div>
         </div>
-      ) : (
-        <WorkoutDayCard resolved={todayResolved} planId={plan?.id} isToday sessionCount={todaySessionCount} />
-      )}
+      ) : isPending ? (
+        <div className={`rounded-xl border bg-slate-800/80 overflow-hidden ${primarySlotMeta ? `border-l-4 ${primarySlotMeta.borderColor} border-slate-700/50` : 'border-slate-700/50'}`}>
+          <div className="p-4 space-y-2">
+            {/* Today label + title */}
+            <div>
+              <p className="text-[10px] font-medium text-sky-400 uppercase tracking-wider mb-0.5">Today</p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-200">{primaryPlanDay.label}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {primarySlotMeta?.label ?? 'Workout'}
+                    {totalExercises > 0 && ` · ${totalExercises} exercise${totalExercises === 1 ? '' : 's'}`}
+                    {estimatedDurationMin != null && ` · ~${estimatedDurationMin} min`}
+                    {todaySessionCount !== undefined && todaySessionCount > 0 && (
+                      <span className="text-slate-500"> · ×{todaySessionCount} done</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-      {/* Previous-session hint — visible only when pending, not in double-day mode */}
-      {(lastSessionSummary || prevSessionOutcome?.notes || (!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.action === 'progress')) && !doubleDay && (
-        <div className="-mt-2 ml-1 space-y-0.5">
-          {lastSessionSummary && (
-            <p className="text-xs text-slate-500 truncate">
-              {lastSessionSummary.endsWith(' · PB')
-                ? <>{lastSessionSummary.slice(0, -5)}<span className="text-amber-400 font-medium"> · PB</span></>
-                : lastSessionSummary}
-              {prevSessionDaysAgo !== null && (
-                <span className="text-slate-600 ml-1">
-                  · {prevSessionDaysAgo === 1 ? 'yesterday' : `${prevSessionDaysAgo}d ago`}
-                </span>
-              )}
-            </p>
-          )}
-          {prevSessionOutcome?.notes && (
-            <p className="text-xs text-slate-600 italic truncate">"{prevSessionOutcome.notes}"</p>
-          )}
-          {!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.action === 'progress' && (
-            <p className="text-xs text-sky-700 truncate">↗ {prevSessionOutcome.progressionRecommendation.note}</p>
+            {/* Last session hint */}
+            {(lastSessionSummary || (prevSessionOutcome?.progressionRecommendation?.action === 'progress' && !todayRunSlot)) && (
+              <div className="space-y-0.5">
+                {lastSessionSummary && (
+                  <p className="text-xs text-slate-500 truncate">
+                    Last:{' '}
+                    {lastSessionSummary.endsWith(' · PB')
+                      ? <>{lastSessionSummary.slice(0, -5)}<span className="text-amber-400 font-medium"> · PB</span></>
+                      : lastSessionSummary}
+                    {prevSessionDaysAgo !== null && (
+                      <span className="text-slate-600 ml-1">
+                        · {prevSessionDaysAgo === 1 ? 'yesterday' : `${prevSessionDaysAgo}d ago`}
+                      </span>
+                    )}
+                  </p>
+                )}
+                {prevSessionOutcome?.notes && (
+                  <p className="text-xs text-slate-600 italic truncate">"{prevSessionOutcome.notes}"</p>
+                )}
+                {!todayRunSlot && prevSessionOutcome?.progressionRecommendation?.action === 'progress' && (
+                  <p className="text-xs text-sky-700 truncate">↗ {prevSessionOutcome.progressionRecommendation.note}</p>
+                )}
+              </div>
+            )}
+
+            {/* Preview exercises toggle */}
+            {primaryPlanDay.slots.some(s => (s.exercises?.length ?? 0) > 0 || isRunType(s.type)) && (
+              <button
+                onClick={() => setPreviewExpanded(v => !v)}
+                className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                {previewExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {previewExpanded ? 'Hide exercises' : 'Preview exercises'}
+              </button>
+            )}
+          </div>
+
+          {/* Expanded exercise list */}
+          {previewExpanded && (
+            <div className={`border-t border-slate-700/50 px-4 py-3 space-y-3 ${primaryPlanDay.slots.length > 1 ? 'divide-y divide-slate-700/50' : ''}`}>
+              {primaryPlanDay.slots.map((slot, i) => (
+                <div key={slot.id} className={i > 0 ? 'pt-3' : ''}>
+                  <WorkoutSlotDetails slot={slot} planId={plan.id} />
+                </div>
+              ))}
+            </div>
           )}
         </div>
-      )}
-
-      {/* Program variables inspector — only for YAML plans with auto-progression vars,
-          only when today's workout is still pending so it's actionable context */}
-      {isPending && Object.keys(planProgramVars).length > 0 && (
-        <ProgramVarsPanel vars={planProgramVars} />
+      ) : (
+        <WorkoutDayCard resolved={todayResolved} planId={plan?.id} isToday sessionCount={todaySessionCount} />
       )}
 
       {/* Double-day bonus workout */}
@@ -940,7 +827,7 @@ export function TodayPage() {
         </div>
       )}
 
-      {/* Start Workout button + Copy Workout shortcut */}
+      {/* Start Workout — primary action */}
       {isPending && activeWorkoutState === 'hidden' && (
         <div className="flex items-center gap-2">
           <button
@@ -972,37 +859,49 @@ export function TodayPage() {
         </div>
       )}
 
-      {/* Double-day toggle — only when pending and there's a next workout */}
-      {isPending && upcoming.length > 0 && (
-        doubleDay ? (
+      {/* Secondary workout-management actions — one compact row */}
+      {isPending && activeWorkoutState === 'hidden' && (
+        <div className="flex items-center gap-0 flex-wrap -mt-1">
+          {upcoming.length > 0 && (
+            <>
+              <button
+                onClick={() => setDoubleDay(v => !v)}
+                className="text-xs text-slate-500 hover:text-slate-300 transition-colors py-1 pr-2"
+              >
+                {doubleDay ? 'Cancel add-on' : 'Add plan workout'}
+              </button>
+              <span className="text-slate-700 text-xs pr-2">·</span>
+            </>
+          )}
+          {adHocWorkoutState === 'hidden' && !showAdHocOutcome && (
+            <>
+              <button
+                onClick={() => {
+                  setAdHocName('')
+                  setAdHocType('weights')
+                  setAdHocModalOpen(true)
+                }}
+                className="text-xs text-slate-500 hover:text-slate-300 transition-colors py-1 pr-2"
+              >
+                Start ad hoc
+              </button>
+              <span className="text-slate-700 text-xs pr-2">·</span>
+            </>
+          )}
           <button
-            onClick={() => setDoubleDay(false)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 text-xs font-medium transition-colors"
+            onClick={() => setShowOverride(true)}
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors py-1 pr-2"
           >
-            <X size={13} /> Cancel double day
+            Change workout
           </button>
-        ) : (
+          <span className="text-slate-700 text-xs pr-2">·</span>
           <button
-            onClick={() => setDoubleDay(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-sky-400 text-xs font-medium transition-colors"
+            onClick={handleSkip}
+            className="text-xs text-slate-500 hover:text-red-400 transition-colors py-1"
           >
-            <PlusCircle size={13} /> Also do {upcoming[0].planDay.label} today
+            Skip
           </button>
-        )
-      )}
-
-      {/* Ad hoc workout button — always visible when no ad hoc session is running */}
-      {adHocWorkoutState === 'hidden' && !showAdHocOutcome && (
-        <button
-          onClick={() => {
-            setAdHocName('')
-            setAdHocType('weights')
-            setAdHocModalOpen(true)
-          }}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
-        >
-          <Plus size={13} /> Start Ad Hoc Workout
-        </button>
+        </div>
       )}
 
       {/* Resolved actions */}
@@ -1016,13 +915,6 @@ export function TodayPage() {
           </button>
           <button
             onClick={() => {
-              // Undo clears today's primary entry/outcome and extras that
-              // originated from the double-day flow. Extras added manually
-              // from the History or Calendar page (source === 'history') are
-              // left alone — they were independent user actions, not part of
-              // this workout's logging flow. Old records without a source
-              // field are treated conservatively as double_day to avoid
-              // leaving orphaned extras behind on upgrade.
               removeEntry(plan.id, today)
               removeOutcome(makeWorkoutInstanceId(plan.id, today))
               let removedDoubleDay = false
@@ -1037,9 +929,6 @@ export function TodayPage() {
                   if (ex.source === 'double_day') removedDoubleDay = true
                 }
               }
-              // The double-day flow adds an 'advance' override alongside the
-              // bonus extra entry. Roll that back so the rotation pointer
-              // returns to the same position it was before logging.
               if (removedDoubleDay) removeLastOverrideByType(plan.id, 'advance')
               setNewPRs(null)
             }}
@@ -1047,26 +936,14 @@ export function TodayPage() {
           >
             <RotateCcw size={13} /> Undo
           </button>
-        </div>
-      )}
-
-      {/* Override controls */}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => setShowOverride(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
-        >
-          <Shuffle size={13} /> Override
-        </button>
-        {isPending && (
           <button
-            onClick={handleSkip}
+            onClick={() => setShowOverride(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
           >
-            <SkipForward size={13} /> Skip
+            <Shuffle size={13} /> Override
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Mobility section */}
       <section>
@@ -1124,7 +1001,6 @@ export function TodayPage() {
           </h2>
           <div className="space-y-2">
             {upcoming.slice(doubleDay ? 1 : 0, doubleDay ? 6 : 5).map(rd => {
-              // Show adaptation note for upcoming run slots
               const upcomingRunSlot = rd.planDay.slots.find(s => isRunType(s.type))
               const upcomingGroupId = upcomingRunSlot?.runConfig?.progressionGroupId
               const upcomingProgression = upcomingGroupId ? getProgressionState(upcomingGroupId) : null
@@ -1259,7 +1135,7 @@ export function TodayPage() {
         )
       })()}
 
-      {/* Cardio workout tracker — kept mounted while open or minimized so timer keeps running */}
+      {/* Cardio workout tracker */}
       {cardioState !== 'hidden' && cardioState !== 'prompt' && (() => {
         const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
         if (!runSlot) return null
@@ -1424,7 +1300,7 @@ export function TodayPage() {
         />
       )}
 
-      {/* Edit outcome for a completed extra workout (double-day bonus or ad-hoc) */}
+      {/* Edit outcome for a completed extra workout */}
       {editingExtra && (() => {
         const extraInstanceId = makeExtraWorkoutInstanceId(plan.id, today, editingExtra.id)
         return (
@@ -1465,7 +1341,6 @@ export function TodayPage() {
           onClose={() => { setLoggingUpcoming(null); setUpcomingLogError(null) }}
         >
           <div className="space-y-4">
-            {/* Workout summary */}
             <div className="space-y-1.5">
               {loggingUpcoming.rd.planDay.slots.map(slot => (
                 <div key={slot.id} className="flex items-center gap-2">
@@ -1508,8 +1383,7 @@ export function TodayPage() {
         </Modal>
       )}
 
-      {/* Outcome modal for upcoming workout — new completes attach to today;
-          edits of pre-existing entries stay on the entry's original date. */}
+      {/* Outcome modal for upcoming workout */}
       {loggingUpcoming && showUpcomingOutcome && (() => {
         const outcomeDate = loggingUpcoming.rd.historyEntry ? loggingUpcoming.rd.calendarDate : today
         const workoutInstanceId = loggingUpcoming.extraId
@@ -1528,11 +1402,7 @@ export function TodayPage() {
         )
       })()}
 
-      {/* Outcome modal for the double-day bonus workout.
-          Opens automatically after the primary outcome is confirmed when
-          double-day was on. The bonus is already persisted as an
-          ExtraWorkoutEntry; the outcome is keyed by the extra's instance id
-          so it doesn't collide with the primary entry's outcome. */}
+      {/* Outcome modal for the double-day bonus workout */}
       {bonusOutcome && (
         <OutcomeModal
           planId={plan.id}
@@ -1546,7 +1416,7 @@ export function TodayPage() {
         />
       )}
 
-      {/* Catch-up confirmation modal — shown before bulk Day Off mark */}
+      {/* Catch-up confirmation modal */}
       {showCatchupConfirm && (
         <Modal title="Mark as Day Off?" onClose={() => setShowCatchupConfirm(false)}>
           <div className="space-y-4">
@@ -1617,6 +1487,18 @@ export function TodayPage() {
                 <p className="text-xs text-slate-400">Pick any day from the rotation</p>
               </div>
             </button>
+            {isPending && (
+              <button
+                onClick={() => { handleSkip(); setShowOverride(false) }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
+              >
+                <SkipForward size={18} className="text-slate-400" />
+                <div>
+                  <p className="text-sm font-medium text-white">Skip today</p>
+                  <p className="text-xs text-slate-400">Mark today as skipped and move on</p>
+                </div>
+              </button>
+            )}
           </div>
         </Modal>
       )}
