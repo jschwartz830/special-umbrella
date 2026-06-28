@@ -1,5 +1,69 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-28 (sixty-sixth pass) — branch `claude/dreamy-mccarthy-7v05ht`
+
+---
+
+### Audit scope
+
+Full re-read of:
+- `src/components/workout/CardioWorkoutTracker.tsx` — timer state, interval logic, segment navigation, completion callback
+- `src/components/workout/ActiveWorkoutTracker.tsx` — wall-clock pattern reference
+- `src/store/mobilityStore.ts` — new Zustand store, all 6 actions
+- `src/pages/CalendarPage.tsx` — DayDetailModal level structure, copy button gap
+- `src/lib/shareWorkout.ts` — `formatWorkoutForClipboard` API
+- `src/store/__tests__/` — existing test coverage inventory
+
+Test suite on entry: **943 tests passing** across 24 test files.
+
+---
+
+### Bug fixed: CardioWorkoutTracker timer drifts when app is backgrounded (HIGH)
+
+**Location**: `src/components/workout/CardioWorkoutTracker.tsx`
+
+**Issue**: The cardio session timer used `setInterval(() => { setTotalElapsed(s => s + 1); setSegmentElapsed(s => s + 1) }, 1000)` — simple 1-second accumulation. iOS browsers throttle or fully pause `setInterval` when the page is backgrounded (screen lock, tab switch). A user who locks their phone mid-run would see the displayed time freeze and the recorded duration would be shorter than actual elapsed time. `ActiveWorkoutTracker` already used the correct wall-clock pattern; `CardioWorkoutTracker` was authored without it.
+
+**Fix**: Applied the same wall-clock pattern:
+- Added `totalElapsedRef` and `segmentElapsedRef` — ref mirrors of state, readable in interval callbacks without stale closures
+- Added `wallTotalRef` and `wallSegRef` (`{ elapsed, time }` bases) — captured on each timer start/resume
+- Changed interval to compute `baseElapsed + Math.floor((Date.now() - baseTime) / 1000)` rather than incrementing
+- Added `visibilitychange` effect to reconcile immediately on foreground restore
+- Updated `goNext`/`goPrev` to reset `wallSegRef` on segment advance; `goNext`/`finish` now read `totalElapsedRef.current` to avoid stale state
+
+---
+
+### Gap addressed: mobilityStore had no unit tests (MEDIUM)
+
+**Location**: `src/store/mobilityStore.ts` — new store added by human commits between pass 65 and pass 66
+
+**Issue**: Every other Zustand store in the project has test coverage. `mobilityStore` had none. The store is the data layer for the daily mobility routine feature — reorder and removal bugs could silently corrupt the user's saved routine between sessions.
+
+**Action**: Added `src/store/__tests__/mobilityStore.test.ts` with 18 tests covering all 6 actions and default state. Pattern matches all other store test files (persist mocked as pass-through, `resetStore()` helper restores default state between tests).
+
+---
+
+### Feature added: copy-workout button on CalendarPage (LOW RISK)
+
+**Location**: `src/pages/CalendarPage.tsx` → `DayDetailModal` Level 2 rotation view
+
+**Issue**: `TodayPage` has had a "Copy workout" button since pass 61 (`formatWorkoutForClipboard`). `CalendarPage` did not — users couldn't copy historical or scheduled workouts from the calendar view.
+
+**Action**: Added Copy button in the Level 2 rotation detail panel, matching TodayPage's behavior: appears only when `!isDayOff`, turns emerald for 2 seconds on success, silently catches clipboard permission errors. No new dependencies; reuses existing `formatWorkoutForClipboard`.
+
+---
+
+### Non-issues confirmed
+
+| Item | Verdict |
+|---|---|
+| `mobilityStore` version: 1, no migrate function | Correct — v1 is the initial version, no prior state to migrate |
+| `removeLastOverrideByType` sort stability | Safe — sorts by `appliedAt` string (ISO 8601), ties are broken deterministically by JS sort |
+| `CardioWorkoutTracker` props interface | Clean — `onComplete(totalElapsed, segmentElapseds)` signature unchanged by fix |
+| `formatWorkoutForClipboard` null safety | Safe — guards `slot.exercises?.length` before mapping |
+
+---
+
 ## 2026-06-27 (sixty-fifth pass) — branch `claude/dreamy-mccarthy-zak0k0`
 
 ---

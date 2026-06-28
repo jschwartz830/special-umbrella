@@ -1,3 +1,57 @@
+# Overnight Changelog — 2026-06-28
+
+## [1] feat: copy-workout button on CalendarPage day detail view
+
+**Summary**: Users can now copy any rotation workout to the clipboard from the CalendarPage day detail modal. A "Copy workout" button appears in the Level 2 rotation detail view (below the workout slot details) for all date types: past, today, upcoming, and future. Tapping it calls `formatWorkoutForClipboard` and writes plain text to the system clipboard. The button turns green for 2 seconds after a successful copy.
+
+**Why it matters**: TodayPage has had this button since pass 61. Extending it to CalendarPage lets users share historical workouts, preview scheduled training blocks, and quickly reference any day's plan without navigating away. This was recommended in both pass 63 and pass 64 review notes.
+
+**Files changed**:
+- `src/pages/CalendarPage.tsx` — added `Copy` icon import, `formatWorkoutForClipboard` import, `copied` state in `DayDetailModal`, and button JSX in the Level 2 rotation view.
+
+**Risks / tradeoffs**: Purely additive. `navigator.clipboard.writeText()` errors (permission denied in some embedded contexts) are silently caught — same pattern as TodayPage. The `Copy workout` button is not shown when `isDayOff` since there's no workout content to copy.
+
+**Rollback**: Revert the CalendarPage commit. Zero data model changes.
+
+---
+
+## [2] fix: CardioWorkoutTracker timer now reconciles with wall clock on resume
+
+**Summary**: The cardio session timer previously used simple 1-second interval accumulation (`s + 1` on each tick). On iOS, browsers throttle or fully pause `setInterval` when the page is backgrounded. If a user locked their phone during a run, the displayed time and the duration reported to OutcomeModal would fall behind the actual elapsed time.
+
+**Root cause**: `CardioWorkoutTracker` was authored without the wall-clock pattern that `ActiveWorkoutTracker` uses. The pattern is: store `{ elapsed, time }` as a base; each tick computes `baseElapsed + Math.floor((Date.now() - baseTime) / 1000)` rather than incrementing. A `visibilitychange` handler triggers an immediate reconcile on foreground restore.
+
+**Fix**:
+- Added `totalElapsedRef` and `segmentElapsedRef` (ref shadows of state) so callbacks avoid stale-closure bugs without `useCallback` deps.
+- Added `wallTotalRef` and `wallSegRef` (`{ elapsed, time }` bases) updated each time the timer starts/resumes.
+- Changed the `[isPaused]` effect to capture the current values into `wallTotalRef` / `wallSegRef` on each start, then compute from those bases in the interval.
+- Added a `visibilitychange` effect for immediate display update on foreground restore.
+- Updated `goNext`, `goPrev`, and `finish` to reset `wallSegRef` on segment advance and use `totalElapsedRef.current` in `onComplete` callbacks.
+
+**Files changed**:
+- `src/components/workout/CardioWorkoutTracker.tsx` — 48 insertions, 8 deletions. Pure timer logic refactor; JSX and rendering are unchanged.
+
+**Risks / tradeoffs**: The fix changes internal computation only — no API surface, no data model, no props change. The new approach is identical to the proven `ActiveWorkoutTracker` pattern. `tsc --noEmit` exits clean.
+
+**Rollback**: Revert the CardioWorkoutTracker commit.
+
+---
+
+## [3] test: unit tests for mobilityStore (18 tests)
+
+**Summary**: The `mobilityStore` added in the previous human-authored feature commit had no unit test coverage. Added `src/store/__tests__/mobilityStore.test.ts` with 18 tests covering all 6 store actions and default state.
+
+**Why it matters**: Every other Zustand store in the project has tests. `mobilityStore` is the data layer for the new daily mobility routine feature — bugs in reorder or removal logic could silently corrupt the user's routine. Completing coverage brings the test suite to parity.
+
+**Files changed**:
+- `src/store/__tests__/mobilityStore.test.ts` — new file, 195 lines, 25 test files total.
+
+**Risks / tradeoffs**: Tests are read-only. The `persist` middleware is mocked as a pass-through (same pattern as all other store test files). `resetStore` uses `setState` to restore the default routine between tests so they are fully isolated.
+
+**Rollback**: Delete `src/store/__tests__/mobilityStore.test.ts`.
+
+---
+
 # Overnight Changelog — 2026-06-27
 
 ## [1] fix: Undo after double-day now removes the advance override

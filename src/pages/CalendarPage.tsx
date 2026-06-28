@@ -10,6 +10,7 @@ import {
   Trash2,
   ClipboardList,
   Play,
+  Copy,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useActivePlan } from '../hooks/useActivePlan'
@@ -31,6 +32,7 @@ import { useProgramStore } from '../store/programStore'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
+import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -549,6 +551,7 @@ function DayDetailModal({
   const [extraType, setExtraType] = useState<WorkoutType>('yoga')
   const [extraName, setExtraName] = useState('')
   const [confirmDeleteExtraId, setConfirmDeleteExtraId] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   // If we're showing an extra's detail but the extra was deleted (e.g. another tab), reset.
   // Use useEffect rather than calling setState during render to avoid the strict-mode warning.
@@ -793,11 +796,36 @@ function DayDetailModal({
             <span className="text-sm font-medium text-amber-400">Day Off</span>
           </div>
         ) : (
-          <div className={`space-y-2 ${displayDay.slots.length > 1 ? 'divide-y divide-slate-700/50' : ''}`}>
-            {displayDay.slots.map((slot, i) => (
-              <WorkoutSlotDetails key={slot.id} slot={slot} planId={plan.id} className={i > 0 ? 'pt-2' : ''} />
-            ))}
-          </div>
+          <>
+            <div className={`space-y-2 ${displayDay.slots.length > 1 ? 'divide-y divide-slate-700/50' : ''}`}>
+              {displayDay.slots.map((slot, i) => (
+                <WorkoutSlotDetails key={slot.id} slot={slot} planId={plan.id} className={i > 0 ? 'pt-2' : ''} />
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={async () => {
+                  try {
+                    const shortDate = format(new Date(calendarDate + 'T00:00'), 'EEE, MMM d')
+                    await navigator.clipboard.writeText(
+                      formatWorkoutForClipboard(displayDay, plan.name, shortDate),
+                    )
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  } catch { /* clipboard access denied */ }
+                }}
+                title="Copy workout to clipboard"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  copied
+                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                    : 'bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                }`}
+              >
+                <Copy size={12} />
+                {copied ? 'Copied!' : 'Copy workout'}
+              </button>
+            </div>
+          </>
         )}
 
         {/* Already logged */}

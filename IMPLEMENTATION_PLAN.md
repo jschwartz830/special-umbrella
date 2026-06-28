@@ -1,5 +1,58 @@
 # Implementation Plan
 
+## Pass 66 — 2026-06-28 (branch `claude/dreamy-mccarthy-7v05ht`)
+
+### Observations on entry
+
+- Branch is at `5f3fe3f` (merged PR #160 from a human-authored feature commit).
+- 943 tests passing across 24 test files before any changes.
+- Two new features landed since pass 65: `CardioWorkoutTracker` (dedicated run session HUD shown after a weights+run combo or for run-only days) and `MobilityTracker` / `mobilityStore` (daily mobility routine tracker). These had zero unit test coverage.
+- CalendarPage copy-workout button was recommended in passes 63 and 64 but not yet implemented. TodayPage has had it since pass 61.
+
+---
+
+### Audit findings
+
+#### Bug (MEDIUM): CardioWorkoutTracker timer doesn't reconcile with wall clock on resume from background
+
+**Location**: `src/components/workout/CardioWorkoutTracker.tsx` — `useEffect` with `[isPaused]` dependency.
+
+**Mechanism**: The timer used a simple 1-second `setInterval` that incremented state by 1 each tick. Browsers throttle/suppress `setInterval` ticks when the page is backgrounded (iOS WebKit can pause them entirely). After returning from background, the displayed elapsed time and the duration reported to `OutcomeModal` could be significantly behind the actual elapsed time.
+
+**Contrast**: `ActiveWorkoutTracker` already solves this correctly with wall-clock bases (`workoutWallBaseRef`, `restWallBaseRef`) and a `visibilitychange` reconcile handler.
+
+**Fix**: Apply the same pattern — store `{ elapsed, time }` bases, compute elapsed from `baseElapsed + (Date.now() - baseTime)`, add a `visibilitychange` handler for immediate reconcile on foreground restore.
+
+#### Gap: mobilityStore has zero unit test coverage
+
+The store was added as part of the new MobilityTracker feature but no test file was created. All other Zustand stores have test coverage.
+
+#### Feature gap: CalendarPage has no copy-workout button
+
+TodayPage has had a "Copy workout" button since pass 61 using `formatWorkoutForClipboard`. CalendarPage's day detail modal shows full workout slot details but has no way to copy them to clipboard. Recommended in passes 63 and 64.
+
+#### Non-issues confirmed this pass
+
+| Item | Verdict |
+|---|---|
+| `mobilityStore` schema migration | Not needed — v1 is the initial version, no v0 data exists |
+| `CardioWorkoutTracker.resolveDistanceExpr` showing unevaluated expressions | Very unlikely in practice — YAML distances are simple values or simple variable refs, not arithmetic expressions |
+| `parseDurationToSeconds` not handling hours format | Workout segment durations are conventionally in min/sec form; hour-format inputs are not in the YAML schema |
+
+---
+
+### Work plan
+
+1. **[FEATURE] CalendarPage copy-workout button** — Add `Copy` button to the DayDetailModal Level 2 rotation view using the existing `formatWorkoutForClipboard` utility. ~20 lines.
+
+2. **[FIX] CardioWorkoutTracker timer wall-clock reconciliation** — Apply the `ActiveWorkoutTracker` pattern: wall-clock base refs, compute elapsed from `(Date.now() - base.time)`, visibility change handler.
+
+3. **[TEST] mobilityStore unit tests** — Cover all 6 store actions (addExercise, removeExercise, reorderExercise, logCompletion, removeCompletion) plus default state. Target 18 tests.
+
+No feature proposal this pass — the CalendarPage copy button is a narrow additive feature adjacent to existing work, not a medium-complexity feature requiring a FEATURE_PROPOSAL.md.
+
+---
+
 ## Pass 65 — 2026-06-27 (branch `claude/dreamy-mccarthy-zak0k0`)
 
 ### Observations on entry

@@ -134,16 +134,54 @@ export function CardioWorkoutTracker({
   const [isPaused, setIsPaused] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Refs that shadow state — readable inside callbacks without stale closures
+  const totalElapsedRef = useRef(0)
+  const segmentElapsedRef = useRef(0)
+
+  // Wall-clock bases — updated each time the timer starts/resumes and on segment advance.
+  // The interval derives elapsed from these rather than incrementing, so ticks missed
+  // while the app is backgrounded are automatically reconciled on the next tick.
+  const wallTotalRef = useRef<{ elapsed: number; time: number }>({ elapsed: 0, time: Date.now() })
+  const wallSegRef = useRef<{ elapsed: number; time: number }>({ elapsed: 0, time: Date.now() })
+
+  function setTotal(n: number) {
+    totalElapsedRef.current = n
+    setTotalElapsed(n)
+  }
+  function setSeg(n: number) {
+    segmentElapsedRef.current = n
+    setSegmentElapsed(n)
+  }
+
   useEffect(() => {
     if (isPaused) {
       if (intervalRef.current) clearInterval(intervalRef.current)
       return
     }
+    // Capture current values as new wall-clock base when the timer (re)starts
+    wallTotalRef.current = { elapsed: totalElapsedRef.current, time: Date.now() }
+    wallSegRef.current = { elapsed: segmentElapsedRef.current, time: Date.now() }
+
     intervalRef.current = setInterval(() => {
-      setTotalElapsed(s => s + 1)
-      setSegmentElapsed(s => s + 1)
+      const now = Date.now()
+      setTotal(wallTotalRef.current.elapsed + Math.floor((now - wallTotalRef.current.time) / 1000))
+      setSeg(wallSegRef.current.elapsed + Math.floor((now - wallSegRef.current.time) / 1000))
     }, 1000)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+  }, [isPaused])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // On resume from background, trigger an immediate reconcile rather than waiting for
+  // the next 1-second interval tick. Mirrors the pattern in ActiveWorkoutTracker.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (!document.hidden && !isPaused) {
+        const now = Date.now()
+        setTotal(wallTotalRef.current.elapsed + Math.floor((now - wallTotalRef.current.time) / 1000))
+        setSeg(wallSegRef.current.elapsed + Math.floor((now - wallSegRef.current.time) / 1000))
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [isPaused])
 
   const seg = effectiveSegments[segmentIdx]
@@ -157,22 +195,24 @@ export function CardioWorkoutTracker({
   const goNext = useCallback(() => {
     if (!isLast) {
       setSegmentIdx(i => i + 1)
-      setSegmentElapsed(0)
+      setSeg(0)
+      wallSegRef.current = { elapsed: 0, time: Date.now() }
     } else {
-      onComplete(Math.round(totalElapsed / 60))
+      onComplete(Math.round(totalElapsedRef.current / 60))
     }
-  }, [isLast, totalElapsed, onComplete])
+  }, [isLast, onComplete])
 
   const goPrev = useCallback(() => {
     if (segmentIdx > 0) {
       setSegmentIdx(i => i - 1)
-      setSegmentElapsed(0)
+      setSeg(0)
+      wallSegRef.current = { elapsed: 0, time: Date.now() }
     }
   }, [segmentIdx])
 
   const finish = useCallback(() => {
-    onComplete(Math.round(totalElapsed / 60))
-  }, [totalElapsed, onComplete])
+    onComplete(Math.round(totalElapsedRef.current / 60))
+  }, [onComplete])
 
   // ── Minimized banner ────────────────────────────────────────────────────────
   if (minimized) {
