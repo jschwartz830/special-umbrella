@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const src = path.join(__dirname, 'icon-source.png');
+const src = path.join(__dirname, 'icon-source-2.png');
 
 const sizes = [
   { size: 512, name: 'pwa-512x512.png' },
