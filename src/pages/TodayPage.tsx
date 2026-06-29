@@ -172,6 +172,7 @@ export function TodayPage() {
   )
 
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
+  const [showAddWorkout, setShowAddWorkout] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
   const [newPRs, setNewPRs] = useState<string[] | null>(null)
   const [workoutCopied, setWorkoutCopied] = useState(false)
@@ -876,38 +877,18 @@ export function TodayPage() {
 
       {/* Secondary workout-management actions */}
       {isPending && activeWorkoutState === 'hidden' && (
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {upcoming.length > 0 && (
-            <button
-              onClick={() => setDoubleDay(v => !v)}
-              className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
-            >
-              {doubleDay ? 'Cancel add-on' : 'Add plan workout'}
-            </button>
-          )}
-          {adHocWorkoutState === 'hidden' && !showAdHocOutcome && (
-            <button
-              onClick={() => {
-                setAdHocName('')
-                setAdHocType('weights')
-                setAdHocModalOpen(true)
-              }}
-              className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
-            >
-              Ad hoc
-            </button>
-          )}
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowOverride(true)}
+            onClick={() => setShowAddWorkout(true)}
+            className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
+          >
+            Add Workout
+          </button>
+          <button
+            onClick={() => setShowJump(true)}
             className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
           >
             Change workout
-          </button>
-          <button
-            onClick={handleSkip}
-            className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-red-400 hover:border-red-900/50 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
-          >
-            Skip
           </button>
         </div>
       )}
@@ -1512,9 +1493,49 @@ export function TodayPage() {
         </Modal>
       )}
 
+      {/* Add Workout picker */}
+      {showAddWorkout && (
+        <Modal title="Add Workout" onClose={() => setShowAddWorkout(false)}>
+          <div className="space-y-2">
+            {upcoming.length > 0 && (
+              <button
+                onClick={() => {
+                  setDoubleDay(v => !v)
+                  setShowAddWorkout(false)
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
+              >
+                <PlusCircle size={18} className="text-sky-400 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-white">Add from plan</p>
+                  <p className="text-xs text-slate-400">Stack the next planned workout onto today</p>
+                </div>
+              </button>
+            )}
+            {adHocWorkoutState === 'hidden' && !showAdHocOutcome && (
+              <button
+                onClick={() => {
+                  setAdHocName('')
+                  setAdHocType('weights')
+                  setAdHocModalOpen(true)
+                  setShowAddWorkout(false)
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
+              >
+                <ListPlus size={18} className="text-sky-400 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-white">Add ad hoc</p>
+                  <p className="text-xs text-slate-400">Log a custom workout outside your plan</p>
+                </div>
+              </button>
+            )}
+          </div>
+        </Modal>
+      )}
+
       {/* Jump modal */}
       {showJump && (
-        <Modal title="Jump to day" onClose={() => setShowJump(false)}>
+        <Modal title="Change workout" onClose={() => setShowJump(false)}>
           <div className="space-y-2">
             {plan.days.map((day, idx) => (
               <button
