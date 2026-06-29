@@ -880,9 +880,8 @@ export function TodayPage() {
           {upcoming.length > 0 && (
             <button
               onClick={() => setDoubleDay(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
+              className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
             >
-              <PlusCircle size={12} />
               {doubleDay ? 'Cancel add-on' : 'Add plan workout'}
             </button>
           )}
@@ -893,24 +892,21 @@ export function TodayPage() {
                 setAdHocType('weights')
                 setAdHocModalOpen(true)
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
+              className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
             >
-              <ListPlus size={12} />
               Ad hoc
             </button>
           )}
           <button
             onClick={() => setShowOverride(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
+            className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
           >
-            <Shuffle size={12} />
             Change workout
           </button>
           <button
             onClick={handleSkip}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-red-400 hover:border-red-900/50 text-xs font-medium transition-colors active:scale-[0.97]"
+            className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-red-400 hover:border-red-900/50 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
           >
-            <SkipForward size={12} />
             Skip
           </button>
         </div>
