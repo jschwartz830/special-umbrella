@@ -1,5 +1,66 @@
 # Implementation Plan
 
+## Pass 67 — 2026-06-29 (branch `claude/dreamy-mccarthy-hhiaa3`)
+
+### Observations on entry
+
+- Branch is at `9b00892` (merged PR #165 "Add Supabase auth and cloud sync for workout data").
+- 961 tests passing across 25 test files before any changes.
+- Three significant human-authored features landed since pass 66:
+  1. **Supabase auth + cloud sync** (PR #165) — `AuthGate`, `authStore`, `storeSync.ts` — zero tests, two bugs found
+  2. **Today tab UI redesign** (PR #163) — Habit-focused compact layout, collapsed upcoming
+  3. **PWA icon update** (PR #164) — Asset-only change
+
+### Audit findings
+
+#### Bug: AuthGate useEffect subscription leak when syncOnLogin races against cleanup (MEDIUM)
+
+**Location**: `src/components/auth/AuthGate.tsx` — second `useEffect` (user dependency)
+
+**Mechanism**: When `user` becomes truthy, the effect calls `syncOnLogin()` (async), then in `.then()` assigns `unsubscribeStores = subscribeStores()`. The cleanup function only calls `unsubscribeStores?.()`. If the component unmounts or `user` changes to null **before** `syncOnLogin()` resolves, the cleanup runs while `unsubscribeStores` is still `undefined`. After cleanup, `.then()` fires and assigns `subscribeStores()` — but the cleanup already ran. Those subscriptions are never freed. This is a subscription leak that causes duplicate Supabase pushes on re-login and prevents garbage collection of the store listeners.
+
+**Fix**: Add `let cancelled = false` flag; check before calling `subscribeStores()` in `.then()`; set `cancelled = true` in the cleanup.
+
+#### Bug: storeSync.ts pushStore and syncOnLogin swallow errors silently (LOW)
+
+**Location**: `src/lib/storeSync.ts`
+
+**Mechanism**: `supabase.from('user_store_data').upsert(...)` and the `.select(...)` query both return `{ data, error }`. Neither checks the `error` field. When a network failure or RLS violation causes a push to fail, the caller receives no feedback. This makes debugging sync issues significantly harder.
+
+**Fix**: Destructure `error` from both calls; log to `console.error` when non-null.
+
+#### Gap: settingsStore had zero unit tests
+
+All other Zustand stores have test coverage. `settingsStore` has a single action (`setStartDelay`) and a default value. Adding basic coverage completes parity.
+
+#### Feature: Progression result not surfaced in HistoryPage (LONG-STANDING RECOMMENDATION)
+
+**Recommended in**: Passes 63, 64, and 65.
+
+`RunProgressionState.lastResult` ('progress' | 'hold' | 'regress') is stored in `outcomeStore.progressionStates` after every progression-eligible run. The `lastCompletedWorkoutInstanceId` field links the state to the exact workout that triggered it. This information has been stored since the run-adaptation module was introduced but has never been shown to users.
+
+**Approach**: Add optional `progressionState?: RunProgressionState | null` to `OutcomeMetrics`. When `lastResult === 'progress'`, show a green "↑ Progressed — next target: N mi" line. When `lastResult === 'regress'`, show amber "↓ Adjusted down — next target: N mi". Hold and None are silent. Wire it in `HistoryPage` using a reverse-lookup Map built from `progressionStates`.
+
+#### Non-issues confirmed this pass
+
+| Item | Verdict |
+|---|---|
+| Supabase anon key hardcoded in `supabase.ts` | Standard practice. The key has prefix `sb_publishable_` (public key). Security comes from Supabase RLS policies, not secret-keeping of the anon key. |
+| AuthGate shows sign-in wall for unauthenticated users | Intentional product decision in PR #165. `supabase.auth.getSession()` reads from localStorage; `loading` resolves to false in milliseconds even offline. |
+| `syncOnLogin` "cloud wins" on first login conflicts | Known limitation. For a personal single-user app this is acceptable. Multi-device merge would require per-record timestamps and conflict resolution beyond this scope. |
+| `subscribeStores` fires on every store change | Correctly debounced at 1500ms. Rapid changes (active workout set logging) coalesce into one push. |
+
+---
+
+### Work plan
+
+1. **[FIX] AuthGate subscription leak** — `src/components/auth/AuthGate.tsx` — 6-line change
+2. **[FIX] storeSync error logging** — `src/lib/storeSync.ts` — 6-line change
+3. **[FEATURE] Run progression result in OutcomeMetrics + HistoryPage** — 2 files, ~50 lines
+4. **[TEST] settingsStore unit tests** — new file, 5 tests
+
+---
+
 ## Pass 66 — 2026-06-28 (branch `claude/dreamy-mccarthy-7v05ht`)
 
 ### Observations on entry

@@ -1,3 +1,59 @@
+# Overnight Changelog — 2026-06-29
+
+## [1] fix: AuthGate subscription leak + storeSync error logging
+
+**Summary**: Two bugs found in the Supabase auth integration added by PR #165.
+
+(a) **AuthGate race condition**: The `useEffect` that calls `syncOnLogin()` and then `subscribeStores()` had a subscription leak. If the component unmounted or the user logged out while `syncOnLogin()` was still in-flight, the cleanup function ran before `.then()` fired. After cleanup, `.then()` created subscriptions that were never freed, causing duplicate Supabase pushes on re-login and leaking store listeners.
+
+(b) **storeSync silent errors**: Both `pushStore` (upsert) and `syncOnLogin` (select query) dropped their Supabase `error` response entirely. A network failure or RLS rejection produced no log output, making sync debugging very difficult.
+
+**Files changed**:
+- `src/components/auth/AuthGate.tsx` — Added `cancelled` flag pattern: `let cancelled = false` before the async call; `if (!cancelled) unsubscribeStores = subscribeStores()` in `.then()`; `cancelled = true` in cleanup.
+- `src/lib/storeSync.ts` — Destructure `error` from upsert and select; `console.error('[storeSync] ...')` on failure.
+
+**Risks / tradeoffs**: Both changes are purely defensive. The AuthGate fix prevents a real but rare edge case (rapid login/logout during a slow network). The storeSync error logging has zero runtime impact when errors don't occur.
+
+**Rollback**: Revert commit `d7572a5`. No data model changes.
+
+---
+
+## [2] feat: surface run progression results in HistoryPage
+
+**Summary**: `RunProgressionState.lastResult` ('progress' / 'hold' / 'regress') has been stored in `outcomeStore.progressionStates` since the run-adaptation module was introduced, but was never shown to users. This was recommended in passes 63, 64, and 65.
+
+Users who have progression-eligible runs in their plan now see, in HistoryPage, a small colored annotation below each run's outcome metrics:
+- Green **↑ Progressed — next target: N mi** (when the run triggered a distance increase)
+- Amber **↓ Adjusted down — next target: N mi** (when the run triggered a distance decrease)
+- Silent (no badge) for "hold" or "none" — avoids visual noise on most workouts
+
+**Implementation**: `OutcomeMetrics` gains an optional `progressionState?: RunProgressionState | null` prop. `HistoryPage` builds a reverse-lookup `Map<instanceId, RunProgressionState>` from `outcomeStore.progressionStates` using `lastCompletedWorkoutInstanceId` as the key. Lookup is O(1) per item; the Map is only rebuilt when `progressionStates` changes.
+
+**Files changed**:
+- `src/components/workout/OutcomeMetrics.tsx` — new `progressionState` prop + two conditional render blocks
+- `src/pages/HistoryPage.tsx` — import `RunProgressionState`, subscribe to `progressionStates`, build reverse-lookup `useMemo`, pass `progressionState` to `<OutcomeMetrics />`
+
+**Risks / tradeoffs**: Additive. `OutcomeMetrics` already renders `progressionRecommendation` in a similar position. No new data is stored; the display reads existing persisted state. The reverse-lookup avoids scanning `progressionStates` per item.
+
+**Rollback**: Revert commit `9260e11`. No state changes.
+
+---
+
+## [3] test: unit tests for settingsStore (5 tests)
+
+**Summary**: `settingsStore` was the only Zustand store without any test coverage. Added 5 tests covering: default value, setStartDelay basic update, reset to 0, large values, and overwrite of a prior setting.
+
+**Why it matters**: Completing store test parity. All 7 Zustand stores (`historyStore`, `outcomeStore`, `planStore`, `programStore`, `exerciseHistoryStore`, `mobilityStore`, `settingsStore`) now have at least basic test coverage.
+
+**Files changed**:
+- `src/store/__tests__/settingsStore.test.ts` — new file, 46 lines
+
+**Risks / tradeoffs**: None — tests are read-only and follow the identical pattern used by all other store test files.
+
+**Rollback**: Delete `src/store/__tests__/settingsStore.test.ts`.
+
+---
+
 # Overnight Changelog — 2026-06-28
 
 ## [1] feat: copy-workout button on CalendarPage day detail view

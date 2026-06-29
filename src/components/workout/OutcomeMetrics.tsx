@@ -1,8 +1,15 @@
 import { Ruler, Timer, Zap, Dumbbell, Waves } from 'lucide-react'
 import { formatPace, formatSwimPace } from '../../modules/workout-outcomes/types'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
+import type { RunProgressionState } from '../../modules/run-adaptation/types'
 
-export function OutcomeMetrics({ outcome }: { outcome: WorkoutOutcome }) {
+export function OutcomeMetrics({
+  outcome,
+  progressionState,
+}: {
+  outcome: WorkoutOutcome
+  progressionState?: RunProgressionState | null
+}) {
   const weightSetCount = outcome.weightsActual?.exercises
     ?.flatMap(ex => ex.sets)
     .filter(s => s.completed).length ?? 0
@@ -61,6 +68,17 @@ export function OutcomeMetrics({ outcome }: { outcome: WorkoutOutcome }) {
 
       {outcome.progressionRecommendation?.action === 'progress' && (
         <p className="text-xs text-sky-300">↗ {outcome.progressionRecommendation.note}</p>
+      )}
+
+      {progressionState?.lastResult === 'progress' && progressionState.currentTargetDistanceMiles != null && (
+        <p className="text-xs text-emerald-400">
+          ↑ Progressed — next target: {progressionState.currentTargetDistanceMiles} mi
+        </p>
+      )}
+      {progressionState?.lastResult === 'regress' && progressionState.currentTargetDistanceMiles != null && (
+        <p className="text-xs text-amber-400">
+          ↓ Adjusted down — next target: {progressionState.currentTargetDistanceMiles} mi
+        </p>
       )}
 
       {!outcome.runActual && !outcome.swimActual && outcome.durationActualMin != null && (
