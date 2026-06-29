@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import {
@@ -113,6 +113,40 @@ function findPreviousWeightsOutcome(
 }
 
 
+function SwipeToDelete({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {
+  const [offset, setOffset] = useState(0)
+  const [swiping, setSwiping] = useState(false)
+  const startXRef = useRef(0)
+  const REVEAL = 68
+
+  return (
+    <div className="relative overflow-hidden rounded-xl">
+      <div
+        className="absolute inset-y-0 right-0 flex items-center justify-center bg-red-500 rounded-r-xl"
+        style={{ width: REVEAL }}
+      >
+        <button onClick={onDelete} aria-label="Delete" className="w-full h-full flex items-center justify-center">
+          <X size={16} className="text-white" />
+        </button>
+      </div>
+      <div
+        style={{ transform: `translateX(${offset}px)`, transition: swiping ? 'none' : 'transform 0.2s ease' }}
+        onTouchStart={e => { startXRef.current = e.touches[0].clientX; setSwiping(true) }}
+        onTouchMove={e => {
+          const dx = e.touches[0].clientX - startXRef.current
+          setOffset(Math.max(Math.min(dx, 0), -REVEAL))
+        }}
+        onTouchEnd={() => {
+          setSwiping(false)
+          setOffset(prev => (prev <= -(REVEAL / 2) ? -REVEAL : 0))
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export function TodayPage() {
   const navigate = useNavigate()
   const { plan, todayResolved, upcoming, planEntries } = useActivePlan()
@@ -173,12 +207,13 @@ export function TodayPage() {
 
   const [showOutcomeModal, setShowOutcomeModal] = useState(false)
   const [showAddWorkout, setShowAddWorkout] = useState(false)
+  const [showAddFromPlan, setShowAddFromPlan] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
   const [newPRs, setNewPRs] = useState<string[] | null>(null)
   const [workoutCopied, setWorkoutCopied] = useState(false)
   const [showJump, setShowJump] = useState(false)
   const [showCatchupConfirm, setShowCatchupConfirm] = useState(false)
-  const [doubleDay, setDoubleDay] = useState(false)
+  const [addFromPlanIdx, setAddFromPlanIdx] = useState<number | null>(null)
   const [loggingUpcoming, setLoggingUpcoming] = useState<{ rd: ResolvedDay; extraId?: string } | null>(null)
   const [showUpcomingOutcome, setShowUpcomingOutcome] = useState(false)
   const [upcomingLogError, setUpcomingLogError] = useState<string | null>(null)
@@ -263,9 +298,10 @@ export function TodayPage() {
     ? generateRunAdaptationNote(todayRunSlot, todayProgressionState)
     : null
 
-  // Difficulty spacing warning (today vs tomorrow) — suppressed in double-day mode
-  const tomorrowSlot = upcoming[doubleDay ? 1 : 0]?.planDay?.slots[0]
-  const spacingWarning = !doubleDay && generateDifficultySpacingWarning(
+  // Difficulty spacing warning (today vs tomorrow) — suppressed when an extra workout is queued
+  const extraIsNextInPlan = addFromPlanIdx !== null && addFromPlanIdx === upcoming[0]?.planDayIndex
+  const tomorrowSlot = upcoming[extraIsNextInPlan ? 1 : 0]?.planDay?.slots[0]
+  const spacingWarning = addFromPlanIdx === null && generateDifficultySpacingWarning(
     todayResolved.planDay.slots[0]?.difficulty,
     tomorrowSlot?.difficulty,
   )
@@ -447,21 +483,28 @@ export function TodayPage() {
       if (prs.length > 0) setNewPRs(prs)
     }
 
-    if (doubleDay && upcoming[0]) {
-      const bonus = upcoming[0]
-      const bonusSlot = bonus.planDay.slots[0]
+    if (addFromPlanIdx !== null && plan!.days[addFromPlanIdx]) {
+      const selectedPlanDay = plan!.days[addFromPlanIdx]
+      const selectedSlot = selectedPlanDay.slots[0]
       const extraId = addExtraEntry({
         planId: plan!.id,
         calendarDate: today,
-        workoutType: bonusSlot?.type ?? 'rest',
-        workoutName: bonus.planDay.label,
+        workoutType: selectedSlot?.type ?? 'rest',
+        workoutName: selectedPlanDay.label,
         source: 'double_day',
       })
-      actions.advance()
-      setBonusOutcome({ rd: bonus, extraId })
+      if (upcoming[0]?.planDayIndex === addFromPlanIdx) {
+        actions.advance()
+        setBonusOutcome({ rd: upcoming[0], extraId })
+      } else {
+        setBonusOutcome({
+          rd: { calendarDate: today, planDayIndex: addFromPlanIdx, planDay: selectedPlanDay, status: 'upcoming' },
+          extraId,
+        })
+      }
     }
 
-    setDoubleDay(false)
+    setAddFromPlanIdx(null)
     setShowOutcomeModal(false)
   }
 
@@ -713,20 +756,28 @@ export function TodayPage() {
             </button>
           )}
           {todayExtras.map(extra => (
-            <button
+            <SwipeToDelete
               key={extra.id}
-              onClick={() => setEditingExtra(extra)}
-              className="w-full text-left flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors active:scale-[0.99]"
+              onDelete={() => {
+                removeOutcome(makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id))
+                removeExtraEntry(extra.id)
+                if (extra.source === 'double_day') removeLastOverrideByType(plan.id, 'advance')
+              }}
             >
-              <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-emerald-200 font-medium truncate">{extra.workoutName}</p>
-                <p className="text-xs text-emerald-300/70 mt-0.5 truncate capitalize">
-                  {extra.workoutType.replace(/_/g, ' ')}
-                </p>
-              </div>
-              <ChevronRight size={14} className="text-emerald-400/60 flex-shrink-0 mt-1" />
-            </button>
+              <button
+                onClick={() => setEditingExtra(extra)}
+                className="w-full text-left flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors active:scale-[0.99]"
+              >
+                <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-emerald-200 font-medium truncate">{extra.workoutName}</p>
+                  <p className="text-xs text-emerald-300/70 mt-0.5 truncate capitalize">
+                    {extra.workoutType.replace(/_/g, ' ')}
+                  </p>
+                </div>
+                <ChevronRight size={14} className="text-emerald-400/60 flex-shrink-0 mt-1" />
+              </button>
+            </SwipeToDelete>
           ))}
         </section>
       )}
@@ -833,13 +884,18 @@ export function TodayPage() {
         <WorkoutDayCard resolved={todayResolved} planId={plan?.id} isToday sessionCount={todaySessionCount} />
       )}
 
-      {/* Double-day bonus workout */}
-      {doubleDay && upcoming[0] && (
+      {/* Added plan workout preview */}
+      {addFromPlanIdx !== null && plan.days[addFromPlanIdx] && (
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <PlusCircle size={11} /> Also today
           </p>
-          <WorkoutDayCard resolved={upcoming[0]} planId={plan?.id} />
+          <SwipeToDelete onDelete={() => setAddFromPlanIdx(null)}>
+            <WorkoutDayCard
+              resolved={{ calendarDate: today, planDayIndex: addFromPlanIdx, planDay: plan.days[addFromPlanIdx], status: 'upcoming' }}
+              planId={plan?.id}
+            />
+          </SwipeToDelete>
         </div>
       )}
 
@@ -989,7 +1045,7 @@ export function TodayPage() {
             Upcoming
           </h2>
           <div className="space-y-2">
-            {upcoming.slice(doubleDay ? 1 : 0, doubleDay ? 6 : 5).map(rd => {
+            {upcoming.slice(extraIsNextInPlan ? 1 : 0, extraIsNextInPlan ? 6 : 5).map(rd => {
               const upcomingRunSlot = rd.planDay.slots.find(s => isRunType(s.type))
               const upcomingGroupId = upcomingRunSlot?.runConfig?.progressionGroupId
               const upcomingProgression = upcomingGroupId ? getProgressionState(upcomingGroupId) : null
@@ -1497,21 +1553,16 @@ export function TodayPage() {
       {showAddWorkout && (
         <Modal title="Add Workout" onClose={() => setShowAddWorkout(false)}>
           <div className="space-y-2">
-            {upcoming.length > 0 && (
-              <button
-                onClick={() => {
-                  setDoubleDay(v => !v)
-                  setShowAddWorkout(false)
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
-              >
-                <PlusCircle size={18} className="text-sky-400 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-white">Add from plan</p>
-                  <p className="text-xs text-slate-400">Stack the next planned workout onto today</p>
-                </div>
-              </button>
-            )}
+            <button
+              onClick={() => { setShowAddWorkout(false); setShowAddFromPlan(true) }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
+            >
+              <PlusCircle size={18} className="text-sky-400 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-white">Add from plan</p>
+                <p className="text-xs text-slate-400">Pick any workout from your plan to stack today</p>
+              </div>
+            </button>
             {adHocWorkoutState === 'hidden' && !showAdHocOutcome && (
               <button
                 onClick={() => {
@@ -1529,6 +1580,45 @@ export function TodayPage() {
                 </div>
               </button>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {/* Add from plan picker */}
+      {showAddFromPlan && (
+        <Modal title="Add from plan" onClose={() => setShowAddFromPlan(false)}>
+          <div className="space-y-2">
+            {plan.days.map((day, idx) => {
+              const isScheduled = idx === todayResolved.planDayIndex
+              const isAlreadyAdded = idx === addFromPlanIdx
+              return (
+                <button
+                  key={day.id}
+                  disabled={isScheduled}
+                  onClick={() => {
+                    setAddFromPlanIdx(isAlreadyAdded ? null : idx)
+                    setShowAddFromPlan(false)
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors ${
+                    isScheduled
+                      ? 'bg-slate-800/50 opacity-40 cursor-not-allowed'
+                      : isAlreadyAdded
+                      ? 'bg-sky-500/20 border border-sky-500/50'
+                      : 'bg-slate-700 hover:bg-slate-600'
+                  }`}
+                >
+                  <span className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0">
+                    {idx + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${isScheduled ? 'text-slate-400' : 'text-white'}`}>{day.label}</p>
+                    <p className="text-xs text-slate-400 truncate">{day.slots.map(s => s.name).join(' + ')}</p>
+                  </div>
+                  {isScheduled && <span className="text-xs text-slate-500 flex-shrink-0">Scheduled</span>}
+                  {isAlreadyAdded && <span className="text-xs text-sky-400 font-medium flex-shrink-0">Added</span>}
+                </button>
+              )
+            })}
           </div>
         </Modal>
       )}
