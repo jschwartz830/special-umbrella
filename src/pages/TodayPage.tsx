@@ -876,7 +876,7 @@ export function TodayPage() {
 
       {/* Secondary workout-management actions */}
       {isPending && activeWorkoutState === 'hidden' && (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto">
           {upcoming.length > 0 && (
             <button
               onClick={() => setDoubleDay(v => !v)}
