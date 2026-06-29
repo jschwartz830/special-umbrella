@@ -25,13 +25,19 @@ export function AuthGate({ children }: Props) {
 
   useEffect(() => {
     if (!user) return
+    let cancelled = false
     let unsubscribeStores: (() => void) | undefined
 
     syncOnLogin().then(() => {
-      unsubscribeStores = subscribeStores()
+      // Guard: if the component unmounted or user changed while syncOnLogin was
+      // in-flight, don't create subscriptions that will never be cleaned up.
+      if (!cancelled) {
+        unsubscribeStores = subscribeStores()
+      }
     })
 
     return () => {
+      cancelled = true
       unsubscribeStores?.()
     }
   }, [user])
