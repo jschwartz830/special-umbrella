@@ -30,6 +30,7 @@ import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { ActionType, HistoryEntry, ExtraWorkoutEntry, WorkoutType, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
+import type { RunProgressionState } from '../modules/run-adaptation/types'
 import { COMPLETION_STATE_LABELS } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
 
@@ -70,6 +71,7 @@ export function HistoryPage() {
   const addExtraEntry = useHistoryStore(s => s.addExtraEntry)
   const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
   const outcomes = useOutcomeStore(s => s.outcomes)
+  const progressionStates = useOutcomeStore(s => s.progressionStates)
   const updateOutcomeNotes = useOutcomeStore(s => s.updateOutcomeNotes)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const importOutcomes = useOutcomeStore(s => s.importOutcomes)
@@ -78,6 +80,18 @@ export function HistoryPage() {
   const updateEntryDate = useHistoryStore(s => s.updateEntryDate)
   const updateExtraEntryDate = useHistoryStore(s => s.updateExtraEntryDate)
   const updateExtraEntry = useHistoryStore(s => s.updateExtraEntry)
+
+  // Reverse-index progressionStates by the workout instance that triggered each state.
+  // Allows O(1) lookup per history item without scanning the full progressionStates object.
+  const progressionByInstance = useMemo(() => {
+    const map = new Map<string, RunProgressionState>()
+    for (const state of Object.values(progressionStates)) {
+      if (state.lastCompletedWorkoutInstanceId) {
+        map.set(state.lastCompletedWorkoutInstanceId, state)
+      }
+    }
+    return map
+  }, [progressionStates])
 
   const [editingEntry, setEditingEntry] = useState<HistoryEntry | null>(null)
   const [notesText, setNotesText] = useState('')
@@ -503,7 +517,9 @@ export function HistoryPage() {
             const { entry } = item
             const plan = plans[entry.planId]
             const planDay = plan?.days[entry.planDayIndex ?? -1]
-            const outcome = outcomes[makeWorkoutInstanceId(entry.planId, entry.calendarDate)] ?? null
+            const instanceId = makeWorkoutInstanceId(entry.planId, entry.calendarDate)
+            const outcome = outcomes[instanceId] ?? null
+            const progressionState = progressionByInstance.get(instanceId) ?? null
             const completionState = outcome?.completionState ?? null
 
             const workoutTitle = entry.action === 'day_off'
@@ -559,7 +575,7 @@ export function HistoryPage() {
                       {/* Outcome actuals */}
                       {outcome && (
                         <div className="mt-2">
-                          <OutcomeMetrics outcome={outcome} />
+                          <OutcomeMetrics outcome={outcome} progressionState={progressionState} />
                         </div>
                       )}
 
