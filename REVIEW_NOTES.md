@@ -1,5 +1,109 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-29 (sixty-seventh pass) — branch `claude/dreamy-mccarthy-hhiaa3`
+
+---
+
+### Executive summary
+
+This pass audited the Supabase auth + cloud sync feature (PR #165) and the two human-authored UI commits that landed since pass 66. Found two bugs in the new sync code and implemented the run-progression-result display feature that had been recommended since pass 63.
+
+**What changed**: 3 commits — 2 bug fixes + 1 feature + 1 test file (5 new tests).
+
+**Highest confidence**: The AuthGate subscription leak fix (clear correctness bug, surgical change) and the storeSync error logging (observability improvement, zero risk). The settingsStore tests are trivial and safe.
+
+**Risky parts**: The run progression badge is additive and purely read-only, but it adds visual output to HistoryPage for a store value (`progressionStates`) that most users may have empty (the run adaptation engine only fires for `progressionEligible` slots, which requires an explicitly configured `runConfig.progressionGroupId`). Users without that config won't see anything different.
+
+**Review first**: The AuthGate fix — it changes cleanup ordering for the auth flow. Confirm the `cancelled` flag correctly handles the user-logs-out-during-syncOnLogin scenario.
+
+---
+
+### Audit scope
+
+Full read of new code added since pass 66:
+- `src/components/auth/AuthGate.tsx` — auth initialization + store subscription lifecycle
+- `src/store/authStore.ts` — Supabase session management
+- `src/lib/storeSync.ts` — cloud sync push/pull logic
+- `src/lib/supabase.ts` — Supabase client init
+- `src/App.tsx` — AuthGate wrapping all routes
+- `src/store/settingsStore.ts` — new settings store
+- `src/components/workout/OutcomeMetrics.tsx` — outcome display component (for progression badge)
+- `src/pages/HistoryPage.tsx` — history item rendering (for progression badge wiring)
+
+Test suite on entry: **961 tests passing** across 25 test files.
+
+---
+
+### Bug fixed: AuthGate subscription leak when syncOnLogin races against effect cleanup (MEDIUM)
+
+**Location**: `src/components/auth/AuthGate.tsx` — second `useEffect`
+
+**Issue**: The effect called `syncOnLogin()` (async network request) then in `.then()` called `subscribeStores()` and assigned the result to `unsubscribeStores`. The effect's cleanup function called `unsubscribeStores?.()`. If cleanup ran **before** the `.then()` callback (component unmount, or user → null from logout), `unsubscribeStores` was still `undefined` at cleanup time. After cleanup, `.then()` fired and created Zustand store subscriptions that would never be freed — leaking listeners and causing duplicate Supabase pushes on re-login.
+
+**Fix**: Added `let cancelled = false` before the async call. The `.then()` callback guards with `if (!cancelled)` before calling `subscribeStores()`. The cleanup sets `cancelled = true` before calling `unsubscribeStores?.()`.
+
+**Verdict**: **Definitely keep** — correct behavior for any async-cleanup pattern in React.
+
+---
+
+### Bug fixed: storeSync.ts swallowed Supabase errors silently (LOW)
+
+**Location**: `src/lib/storeSync.ts` — `pushStore` and `syncOnLogin`
+
+**Issue**: Both the `upsert` in `pushStore` and the `select` in `syncOnLogin` returned `{ data, error }` from the Supabase SDK. Neither destructured or logged `error`. A network failure, RLS rejection, or schema mismatch would silently produce a no-op — no user feedback, no console output, no retry.
+
+**Fix**: Destructure `error` from both calls; `console.error` when non-null. For the `select` in `syncOnLogin`, also return early so stale cloud data isn't applied to a partial response.
+
+**Verdict**: **Definitely keep** — observability improvement with zero runtime cost.
+
+---
+
+### Feature added: run progression result badges in HistoryPage (MEDIUM)
+
+**Location**: `src/components/workout/OutcomeMetrics.tsx` + `src/pages/HistoryPage.tsx`
+
+**Context**: When a user completes a progression-eligible run, the run adaptation engine decides to progress/hold/regress the target distance. This decision has been stored in `outcomeStore.progressionStates` since the module was introduced (passes ~55–58), keyed by `progressionGroupId` with `lastCompletedWorkoutInstanceId` linking it to a specific workout. No UI ever showed the result.
+
+**What was built**: `OutcomeMetrics` accepts `progressionState?: RunProgressionState | null`. When `lastResult === 'progress'`, it shows a green "↑ Progressed — next target: N mi" line. When `lastResult === 'regress'`, an amber "↓ Adjusted down — next target: N mi" line. Hold and none are silent. `HistoryPage` builds a reverse-lookup `Map<instanceId, RunProgressionState>` from all stored progression states.
+
+**Verdict**: **Definitely keep** — surfaces the run adaptation system for the first time. Users who have progression-eligible runs will see the consequence of each run result in their history.
+
+**Open questions**:
+1. Should the "next target" shown be labeled more explicitly (e.g. "next run: 5.5 mi" vs "next target: 5.5 mi")?
+2. Should the badge also appear in TodayPage's resolved card (after completing today's run)?
+
+---
+
+### Test coverage added: settingsStore (5 tests)
+
+`settingsStore` was the only Zustand store without any unit test coverage. Added 5 tests covering default value and all `setStartDelay` behaviors. All 7 Zustand stores now have at least basic test coverage.
+
+---
+
+### Non-issues confirmed
+
+| Item | Verdict |
+|---|---|
+| Supabase anon key hardcoded in `supabase.ts` | Correct for Supabase frontend usage. `sb_publishable_` prefix confirms this is the public key. Security is enforced by Row Level Security policies on the database side. |
+| AuthGate blocks entire app behind Google login | Intentional product design in PR #165. `getSession()` reads from localStorage (fast, offline-safe), so `loading` resolves quickly even without network. |
+| `syncOnLogin` "cloud wins" override on login | Known limitation. For a personal single-user tracker this is acceptable. Multi-device merge requires per-record vector clocks — well out of scope. |
+| `subscribeStores` pushes every state change | 1500ms debounce correctly coalesces rapid changes (e.g., during active set logging). Acceptable. |
+| TypeScript: `tsc --noEmit` | Exits clean after all changes. |
+
+---
+
+### Recommendations for future passes
+
+1. **storeSync.ts retry on push failure** — Currently errors are logged but not retried. A failed push during poor connectivity permanently desynchronizes local and cloud state until the next successful change. A simple 1-retry with delay would reduce drift frequency.
+
+2. **storeSync.ts integration test** — Testing storeSync requires mocking the Supabase client. `vi.mock('@supabase/supabase-js')` is straightforward; the sync module itself has no complex dependencies. A test for `syncOnLogin` (cloud wins, first-ever login push) and `pushStore` (error path) would complete coverage.
+
+3. **Run progression badge on TodayPage** — The same `progressionState` could be shown in today's resolved workout card after completing a run (with wording like "You progressed! Next run: 5.5 mi"). This surfaces the achievement at the moment of completion rather than only in History.
+
+4. **Component/integration test layer** — Unit coverage is excellent. A thin RTL smoke test over TodayPage's core flow (start workout → complete → outcome modal → log) remains the biggest gap in quality assurance.
+
+---
+
 ## 2026-06-28 (sixty-sixth pass) — branch `claude/dreamy-mccarthy-7v05ht`
 
 ---

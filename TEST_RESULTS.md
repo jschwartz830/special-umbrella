@@ -1,5 +1,64 @@
 # Test Results
 
+## 2026-06-29 (sixty-seventh pass) — branch `claude/dreamy-mccarthy-hhiaa3`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  25 passed (25)
+     Tests  961 passed (961)
+  Duration  ~3.0s
+```
+
+(961 reflects 18 new tests added this pass versus the 943 baseline from pass 66, plus additional tests from human-authored commits between passes.)
+
+### New tests added: `settingsStore` (5 tests)
+
+File: `src/store/__tests__/settingsStore.test.ts` (new file)
+
+| Suite | Tests | Covers |
+|---|---|---|
+| default state | 1 | startDelaySeconds defaults to 0 |
+| setStartDelay | 4 | update, reset to 0, large values, overwrite |
+
+### Final run (after all changes)
+
+```
+Test Files  26 passed (26)
+     Tests  966 passed (966)
+  Duration  ~3.1s
+```
+
+5 new tests pass. No regressions in existing suite. TypeScript: `tsc --noEmit` exits clean.
+
+---
+
+### Test suite coverage summary (updated)
+
+| Module | Tests | Coverage notes |
+|---|---|---|
+| `rotationEngine.ts` | ~80 | All branches including symmetric modulo, leap years, skips |
+| `historyStats.ts` | ~210 | All stat functions, deduplication, streak, weekly breakdown, best week |
+| `expressionEval.ts` | ~120 | All operators, NaN/Infinity guards, nested parens, assignment |
+| `run-adaptation/engine.ts` | ~30 | All 6 outcome paths, effort thresholds, distance thresholds |
+| `workout-outcomes/progression.ts` | ~40 | Single/double/volume/run/swim modes |
+| `sessionSummary.ts` | ~20 | Pace derivation, stored-zero fallback, PB detection |
+| `workoutInstanceId.ts` | ~10 | Round-trip parse, underscore-in-planId |
+| `mobilityStore.ts` | 18 | All 6 actions, default state, edge cases |
+| `settingsStore.ts` | 5 | Default value + setStartDelay action |
+| Other utilities | ~30 | outcomeSortKey, planDayUtils, addOverride |
+
+### Still untested (no unit tests)
+
+- React components (TodayPage, CalendarPage, HistoryPage, etc.) — UI components require RTL or Playwright
+- `storeSync.ts` / `authStore.ts` — require mocking the Supabase client (Supabase SDK is not a simple mock)
+- `CardioWorkoutTracker` timer logic — depends on `Date.now()` and `setInterval` which are blocked in Vitest node environment
+- `ActiveWorkoutTracker` audio scheduling and wake lock
+
+---
+
 ## 2026-06-28 (sixty-sixth pass) — branch `claude/dreamy-mccarthy-7v05ht`
 
 ---
