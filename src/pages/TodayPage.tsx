@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import {
@@ -115,9 +115,31 @@ function findPreviousWeightsOutcome(
 
 function SwipeToDelete({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {
   const [offset, setOffset] = useState(0)
-  const [swiping, setSwiping] = useState(false)
+  const swipingRef = useRef(false)
   const startXRef = useRef(0)
+  const startYRef = useRef(0)
+  const directionRef = useRef<'h' | 'v' | null>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
   const REVEAL = 68
+
+  useEffect(() => {
+    const el = innerRef.current
+    if (!el) return
+    const onMove = (e: TouchEvent) => {
+      const dx = e.touches[0].clientX - startXRef.current
+      const dy = e.touches[0].clientY - startYRef.current
+      if (directionRef.current === null) {
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 4) directionRef.current = 'h'
+        else if (Math.abs(dy) > 4) directionRef.current = 'v'
+      }
+      if (directionRef.current === 'h') {
+        e.preventDefault()
+        setOffset(Math.max(Math.min(dx, 0), -REVEAL))
+      }
+    }
+    el.addEventListener('touchmove', onMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onMove)
+  }, [])
 
   return (
     <div className="relative overflow-hidden rounded-xl">
@@ -130,14 +152,17 @@ function SwipeToDelete({ children, onDelete }: { children: React.ReactNode; onDe
         </button>
       </div>
       <div
-        style={{ transform: `translateX(${offset}px)`, transition: swiping ? 'none' : 'transform 0.2s ease' }}
-        onTouchStart={e => { startXRef.current = e.touches[0].clientX; setSwiping(true) }}
-        onTouchMove={e => {
-          const dx = e.touches[0].clientX - startXRef.current
-          setOffset(Math.max(Math.min(dx, 0), -REVEAL))
+        ref={innerRef}
+        style={{ transform: `translateX(${offset}px)`, transition: swipingRef.current ? 'none' : 'transform 0.2s ease' }}
+        onTouchStart={e => {
+          startXRef.current = e.touches[0].clientX
+          startYRef.current = e.touches[0].clientY
+          directionRef.current = null
+          swipingRef.current = true
         }}
         onTouchEnd={() => {
-          setSwiping(false)
+          swipingRef.current = false
+          directionRef.current = null
           setOffset(prev => (prev <= -(REVEAL / 2) ? -REVEAL : 0))
         }}
       >
