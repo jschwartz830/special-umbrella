@@ -511,19 +511,21 @@ export function TodayPage() {
     if (addFromPlanIdx !== null && plan!.days[addFromPlanIdx]) {
       const selectedPlanDay = plan!.days[addFromPlanIdx]
       const selectedSlot = selectedPlanDay.slots[0]
+      const willAdvance = upcoming[0]?.planDayIndex === addFromPlanIdx
       const extraId = addExtraEntry({
         planId: plan!.id,
         calendarDate: today,
         workoutType: selectedSlot?.type ?? 'rest',
         workoutName: selectedPlanDay.label,
         source: 'double_day',
+        advancedRotation: willAdvance,
       })
-      if (upcoming[0]?.planDayIndex === addFromPlanIdx) {
+      if (willAdvance) {
         actions.advance()
         setBonusOutcome({ rd: upcoming[0], extraId })
       } else {
         setBonusOutcome({
-          rd: { calendarDate: today, planDayIndex: addFromPlanIdx, planDay: selectedPlanDay, status: 'upcoming' },
+          rd: { calendarDate: today, planDayIndex: addFromPlanIdx, planDay: selectedPlanDay, status: 'future' },
           extraId,
         })
       }
@@ -588,6 +590,7 @@ export function TodayPage() {
         workoutType: bonusSlot?.type ?? 'rest',
         workoutName: rd.planDay.label,
         source: 'double_day',
+        advancedRotation: true,
       })
       actions.advance()
       setUpcomingLogError(null)
@@ -786,7 +789,7 @@ export function TodayPage() {
               onDelete={() => {
                 removeOutcome(makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id))
                 removeExtraEntry(extra.id)
-                if (extra.source === 'double_day') removeLastOverrideByType(plan.id, 'advance')
+                if (extra.advancedRotation ?? extra.source === 'double_day') removeLastOverrideByType(plan.id, 'advance')
               }}
             >
               <button
@@ -933,7 +936,7 @@ export function TodayPage() {
           </p>
           <SwipeToDelete onDelete={() => setAddFromPlanIdx(null)}>
             <WorkoutDayCard
-              resolved={{ calendarDate: today, planDayIndex: addFromPlanIdx, planDay: plan.days[addFromPlanIdx], status: 'upcoming' }}
+              resolved={{ calendarDate: today, planDayIndex: addFromPlanIdx, planDay: plan.days[addFromPlanIdx], status: 'future' }}
               planId={plan?.id}
             />
           </SwipeToDelete>
@@ -992,7 +995,7 @@ export function TodayPage() {
                 ) {
                   removeOutcome(makeExtraWorkoutInstanceId(plan.id, today, ex.id))
                   removeExtraEntry(ex.id)
-                  if (ex.source === 'double_day') removedDoubleDay = true
+                  if (ex.advancedRotation ?? ex.source === 'double_day') removedDoubleDay = true
                 }
               }
               if (removedDoubleDay) removeLastOverrideByType(plan.id, 'advance')

@@ -1,5 +1,99 @@
 # Review Notes — Overnight Audit
 
+## 2026-06-30 (sixty-eighth pass) — branch `claude/dreamy-mccarthy-4vdzsq`
+
+---
+
+### Executive summary
+
+1. **What changed**: 2 bug fixes (one production-breaking, one data-corruption) + this documentation update. No new features, no new tests.
+2. **What is highest confidence**: The `DayStatus` type fix — it's a one-word correction restoring a value that already exists and is used everywhere else in the codebase for the same purpose; it was actively breaking every production deploy.
+3. **What is risky**: The override-removal fix changes write-path logic in `TodayPage.tsx`'s delete handlers. The `??` fallback was designed to preserve legacy behavior for records predating the new field, but this logic is untested (no RTL/Playwright coverage exists for `TodayPage.tsx`) — worth a manual click-through of "log a double-day extra via the full plan picker for a non-upcoming day, then delete it" before fully trusting it.
+4. **What I should review first**: The override-removal fix (`3e06cc5`) — confirm the `willAdvance` computation in `handleOutcomeConfirm` correctly mirrors the rotation-advance condition used elsewhere in the file.
+
+---
+
+### Audit scope
+
+Focused on the one unaudited surface area since pass 67: the "full plan picker" double-day feature (commit `bcee1f6`), plus a full read of `TodayPage.tsx` (1678 lines) since it was the file most recently and heavily modified.
+
+Also did a routine check of GitHub Actions deploy history, which surfaced the build-breaking bug below — this was not part of the originally planned audit scope but took priority once found, since it represented an active production outage.
+
+Test suite on entry: **966 tests passing** across 26 test files.
+
+---
+
+### Bug fixed: invalid `DayStatus` literal broke every production deploy since commit `20bb8ac` (HIGH)
+
+**Location**: `src/pages/TodayPage.tsx`, two synthetic `ResolvedDay` literals (~lines 526, 936)
+
+**Issue**: Both used `status: 'upcoming'`, which is not a member of the `DayStatus` union. `tsc --noEmit` fails on this, and the production build is `tsc && vite build`, so this broke CI on every push to `main` since `20bb8ac`. Confirmed via GitHub Actions run history: 3 consecutive failed runs, meaning the live GitHub Pages site had not received any of those changes.
+
+**Fix**: Changed both to `status: 'future'`, the existing union member used everywhere else in the codebase for not-yet-started days.
+
+**Verdict**: **Definitely keep** — this is a pure correction with no behavioral ambiguity; it restores deploys.
+
+---
+
+### Bug fixed: deleting a non-advancing double-day extra could strip an unrelated rotation override (HIGH)
+
+**Location**: `src/pages/TodayPage.tsx` — `SwipeToDelete onDelete` handler and the Undo button's loop; `src/types/index.ts` — `ExtraWorkoutEntry`
+
+**Issue**: The "full plan picker" feature (`bcee1f6`) decoupled `source: 'double_day'` from "this extra advanced the rotation" — previously the two were always equivalent. Both delete paths still assumed the old equivalence and unconditionally removed the plan's single most-recent `advance` override whenever `extra.source === 'double_day'`, even for extras that picked an arbitrary (non-upcoming) plan day and never advanced anything. Because `removeLastOverrideByType` is scoped to the whole plan (not the specific extra), this could silently remove an unrelated, legitimate advance override — corrupting the rotation pointer with no error shown to the user.
+
+**Fix**: Added `advancedRotation?: boolean` to `ExtraWorkoutEntry`, set precisely at both creation sites. Delete paths now check `extra.advancedRotation ?? extra.source === 'double_day'`, where the `??` fallback keeps legacy (pre-field) records behaving exactly as before.
+
+**Verdict**: **Definitely keep** — correctness fix for silent data corruption; backward compatible via the optional-field fallback.
+
+**Open questions**:
+1. Should `removeLastOverrideByType` itself be made extra-scoped (e.g. by matching `appliedAt` against the extra's `createdAt` within a tolerance) rather than relying on callers to gate the call correctly? That would close this entire class of bug at the source rather than per-call-site, but is a larger, riskier change to a shared store method — left as a recommendation, not implemented this pass.
+
+---
+
+### Improvements completed
+
+- Restored production deploys (build-breaking type error).
+- Closed a silent rotation-pointer data-corruption path introduced by the most recent feature commit.
+
+### Small features added
+
+None this pass.
+
+### Medium-complexity feature explored
+
+None this pass. Per the routine's own rule ("skip feature work entirely if audit findings suggest the codebase needs stabilization first"), finding one production-breaking bug and one silent-data-corruption bug in the same, very recently merged feature area was treated as a clear signal to spend the pass on stabilization and documentation rather than open new feature surface area.
+
+### Definitely keep
+
+- `DayStatus` fix (`b8d21d0`)
+- Override-removal fix (`3e06cc5`)
+
+### Probably keep but tweak
+
+None this pass.
+
+### Do not keep
+
+None this pass.
+
+### Recommendations only (not implemented)
+
+- Consider making `removeLastOverrideByType` itself scoped to a specific action/extra rather than "most recent of this type for the plan" — see open question above. This is the second pass to find a bug rooted in that method's plan-wide scoping; a more targeted API (e.g. matching by `appliedAt` timestamp proximity, or storing an explicit override id on the `ExtraWorkoutEntry`) would prevent future call sites from making the same mistake.
+
+### Open questions for the user
+
+1. Should `removeLastOverrideByType` be redesigned to be extra-scoped instead of plan-scoped? (see Recommendations)
+
+### Known issues / incomplete work
+
+- `TodayPage.tsx` (and React components generally) remain untested by the unit suite — both bugs fixed this pass lived in this exact gap. No RTL/Playwright infra exists yet; introducing one would be a larger, cross-cutting decision better made deliberately by the maintainer than slipped into an overnight pass.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-06-29 (sixty-seventh pass) — branch `claude/dreamy-mccarthy-hhiaa3`
 
 ---
