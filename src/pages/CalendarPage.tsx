@@ -17,6 +17,7 @@ import { useActivePlan } from '../hooks/useActivePlan'
 import { useToday } from '../hooks/useToday'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
+import { useMobilityStore } from '../store/mobilityStore'
 import { buildMonthGrid } from '../engine/calendarProjection'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { ActiveWorkoutTracker } from '../components/workout/ActiveWorkoutTracker'
@@ -81,6 +82,7 @@ export function CalendarPage() {
   const updateExtraEntryDate = useHistoryStore(s => s.updateExtraEntryDate)
   const addExtraEntry = useHistoryStore(s => s.addExtraEntry)
   const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
+  const mobilityCompletions = useMobilityStore(s => s.completions)
   const outcomes = useOutcomeStore(s => s.outcomes)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
@@ -343,6 +345,7 @@ export function CalendarPage() {
                   const isPending = rd?.status === 'today_pending'
                   const hasFutureDayOff = rd?.status === 'future' && rd.historyEntry?.action === 'day_off'
                   const extras = rd ? getExtrasForDate(rd.calendarDate) : []
+                  const hasMobility = cell.isCurrentMonth && !!mobilityCompletions[cell.date]
 
                   const bgClass = cell.isToday
                     ? 'bg-sky-500 text-white'
@@ -364,7 +367,7 @@ export function CalendarPage() {
                     <button
                       key={cell.date}
                       onClick={() => rd && cell.isCurrentMonth && setSelected(rd)}
-                      className={`rounded-lg aspect-square flex flex-col items-center justify-center transition-colors ${cell.isCurrentMonth ? bgClass : 'text-slate-700'} ${rd && cell.isCurrentMonth ? 'active:scale-95' : 'cursor-default'}`}
+                      className={`rounded-lg aspect-square flex flex-col items-center justify-center transition-colors ${cell.isCurrentMonth ? bgClass : 'text-slate-700'} ${rd && cell.isCurrentMonth ? 'active:scale-95' : 'cursor-default'} ${hasMobility ? 'ring-1 ring-emerald-400' : ''}`}
                     >
                       <span className="text-xs font-semibold leading-none">
                         {new Date(cell.date + 'T00:00').getDate()}
@@ -397,6 +400,7 @@ export function CalendarPage() {
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-slate-800/50 inline-block" />Upcoming</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500/10 inline-block" />Day Off</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-slate-800 inline-block" />Skipped</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm ring-1 ring-emerald-400 inline-block" />Mobility</span>
           </div>
         </>
       )}
