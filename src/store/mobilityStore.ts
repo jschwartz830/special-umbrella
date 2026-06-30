@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { nanoid } from '../lib/utils'
+import { MOBILITY_LIBRARY, type MobilityPreset } from '../lib/mobilityLibrary'
 
 export interface MobilityExercise {
   id: string
@@ -30,8 +31,10 @@ interface MobilityState {
 
   setRoutine: (exercises: MobilityExercise[]) => void
   addExercise: (name: string, durationSec: number) => void
+  addExerciseFromLibrary: (libraryId: string) => void
   removeExercise: (id: string) => void
   reorderExercise: (fromIdx: number, toIdx: number) => void
+  loadPreset: (preset: MobilityPreset, mode: 'replace' | 'append') => void
   logCompletion: (date: string, completion: MobilityCompletion) => void
   removeCompletion: (date: string) => void
 }
@@ -52,6 +55,15 @@ export const useMobilityStore = create<MobilityState>()(
         }))
       },
 
+      addExerciseFromLibrary(libraryId) {
+        const libEx = MOBILITY_LIBRARY.find(e => e.id === libraryId)
+        if (!libEx) return
+        set(s => {
+          if (s.routine.some(e => e.id === libraryId)) return s
+          return { routine: [...s.routine, { id: libraryId, name: libEx.name, durationSec: libEx.durationSec }] }
+        })
+      },
+
       removeExercise(id) {
         set(s => ({ routine: s.routine.filter(e => e.id !== id) }))
       },
@@ -62,6 +74,19 @@ export const useMobilityStore = create<MobilityState>()(
           const [moved] = next.splice(fromIdx, 1)
           next.splice(toIdx, 0, moved)
           return { routine: next }
+        })
+      },
+
+      loadPreset(preset, mode) {
+        const incoming: MobilityExercise[] = preset.exercises.map(pe => {
+          const libEx = MOBILITY_LIBRARY.find(e => e.id === pe.exerciseId)
+          return { id: pe.exerciseId, name: libEx?.name ?? pe.exerciseId, durationSec: pe.durationSec }
+        })
+        set(s => {
+          if (mode === 'replace') return { routine: incoming }
+          const existing = new Set(s.routine.map(e => e.id))
+          const toAdd = incoming.filter(e => !existing.has(e.id))
+          return { routine: [...s.routine, ...toAdd] }
         })
       },
 
