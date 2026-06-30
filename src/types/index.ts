@@ -140,6 +140,16 @@ export interface ExtraWorkoutEntry {
    * sets them to 'history' (conservative — keeps the entry, never auto-removes).
    */
   source?: 'history' | 'double_day'
+  /**
+   * Whether adding this extra also advanced the rotation pointer (logged an
+   * 'advance' override). Only true when the extra was the day already next
+   * in the rotation; a double-day extra added from an arbitrary plan day
+   * (via "Add from plan") does not advance the rotation, so this is false.
+   * Undefined on records created before this field existed — those were all
+   * created via the old all-or-nothing double-day flow, so they're treated
+   * as if true (see call sites).
+   */
+  advancedRotation?: boolean
 }
 
 // ── Overrides ────────────────────────────────────────────────────────────────
