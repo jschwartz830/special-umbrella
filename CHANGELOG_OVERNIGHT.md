@@ -1,3 +1,45 @@
+# Overnight Changelog — 2026-06-30
+
+## [1] fix: invalid `DayStatus` literal was breaking every production deploy
+
+**Summary**: `TodayPage.tsx` built two synthetic `ResolvedDay` objects using `status: 'upcoming'`, a string that is not a member of the `DayStatus` union (`src/types/index.ts`). `tsc --noEmit` fails on this, and since the production build script is `tsc && vite build`, every push to `main` since commit `20bb8ac` failed CI and silently never deployed to GitHub Pages — confirmed via GitHub Actions run history (3 consecutive failed runs, all on `main`).
+
+**Files changed**:
+- `src/pages/TodayPage.tsx` — changed `status: 'upcoming'` to `status: 'future'` at both occurrences (~lines 526, 936). `'future'` is the existing union member used everywhere else for not-yet-started days.
+
+**Risks / tradeoffs**: None — this restores a valid type, doesn't change any runtime behavior (the `'future'` status was almost certainly the intended value all along, just mistyped).
+
+**Rollback**: Revert commit `b8d21d0`. Note: reverting restores the build-breaking state.
+
+---
+
+## [2] fix: deleting a non-advancing double-day extra could strip an unrelated rotation override
+
+**Summary**: The "full plan picker" feature (commit `bcee1f6`) let users pick any plan day — not just the next one in rotation — as a bonus ("double-day") workout. That broke an invariant the delete paths relied on: previously every `source: 'double_day'` extra was created by logging the next-in-rotation day, so it always corresponded 1:1 with an `advance` override. Now a `double_day` extra can exist that never advanced the rotation. Both delete paths (swipe-to-delete and the Undo button) unconditionally removed the plan's most recent `advance` override whenever `extra.source === 'double_day'`, regardless of whether that specific extra caused one. Since `removeLastOverrideByType` removes the single most-recent override of that type for the whole plan (not scoped to the deleted extra), this could silently strip away an unrelated, legitimate advance override belonging to a different action — corrupting the user's rotation pointer with no error or warning.
+
+**Files changed**:
+- `src/types/index.ts` — added `advancedRotation?: boolean` to `ExtraWorkoutEntry`, documenting that pre-existing records (created before this field existed) are treated as `true` at call sites via a `??` fallback.
+- `src/pages/TodayPage.tsx` — `handleOutcomeConfirm` now computes `willAdvance` and passes `advancedRotation: willAdvance` when creating the extra; `handleUpcomingLog` always sets `advancedRotation: true` (that path always advances). Both delete handlers (`SwipeToDelete onDelete` for "Completed today" extras, and the Undo button's loop) now check `extra.advancedRotation ?? extra.source === 'double_day'` instead of `extra.source === 'double_day'` alone.
+
+**Risks / tradeoffs**: Backward compatible — the `??` fallback means extras created before this field existed behave exactly as before (since they were always 1:1 with an advance). Only newly-created `double_day` extras from the plan-picker flow get the corrected, narrower behavior.
+
+**Rollback**: Revert commit `3e06cc5`. No data migration needed — the new field is optional and additive.
+
+---
+
+## [3] docs: pass 68 audit notes, changelog, and test results
+
+**Summary**: Documentation-only update recording this pass's findings per the standard overnight-routine format.
+
+**Files changed**:
+- `IMPLEMENTATION_PLAN.md`, `CHANGELOG_OVERNIGHT.md`, `REVIEW_NOTES.md`, `TEST_RESULTS.md`
+
+**Risks / tradeoffs**: None.
+
+**Rollback**: Revert the docs commit; no functional impact.
+
+---
+
 # Overnight Changelog — 2026-06-29
 
 ## [1] fix: AuthGate subscription leak + storeSync error logging

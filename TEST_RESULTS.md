@@ -1,5 +1,57 @@
 # Test Results
 
+## 2026-06-30 (sixty-eighth pass) — branch `claude/dreamy-mccarthy-4vdzsq`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  26 passed (26)
+     Tests  966 passed (966)
+  Duration  ~3.1s
+```
+
+### New tests added: none
+
+Both fixes this pass (the `DayStatus` type correction and the override-removal data-corruption fix) live entirely inside `TodayPage.tsx`'s event handlers — React component logic with no pure-function equivalent to unit test, consistent with the long-standing gap noted in every prior pass (no RTL/Playwright infra exists). This is a real gap: both bugs fixed this pass were in exactly this untested surface area. Introducing component-test infrastructure is a deliberate, cross-cutting decision flagged as a recommendation in `REVIEW_NOTES.md` rather than added ad hoc this pass.
+
+### Final run (after all changes)
+
+```
+Test Files  26 passed (26)
+     Tests  966 passed (966)
+  Duration  ~3.1s
+```
+
+No regressions. TypeScript: `tsc --noEmit` exits clean (this was the failure being fixed — confirmed it now passes). `npm run build` succeeds end-to-end.
+
+---
+
+### Test suite coverage summary (unchanged)
+
+| Module | Tests | Coverage notes |
+|---|---|---|
+| `rotationEngine.ts` | ~80 | All branches including symmetric modulo, leap years, skips |
+| `historyStats.ts` | ~210 | All stat functions, deduplication, streak, weekly breakdown, best week |
+| `expressionEval.ts` | ~120 | All operators, NaN/Infinity guards, nested parens, assignment |
+| `run-adaptation/engine.ts` | ~30 | All 6 outcome paths, effort thresholds, distance thresholds |
+| `workout-outcomes/progression.ts` | ~40 | Single/double/volume/run/swim modes |
+| `sessionSummary.ts` | ~20 | Pace derivation, stored-zero fallback, PB detection |
+| `workoutInstanceId.ts` | ~10 | Round-trip parse, underscore-in-planId |
+| `mobilityStore.ts` | 18 | All 6 actions, default state, edge cases |
+| `settingsStore.ts` | 5 | Default value + setStartDelay action |
+| Other utilities | ~30 | outcomeSortKey, planDayUtils, addOverride |
+
+### Still untested (no unit tests)
+
+- React components (TodayPage, CalendarPage, HistoryPage, etc.) — UI components require RTL or Playwright. Both bugs fixed this pass lived here.
+- `storeSync.ts` / `authStore.ts` — require mocking the Supabase client (Supabase SDK is not a simple mock)
+- `CardioWorkoutTracker` timer logic — depends on `Date.now()` and `setInterval` which are blocked in Vitest node environment
+- `ActiveWorkoutTracker` audio scheduling and wake lock
+
+---
+
 ## 2026-06-29 (sixty-seventh pass) — branch `claude/dreamy-mccarthy-hhiaa3`
 
 ---

@@ -1,5 +1,52 @@
 # Implementation Plan
 
+## Pass 68 — 2026-06-30 (branch `claude/dreamy-mccarthy-4vdzsq`)
+
+### Observations on entry
+
+- Branch reset from latest `main` (no unique unmerged work, no open PR for the prior branch name).
+- 966 tests passing across 26 test files before any changes.
+- One human/agent-authored feature landed since pass 67 that had not yet been audited: the "full plan picker" double-day flow (commit `bcee1f6`), which lets a user pick *any* plan day (not just the next one in rotation) when logging a bonus workout on a date that already has a workout logged.
+
+### Audit findings
+
+#### Bug: invalid `DayStatus` literal broke every production deploy since commit `20bb8ac` (HIGH, production-breaking)
+
+**Location**: `src/pages/TodayPage.tsx` — two synthetic `ResolvedDay` object literals (~lines 526, 936)
+
+**Mechanism**: Both literals set `status: 'upcoming'`. `'upcoming'` is not a member of the `DayStatus` union in `src/types/index.ts` (the correct value for a not-yet-started day, used everywhere else, is `'future'`). `tsc --noEmit` fails on this, and since `npm run build` is `tsc && vite build`, every push to `main` since `20bb8ac` failed CI and never deployed — confirmed via GitHub Actions run history (3 consecutive failed runs).
+
+**Fix**: Changed both occurrences to `status: 'future'`.
+
+#### Bug: deleting a non-advancing double-day extra could strip an unrelated rotation override (HIGH, silent data corruption)
+
+**Location**: `src/pages/TodayPage.tsx` — `SwipeToDelete onDelete` handler for "Completed today" extras, and the Undo button handler
+
+**Mechanism**: Both delete paths called `removeLastOverrideByType(plan.id, 'advance')` whenever `extra.source === 'double_day'`. Before the "full plan picker" feature (`bcee1f6`), every `double_day` extra was created by logging the next-in-rotation day, so it was always 1:1 with an `advance` override. The picker feature broke that invariant: a user can now pick an arbitrary plan day as the bonus workout, which does **not** advance the rotation pointer, yet the extra is still tagged `source: 'double_day'`. Deleting such an extra removed the plan's most recent `advance` override regardless of whether *this* extra actually caused one — silently corrupting the rotation pointer if any other action had advanced it since.
+
+**Fix**: Added `advancedRotation?: boolean` to `ExtraWorkoutEntry`. Set precisely at both creation sites (`handleOutcomeConfirm` computes `willAdvance`; `handleUpcomingLog` always advances, so it's hardcoded `true`). Both deletion sites now check `extra.advancedRotation ?? extra.source === 'double_day'` — the `??` fallback preserves correct behavior for extras created before this field existed (those were always created via the old all-or-nothing flow, so treating them as if `true` is correct).
+
+#### Non-issues confirmed this pass
+
+| Item | Verdict |
+|---|---|
+| `CalendarPage.tsx`'s own extra-deletion logic | Does not call `removeLastOverrideByType` — unaffected by the bug above. |
+| `HistoryPage.tsx`'s other `source === 'double_day'` check (~line 645) | Purely a UI display label ("Bonus" vs "Extra" badge) — not a data mutation, no change needed. |
+| Mobility ring + legend addition to `CalendarPage.tsx` (commit `886c0e0`) | Clean, additive, no issues found. |
+| `WorkoutDayCard.tsx` rendering of synthetic `ResolvedDay` objects with `status: 'future'`, no `historyEntry` | Renders correctly — `historyEntry` is already optional on the type. |
+
+---
+
+### Work plan
+
+1. **[FIX] Invalid `DayStatus` literal (`'upcoming'` → `'future'`)** — `src/pages/TodayPage.tsx` — 2-line change, production-breaking, shipped immediately
+2. **[FIX] Override-removal data corruption on double-day delete** — `src/pages/TodayPage.tsx`, `src/types/index.ts` — new optional field + 4 call-site changes
+3. **[DOCS] Pass 68 audit notes, changelog, test results, review notes**
+
+No new tests added this pass (see `TEST_RESULTS.md` for rationale) and no feature work attempted — both fixes landed in unaudited UI logic with no testable pure-function equivalent, and finding two production-impacting bugs in one pass was treated as a clear signal to prioritize stabilization and documentation over new feature work this time.
+
+---
+
 ## Pass 67 — 2026-06-29 (branch `claude/dreamy-mccarthy-hhiaa3`)
 
 ### Observations on entry
