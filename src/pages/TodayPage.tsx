@@ -523,7 +523,7 @@ export function TodayPage() {
         setBonusOutcome({ rd: upcoming[0], extraId })
       } else {
         setBonusOutcome({
-          rd: { calendarDate: today, planDayIndex: addFromPlanIdx, planDay: selectedPlanDay, status: 'upcoming' },
+          rd: { calendarDate: today, planDayIndex: addFromPlanIdx, planDay: selectedPlanDay, status: 'future' },
           extraId,
         })
       }
@@ -933,7 +933,7 @@ export function TodayPage() {
           </p>
           <SwipeToDelete onDelete={() => setAddFromPlanIdx(null)}>
             <WorkoutDayCard
-              resolved={{ calendarDate: today, planDayIndex: addFromPlanIdx, planDay: plan.days[addFromPlanIdx], status: 'upcoming' }}
+              resolved={{ calendarDate: today, planDayIndex: addFromPlanIdx, planDay: plan.days[addFromPlanIdx], status: 'future' }}
               planId={plan?.id}
             />
           </SwipeToDelete>
