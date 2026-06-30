@@ -829,6 +829,22 @@ export function TodayPage() {
                     )}
                   </p>
                 </div>
+                {activeWorkoutState === 'hidden' && (
+                  <button
+                    onClick={() => {
+                      const firstSlot = primaryPlanDay.slots[0]
+                      if (firstSlot && isRunType(firstSlot.type)) {
+                        setCardioState('open')
+                      } else {
+                        setActiveWorkoutState('open')
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold text-xs transition-colors active:scale-[0.98] flex-shrink-0"
+                  >
+                    <Play size={13} />
+                    Start
+                  </button>
+                )}
               </div>
             </div>
 
@@ -899,52 +915,32 @@ export function TodayPage() {
         </div>
       )}
 
-      {/* Start Workout — primary action */}
-      {isPending && activeWorkoutState === 'hidden' && (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              const firstSlot = primaryPlanDay.slots[0]
-              if (firstSlot && isRunType(firstSlot.type)) {
-                setCardioState('open')
-              } else {
-                setActiveWorkoutState('open')
-              }
-            }}
-            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors active:scale-[0.98]"
-          >
-            <Play size={18} />
-            Start Workout
-          </button>
-          <button
-            onClick={handleCopyWorkout}
-            aria-label="Copy workout to clipboard"
-            title="Copy workout"
-            className={`flex items-center justify-center px-3.5 py-3.5 rounded-xl border text-sm transition-colors ${
-              workoutCopied
-                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 active:scale-[0.96]'
-            }`}
-          >
-            <Copy size={18} />
-          </button>
-        </div>
-      )}
-
       {/* Secondary workout-management actions */}
       {isPending && activeWorkoutState === 'hidden' && (
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAddWorkout(true)}
-            className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
+            className="flex-1 flex items-center justify-center px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
           >
             Add Workout
           </button>
           <button
             onClick={() => setShowJump(true)}
-            className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97] whitespace-nowrap"
+            className="flex-1 flex items-center justify-center px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
           >
             Change workout
+          </button>
+          <button
+            onClick={handleCopyWorkout}
+            aria-label="Copy workout to clipboard"
+            title="Copy workout"
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors active:scale-[0.97] ${
+              workoutCopied
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
+            }`}
+          >
+            <Copy size={13} />{workoutCopied ? 'Copied' : 'Copy'}
           </button>
         </div>
       )}
