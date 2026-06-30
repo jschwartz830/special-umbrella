@@ -19,6 +19,7 @@ import {
   Play,
   ChevronDown,
   Copy,
+  Check,
   Trophy,
   Plus,
   Zap,
@@ -145,7 +146,7 @@ function SwipeToDelete({ children, onDelete }: { children: React.ReactNode; onDe
     <div className="relative overflow-hidden rounded-xl">
       <div
         className="absolute inset-y-0 right-0 flex items-center justify-center bg-red-500 rounded-r-xl"
-        style={{ width: REVEAL }}
+        style={{ width: REVEAL, opacity: offset < 0 ? 1 : 0, pointerEvents: offset < 0 ? 'auto' : 'none' }}
       >
         <button onClick={onDelete} aria-label="Delete" className="w-full h-full flex items-center justify-center">
           <X size={16} className="text-white" />
@@ -956,19 +957,19 @@ export function TodayPage() {
             onClick={() => setShowJump(true)}
             className="flex-1 flex items-center justify-center px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
           >
-            Change workout
+            Change Workout
           </button>
           <button
             onClick={handleCopyWorkout}
             aria-label="Copy workout to clipboard"
             title="Copy workout"
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors active:scale-[0.97] ${
+            className={`flex items-center justify-center px-3 py-1.5 rounded-lg border transition-colors active:scale-[0.97] ${
               workoutCopied
                 ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                 : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
           >
-            <Copy size={13} />{workoutCopied ? 'Copied' : 'Copy'}
+            {workoutCopied ? <Check size={13} /> : <Copy size={13} />}
           </button>
         </div>
       )}
@@ -1649,7 +1650,7 @@ export function TodayPage() {
 
       {/* Jump modal */}
       {showJump && (
-        <Modal title="Change workout" onClose={() => setShowJump(false)}>
+        <Modal title="Change Workout" onClose={() => setShowJump(false)}>
           <div className="space-y-2">
             {plan.days.map((day, idx) => (
               <button
