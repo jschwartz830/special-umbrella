@@ -15,6 +15,15 @@ export interface MobilityCompletion {
   completedExerciseIds: string[]
 }
 
+export interface MobilitySessionCheckpoint {
+  date: string
+  exerciseIds: string[]   // routine snapshot at session start
+  currentIdx: number
+  completedIds: string[]
+  totalElapsedSec: number
+  exElapsedSec: number    // accumulated time on current exercise before pause
+}
+
 const DEFAULT_ROUTINE: MobilityExercise[] = [
   { id: 'hip-90-90', name: 'Hip 90/90', durationSec: 60 },
   { id: 'worlds-greatest', name: "World's Greatest Stretch", durationSec: 60 },
@@ -28,6 +37,7 @@ const DEFAULT_ROUTINE: MobilityExercise[] = [
 interface MobilityState {
   routine: MobilityExercise[]
   completions: Record<string, MobilityCompletion>
+  activeSession: MobilitySessionCheckpoint | null
 
   setRoutine: (exercises: MobilityExercise[]) => void
   addExercise: (name: string, durationSec: number) => void
@@ -37,6 +47,9 @@ interface MobilityState {
   loadPreset: (preset: MobilityPreset, mode: 'replace' | 'append') => void
   logCompletion: (date: string, completion: MobilityCompletion) => void
   removeCompletion: (date: string) => void
+  startSession: (date: string, exerciseIds: string[]) => void
+  saveCheckpoint: (cp: MobilitySessionCheckpoint) => void
+  clearSession: () => void
 }
 
 export const useMobilityStore = create<MobilityState>()(
@@ -44,6 +57,7 @@ export const useMobilityStore = create<MobilityState>()(
     (set) => ({
       routine: DEFAULT_ROUTINE,
       completions: {},
+      activeSession: null,
 
       setRoutine(exercises) {
         set({ routine: exercises })
@@ -101,7 +115,37 @@ export const useMobilityStore = create<MobilityState>()(
           return { completions: next }
         })
       },
+
+      startSession(date, exerciseIds) {
+        set({
+          activeSession: {
+            date,
+            exerciseIds,
+            currentIdx: 0,
+            completedIds: [],
+            totalElapsedSec: 0,
+            exElapsedSec: 0,
+          },
+        })
+      },
+
+      saveCheckpoint(cp) {
+        set({ activeSession: cp })
+      },
+
+      clearSession() {
+        set({ activeSession: null })
+      },
     }),
-    { name: 'wpt_mobility', version: 1 },
+    {
+      name: 'wpt_mobility',
+      version: 2,
+      migrate(state: unknown, fromVersion: number) {
+        if (fromVersion === 1) {
+          return { ...(state as object), activeSession: null }
+        }
+        return state
+      },
+    },
   ),
 )
