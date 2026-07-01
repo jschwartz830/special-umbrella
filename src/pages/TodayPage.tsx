@@ -275,7 +275,7 @@ export function TodayPage() {
   const mobilityCompletion = mobilityCompletions[today] ?? null
   const mobilityRoutine = useMobilityStore(s => s.routine)
   const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
-  const [showMobilityTracker, setShowMobilityTracker] = useState(false)
+  const [mobilityState, setMobilityState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
 
   if (!plan || !todayResolved) {
     return (
@@ -1048,7 +1048,7 @@ export function TodayPage() {
           </div>
         ) : (
           <button
-            onClick={() => setShowMobilityTracker(true)}
+            onClick={() => setMobilityState('open')}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 hover:bg-slate-800 transition-colors active:scale-[0.99]"
           >
             <Zap size={14} className="text-teal-400 flex-shrink-0" />
@@ -1359,13 +1359,16 @@ export function TodayPage() {
         </Modal>
       )}
 
-      {/* Mobility tracker */}
-      {showMobilityTracker && (
+      {/* Mobility tracker — kept mounted while open or minimized so timers keep running */}
+      {mobilityState !== 'hidden' && (
         <MobilityTracker
           today={today}
-          onClose={() => setShowMobilityTracker(false)}
+          minimized={mobilityState === 'minimized'}
+          onMinimize={() => setMobilityState('minimized')}
+          onResume={() => setMobilityState('open')}
+          onClose={() => setMobilityState('hidden')}
           onManageRoutine={() => {
-            setShowMobilityTracker(false)
+            setMobilityState('hidden')
             navigate('/mobility')
           }}
         />
