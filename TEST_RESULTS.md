@@ -1,5 +1,66 @@
 # Test Results
 
+## 2026-07-01 (sixty-ninth pass) — branch `claude/dreamy-mccarthy-4cykvp`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  26 passed (26)
+     Tests  966 passed (966)
+  Duration  ~3.3s
+```
+
+### New tests added: 21
+
+All 21 new tests are in `src/store/__tests__/mobilityStore.test.ts`.
+
+| Describe block | Tests | New? |
+|---|---|---|
+| `addExerciseFromLibrary` | 5 | ✓ new |
+| `loadPreset` | 5 | ✓ new |
+| `startSession` | 5 | ✓ new |
+| `saveCheckpoint` | 3 | ✓ new |
+| `clearSession` | 3 | ✓ new |
+| `resetStore()` isolation fix | — | ✓ updated |
+
+### Final run (after all changes)
+
+```
+Test Files  26 passed (26)
+     Tests  987 passed (987)
+  Duration  ~3.3s
+```
+
+No regressions. TypeScript: `tsc --noEmit` exits clean.
+
+---
+
+### Test suite coverage summary (updated)
+
+| Module | Tests | Coverage notes |
+|---|---|---|
+| `rotationEngine.ts` | ~80 | All branches including symmetric modulo, leap years, skips |
+| `historyStats.ts` | ~210 | All stat functions, deduplication, streak, weekly breakdown, best week |
+| `expressionEval.ts` | ~120 | All operators, NaN/Infinity guards, nested parens, assignment |
+| `run-adaptation/engine.ts` | ~30 | All 6 outcome paths, effort thresholds, distance thresholds |
+| `workout-outcomes/progression.ts` | ~40 | Single/double/volume/run/swim modes |
+| `sessionSummary.ts` | ~20 | Pace derivation, stored-zero fallback, PB detection |
+| `workoutInstanceId.ts` | ~10 | Round-trip parse, underscore-in-planId |
+| `mobilityStore.ts` | **39** | All 11 actions (6 original + 5 new), default state, session lifecycle — **was 18** |
+| `settingsStore.ts` | 5 | Default value + setStartDelay action |
+| Other utilities | ~30 | outcomeSortKey, planDayUtils, addOverride |
+
+### Still untested (no unit tests)
+
+- React components (TodayPage, CalendarPage, HistoryPage, MobilityPage, MobilityTracker, etc.) — UI components require RTL or Playwright. Both pass 68 bugs lived here.
+- `storeSync.ts` / `authStore.ts` — require mocking the Supabase client
+- `CardioWorkoutTracker` timer logic — depends on `Date.now()` and `setInterval` which are blocked in Vitest node environment
+- mobilityStore v1→v2 migration — bypassed by the `persist` mock (acceptable; migration is a trivial one-field insertion)
+
+---
+
 ## 2026-06-30 (sixty-eighth pass) — branch `claude/dreamy-mccarthy-4vdzsq`
 
 ---

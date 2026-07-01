@@ -1,3 +1,22 @@
+# Overnight Changelog — 2026-07-01
+
+## [1] test: extend mobilityStore tests for new v2 actions (21 new tests)
+
+**Summary**: The MobilityTracker rewrite (PRs #172 and #173) added 5 new store actions to `mobilityStore` — `addExerciseFromLibrary`, `loadPreset`, `startSession`, `saveCheckpoint`, `clearSession` — with no unit test coverage. Additionally, the existing `resetStore()` helper did not include `activeSession: null`, creating a risk of state leakage between describe blocks now that `activeSession` is part of the store.
+
+**Why it matters**: Every other Zustand store (and their action sets) has unit test coverage. The mobility store is the data layer for the daily mobility routine feature — its session state and preset logic should be verified to behave correctly under all expected inputs. The `resetStore()` gap was a latent test-isolation risk.
+
+**Files changed**:
+- `src/store/__tests__/mobilityStore.test.ts` — `resetStore()` now includes `activeSession: null`; added 5 new describe blocks covering all 5 new actions (21 tests). The `MobilitySessionCheckpoint` type is now also imported and used in tests.
+
+**Risks / tradeoffs**: Tests are read-only. The `persist` middleware is mocked as a passthrough (same pattern as all other store test files). The v1→v2 migration (`activeSession: null` insertion) is not directly tested because the migration runs inside the `persist` middleware (bypassed by the mock) — this is noted as an acceptable gap given the migration's triviality (one-field insertion).
+
+**Test count**: 966 → 987 (+21). No regressions.
+
+**Rollback**: Revert the test commit. No production impact.
+
+---
+
 # Overnight Changelog — 2026-06-30
 
 ## [1] fix: invalid `DayStatus` literal was breaking every production deploy

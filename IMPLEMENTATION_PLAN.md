@@ -1,5 +1,59 @@
 # Implementation Plan
 
+## Pass 69 — 2026-07-01 (branch `claude/dreamy-mccarthy-4cykvp`)
+
+### Observations on entry
+
+- Branch reset from latest `main` (55ba7cd). No unique unmerged work; no open PR for the prior branch name.
+- **987 tests passing** across 26 test files before any changes (966 baseline + 21 added this pass).
+- Three significant human-authored features landed since pass 68:
+  1. **MobilityTracker rewrite** (PR #173): Sequential exercise timers with wall-clock accuracy, 5-second transition countdown, session checkpointing/resume-on-close, `visibilitychange`-resilient architecture, Previous/Redo/Skip-transition navigation.
+  2. **Personalized mobility library + presets** (PR #172): `mobilityLibrary.ts` (37 exercises across 5 categories), `MobilityPage` rewritten with My Routine / Library / Presets tabs, `loadPreset` (replace/append modes), `addExerciseFromLibrary`, in-store session checkpointing (`startSession`, `saveCheckpoint`, `clearSession`).
+  3. **TodayPage polish** (commit `6ce0f71`): SwipeToDelete reveal visibility fix, copy button icon toggle (Copy→Check), "Change Workout" capitalisation.
+
+### Audit findings
+
+#### Non-issue confirmed: MobilityTracker timer accuracy
+
+The new `MobilityTracker` uses wall-clock bases (`totalR`, `exR` refs of the form `{ acc, at }`) and a 100ms interval computing `acc + (now - at) / 1000`. This is the same pattern applied to `CardioWorkoutTracker` in pass 66. Even if the browser throttles the interval (screen lock, background tab), the next interval tick that DOES fire computes the correct elapsed time from `Date.now()`. The display freezes briefly when backgrounded, then snaps to the correct value on resume — this is a 0–100ms display lag at most, not a duration accuracy issue. A `visibilitychange` handler (as in CardioWorkoutTracker) would make the snap instantaneous but is purely cosmetic for a 100ms interval.
+
+#### Non-issue confirmed: `handlePrevious` removes current exercise from completedIds during transition
+
+`handlePrevious()` filters out both `prevId` and `curId` from `completedIds`. During transition (just completed exercise N, about to start N+1), this un-completes exercise N AND un-completes exercise N−1. At first glance this seems surprising — the user DID complete exercise N. However: there is already a separate "← Redo" button specifically for undoing the current exercise (re-doing N without going back to N−1). "Previous" is therefore correctly interpreted as "I want to go back to exercise N−1" — and since you're going back past exercise N to re-do it from the beginning, removing both from `completedIds` is the right semantic. This is intentional behavior.
+
+#### Non-issue confirmed: checkpoint does not persist `phase`
+
+When the user closes and reopens MobilityTracker, `phase` always resets to `'idle'`. The `exElapsedSec` in the checkpoint captures how far into the current exercise the timer was, so the exercise countdown resumes from the saved position. But the user must press Start to re-activate the exercise timer. This is intentional — auto-resuming would surprise a user who opens the tracker just to check which exercise is next.
+
+#### Gap found: 5 new mobilityStore actions had zero unit tests (FIXED)
+
+`addExerciseFromLibrary`, `loadPreset`, `startSession`, `saveCheckpoint`, `clearSession` were all added in the pass 72 PRs with no test coverage.
+
+Additionally, `resetStore()` in the existing test file did not include `activeSession: null`, meaning any test that set `activeSession` could contaminate subsequent describe blocks that didn't use `beforeEach(resetStore)`.
+
+**Fix**: Updated `resetStore()` to include `activeSession: null`; added 21 new tests covering all 5 new actions. See Test Results.
+
+#### Non-issues confirmed this pass
+
+| Item | Verdict |
+|---|---|
+| `loadPreset` uses preset's `durationSec`, not library's | Intentional — presets express specific timing requirements that can differ from library defaults |
+| `addExerciseFromLibrary` dedup check (`s.routine.some(e => e.id === libraryId)`) | Correct — prevents duplicate entries when called twice |
+| mobilityStore v1→v2 migration adds `activeSession: null` | Trivial, correct. Cannot be tested through the store mock (persist is a pass-through in tests), which is acceptable given the migration's simplicity |
+| `MobilityPage` `PresetsTab` confirm-replace UX | Clean — requires two clicks (Load Routine → Replace/Append) to prevent accidental overwrites |
+| SwipeToDelete opacity/pointer-events fix in `TodayPage` | Clean fix: hides the delete affordance when `offset >= 0` (not swiping) |
+
+---
+
+### Work plan
+
+1. **[TEST] Extend mobilityStore tests for 5 new v2 actions** — `src/store/__tests__/mobilityStore.test.ts` — Fix `resetStore()` + 21 new tests.
+2. **[DOCS] Pass 69 audit notes, changelog, test results, review notes.**
+
+No feature work this pass. Per the overnight routine's own rule ("skip feature work entirely if audit findings suggest the codebase needs stabilization first"), the presence of two large feature PRs with zero unit test coverage on their new store actions — and the confirmed gap in `resetStore()` — was treated as a clear signal to spend this pass on stabilization.
+
+---
+
 ## Pass 68 — 2026-06-30 (branch `claude/dreamy-mccarthy-4vdzsq`)
 
 ### Observations on entry
