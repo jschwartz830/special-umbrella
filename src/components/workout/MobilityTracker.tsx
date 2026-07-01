@@ -1,24 +1,27 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Settings2, ChevronLeft } from 'lucide-react'
+import { X, Settings2, ChevronLeft, ChevronUp, Trash2, Check } from 'lucide-react'
 import { useMobilityStore } from '../../store/mobilityStore'
 import type { MobilitySessionCheckpoint } from '../../store/mobilityStore'
-
-const TRANSITION_SEC = 5
 
 function fmtTime(sec: number): string {
   const s = Math.max(0, Math.floor(sec))
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
 }
 
-type Phase = 'idle' | 'exercising' | 'transition' | 'finished'
+type Phase = 'idle' | 'exercising' | 'finished'
+
+const SWIPE_MIN_DX = 50
 
 interface Props {
   today: string
+  minimized: boolean
+  onMinimize: () => void
+  onResume: () => void
   onClose: () => void
   onManageRoutine: () => void
 }
 
-export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
+export function MobilityTracker({ today, minimized, onMinimize, onResume, onClose, onManageRoutine }: Props) {
   const routine = useMobilityStore(s => s.routine)
   const logCompletion = useMobilityStore(s => s.logCompletion)
   const activeSession = useMobilityStore(s => s.activeSession)
@@ -37,22 +40,24 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
   const [currentIdx, setCurrentIdx] = useState(cp?.currentIdx ?? 0)
   const [completedIds, setCompletedIds] = useState<string[]>(cp?.completedIds ?? [])
   const [phase, setPhase] = useState<Phase>('idle')
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [showJumpMenu, setShowJumpMenu] = useState(false)
 
   // Live display state (driven by 100ms tick)
   const [totalSec, setTotalSec] = useState(cp?.totalElapsedSec ?? 0)
   const [exSec, setExSec] = useState(cp?.exElapsedSec ?? 0)
-  const [transSec, setTransSec] = useState(TRANSITION_SEC)
 
   // Wall-clock refs — never go stale in closures
   const totalR = useRef({ acc: cp?.totalElapsedSec ?? 0, at: Date.now() as number | null })
   const exR = useRef({ acc: cp?.exElapsedSec ?? 0, at: null as number | null })
-  const transEndR = useRef<number | null>(null)
 
   // Stale-closure-safe mirrors of state for interval + cleanup
   const phaseR = useRef<Phase>('idle')
   const idxR = useRef(cp?.currentIdx ?? 0)
   const doneR = useRef<string[]>(cp?.completedIds ?? [])
   const autoFiredR = useRef(false) // prevent double-fire when exercise timer hits 0
+  const finalizedR = useRef(false) // set once session is logged or discarded — skip resave on unmount
+  const swipeStartR = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => { phaseR.current = phase }, [phase])
   useEffect(() => { idxR.current = currentIdx }, [currentIdx])
@@ -64,8 +69,8 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
     totalR.current.at = Date.now() // total timer always starts running on open
 
     return () => {
-      // Unmount without logging → save checkpoint so user can resume
-      if (phaseR.current === 'finished') return
+      // Unmount without finalizing → save checkpoint so user can resume
+      if (phaseR.current === 'finished' || finalizedR.current) return
       const now = Date.now()
       const te = totalR.current.at != null
         ? totalR.current.acc + (now - totalR.current.at) / 1000
@@ -101,16 +106,6 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
         : exR.current.acc
       setExSec(e)
 
-      // Transition countdown
-      if (transEndR.current != null) {
-        const rem = (transEndR.current - now) / 1000
-        setTransSec(Math.max(0, rem))
-        if (rem <= 0 && phaseR.current === 'transition') {
-          transEndR.current = null
-          _advance()
-        }
-      }
-
       // Auto-complete when exercise countdown hits zero
       if (phaseR.current === 'exercising' && !autoFiredR.current) {
         const cur = routine[idxR.current]
@@ -134,6 +129,20 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
     }
   }
 
+  // Jump to any exercise by index — used by Previous, swipe, and the jump menu.
+  // Navigation never touches completedIds; only Mark Done does.
+  function goToIndex(newIdx: number) {
+    if (newIdx < 0 || newIdx >= routine.length) return
+    _snapshotEx()
+    exR.current = { acc: 0, at: null }
+    autoFiredR.current = false
+    idxR.current = newIdx
+    setCurrentIdx(newIdx)
+    setExSec(0)
+    phaseR.current = 'idle'
+    setPhase('idle')
+  }
+
   function _markDone() {
     _snapshotEx()
     const id = routine[idxR.current]?.id
@@ -146,27 +155,8 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
       phaseR.current = 'finished'
       setPhase('finished')
     } else {
-      transEndR.current = Date.now() + TRANSITION_SEC * 1000
-      setTransSec(TRANSITION_SEC)
-      phaseR.current = 'transition'
-      setPhase('transition')
+      goToIndex(idxR.current + 1)
     }
-  }
-
-  function _advance() {
-    const next = idxR.current + 1
-    if (next >= routine.length) {
-      phaseR.current = 'finished'
-      setPhase('finished')
-      return
-    }
-    exR.current = { acc: 0, at: null }
-    autoFiredR.current = false
-    idxR.current = next
-    setCurrentIdx(next)
-    setExSec(0)
-    phaseR.current = 'idle'
-    setPhase('idle')
   }
 
   // ── User actions ─────────────────────────────────────────────────────────
@@ -182,44 +172,8 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
     _markDone()
   }
 
-  function handleRedoCurrent() {
-    // Cancel transition, reset current exercise, go back to idle
-    transEndR.current = null
-    const curId = routine[idxR.current]?.id
-    if (curId) {
-      const next = doneR.current.filter(id => id !== curId)
-      doneR.current = next
-      setCompletedIds(next)
-    }
-    exR.current = { acc: 0, at: null }
-    autoFiredR.current = false
-    setExSec(0)
-    phaseR.current = 'idle'
-    setPhase('idle')
-  }
-
-  function handleSkipTransition() {
-    transEndR.current = null
-    _advance()
-  }
-
   function handlePrevious() {
-    const prevIdx = idxR.current - 1
-    if (prevIdx < 0) return
-    transEndR.current = null
-    _snapshotEx()
-    autoFiredR.current = false
-    const prevId = routine[prevIdx]?.id
-    const curId = routine[idxR.current]?.id
-    const next = doneR.current.filter(id => id !== prevId && id !== curId)
-    doneR.current = next
-    setCompletedIds(next)
-    exR.current = { acc: 0, at: null }
-    idxR.current = prevIdx
-    setCurrentIdx(prevIdx)
-    setExSec(0)
-    phaseR.current = 'idle'
-    setPhase('idle')
+    goToIndex(idxR.current - 1)
   }
 
   function handleAdjustTotal(delta: number) {
@@ -237,6 +191,7 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
     const te = totalR.current.at != null
       ? totalR.current.acc + (now - totalR.current.at) / 1000
       : totalR.current.acc
+    finalizedR.current = true
     logCompletion(today, {
       completedAt: new Date().toISOString(),
       durationMin: Math.max(1, Math.round(te / 60)),
@@ -246,13 +201,59 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
     onClose()
   }
 
+  function handleDiscard() {
+    finalizedR.current = true
+    clearSession()
+    setShowDiscardConfirm(false)
+    onClose()
+  }
+
+  // ── Swipe navigation (out-of-order exercise browsing) ───────────────────
+
+  function handleTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0]
+    swipeStartR.current = { x: t.clientX, y: t.clientY }
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    const start = swipeStartR.current
+    swipeStartR.current = null
+    if (!start) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    if (Math.abs(dx) < SWIPE_MIN_DX || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    if (dx < 0) goToIndex(idxR.current + 1)
+    else goToIndex(idxR.current - 1)
+  }
+
   // ── Derived values ───────────────────────────────────────────────────────
 
   const currentExercise = routine[currentIdx]
   const exRemaining = currentExercise ? Math.max(0, currentExercise.durationSec - exSec) : 0
-  const nextExercise = routine[currentIdx + 1]
 
   // ── Render ───────────────────────────────────────────────────────────────
+
+  if (minimized) {
+    return (
+      <div className="fixed bottom-[72px] inset-x-0 z-50 px-4 pb-2">
+        <button
+          onClick={onResume}
+          className="w-full flex items-center gap-3 px-4 py-3 bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl active:scale-[0.98] transition-transform"
+        >
+          <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse flex-shrink-0" />
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-sm font-semibold text-white truncate">Daily Mobility</p>
+            <p className="text-xs text-slate-400">
+              {completedIds.length}/{routine.length} done — tap to resume
+            </p>
+          </div>
+          <span className="font-mono text-teal-300 text-sm flex-shrink-0">{fmtTime(totalSec)}</span>
+          <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-900">
@@ -272,9 +273,16 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
             <Settings2 size={16} />
           </button>
           <button
-            onClick={onClose}
+            onClick={() => setShowDiscardConfirm(true)}
+            className="p-2 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+            aria-label="Discard session"
+          >
+            <Trash2 size={16} />
+          </button>
+          <button
+            onClick={onMinimize}
             className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
-            aria-label="Close"
+            aria-label="Minimize"
           >
             <X size={18} />
           </button>
@@ -303,8 +311,12 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
         </div>
       </div>
 
-      {/* ── Main content (phase-driven) ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
+      {/* ── Main content (phase-driven, swipeable) ── */}
+      <div
+        className="flex-1 flex flex-col items-center justify-center px-6 py-4"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
 
         {routine.length === 0 ? (
           <div className="text-center">
@@ -324,35 +336,6 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
               <p className="text-sm text-slate-400 mt-1">
                 {completedIds.length} of {routine.length} exercise{routine.length === 1 ? '' : 's'} done
               </p>
-            </div>
-          </div>
-
-        ) : phase === 'transition' ? (
-          <div className="text-center space-y-5 w-full">
-            <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Next up in</p>
-            <p className="text-8xl font-mono font-bold text-white tabular-nums leading-none">
-              {Math.ceil(transSec)}
-            </p>
-            {nextExercise && (
-              <div className="bg-slate-800/60 rounded-xl border border-slate-700/50 px-4 py-3 text-center">
-                <p className="text-sm font-semibold text-slate-200">{nextExercise.name}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{fmtTime(nextExercise.durationSec)}</p>
-              </div>
-            )}
-            <div className="flex items-center justify-center gap-4 pt-1">
-              <button
-                onClick={handleRedoCurrent}
-                className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                ← Redo
-              </button>
-              <span className="text-slate-700 text-xs">·</span>
-              <button
-                onClick={handleSkipTransition}
-                className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                Skip →
-              </button>
             </div>
           </div>
 
@@ -417,9 +400,16 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
       {/* ── Bottom: progress dots + nav + log ── */}
       <div className="px-4 pt-3 pb-4 border-t border-slate-800 space-y-3">
 
-        {/* Progress dots */}
+        {/* Progress dots — tap to jump to any exercise */}
         {routine.length > 0 && (
-          <div className="flex justify-center gap-1.5 flex-wrap">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setShowJumpMenu(true)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setShowJumpMenu(true) }}
+            aria-label="Jump to exercise"
+            className="flex justify-center gap-1.5 flex-wrap py-1 cursor-pointer"
+          >
             {routine.map((ex, i) => (
               <div
                 key={ex.id}
@@ -439,7 +429,7 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
         <div className="flex gap-2">
           <button
             onClick={handlePrevious}
-            disabled={currentIdx === 0 && phase !== 'transition'}
+            disabled={currentIdx === 0}
             className="flex items-center gap-1 px-3 py-2.5 rounded-xl border border-slate-700 text-slate-400 text-xs font-medium hover:bg-slate-800 disabled:opacity-25 disabled:hover:bg-transparent transition-colors"
           >
             <ChevronLeft size={14} />
@@ -459,6 +449,72 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
           </button>
         </div>
       </div>
+
+      {/* ── Jump-to-exercise menu ── */}
+      {showJumpMenu && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/70"
+          onClick={() => setShowJumpMenu(false)}
+        >
+          <div
+            className="w-full max-w-lg bg-slate-800 border-t border-slate-700 rounded-t-2xl max-h-[70vh] overflow-y-auto pb-safe"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-4 pt-4 pb-2 sticky top-0 bg-slate-800 border-b border-slate-700/60">
+              <p className="text-sm font-semibold text-white">Jump to exercise</p>
+            </div>
+            <div className="px-2 py-2 space-y-1">
+              {routine.map((ex, i) => (
+                <button
+                  key={ex.id}
+                  onClick={() => { goToIndex(i); setShowJumpMenu(false) }}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors ${
+                    i === currentIdx ? 'bg-sky-500/15 border border-sky-500/40' : 'hover:bg-slate-700/60 border border-transparent'
+                  }`}
+                >
+                  <span className="text-xs text-slate-500 w-5 flex-shrink-0 tabular-nums">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium truncate ${i === currentIdx ? 'text-sky-300' : 'text-slate-200'}`}>
+                      {ex.name}
+                    </p>
+                    <p className="text-xs text-slate-500">{fmtTime(ex.durationSec)}</p>
+                  </div>
+                  {completedIds.includes(ex.id) && <Check size={15} className="text-emerald-400 flex-shrink-0" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Discard confirmation ── */}
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-6">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <Trash2 size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-white font-semibold">Discard mobility session?</p>
+                <p className="text-sm text-slate-400 mt-1">Your progress won't be saved.</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDiscardConfirm(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-semibold text-sm transition-colors"
+              >
+                Keep going
+              </button>
+              <button
+                onClick={handleDiscard}
+                className="flex-1 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
