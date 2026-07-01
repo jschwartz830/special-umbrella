@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { X, Settings2, ChevronLeft, ChevronUp, Trash2, Check } from 'lucide-react'
 import { useMobilityStore } from '../../store/mobilityStore'
 import type { MobilitySessionCheckpoint } from '../../store/mobilityStore'
+import { MOBILITY_LIBRARY } from '../../lib/mobilityLibrary'
 
 function fmtTime(sec: number): string {
   const s = Math.max(0, Math.floor(sec))
@@ -231,6 +232,9 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
 
   const currentExercise = routine[currentIdx]
   const exRemaining = currentExercise ? Math.max(0, currentExercise.durationSec - exSec) : 0
+  const currentLibInfo = currentExercise
+    ? MOBILITY_LIBRARY.find(e => e.id === currentExercise.id)
+    : undefined
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -347,10 +351,27 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
               {currentIdx + 1} / {routine.length}
             </p>
 
-            {/* Exercise name */}
-            <p className="text-xl font-bold text-white leading-snug px-2">
-              {currentExercise?.name}
-            </p>
+            {/* Exercise name + description */}
+            <div className="space-y-1.5">
+              <p className="text-xl font-bold text-white leading-snug px-2">
+                {currentExercise?.name}
+              </p>
+              {currentLibInfo?.description && (
+                <p className="text-xs text-slate-500 leading-relaxed px-4">
+                  {currentLibInfo.description}
+                </p>
+              )}
+              {currentLibInfo?.note && (
+                <div className="flex items-start justify-center gap-1.5 px-4 pt-1">
+                  <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wide mt-0.5 flex-shrink-0">
+                    Note
+                  </span>
+                  <p className="text-xs text-amber-300/80 leading-relaxed text-left">
+                    {currentLibInfo.note}
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Countdown display */}
             <div className="space-y-3">
