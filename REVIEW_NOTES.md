@@ -1,5 +1,115 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-01 (sixty-ninth pass) — branch `claude/dreamy-mccarthy-4cykvp`
+
+---
+
+### Executive summary
+
+1. **What changed**: 21 new unit tests for 5 new mobilityStore actions + `resetStore()` isolation fix. No production code changes.
+2. **What is highest confidence**: The test additions are pure coverage work — they read store state only through the public action API and use the same mock/reset pattern as all other store tests. All 987 tests pass; `tsc --noEmit` exits clean.
+3. **What is risky**: Nothing this pass. The one gap noted below (`resetStore()` not including `activeSession: null`) was a test-isolation risk, not a production bug.
+4. **What I should review first**: The `loadPreset` test that verifies preset `durationSec` overrides the library default — this validates a non-obvious behavior (line: `expect(ex.durationSec).toBe(90)` for `lib-ankle-cars` whose library default is 60). If you expected `loadPreset` to always use library defaults, this test is a useful prompt to verify the intent.
+
+---
+
+### Audit scope
+
+Full read of all new code since pass 68:
+- `src/components/workout/MobilityTracker.tsx` — sequential timer architecture, checkpoint save/restore, phase state machine
+- `src/lib/mobilityLibrary.ts` — 37 exercises, 5 categories, 6 presets
+- `src/pages/MobilityPage.tsx` — My Routine / Library / Presets tab structure
+- `src/store/mobilityStore.ts` — new v2 schema, 5 new actions, v1→v2 migration
+- `src/pages/TodayPage.tsx` — SwipeToDelete reveal fix, copy button icon change
+
+Test suite on entry: **966 tests passing** across 26 test files.
+
+---
+
+### Non-issues confirmed
+
+| Item | Verdict |
+|---|---|
+| MobilityTracker wall-clock timer accuracy when backgrounded | Not a bug — 100ms interval + `Date.now()` computation means at most 100ms display lag on foreground restore. No duration drift. |
+| `handlePrevious` removes both current AND previous exercise from completedIds | Intentional: "Previous" means "go back to exercise N−1", semantically undoing N as well. "← Redo" button is the targeted action for just undoing N. |
+| Checkpoint does not persist `phase` | Intentional: always resumes in idle, requires user to press Start. Avoids auto-starting timer unexpectedly on reopen. |
+| `loadPreset` uses preset's `durationSec`, not library's | Intentional: presets encode specific timing requirements. |
+| `addExerciseFromLibrary` ignores unknown IDs | Intentional: silently no-ops on bad input rather than inserting a partially-formed record. |
+| v1→v2 migration (add `activeSession: null`) | Trivially correct. Not testable through the persist mock, which is acceptable. |
+| SwipeToDelete opacity+pointerEvents fix | Clean fix — hides delete affordance visually and from hit-testing when not in a swipe. |
+
+---
+
+### Test coverage added: mobilityStore v2 actions (21 tests)
+
+**Files**: `src/store/__tests__/mobilityStore.test.ts`
+
+| Action | Tests | What's covered |
+|---|---|---|
+| `addExerciseFromLibrary` | 5 | Library lookup, correct name/durationSec, no-op on duplicate, no-op on unknown ID, routine length |
+| `loadPreset` (replace) | 3 | Full replacement, preset durationSec override, unknown-ID name fallback |
+| `loadPreset` (append) | 2 | Appends missing, skips already-present (dedup) |
+| `startSession` | 5 | date, exerciseIds, currentIdx=0, completedIds=[], totalElapsedSec/exElapsedSec=0, overwrites prior |
+| `saveCheckpoint` | 3 | Stores all fields, overwrites prior checkpoint |
+| `clearSession` | 3 | Sets null, no-op when already null, leaves routine+completions intact |
+| `resetStore()` fix | — | Now includes `activeSession: null` to prevent inter-describe leakage |
+
+---
+
+### Improvements completed
+
+- Test isolation fix: `resetStore()` now fully resets `activeSession`.
+- Coverage: all 5 new mobilityStore v2 actions covered.
+
+### Small features added
+
+None.
+
+### Medium-complexity feature explored
+
+None. Per the routine's own rule, two large feature PRs (PRs #172, #173) with zero unit test coverage on their new store actions was treated as a stabilization signal. Adding feature surface on top of recently untested code would compound risk.
+
+### Definitely keep
+
+- Test commit `89cb258` — pure test additions, zero risk, complete coverage of new API surface.
+
+### Probably keep but tweak
+
+None.
+
+### Do not keep
+
+None.
+
+### Recommendations only (not implemented)
+
+1. **`removeLastOverrideByType` remains plan-scoped** (from pass 68): redesigning it to be extra-scoped or timestamp-matched would close this class of bug at the API level. Third consecutive pass flagging this.
+
+2. **RTL/Playwright component test layer**: Both pass 68 production bugs lived in untested React component logic. This is the highest-ROI test investment available. Should be a deliberate decision by the maintainer, not an overnight add.
+
+3. **`visibilitychange` handler in MobilityTracker**: The current 100ms wall-clock approach is accurate; a `visibilitychange` handler would only improve perceived responsiveness by up to 100ms on foreground restore. Low priority, but easy to add (pattern is already in `CardioWorkoutTracker`).
+
+4. **storeSync.ts retry on push failure** (from pass 67): A single push failure permanently desynchronizes local and cloud state until the next successful write. A 1-retry with a brief delay would reduce drift significantly.
+
+5. **Run progression badge on TodayPage** (recommended passes 63–67, partially done in pass 67 for HistoryPage): Surfacing the "↑ Progressed" result at the moment of completion would make the progression system feel responsive.
+
+### Open questions for the user
+
+1. Does `loadPreset` intentionally use the preset's `durationSec` rather than the library's default? (Test line: `expect(ex.durationSec).toBe(90)` for `lib-ankle-cars` whose library default is 60.) This is the behavior as coded; just flagging it for awareness.
+
+2. Should "Previous" during a non-transition phase un-complete the exercise you're going back to AND the one you're leaving (current behavior), or only the one you're going back to? Worth a UX decision before it surprises a user.
+
+### Known issues / incomplete work
+
+- v1→v2 migration is untested (acceptable given triviality; noted in test file comment).
+- React component layer (TodayPage, CalendarPage, MobilityTracker) remains uncovered by automated tests.
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-06-30 (sixty-eighth pass) — branch `claude/dreamy-mccarthy-4vdzsq`
 
 ---
