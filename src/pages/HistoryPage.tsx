@@ -33,14 +33,9 @@ import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import type { RunProgressionState } from '../modules/run-adaptation/types'
 import { COMPLETION_STATE_LABELS } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
+import { WORKOUT_TYPE_OPTIONS } from '../lib/constants'
 
-const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
-  { type: 'weights', label: 'Weights' },
-  { type: 'run', label: 'Run' },
-  { type: 'swim', label: 'Swim' },
-  { type: 'yoga', label: 'Yoga' },
-  { type: 'other', label: 'Other' },
-]
+const WORKOUT_TYPES = WORKOUT_TYPE_OPTIONS
 
 /** Plural display labels used in the training-mix summary row. */
 const TYPE_MIX_LABEL: Partial<Record<WorkoutType, string>> = {
@@ -346,7 +341,7 @@ export function HistoryPage() {
       }
     }
 
-    const slot = outcomeTarget.planDay.slots[0] ?? { id: '', type: 'rest' as WorkoutType, name: '' }
+    const slot = outcomeTarget.planDay.slots[0] ?? { id: '', type: 'other' as WorkoutType, name: '' }
     logOutcomeWithProgression(finalOutcome, slot)
     // Read fresh store state — `entries` closure is stale if updateEntryDate ran above
     const freshEntries = useHistoryStore.getState().entries

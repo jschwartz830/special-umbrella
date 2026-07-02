@@ -184,6 +184,67 @@ describe('plansToCsv + plansFromCsv', () => {
     expect(plans[0].days[0].slots[0].id).not.toBe('s1')
   })
 
+  it('round-trips slot location and weightsFocusArea via the tags column', () => {
+    const planWithMeta: Plan = {
+      ...makePlan(),
+      days: [
+        {
+          id: 'd1',
+          label: 'Upper',
+          slots: [
+            {
+              id: 's1',
+              type: 'weights',
+              name: 'Push',
+              location: 'gym',
+              weightsFocusArea: 'upper',
+            },
+          ],
+        },
+        {
+          id: 'd2',
+          label: 'Legs',
+          slots: [
+            {
+              id: 's2',
+              type: 'weights',
+              name: 'Squat',
+              location: 'home',
+              weightsFocusArea: 'lower',
+            },
+          ],
+        },
+      ],
+    }
+    const csv = plansToCsv([planWithMeta])
+    const { plans, warnings } = plansFromCsv(csv)
+    expect(warnings).toEqual([])
+    expect(plans).toHaveLength(1)
+    const upper = plans[0].days[0].slots[0]
+    expect(upper.location).toBe('gym')
+    expect(upper.weightsFocusArea).toBe('upper')
+    const legs = plans[0].days[1].slots[0]
+    expect(legs.location).toBe('home')
+    expect(legs.weightsFocusArea).toBe('lower')
+  })
+
+  it('round-trips slots with only location (no weightsFocusArea)', () => {
+    const planWithLocation: Plan = {
+      ...makePlan(),
+      days: [
+        {
+          id: 'd1',
+          label: 'Run',
+          slots: [{ id: 's1', type: 'run', name: 'Easy Run', location: 'outdoor' }],
+        },
+      ],
+    }
+    const csv = plansToCsv([planWithLocation])
+    const { plans } = plansFromCsv(csv)
+    expect(plans[0].days[0].slots[0].location).toBe('outdoor')
+    expect(plans[0].days[0].slots[0].weightsFocusArea).toBeUndefined()
+  })
+
   it('reports warnings for unknown slot types', () => {
     const csv =
       'planId,planName,planStatus,planStartDate,planStartDayIndex,durationType,durationValue,dayIndex,dayLabel,slotIndex,slotType,slotName\n' +
@@ -451,6 +512,35 @@ describe('historyToCsv + historyFromCsv', () => {
     const u = parsed.find(e => e.id === 'ex-u')!
     // Empty extraSource column → restored as undefined (matches old-record shape)
     expect(u.source).toBeUndefined()
+  })
+
+  it('rejects fractional perceivedEffort values from manually-edited CSVs', () => {
+    const csv =
+      'entryKind,planId,calendarDate,planDayIndex,action,completionState,perceivedEffort,createdAt\n' +
+      `rotation,${plan.id},2026-04-10,0,complete,completed,1.7,2026-04-10T00:00:00Z`
+    const { outcomes } = historyFromCsv(csv, planIds)
+    expect(outcomes).toHaveLength(1)
+    expect(outcomes[0].perceivedEffort).toBeUndefined()
+  })
+
+  it('accepts integer perceivedEffort values 1–5', () => {
+    for (const val of [1, 2, 3, 4, 5]) {
+      const csv =
+        'entryKind,planId,calendarDate,planDayIndex,action,completionState,perceivedEffort,createdAt\n' +
+        `rotation,${plan.id},2026-04-10,0,complete,completed,${val},2026-04-10T00:00:00Z`
+      const { outcomes } = historyFromCsv(csv, planIds)
+      expect(outcomes[0].perceivedEffort).toBe(val)
+    }
+  })
+
+  it('rejects out-of-range perceivedEffort (0 or 6)', () => {
+    for (const val of [0, 6]) {
+      const csv =
+        'entryKind,planId,calendarDate,planDayIndex,action,completionState,perceivedEffort,createdAt\n' +
+        `rotation,${plan.id},2026-04-10,0,complete,completed,${val},2026-04-10T00:00:00Z`
+      const { outcomes } = historyFromCsv(csv, planIds)
+      expect(outcomes[0].perceivedEffort).toBeUndefined()
+    }
   })
 
   it('rejects extra rows with invalid workoutType', () => {

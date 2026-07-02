@@ -102,6 +102,15 @@ export const WORKOUT_TYPES: WorkoutType[] = [
   'other',
 ]
 
+/** Structured type+label pairs for select/filter UI — single source of truth. */
+export const WORKOUT_TYPE_OPTIONS: { type: WorkoutType; label: string }[] = [
+  { type: 'weights', label: 'Weights' },
+  { type: 'run', label: 'Run' },
+  { type: 'swim', label: 'Swim' },
+  { type: 'yoga', label: 'Yoga' },
+  { type: 'other', label: 'Other' },
+]
+
 // ── Difficulty display metadata ───────────────────────────────────────────────
 
 export interface DifficultyMeta {
