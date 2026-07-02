@@ -14,6 +14,25 @@
 
 ---
 
+### Commit 2 — `4737e7f`
+
+**fix: csv.ts — export slot location/weightsFocusArea in tags column; reject fractional perceivedEffort**
+
+#### Changes
+
+- `src/lib/csv.ts`:
+  - **`plansToCsv` (line 238)**: The `tags` column was always exported as `''`, silently discarding `slot.location` and `slot.weightsFocusArea`. Fixed: now exports `[slot.location, slot.weightsFocusArea].filter(Boolean).join('|')`. The importer already parsed this pipe-delimited format correctly — the exporter simply wasn't producing it.
+  - **`buildOutcomeFromRow` (line 722)**: Added `Number.isInteger(effort)` guard before the 1–5 range check. A manually-edited CSV value of `1.7` previously passed the range check and was cast to `PerceivedEffort` (typed `1|2|3|4|5`), violating the type contract.
+- `src/lib/__tests__/csv.test.ts`: 5 new tests — tags round-trip with both fields, location-only round-trip, fractional effort rejection, integer effort acceptance (all 5 values), out-of-range effort rejection.
+
+#### Impact
+
+- **Data integrity**: Plan slots with `location` or `weightsFocusArea` are now faithfully preserved through a CSV export/import round-trip.
+- **Type safety**: `perceivedEffort` is always stored as a valid `1|2|3|4|5` integer after import.
+- 992 tests passing (+5 from baseline).
+
+---
+
 # Overnight Changelog — 2026-07-01
 
 ## [1] test: extend mobilityStore tests for new v2 actions (21 new tests)

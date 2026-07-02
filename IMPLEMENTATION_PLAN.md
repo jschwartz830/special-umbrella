@@ -59,7 +59,34 @@ const slot = outcomeTarget.planDay.slots[0] ?? { id: '', type: 'rest' as Workout
 2. **[FIX] Legacy `'rest'` fallback in HistoryPage outcome-confirm** — `src/pages/HistoryPage.tsx:349`.
 3. **[DOCS] Pass 70 audit notes, changelog, test results, review notes.**
 
-No test additions this pass — test suite is healthy at 987, and the changes are purely mechanical refactors with no new logic to exercise.
+No test additions in the initial commit — the changes were purely mechanical refactors. A background audit agent completed while initial work was in progress and surfaced two additional bugs in `csv.ts`. Those were fixed in a second commit with 5 new tests (see below). Final test count: 992.
+
+### Additional work (from background audit agent findings)
+
+#### Bug: `plansToCsv` silently discards `location` and `weightsFocusArea` (FIXED)
+
+**Location**: `src/lib/csv.ts:238`
+
+The `tags` export column was hardcoded to `''`. `plansFromCsv` already reads the column correctly (pipe-delimited `home|upper` → `location`, `weightsFocusArea`), but the exporter never wrote it. Any plan with location or focus-area metadata was silently losing those fields on CSV round-trip.
+
+**Fix**: `[slot.location, slot.weightsFocusArea].filter(Boolean).join('|')`.
+
+#### Bug: `buildOutcomeFromRow` accepts fractional `perceivedEffort` (FIXED)
+
+**Location**: `src/lib/csv.ts:722-724`
+
+A manually-edited CSV value of `1.7` passed the `>= 1 && <= 5` range check and was cast to `PerceivedEffort` (typed `1 | 2 | 3 | 4 | 5`), violating the type contract. **Fix**: added `Number.isInteger(effort)` guard.
+
+**5 new tests** cover both fixes. Commit `4737e7f`.
+
+#### Non-issues noted from agent report
+
+| Item | Disposition |
+|---|---|
+| `historyToCsv`/`historyFromCsv` notes duplication after round-trip | Low severity; documented in REVIEW_NOTES.md for future cleanup |
+| Supabase anon key hardcoded | Intentional; publishable key by design |
+| Custom `nanoid` via `Math.random()` | Architectural decision; negligible collision risk |
+| `applyProgressionRule` swallows errors silently | Tested and intentional |
 
 ---
 

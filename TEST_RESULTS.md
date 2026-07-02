@@ -24,7 +24,26 @@ Test Files  26 passed (26)
   Duration  ~3.0s
 ```
 
-Net: **+0 tests, 0 regressions**.
+_After commit 1 only._
+
+### Additional tests added (commit 2): +5
+
+**`src/lib/__tests__/csv.test.ts`** — 5 new tests covering the CSV fixes found by the background audit agent:
+1. `round-trips slot location and weightsFocusArea via the tags column` — verifies that `gym`/`upper` and `home`/`lower` survive a plansToCsv → plansFromCsv round-trip
+2. `round-trips slots with only location (no weightsFocusArea)` — `outdoor` location alone, no focus area
+3. `rejects fractional perceivedEffort values from manually-edited CSVs` — `1.7` must produce `perceivedEffort: undefined`
+4. `accepts integer perceivedEffort values 1–5` — all 5 valid values accepted
+5. `rejects out-of-range perceivedEffort (0 or 6)` — boundary values rejected
+
+### Final (after all changes)
+
+```
+Test Files  26 passed (26)
+     Tests  992 passed (992)
+  Duration  ~2.7s
+```
+
+Net: **+5 tests, 0 regressions**.
 
 ---
 

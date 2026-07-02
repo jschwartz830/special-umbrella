@@ -23,6 +23,20 @@ Full read of:
 - `historyStore.ts`, `planStore.ts`, `outcomeStore.ts`, `mobilityStore.ts`, `settingsStore.ts`, `storeSync.ts`, `exerciseHistoryStore.ts` (in prior passes, confirmed unchanged)
 - `usePlanActions.ts`, `useActivePlan.ts`, `planDayUtils.ts`, `outcomeSortKey.ts`, `previousSetsHelper.ts`, `sessionSummary.ts`
 
+### Bugs fixed (from background agent findings)
+
+#### Bug: `plansToCsv` silently discards `location` and `weightsFocusArea` (FIXED)
+
+**Location**: `src/lib/csv.ts:238`
+
+The `tags` column was hardcoded to `''` in the plan exporter. `plansFromCsv` already parses this column correctly (pipe-delimited, reads `home`/`gym`/`indoor`/`outdoor` → `slot.location`; `upper`/`lower`/`full_body` → `slot.weightsFocusArea`), but nothing was writing those values on export. Any plan using location or focus-area metadata would lose it on CSV round-trip. Fixed: serialize as `[slot.location, slot.weightsFocusArea].filter(Boolean).join('|')`.
+
+#### Bug: `buildOutcomeFromRow` accepts fractional `perceivedEffort` (FIXED)
+
+**Location**: `src/lib/csv.ts:722-724`
+
+`toNum('1.7')` returns `1.7`, which passes the `>= 1 && <= 5` range check and is cast to `PerceivedEffort` (typed `1 | 2 | 3 | 4 | 5`). A manually edited CSV can inject a fractional value that violates the type contract. Fixed: added `Number.isInteger(effort)` guard.
+
 ### Non-issues confirmed
 
 | Item | Location | Verdict |
@@ -33,6 +47,10 @@ Full read of:
 | `weeklyBreakdown` uses `addDays(new Date(), -55)` | `HistoryPage.tsx:233` | Appropriate — stats history window doesn't need the `useToday()` anchor; minor date drift on DST transitions is acceptable |
 | Ad hoc `source: 'history'` tagging | `TodayPage.tsx:1347` | Correct — prevents Undo from auto-removing user-initiated extras |
 | `VALID_WORKOUT_TYPES` in `csv.ts` and `programParser.ts` | Not consolidated | Correct choice — these are validation guards, intentionally independent of display lists |
+| `historyToCsv`/`historyFromCsv` notes duplication | `csv.ts:542,699,729` | On export, `entry.notes ?? outcome.notes` is used; on import, the same string is written to both. A note originally only on the outcome becomes duplicated onto the entry after round-trip. Low severity (UI shows the same string either way); documented for future cleanup |
+| Supabase anon key hardcoded | `src/lib/supabase.ts` | Publishable/anon key; intentionally public by Supabase design. Security relies on RLS. Not a bug, standard practice |
+| `nanoid` custom implementation | `src/lib/utils.ts` | 9-character base-36 via `Math.random()`. Collision probability negligible for a personal app; architectural decision |
+| `applyProgressionRule` swallows errors silently | `programStore.ts` | Tested and intentional — broken progression rule no-ops rather than crashing. Known limitation, documented |
 
 ---
 
