@@ -1,5 +1,68 @@
 # Implementation Plan
 
+## Pass 70 — 2026-07-02 (branch `claude/dreamy-mccarthy-jy89cx`)
+
+### Observations on entry
+
+- Branch reset from latest `main` (1aed19f). No unique unmerged work; no open PR for the prior branch name.
+- **987 tests passing** across 26 test files before any changes (same baseline as pass 69).
+- Recent human-authored feature landed since pass 69: mobility session shows exercise description and caution notes during live session (PR #176 / commit `26f7401`).
+
+### Audit scope
+
+Full read of: `TodayPage.tsx` (complete), `HistoryPage.tsx` (complete), `CalendarPage.tsx` (imports + usage), `constants.ts` (complete), `historyStore.ts`, `planStore.ts`, `outcomeStore.ts`, `mobilityStore.ts`, `settingsStore.ts`, `storeSync.ts`, `exerciseHistoryStore.ts`, `calendarProjection.ts`, `planDayUtils.ts`, `outcomeSortKey.ts`, `previousSetsHelper.ts`, `sessionSummary.ts`, `usePlanActions.ts`, `useActivePlan.ts`.
+
+### Audit findings
+
+#### Code quality: WORKOUT_TYPES defined three times (FIXED)
+
+**Location**: `src/lib/constants.ts`, `src/pages/CalendarPage.tsx:40`, `src/pages/HistoryPage.tsx:37`
+
+**Mechanism**: The 5-item workout type list for UI selects/filters was independently defined in three places:
+- `constants.ts`: `WORKOUT_TYPES: WorkoutType[]` — plain string array (5 canonical types)
+- `CalendarPage.tsx`: `WORKOUT_TYPES: { type: WorkoutType; label: string }[]` — object array with labels (same 5 values)
+- `HistoryPage.tsx`: `WORKOUT_TYPES: { type: WorkoutType; label: string }[]` — identical definition
+
+Adding or renaming a workout type in the UI required three file changes. `PlanBuilderPage.tsx` correctly imports the string-array version from `constants.ts`, but the pages needed a labeled version and each defined their own.
+
+**Fix**: Added `WORKOUT_TYPE_OPTIONS: { type: WorkoutType; label: string }[]` to `constants.ts` as the single canonical export; `CalendarPage` and `HistoryPage` import and alias it. Zero behavioral change, no new dependencies.
+
+#### Code quality: legacy `'rest'` type in fallback slot (FIXED)
+
+**Location**: `src/pages/HistoryPage.tsx:349`
+
+**Mechanism**: The outcome-confirm handler builds a fallback slot when `outcomeTarget.planDay.slots[0]` is undefined:
+```ts
+const slot = outcomeTarget.planDay.slots[0] ?? { id: '', type: 'rest' as WorkoutType, name: '' }
+```
+`planStore` v2 migrates `'rest'` → `'other'`, so this code path would produce a legacy type that no longer exists in any live plan. While `'rest'` remains in the `WorkoutType` union for backward compatibility, using it in new code paths is inconsistent.
+
+**Fix**: Changed fallback type to `'other'`.
+
+#### Non-issues confirmed
+
+| Item | Verdict |
+|---|---|
+| TodayPage Undo handler removes override correctly | Pass 68 fix (`advancedRotation ?? extra.source === 'double_day'`) holds; logic sound |
+| `handleUpcomingLog` date-shift for extras | Correct — `outcomeDate` derived from historyEntry when present |
+| CalendarPage local VALID_WORKOUT_TYPES in csv.ts / programParser.ts | Intentionally separate validation lists; should NOT be consolidated (different purpose: validation vs. display) |
+| Ad hoc workout `source: 'history'` tagging | Correct — prevents Undo from auto-removing user-initiated ad hoc entries |
+| HistoryPage `handleOutcomeConfirm` silently removes destination entry on date move | Intentional — comment at line 341 explains the orphan-prevention rationale |
+| progressionByInstance Map (O(1) reverse-index of progressionStates) | Correct and efficient |
+| `weeklyBreakdown` uses `addDays(new Date(), -55)` directly | Acceptable — `useToday()` is for the "today" anchor; stats history window can use `Date.now()` |
+
+---
+
+### Work plan
+
+1. **[REFACTOR] Consolidate WORKOUT_TYPE_OPTIONS into `constants.ts`** — `src/lib/constants.ts`, `src/pages/CalendarPage.tsx`, `src/pages/HistoryPage.tsx`.
+2. **[FIX] Legacy `'rest'` fallback in HistoryPage outcome-confirm** — `src/pages/HistoryPage.tsx:349`.
+3. **[DOCS] Pass 70 audit notes, changelog, test results, review notes.**
+
+No test additions this pass — test suite is healthy at 987, and the changes are purely mechanical refactors with no new logic to exercise.
+
+---
+
 ## Pass 69 — 2026-07-01 (branch `claude/dreamy-mccarthy-4cykvp`)
 
 ### Observations on entry

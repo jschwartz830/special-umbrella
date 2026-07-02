@@ -1,3 +1,19 @@
+# Overnight Changelog — Pass 70 (2026-07-02)
+
+## Branch: `claude/dreamy-mccarthy-jy89cx`
+
+### Commit 1 — `915860b`
+
+**refactor: consolidate WORKOUT_TYPE_OPTIONS into constants.ts**
+
+- `src/lib/constants.ts`: Added `WORKOUT_TYPE_OPTIONS: { type: WorkoutType; label: string }[]` — canonical labeled workout type list for UI selects and filters.
+- `src/pages/CalendarPage.tsx`: Removed local `WORKOUT_TYPES` duplicate; imports `WORKOUT_TYPE_OPTIONS` from constants. No behavior change.
+- `src/pages/HistoryPage.tsx`: Same consolidation; also fixed fallback slot type in `handleOutcomeConfirm`: `'rest'` → `'other'` (planStore v2 migrates `'rest'` to `'other'`; using the legacy type in new code is inconsistent).
+
+**Impact**: Zero behavior change. Adding a new workout type to the filter/select UI now requires one file edit instead of three. All 987 tests pass.
+
+---
+
 # Overnight Changelog — 2026-07-01
 
 ## [1] test: extend mobilityStore tests for new v2 actions (21 new tests)

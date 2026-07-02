@@ -1,5 +1,33 @@
 # Test Results
 
+## 2026-07-02 (seventieth pass) — branch `claude/dreamy-mccarthy-jy89cx`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  26 passed (26)
+     Tests  987 passed (987)
+  Duration  ~3.0s
+```
+
+### New tests added: 0
+
+No new tests this pass. The change is a pure mechanical consolidation of a data constant; no logic was altered that would benefit from new test coverage. The `WORKOUT_TYPE_OPTIONS` export is a declarative value — equality with the previous inline definitions is verified implicitly by the unchanged behavior of all 987 existing tests.
+
+### Final (after changes)
+
+```
+Test Files  26 passed (26)
+     Tests  987 passed (987)
+  Duration  ~3.0s
+```
+
+Net: **+0 tests, 0 regressions**.
+
+---
+
 ## 2026-07-01 (sixty-ninth pass) — branch `claude/dreamy-mccarthy-4cykvp`
 
 ---
