@@ -1,5 +1,52 @@
 # Test Results
 
+## 2026-07-02 (seventieth pass) — branch `claude/dreamy-mccarthy-jy89cx`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  26 passed (26)
+     Tests  987 passed (987)
+  Duration  ~3.0s
+```
+
+### New tests added: 0
+
+No new tests this pass. The change is a pure mechanical consolidation of a data constant; no logic was altered that would benefit from new test coverage. The `WORKOUT_TYPE_OPTIONS` export is a declarative value — equality with the previous inline definitions is verified implicitly by the unchanged behavior of all 987 existing tests.
+
+### Final (after changes)
+
+```
+Test Files  26 passed (26)
+     Tests  987 passed (987)
+  Duration  ~3.0s
+```
+
+_After commit 1 only._
+
+### Additional tests added (commit 2): +5
+
+**`src/lib/__tests__/csv.test.ts`** — 5 new tests covering the CSV fixes found by the background audit agent:
+1. `round-trips slot location and weightsFocusArea via the tags column` — verifies that `gym`/`upper` and `home`/`lower` survive a plansToCsv → plansFromCsv round-trip
+2. `round-trips slots with only location (no weightsFocusArea)` — `outdoor` location alone, no focus area
+3. `rejects fractional perceivedEffort values from manually-edited CSVs` — `1.7` must produce `perceivedEffort: undefined`
+4. `accepts integer perceivedEffort values 1–5` — all 5 valid values accepted
+5. `rejects out-of-range perceivedEffort (0 or 6)` — boundary values rejected
+
+### Final (after all changes)
+
+```
+Test Files  26 passed (26)
+     Tests  992 passed (992)
+  Duration  ~2.7s
+```
+
+Net: **+5 tests, 0 regressions**.
+
+---
+
 ## 2026-07-01 (sixty-ninth pass) — branch `claude/dreamy-mccarthy-4cykvp`
 
 ---

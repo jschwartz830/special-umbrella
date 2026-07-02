@@ -235,7 +235,7 @@ function planHeaderCells(
     empty ? '' : slot.targetPace ?? '',
     empty ? '' : slot.targetDuration ?? '',
     empty ? '' : slot.difficulty ?? '',
-    '',
+    empty ? '' : [slot.location, slot.weightsFocusArea].filter(Boolean).join('|'),
     empty ? '' : slot.subtype ?? run?.subtype ?? '',
     empty ? '' : run?.targetDistanceMiles ?? '',
     empty ? '' : run?.targetDurationMin ?? '',
@@ -720,7 +720,7 @@ function buildOutcomeFromRow(
   const outcome: WorkoutOutcome = { workoutInstanceId, completionState }
 
   const effort = toNum(row.perceivedEffort)
-  if (effort !== undefined && effort >= 1 && effort <= 5) {
+  if (effort !== undefined && Number.isInteger(effort) && effort >= 1 && effort <= 5) {
     outcome.perceivedEffort = effort as PerceivedEffort
   }
   const dur = toNum(row.durationActualMin)

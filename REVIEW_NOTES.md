@@ -1,5 +1,59 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-02 (seventieth pass) — branch `claude/dreamy-mccarthy-jy89cx`
+
+---
+
+### Executive summary
+
+1. **What changed**: One refactor commit — `WORKOUT_TYPE_OPTIONS` centralized in `constants.ts`; two pages (`CalendarPage`, `HistoryPage`) now import it instead of duplicating the list. Minor: legacy `'rest'` fallback type replaced with `'other'` in `HistoryPage.handleOutcomeConfirm`.
+2. **What is highest confidence**: Pure mechanical consolidation — alias assignment, no logic touched. All 987 tests pass, tsc clean.
+3. **What is risky**: Nothing. The only behavioral difference is the fallback slot type (`'rest'` → `'other'`), which only fires when `planDay.slots` is empty — an impossible state in normal use since every `PlanDay` has at least one slot.
+4. **What to review first**: `constants.ts` — confirm `WORKOUT_TYPE_OPTIONS` ordering matches your preferred UI order. Current order: Weights, Run, Swim, Yoga, Other (matches all previous local definitions).
+
+---
+
+### Audit scope
+
+Full read of:
+- `TodayPage.tsx` — 1686 lines, complete
+- `HistoryPage.tsx` — ~900 lines, complete (imports + business logic)
+- `CalendarPage.tsx` — imports and local definitions
+- `constants.ts` — complete
+- `historyStore.ts`, `planStore.ts`, `outcomeStore.ts`, `mobilityStore.ts`, `settingsStore.ts`, `storeSync.ts`, `exerciseHistoryStore.ts` (in prior passes, confirmed unchanged)
+- `usePlanActions.ts`, `useActivePlan.ts`, `planDayUtils.ts`, `outcomeSortKey.ts`, `previousSetsHelper.ts`, `sessionSummary.ts`
+
+### Bugs fixed (from background agent findings)
+
+#### Bug: `plansToCsv` silently discards `location` and `weightsFocusArea` (FIXED)
+
+**Location**: `src/lib/csv.ts:238`
+
+The `tags` column was hardcoded to `''` in the plan exporter. `plansFromCsv` already parses this column correctly (pipe-delimited, reads `home`/`gym`/`indoor`/`outdoor` → `slot.location`; `upper`/`lower`/`full_body` → `slot.weightsFocusArea`), but nothing was writing those values on export. Any plan using location or focus-area metadata would lose it on CSV round-trip. Fixed: serialize as `[slot.location, slot.weightsFocusArea].filter(Boolean).join('|')`.
+
+#### Bug: `buildOutcomeFromRow` accepts fractional `perceivedEffort` (FIXED)
+
+**Location**: `src/lib/csv.ts:722-724`
+
+`toNum('1.7')` returns `1.7`, which passes the `>= 1 && <= 5` range check and is cast to `PerceivedEffort` (typed `1 | 2 | 3 | 4 | 5`). A manually edited CSV can inject a fractional value that violates the type contract. Fixed: added `Number.isInteger(effort)` guard.
+
+### Non-issues confirmed
+
+| Item | Location | Verdict |
+|---|---|---|
+| Undo handler safe override removal | `TodayPage.tsx:999,1002` | Pass-68 fix holds — `advancedRotation ?? extra.source === 'double_day'` is correct; non-advancing extras don't strip the override |
+| `handleOutcomeConfirm` silently removes destination entry on date move | `HistoryPage.tsx:337` | Intentional data-safety measure (comment at 341); saves user from orphaned exercise history records |
+| `progressionByInstance` Map construction | `HistoryPage.tsx:86` | O(1) reverse-index is correct and efficient |
+| `weeklyBreakdown` uses `addDays(new Date(), -55)` | `HistoryPage.tsx:233` | Appropriate — stats history window doesn't need the `useToday()` anchor; minor date drift on DST transitions is acceptable |
+| Ad hoc `source: 'history'` tagging | `TodayPage.tsx:1347` | Correct — prevents Undo from auto-removing user-initiated extras |
+| `VALID_WORKOUT_TYPES` in `csv.ts` and `programParser.ts` | Not consolidated | Correct choice — these are validation guards, intentionally independent of display lists |
+| `historyToCsv`/`historyFromCsv` notes duplication | `csv.ts:542,699,729` | On export, `entry.notes ?? outcome.notes` is used; on import, the same string is written to both. A note originally only on the outcome becomes duplicated onto the entry after round-trip. Low severity (UI shows the same string either way); documented for future cleanup |
+| Supabase anon key hardcoded | `src/lib/supabase.ts` | Publishable/anon key; intentionally public by Supabase design. Security relies on RLS. Not a bug, standard practice |
+| `nanoid` custom implementation | `src/lib/utils.ts` | 9-character base-36 via `Math.random()`. Collision probability negligible for a personal app; architectural decision |
+| `applyProgressionRule` swallows errors silently | `programStore.ts` | Tested and intentional — broken progression rule no-ops rather than crashing. Known limitation, documented |
+
+---
+
 ## 2026-07-01 (sixty-ninth pass) — branch `claude/dreamy-mccarthy-4cykvp`
 
 ---
