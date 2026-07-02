@@ -34,16 +34,11 @@ import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTrac
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { formatWorkoutForClipboard } from '../lib/shareWorkout'
+import { WORKOUT_TYPE_OPTIONS } from '../lib/constants'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const WORKOUT_TYPES: { type: WorkoutType; label: string }[] = [
-  { type: 'weights', label: 'Weights' },
-  { type: 'run', label: 'Run' },
-  { type: 'swim', label: 'Swim' },
-  { type: 'yoga', label: 'Yoga' },
-  { type: 'other', label: 'Other' },
-]
+const WORKOUT_TYPES = WORKOUT_TYPE_OPTIONS
 
 export function CalendarPage() {
   const todayStr = useToday()
