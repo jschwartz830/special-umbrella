@@ -1,5 +1,107 @@
 # Feature Proposals
 
+## Pass 71 — 2026-07-03 (branch `claude/dreamy-mccarthy-4ywaek`)
+
+---
+
+### Proposal: PR Badges in History View
+
+**Status**: Implemented in this pass.
+
+---
+
+#### Feature selected
+
+**Exercise Personal Record badges on history workout items**
+
+When browsing the History page, weight-training workouts that set a new all-time load or reps record (at the time they were logged) now show a small trophy badge inline with the set count: "Load PR", "Reps PR", or "Load & reps PR".
+
+---
+
+#### Why this feature
+
+The PR infrastructure was already mostly built:
+- `exerciseHistoryStore` stores maxLoad/maxReps per exercise per session
+- `computePersonalRecords` in `historyStats.ts` computes all-time PRs for the PR export table
+- `TodayPage` shows a PR celebration banner immediately after logging
+- What was missing: retroactive visibility in the history view — you couldn't look at a past workout and know it was a PR when you did it
+
+This is the natural third piece of the PR tracking story. It closes the loop between "I set a PR today" and "this is my historical record."
+
+---
+
+#### Expected user value
+
+When users browse their history, they'll see which workouts were personal records at the time. This helps them:
+- Identify peak performance periods
+- Understand how their training has progressed
+- Feel proud of specific past sessions without navigating to the PR table
+
+---
+
+#### Implementation scope
+
+Narrowest viable slice:
+1. `computeWorkoutPRFlags(workoutInstanceId, allRecords)` utility in `historyStats.ts` — pure function, fully testable
+2. Optional `prFlags` prop on `OutcomeMetrics` — shows badge when either flag is true
+3. HistoryPage passes `prFlags` to both rotation and extra workout `OutcomeMetrics` instances
+
+---
+
+#### Assumptions
+
+- A session sets a PR only if it **strictly exceeded** (not tied) all prior sessions for the same exercise by calendarDate. This means a session that ties an existing PR does NOT get a badge — only the first time a new high was set.
+- The badge reflects the state at log time: if a session was a PR when logged but has since been surpassed, it still shows the badge. This is the more informative behavior (it answers "was this a PR when I did it?").
+- Only load and reps PRs are shown. Volume (sets × reps × load) is not included — it's more complex to interpret and already shown in the PR table if needed.
+
+---
+
+#### Open product / UX decisions
+
+1. **Tied PRs**: Should a session that matched (but didn't exceed) the prior best get a badge? Current: No. Rationale: "first time this high was reached" is cleaner than "every time this high was matched."
+2. **Badge prominence**: Currently a subtle text badge inline with set count. Could be made more prominent (separate row, animation) for big PRs.
+3. **Per-exercise granularity**: The badge currently says "Load PR" if any exercise in the session set a load PR. It doesn't say which exercise. A future improvement could list the exercises ("Bench Press PR").
+
+---
+
+#### Architecture / schema impact
+
+None. Pure addition:
+- New function in existing `historyStats.ts`
+- New optional prop on existing `OutcomeMetrics`
+- New import in existing `HistoryPage`
+- No new store state, no localStorage keys, no schema changes
+
+---
+
+#### Risks
+
+- **Performance**: `computeWorkoutPRFlags` is called for each rendered workout item in HistoryPage. It does an O(n) scan of `allExerciseRecords` for each exercise in the session. For a personal tracker with ~1000 total records and ~10 exercises per session, this is ~10,000 operations per item. With 50 visible history items, that's ~500,000 array iterations on each render. This could be a concern for users with long history. Mitigation: the `allExerciseRecords` array is stable across renders (Zustand memoizes it), so it could be pre-indexed per exercise name if performance becomes an issue. Not doing it yet (YAGNI).
+- **Correctness on date ties**: If two sessions have the same `calendarDate` for the same exercise (shouldn't happen in normal use, but could with CSV import), the "prior" filter (`calendarDate < session.calendarDate`) would treat them as simultaneous and neither would be marked as a PR. Edge case: acceptable for now.
+
+---
+
+#### Rollback strategy
+
+Single commit revert of commit `d050db6`:
+- Remove `computeWorkoutPRFlags` from `historyStats.ts`
+- Revert `OutcomeMetrics.tsx` prop addition and badge JSX
+- Revert `HistoryPage.tsx` import and prop passing
+- No data migrations needed
+
+---
+
+#### What is intentionally NOT being built yet
+
+- Per-exercise PR breakdown in the badge (e.g., "Bench Press: Load PR")
+- Volume PRs
+- PR badge on TodayPage's outcome confirmation (already covered by the celebration banner)
+- PR badge in CalendarPage
+- PR persistence / notifications
+- "Most recent PR" indicator in the PR table
+
+---
+
 ## Pass 61 — 2026-06-19 (branch `claude/dreamy-mccarthy-7ugj5k`)
 
 ---

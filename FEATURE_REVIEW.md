@@ -1,5 +1,71 @@
 # Feature Reviews
 
+## Pass 71 — 2026-07-03 (branch `claude/dreamy-mccarthy-4ywaek`)
+
+### Feature: PR Badges in History View
+
+---
+
+#### What was actually built
+
+1. **`computeWorkoutPRFlags`** in `src/lib/historyStats.ts` — pure utility that computes whether any exercise in a given workout session set a new all-time load or reps PR at the time it was logged. Uses strict ">" comparison against prior sessions by calendarDate.
+
+2. **`prFlags` prop on `OutcomeMetrics`** — optional `{ hasLoadPR, hasRepsPR }` prop. When either is true, renders a small trophy-icon badge inline with the completed-set count row. Three label states: "Load PR", "Reps PR", "Load & reps PR".
+
+3. **HistoryPage wiring** — `computeWorkoutPRFlags` called for every rotation and extra workout entry that has an outcome, using the `allExerciseRecords` from the existing `useExerciseHistoryStore` hook.
+
+4. **10 new tests** covering edge cases: empty records, first-session PR, strict-exceed-only (tied doesn't count), regression, any-exercise-is-enough, zero/null exclusion, both-flags.
+
+---
+
+#### What assumptions were encoded
+
+- A session sets a PR only when it STRICTLY exceeds all prior sessions for the exercise (not ties). This means equal-to-prior-best gets no badge.
+- PR is relative to log date: the "prior" comparison uses `calendarDate < session.calendarDate`, so if today's session is the all-time best, it gets a badge even if surpassed tomorrow.
+- Only `maxLoad` and `maxReps` are checked, not `totalVolume`.
+- The `Trophy` icon is yellow at 90% opacity — subtle enough not to dominate but visible enough to notice.
+
+---
+
+#### What worked well
+
+- The computation is completely separated from display — `computeWorkoutPRFlags` has no React dependencies and is independently testable.
+- The `OutcomeMetrics` prop is additive and optional — all existing callsites work without changes.
+- 10 tests cover the key cases and make the semantics explicit.
+- The "at log time" semantics are correct and valuable — a PR from 3 months ago stays marked even after it's been surpassed.
+
+---
+
+#### What feels risky or incomplete
+
+- **Performance**: Called once per rendered history item, not memoized. For users with large exercise history, this could slow history rendering. Low risk today but worth watching.
+- **No per-exercise detail**: The badge says "Load PR" but doesn't say which exercise. With a superset of 5 exercises, the user has to guess which one set the PR.
+- **Date-tie edge case**: Two sessions with identical `calendarDate` for the same exercise — neither gets a badge (the filter is strict `<`). Unlikely in normal use but possible after CSV import.
+
+---
+
+#### What I should evaluate
+
+1. Does the badge appear on real data? (requires testing with actual workout history)
+2. Is the badge too subtle? Try with a user who has many PRs — does the history view feel cluttered?
+3. Does HistoryPage render perceptibly slower with many entries? Profile if needed.
+
+---
+
+#### Recommended next steps
+
+1. If per-exercise detail is wanted: `computeWorkoutPRFlags` could return `{ loadPRExercises: string[]; repsPRExercises: string[] }` and show "Bench Press: Load PR" in the badge.
+2. If performance becomes an issue: pre-compute a `Map<exerciseName, ExerciseSessionRecord[]>` once and pass it to `computeWorkoutPRFlags` instead of filtering the flat array on each call.
+3. CalendarPage could show the same badge on completed workout cards.
+
+---
+
+#### Verdict: **Keep**
+
+Clean implementation, additive, well-tested, no schema changes, closes the "what were my best sessions?" question directly in the flow where users look at history. The "at log time" semantics are correct and valuable.
+
+---
+
 ## Pass 61 — 2026-06-19 (branch `claude/dreamy-mccarthy-7ugj5k`)
 
 ---

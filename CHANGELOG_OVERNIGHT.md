@@ -1,3 +1,112 @@
+# Overnight Changelog — Pass 71 (2026-07-03)
+
+## Branch: `claude/dreamy-mccarthy-4ywaek`
+
+### Commit 1 — `3fefb14`
+
+**refactor: import nanoid from lib/utils directly in programParser**
+
+- `src/engine/programParser.ts`: Changed `import { nanoid } from './rotationEngine'` to `import { nanoid } from '../lib/utils'`.
+- Why: `rotationEngine` was a middleman — it just re-exports `nanoid` from `lib/utils`. The direct import removes an artificial dependency between the parser layer and the scheduling engine layer.
+- Risk: None. Behavior is identical. No tests affected.
+- Rollback: One-line revert.
+
+---
+
+### Commit 2 — `256001e`
+
+**fix: remove dead unsubscribeStores variable from AuthGate initialize effect**
+
+- `src/components/auth/AuthGate.tsx`: Removed the `unsubscribeStores` variable from the first `useEffect` (the one that calls `initialize()`). The variable was declared but never assigned, so the cleanup `unsubscribeStores?.()` was always a no-op.
+- Why: The actual subscription cleanup lives in the second `useEffect` (which watches `user`). The dead variable in the first effect was confusing and implied cleanup was happening when it wasn't.
+- Risk: None. No behavior change — the cleanup was already a no-op.
+- Rollback: One-line revert.
+
+---
+
+### Commit 3 — `9767c3b`
+
+**fix: add explicit parentheses to clarify ?? operator precedence in TodayPage**
+
+- `src/pages/TodayPage.tsx` (lines 793, 999): Changed `x ?? y === 'z'` to `x ?? (y === 'z')`.
+- Why: `??` has lower precedence than `===` so the existing code was correct, but the expression reads as if it might mean `(x ?? y) === 'z'`. Explicit parentheses make intent unambiguous.
+- Risk: None. No behavior change.
+- Rollback: Two-line revert.
+
+---
+
+### Commit 4 — `9156c59`
+
+**refactor: extract deriveProgressionMode to shared module**
+
+- Created `src/modules/workout-outcomes/progressionMode.ts` with the canonical `deriveProgressionMode` function.
+- `src/components/workout/ActiveWorkoutTracker.tsx`: Removed local copy; imports from shared module.
+- `src/components/workout/OutcomeModal.tsx`: Removed local copy; imports from shared module.
+- Why: The function was copy-pasted identically in two files with slightly different (but compatible) type signatures. A single canonical location makes it testable and prevents future drift.
+- Risk: Low. Both copies were identical; extraction is mechanical.
+- Rollback: Restore local copies and remove the module file.
+
+---
+
+### Commit 5 — `b9bf3cd`
+
+**fix: move PlanCard to module scope in PlansPage**
+
+- `src/pages/PlansPage.tsx`: Moved `PlanCard` from inside `PlansPage` to module scope. Added `PlanCardProps` interface with `entries`, `today`, `onRequestActivate`, `onRequestDelete`. Store actions (`deactivatePlan`, `archivePlan`, `duplicatePlan`) are called via hooks inside `PlanCard`. Parent's `deactivatePlan` and `archivePlan` imports removed.
+- Why: Components defined inside other components get a new function reference on every parent render. React uses referential identity to compare component types — a new reference means full unmount+remount of every card on every parent state update (e.g., when the activate/delete modal opens). This is both a correctness issue (lost local state, e.g., hover animations) and a performance issue.
+- Risk: Low. The refactor is structural but non-behavioral — all the same data flows through; only the prop shape changed.
+- Rollback: Revert to the nested function version.
+
+---
+
+### Commit 6 — `a58fce8`
+
+**fix: use first exercise with progressionMode in buildWeightsRecommendation**
+
+- `src/modules/workout-outcomes/progression.ts`: Changed `exercises[0].progressionMode` (always the first exercise) to `exercises.find(ex => ex.progressionMode != null)?.progressionMode` (first exercise that has a mode configured). The null guard was already using `exercises.some(...)` to check if any exercise has a mode — now the mode read is consistent with that check.
+- `src/modules/workout-outcomes/__tests__/progression.test.ts`: Updated the test that previously documented "uses exercises[0]" to instead verify that a workout with a leading exercise with no mode (e.g., a warmup) and a second exercise with `progressionMode: 'double'` correctly produces mode `'double'`.
+- Why: If exercises[0] has no progressionMode (e.g., it's a bodyweight warmup without progression config), the old code silently fell back to `undefined ?? 'single'` instead of finding the configured exercise.
+- Risk: Low-medium. Behavior change only when exercises[0] lacks a progressionMode and a later exercise has one. In that case, the new behavior is more correct.
+- Rollback: Restore `exercises[0].progressionMode` and revert test change.
+
+---
+
+### Commit 7 — `cf734ef`
+
+**fix: cancel post-save navigate timer on PlanBuilderPage unmount**
+
+- `src/pages/PlanBuilderPage.tsx`: Added `useEffect`/`useRef` cleanup to cancel the 600ms navigate timer if the component unmounts before the timer fires. Added `useEffect, useRef` to the React import.
+- Why: If a user saves a new plan and immediately navigates back (within 600ms), the timer fires on an unmounted component and triggers a navigation to the now-irrelevant `/plans/${newId}/edit` URL. React Router v6 handles this without crashing, but the unexpected navigation is confusing.
+- Risk: None. No behavior change for the common case (component stays mounted). Only affects the edge case of unmounting within 600ms of saving.
+- Rollback: Remove the ref, effect, and update to the `setTimeout` call.
+
+---
+
+### Commit 8 — `2b1e77a`
+
+**test: add unit tests for deriveProgressionMode**
+
+- Created `src/modules/workout-outcomes/__tests__/progressionMode.test.ts`.
+- 9 tests covering: undefined early-return, all mapping cases (double, dynamic_double, triple, step_loading), unknown-type fallback to single, hasProgressRule interaction.
+- Why: The function was untested before extraction. Adding tests now pins the contract and catches regressions if the mapping is adjusted.
+- Risk: None.
+
+---
+
+### Commit 9 — `d050db6`
+
+**feat: PR badges on history workout items for weight exercises**
+
+- `src/lib/historyStats.ts`: Added `computeWorkoutPRFlags(workoutInstanceId, allRecords)` — determines whether any exercise in a given workout session set a new all-time load or reps PR *at the time it was logged* (comparing against strictly prior sessions by calendarDate).
+- `src/components/workout/OutcomeMetrics.tsx`: Added optional `prFlags?: { hasLoadPR, hasRepsPR }` prop. When either flag is true, shows a small trophy-icon badge inline with the set count row ("Load PR", "Reps PR", or "Load & reps PR").
+- `src/pages/HistoryPage.tsx`: Passes `prFlags` to both rotation and extra workout `OutcomeMetrics` instances. Added `computeWorkoutPRFlags` to the `historyStats` import.
+- `src/lib/__tests__/historyStats.test.ts`: 10 new tests covering empty state, first-session PR, new load/reps PR, tied-not-exceeded case, regression case, any-exercise-is-enough, and zero/null exclusion.
+- Why: TodayPage already shows a PR celebration banner after logging a workout. HistoryPage has a PR table showing all-time bests. But there was no way to look back at a past workout and see which ones were PRs when you did them. This closes the loop.
+- Risk: Low. Purely additive. No schema changes. No new dependencies. The PR detection is O(n) per exercise session (prior records filter). For typical personal-tracker usage (< 2000 total records), this is negligible. Computation happens in the render cycle but is bounded by the existing `allExerciseRecords` array.
+- Rollback: Remove `computeWorkoutPRFlags` from historyStats.ts, revert OutcomeMetrics and HistoryPage changes, remove the test additions.
+
+---
+
 # Overnight Changelog — Pass 70 (2026-07-02)
 
 ## Branch: `claude/dreamy-mccarthy-jy89cx`

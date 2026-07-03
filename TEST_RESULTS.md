@@ -1,5 +1,94 @@
 # Test Results
 
+## 2026-07-03 (seventy-first pass) — branch `claude/dreamy-mccarthy-4ywaek`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  26 passed (26)
+     Tests  992 passed (992)
+  Duration  ~2.6s
+```
+
+### Final (after all changes)
+
+```
+Test Files  27 passed (27)
+     Tests  1010 passed (1010)
+  Duration  ~2.5s
+```
+
+**+1 test file, +18 tests.**
+
+---
+
+### Tests added
+
+#### `src/modules/workout-outcomes/__tests__/progressionMode.test.ts` (new file, 9 tests)
+
+Covers `deriveProgressionMode` (extracted from `ActiveWorkoutTracker` + `OutcomeModal`):
+- `undefined` early-return (no progressionType, no rule)
+- Empty-string progressionType with no rule → undefined
+- `hasProgressRule=true` with no type → `'single'`
+- `double` → `'double'`
+- `dynamic_double` → `'double'`
+- `triple` → `'volume'`
+- `step_loading` → `'maintenance'`
+- Unknown type → `'single'` fallback
+- Type set + rule also set → type wins
+
+#### `src/lib/__tests__/historyStats.test.ts` (9 new tests added)
+
+Covers `computeWorkoutPRFlags`:
+- Empty records → both false
+- First-ever session → both true (load and reps)
+- Only reps, no load → repsPR only
+- Exceeds prior best → loadPR
+- Ties prior best (not strictly exceeds) → no badge
+- Below prior best → no badge
+- Any exercise in session sets PR → hasLoadPR true for whole workout
+- Zero load → excluded (not a PR)
+- Both load and reps PR in same session → both flags
+
+#### `src/modules/workout-outcomes/__tests__/progression.test.ts` (1 test updated)
+
+Updated "uses progressionMode from the first exercise" to "uses progressionMode from the first exercise that has one configured" — verifying the fix to `buildWeightsRecommendation`.
+
+---
+
+### Tests reviewed (no changes)
+
+All 26 prior test files continue to pass without modification, including:
+
+- `rotationEngine.test.ts` — rotation/override logic
+- `calendarProjection.test.ts` — calendar scheduling
+- `historyStore.test.ts` — state management
+- `outcomeStore.test.ts` — outcome/progression stores
+- `planStore.test.ts`, `planDeleteCleanup.test.ts` — plan lifecycle
+- `exerciseHistoryStore.test.ts` — exercise record storage
+- `progressionMode.test.ts` *(new)* — progression mode mapping
+- `expressionEval.test.ts` — load expression parser
+- `csv.test.ts` — import/export
+- `sessionSummary.test.ts` — session summary logic
+- `historyStats.test.ts` — stats, PRs, streaks, weekly breakdown
+
+---
+
+### Areas still lacking test coverage
+
+| Area | Gap |
+|---|---|
+| `PlanCard` component (PlansPage) | No tests for rendering or interaction |
+| `AuthGate` | No tests for auth state transitions |
+| `programParser.ts` | Parser has no dedicated unit tests |
+| `expressionEval.ts` silent-fail paths | Tested for correct results; not for the silent-0 fallback behavior |
+| `storeSync.ts` | No tests for sync/conflict behavior |
+| `calendarProjection.ts` | Good coverage but no test for the `estimateRunDurationMin` logic (now in TodayPage) |
+
+---
+
 ## 2026-07-02 (seventieth pass) — branch `claude/dreamy-mccarthy-jy89cx`
 
 ---
