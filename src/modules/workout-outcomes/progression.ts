@@ -98,9 +98,10 @@ function buildWeightsRecommendation(
   if (completedSets.length === 0) return null
 
   // Only generate a recommendation when progression logic is explicitly configured.
-  if (!exercises.some(ex => ex.progressionMode != null)) return null
+  const primaryEx = exercises.find(ex => ex.progressionMode != null)
+  if (!primaryEx) return null
 
-  const mode = exercises[0].progressionMode ?? 'single'
+  const mode = primaryEx.progressionMode ?? 'single'
 
   if ((effort ?? 0) >= 5) {
     return {
