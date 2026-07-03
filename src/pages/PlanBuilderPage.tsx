@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { DragEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -900,6 +900,11 @@ export function PlanBuilderPage() {
   const [yamlText, setYamlText] = useState('')
   const [yamlError, setYamlError] = useState<string | null>(null)
 
+  const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (navigateTimerRef.current !== null) clearTimeout(navigateTimerRef.current)
+  }, [])
+
   function markDirty() {
     if (!isDirty) setIsDirty(true)
     if (saved) setSaved(false)
@@ -975,7 +980,7 @@ export function PlanBuilderPage() {
       const newId = createPlan(payload)
       setSaved(true)
       setIsDirty(false)
-      setTimeout(() => navigate(`/plans/${newId}/edit`), 600)
+      navigateTimerRef.current = setTimeout(() => navigate(`/plans/${newId}/edit`), 600)
     } else if (id) {
       updatePlan(id, payload)
       setSaved(true)
