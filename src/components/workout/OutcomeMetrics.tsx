@@ -1,4 +1,4 @@
-import { Ruler, Timer, Zap, Dumbbell, Waves } from 'lucide-react'
+import { Ruler, Timer, Zap, Dumbbell, Waves, Trophy } from 'lucide-react'
 import { formatPace, formatSwimPace } from '../../modules/workout-outcomes/types'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import type { RunProgressionState } from '../../modules/run-adaptation/types'
@@ -6,9 +6,11 @@ import type { RunProgressionState } from '../../modules/run-adaptation/types'
 export function OutcomeMetrics({
   outcome,
   progressionState,
+  prFlags,
 }: {
   outcome: WorkoutOutcome
   progressionState?: RunProgressionState | null
+  prFlags?: { hasLoadPR: boolean; hasRepsPR: boolean }
 }) {
   const weightSetCount = outcome.weightsActual?.exercises
     ?.flatMap(ex => ex.sets)
@@ -33,9 +35,17 @@ export function OutcomeMetrics({
       )}
 
       {outcome.weightsActual && (
-        <p className="text-xs text-slate-400 flex items-center gap-1">
-          <Dumbbell size={10} /> {weightSetCount} completed set{weightSetCount === 1 ? '' : 's'}
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-xs text-slate-400 flex items-center gap-1">
+            <Dumbbell size={10} /> {weightSetCount} completed set{weightSetCount === 1 ? '' : 's'}
+          </p>
+          {(prFlags?.hasLoadPR || prFlags?.hasRepsPR) && (
+            <span className="inline-flex items-center gap-0.5 text-xs font-medium text-yellow-400/90 bg-yellow-500/10 px-1.5 py-0.5 rounded">
+              <Trophy size={9} />
+              {prFlags.hasLoadPR && prFlags.hasRepsPR ? 'Load & reps PR' : prFlags.hasLoadPR ? 'Load PR' : 'Reps PR'}
+            </span>
+          )}
+        </div>
       )}
 
       {outcome.runActual && (
