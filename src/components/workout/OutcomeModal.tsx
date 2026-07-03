@@ -29,6 +29,7 @@ import {
   formatSwimPace,
 } from '../../modules/workout-outcomes/types'
 import { isRunType } from '../../modules/workout-metadata/types'
+import { deriveProgressionMode } from '../../modules/workout-outcomes/progressionMode'
 import { makeWorkoutInstanceId } from '../../store/outcomeStore'
 import { useProgramStore } from '../../store/programStore'
 
@@ -84,16 +85,6 @@ function getSwimSlot(planDay: PlanDay): WorkoutSlot | null {
   return planDay.slots.find(s => s.type === 'swim') ?? null
 }
 
-function deriveProgressionMode(
-  progressionType: string | undefined,
-  hasProgressRule: boolean,
-): LoggedExerciseActual['progressionMode'] | undefined {
-  if (!progressionType && !hasProgressRule) return undefined
-  if (progressionType === 'double' || progressionType === 'dynamic_double') return 'double'
-  if (progressionType === 'triple') return 'volume'
-  if (progressionType === 'step_loading') return 'maintenance'
-  return 'single'
-}
 
 function resolveRepsFromVars(
   reps: number | string | undefined,

@@ -3,6 +3,7 @@ import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus,
 import type { WorkoutSlot, PlanDay } from '../../types'
 import type { ExerciseSpec, WarmupRampSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
+import { deriveProgressionMode } from '../../modules/workout-outcomes/progressionMode'
 import { resolveLoad, type EvalContext } from '../../lib/expressionEval'
 import { EXERCISE_LIBRARY } from '../../lib/exerciseLibrary'
 import { usePlanStore } from '../../store/planStore'
@@ -55,13 +56,6 @@ function warmupRepsForIndex(warmup: ExerciseSpec['warmup'], index: number): numb
   return [8, 5, 3, 2, 1][index] ?? 1
 }
 
-function deriveProgressionMode(progressionType?: string, hasProgressRule?: boolean): string | undefined {
-  if (!progressionType && !hasProgressRule) return undefined
-  if (progressionType === 'double' || progressionType === 'dynamic_double') return 'double'
-  if (progressionType === 'triple') return 'volume'
-  if (progressionType === 'step_loading') return 'maintenance'
-  return 'single'
-}
 
 function parseRepRange(reps: number | string | null | undefined): { low: number; high: number } | null {
   if (reps == null || typeof reps === 'number') return null
