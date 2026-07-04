@@ -219,6 +219,24 @@ describe('evaluateRunProgression', () => {
       expect(result.action).toBe('regress')
       expect(result.reason).toBe('high_effort')
     })
+
+    it('regression floor equals current target when slot has no targetDistanceMiles (no-op regress)', () => {
+      // When slot.runConfig.targetDistanceMiles is absent, `baseline` falls back
+      // to `targetDistance` (the current progression-state value).
+      // Math.max(currentTarget - step, currentTarget) = currentTarget, so the
+      // action is 'regress' but nextTargetDistanceMiles is unchanged.
+      // Callers should treat this as a hold in practice — it documents a known
+      // limitation when the slot template lacks an original distance anchor.
+      const slot = makeSlot({ targetDistanceMiles: undefined })
+      const result = evaluateRunProgression(
+        slot,
+        makeOutcome({ perceivedEffort: 5, runActual: { actualDistanceMiles: 6.0 } }),
+        makeState({ currentTargetDistanceMiles: 6 }),
+      )
+      expect(result.action).toBe('regress')
+      // nextTargetDistanceMiles equals the current target — no actual decrease
+      expect(result.nextTargetDistanceMiles).toBe(6)
+    })
   })
 
   describe('default hold path', () => {
