@@ -1,5 +1,81 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-04 (seventy-first pass) — branch `claude/dreamy-mccarthy-16z0ml`
+
+---
+
+### Executive summary
+
+1. **What changed**: One correctness fix (`usePlanActions` now uses `useToday()` for midnight-safe date logging) and one new test documenting an edge case in the run-adaptation engine regression floor.
+2. **What is highest confidence**: The `useToday()` fix is unambiguous — the hook already existed for exactly this purpose and is used throughout the codebase. The test addition is purely additive.
+3. **What is risky**: Nothing. The fix is a drop-in replacement of one import and one `const`; no logic changes.
+4. **What to review first**: `src/hooks/usePlanActions.ts` — confirm the `useToday()` hook is appropriate here. It subscribes to a midnight state update, so components using `usePlanActions` will re-render once at midnight (correct behavior).
+
+---
+
+### Audit scope
+
+Full read of:
+- `src/hooks/usePlanActions.ts` — complete
+- `src/hooks/useToday.ts` — complete
+- `src/store/historyStore.ts` — complete
+- `src/store/outcomeStore.ts` — complete
+- `src/store/programStore.ts` — complete (focus: `applyProgressionRule` error handling)
+- `src/engine/rotationEngine.ts` — complete
+- `src/engine/calendarProjection.ts` — complete (dead code survey)
+- `src/lib/historyStats.ts` — relevant sections
+- `src/lib/expressionEval.ts` — relevant sections
+- `src/modules/run-adaptation/engine.ts` — complete
+- `src/modules/run-adaptation/__tests__/engine.test.ts` — complete
+
+---
+
+### Bugs fixed
+
+#### Bug: `usePlanActions` logs workouts to wrong date when app stays open past midnight (FIXED)
+
+**Location**: `src/hooks/usePlanActions.ts` (was line 8)
+
+**Mechanism**: `today` was computed as `format(new Date(), 'yyyy-MM-dd')` at component mount time. This value is captured in a closure and never updated. If a user starts a workout at 11:58 PM and completes it at 12:02 AM, `complete()` and `skip()` log the action with the previous day's date string.
+
+**Fix**: Replaced with `useToday()` — the reactive hook that fires a midnight timeout and updates state, triggering a re-render. The component now always sees the correct calendar date.
+
+**Regression risk**: None. `useToday()` is already used in `TodayPage.tsx`, `CalendarPage.tsx`, and similar components for exactly this purpose. The only behavioral difference is that components using this hook will re-render at midnight.
+
+---
+
+### Edge cases documented
+
+#### Edge case: regression floor is a no-op when `slot.runConfig.targetDistanceMiles` is absent
+
+**Location**: `src/modules/run-adaptation/engine.ts:evaluateRunProgression`
+
+When a run slot has no `runConfig.targetDistanceMiles` set, the regression baseline falls back to `targetDistance` (the current progression-state value). `Math.max(currentTarget - step, currentTarget)` evaluates to `currentTarget`, so the engine returns `action: 'regress'` with `nextTargetDistanceMiles` unchanged. This is correct by design (no original anchor to regress toward) but surprising — callers receive a `'regress'` decision that doesn't actually change the target.
+
+A new test in `engine.test.ts` documents this behavior and explains the limitation in the inline comment.
+
+---
+
+### Non-issues confirmed
+
+| Item | Location | Verdict |
+|---|---|---|
+| `outcomeStore.logOutcomeWithProgression` error safety | `outcomeStore.ts:logOutcomeWithProgression` | Two-layer try/catch — run progression and `applyProgressionRule` each have independent guards |
+| `computeConsecutiveSkips` breakDates prioritization | `historyStats.ts` | Correct — 13 existing tests confirm break handling |
+| `getFutureProjection` dead code | `calendarProjection.ts` | No callers found in codebase; safe dead code. Candidate for removal in a future cleanup pass |
+| `expressionEval.ts` unknown-char silently skipped | `expressionEval.ts:67` | Intentional design decision — `i++` skips unrecognized tokens gracefully |
+| `historyStats.computeLoggedRate` deduplication | `historyStats.ts` | Correct — `Set<string>` on `calendarDate` |
+
+---
+
+### Recommendations (carried forward)
+
+- **`getFutureProjection` dead code**: `src/engine/calendarProjection.ts` exports `getFutureProjection` but no file imports or calls it. Safe to remove when convenient.
+- **Component test infrastructure**: React components (TodayPage, CalendarPage, HistoryPage, MobilityPage) remain untested. Several bugs in prior passes originated here. RTL or Playwright infra would close this gap.
+- **Midnight re-render audit**: With the `usePlanActions` fix applied, it's worth confirming no other hooks freeze `new Date()` at mount time. Quick pattern: `grep -r "format(new Date()" src/hooks`.
+
+---
+
 ## 2026-07-02 (seventieth pass) — branch `claude/dreamy-mccarthy-jy89cx`
 
 ---

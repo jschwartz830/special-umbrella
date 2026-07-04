@@ -1,5 +1,59 @@
 # Implementation Plan
 
+## Pass 71 — 2026-07-04 (branch `claude/dreamy-mccarthy-16z0ml`)
+
+### Observations on entry
+
+- Branch reset from latest `main`. No unique unmerged work from prior branch.
+- **992 tests passing** across 26 test files before any changes (pass 70 final count).
+- Recent human-authored changes examined: no new user commits since pass 70.
+
+### Audit scope
+
+Full read of: `usePlanActions.ts`, `useToday.ts`, `historyStore.ts`, `outcomeStore.ts`, `programStore.ts`, `calendarProjection.ts`, `rotationEngine.ts`, `historyStats.ts`, `expressionEval.ts`, `run-adaptation/engine.ts`, `run-adaptation/__tests__/engine.test.ts`.
+
+### Audit findings
+
+#### Bug: `usePlanActions` used frozen `today` date (FIXED)
+
+**Location**: `src/hooks/usePlanActions.ts`
+
+**Mechanism**: `today` was computed once as `format(new Date(), 'yyyy-MM-dd')` at render time. If a component mounted before midnight and stayed open past midnight (e.g. user in the middle of a workout at 11:58 PM that finishes at 12:02 AM), `complete()` and `skip()` would log the workout against the previous day. The `useToday()` hook already exists for exactly this purpose — it fires a timeout at midnight and updates its state, triggering a re-render.
+
+**Fix**: Replaced the frozen `format(new Date(), 'yyyy-MM-dd')` with `useToday()`. The `format` import was also removed (no longer needed).
+
+#### Edge case: regression floor no-ops when `slot.runConfig.targetDistanceMiles` is absent (DOCUMENTED)
+
+**Location**: `src/modules/run-adaptation/engine.ts` (evaluateRunProgression)
+
+**Mechanism**: The regression floor is computed as:
+```ts
+const baseline = slot.runConfig?.targetDistanceMiles ?? targetDistance
+const nextTarget = Math.max(roundMiles(targetDistance - step), baseline)
+```
+When `slot.runConfig.targetDistanceMiles` is undefined, `baseline` falls back to the current `targetDistance`. `Math.max(currentTarget - step, currentTarget)` equals `currentTarget` — so the action is `'regress'` but `nextTargetDistanceMiles` is unchanged. Callers don't distinguish this from a real regress. This is a known limitation when a slot template lacks a distance anchor — not fixable without changing the data model. The behavior is correct by design (don't regress below a baseline that doesn't exist), but surprising.
+
+**Action**: Added a test documenting the behavior so future readers understand it is intentional, not accidental.
+
+#### Non-issues confirmed
+
+| Item | Verdict |
+|---|---|
+| `outcomeStore.logOutcomeWithProgression` error handling | Safe — run progression wrapped in try/catch (step 2); `applyProgressionRule` has its own try/catch (step 3) |
+| `computeConsecutiveSkips` skip/break prioritization | Correct — `breakDates` tested in 13 test cases |
+| `getFutureProjection` dead code in `calendarProjection.ts` | No callers found; safe dead code (noted for future cleanup) |
+| `historyStats.computeLoggedRate` | Correct — deduplication uses `Set` on `calendarDate` |
+
+---
+
+### Work plan
+
+1. **[FIX] `usePlanActions` uses reactive `useToday()` instead of frozen date** — `src/hooks/usePlanActions.ts`.
+2. **[TEST] Document regression-floor no-op when `slot.runConfig.targetDistanceMiles` is absent** — `src/modules/run-adaptation/__tests__/engine.test.ts`.
+3. **[DOCS] Pass 71 audit notes, changelog, test results, review notes.**
+
+---
+
 ## Pass 70 — 2026-07-02 (branch `claude/dreamy-mccarthy-jy89cx`)
 
 ### Observations on entry
