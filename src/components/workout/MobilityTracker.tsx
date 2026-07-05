@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Settings2, ChevronLeft, ChevronUp, Trash2, Check } from 'lucide-react'
+import { X, Settings2, ChevronLeft, ChevronUp, Trash2, Check, Volume2, VolumeX, ArrowLeftRight } from 'lucide-react'
 import { useMobilityStore } from '../../store/mobilityStore'
 import type { MobilitySessionCheckpoint } from '../../store/mobilityStore'
-import { MOBILITY_LIBRARY } from '../../lib/mobilityLibrary'
+import { MOBILITY_LIBRARY, isBilateralExercise } from '../../lib/mobilityLibrary'
+import { primeAudio, playExerciseEndSound, playSwitchSidesSound, playSessionCompleteSound } from '../../lib/timerSounds'
 
 function fmtTime(sec: number): string {
   const s = Math.max(0, Math.floor(sec))
@@ -29,6 +30,8 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
   const startSession = useMobilityStore(s => s.startSession)
   const saveCheckpoint = useMobilityStore(s => s.saveCheckpoint)
   const clearSession = useMobilityStore(s => s.clearSession)
+  const soundEnabled = useMobilityStore(s => s.soundEnabled)
+  const setSoundEnabled = useMobilityStore(s => s.setSoundEnabled)
 
   // Validate checkpoint: must match today's date and the same routine order
   const routineKey = routine.map(e => e.id).join(',')
@@ -43,6 +46,7 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
   const [phase, setPhase] = useState<Phase>('idle')
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [showJumpMenu, setShowJumpMenu] = useState(false)
+  const [showSwitchCue, setShowSwitchCue] = useState(false)
 
   // Live display state (driven by 100ms tick)
   const [totalSec, setTotalSec] = useState(cp?.totalElapsedSec ?? 0)
@@ -57,12 +61,16 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
   const idxR = useRef(cp?.currentIdx ?? 0)
   const doneR = useRef<string[]>(cp?.completedIds ?? [])
   const autoFiredR = useRef(false) // prevent double-fire when exercise timer hits 0
+  const switchFiredR = useRef(false) // prevent double-fire of the bilateral switch cue
+  const switchCueTimerR = useRef<ReturnType<typeof setTimeout> | null>(null)
   const finalizedR = useRef(false) // set once session is logged or discarded — skip resave on unmount
   const swipeStartR = useRef<{ x: number; y: number } | null>(null)
+  const soundOnR = useRef(soundEnabled) // stale-closure-safe mirror for the interval
 
   useEffect(() => { phaseR.current = phase }, [phase])
   useEffect(() => { idxR.current = currentIdx }, [currentIdx])
   useEffect(() => { doneR.current = completedIds }, [completedIds])
+  useEffect(() => { soundOnR.current = soundEnabled }, [soundEnabled])
 
   // ── Mount: init store session + start total timer ───────────────────────
   useEffect(() => {
@@ -70,6 +78,7 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
     totalR.current.at = Date.now() // total timer always starts running on open
 
     return () => {
+      if (switchCueTimerR.current) clearTimeout(switchCueTimerR.current)
       // Unmount without finalizing → save checkpoint so user can resume
       if (phaseR.current === 'finished' || finalizedR.current) return
       const now = Date.now()
@@ -107,12 +116,25 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
         : exR.current.acc
       setExSec(e)
 
-      // Auto-complete when exercise countdown hits zero
-      if (phaseR.current === 'exercising' && !autoFiredR.current) {
+      if (phaseR.current === 'exercising') {
         const cur = routine[idxR.current]
-        if (cur && e >= cur.durationSec) {
-          autoFiredR.current = true
-          _markDone()
+        if (cur) {
+          // Halfway cue for bilateral exercises — time to switch sides.
+          if (
+            !switchFiredR.current &&
+            isBilateralExercise(cur) &&
+            e >= cur.durationSec / 2 &&
+            e < cur.durationSec
+          ) {
+            switchFiredR.current = true
+            if (soundOnR.current) playSwitchSidesSound()
+            flashSwitchCue()
+          }
+          // Auto-complete when exercise countdown hits zero.
+          if (!autoFiredR.current && e >= cur.durationSec) {
+            autoFiredR.current = true
+            _markDone({ fromTimer: true })
+          }
         }
       }
     }, 100)
@@ -130,6 +152,13 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
     }
   }
 
+  // Briefly surface a "Switch sides" banner alongside the audio cue.
+  function flashSwitchCue() {
+    setShowSwitchCue(true)
+    if (switchCueTimerR.current) clearTimeout(switchCueTimerR.current)
+    switchCueTimerR.current = setTimeout(() => setShowSwitchCue(false), 2200)
+  }
+
   // Jump to any exercise by index — used by Previous, swipe, and the jump menu.
   // Navigation never touches completedIds; only Mark Done does.
   function goToIndex(newIdx: number) {
@@ -137,6 +166,8 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
     _snapshotEx()
     exR.current = { acc: 0, at: null }
     autoFiredR.current = false
+    switchFiredR.current = false
+    setShowSwitchCue(false)
     idxR.current = newIdx
     setCurrentIdx(newIdx)
     setExSec(0)
@@ -144,7 +175,7 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
     setPhase('idle')
   }
 
-  function _markDone() {
+  function _markDone(opts?: { fromTimer?: boolean }) {
     _snapshotEx()
     const id = routine[idxR.current]?.id
     if (id && !doneR.current.includes(id)) {
@@ -153,9 +184,12 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
       setCompletedIds(next)
     }
     if (idxR.current >= routine.length - 1) {
+      if (soundOnR.current) playSessionCompleteSound()
       phaseR.current = 'finished'
       setPhase('finished')
     } else {
+      // Chime only when the timer ran out on its own; a manual Mark Done is silent.
+      if (opts?.fromTimer && soundOnR.current) playExerciseEndSound()
       goToIndex(idxR.current + 1)
     }
   }
@@ -163,8 +197,13 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
   // ── User actions ─────────────────────────────────────────────────────────
 
   function handleStart() {
+    // Warm the audio context from this user gesture so later cues can fire on iOS.
+    if (soundEnabled) primeAudio()
     exR.current = { acc: exR.current.acc, at: Date.now() }
     autoFiredR.current = false
+    // If resuming past the halfway point, don't fire a late switch cue.
+    const cur = routine[idxR.current]
+    switchFiredR.current = !!cur && (!isBilateralExercise(cur) || exR.current.acc >= cur.durationSec / 2)
     phaseR.current = 'exercising'
     setPhase('exercising')
   }
@@ -235,6 +274,7 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
   const currentLibInfo = currentExercise
     ? MOBILITY_LIBRARY.find(e => e.id === currentExercise.id)
     : undefined
+  const currentBilateral = currentExercise ? isBilateralExercise(currentExercise) : false
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -269,6 +309,14 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
           <h2 className="text-lg font-bold text-white leading-tight">Daily Routine</h2>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
+            aria-label={soundEnabled ? 'Mute timer sounds' : 'Unmute timer sounds'}
+            aria-pressed={soundEnabled}
+          >
+            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
           <button
             onClick={onManageRoutine}
             className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
@@ -356,6 +404,14 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
               <p className="text-xl font-bold text-white leading-snug px-2">
                 {currentExercise?.name}
               </p>
+              {currentBilateral && (
+                <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-fuchsia-500/15 border border-fuchsia-500/30 text-fuchsia-300 text-[11px] font-semibold">
+                    <ArrowLeftRight size={12} />
+                    Both sides — switch at halfway
+                  </span>
+                </div>
+              )}
               {currentLibInfo?.description && (
                 <p className="text-xs text-slate-500 leading-relaxed px-4">
                   {currentLibInfo.description}
@@ -375,9 +431,15 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
 
             {/* Countdown display */}
             <div className="space-y-3">
+              {showSwitchCue && (
+                <div className="flex items-center justify-center gap-2 text-fuchsia-300 animate-pulse">
+                  <ArrowLeftRight size={18} />
+                  <span className="text-lg font-bold uppercase tracking-wide">Switch sides!</span>
+                </div>
+              )}
               <p className={`text-7xl font-mono font-bold tabular-nums leading-none transition-colors ${
                 phase === 'exercising'
-                  ? exRemaining <= 10 ? 'text-amber-400' : 'text-sky-400'
+                  ? showSwitchCue ? 'text-fuchsia-400' : exRemaining <= 10 ? 'text-amber-400' : 'text-sky-400'
                   : 'text-slate-500'
               }`}>
                 {fmtTime(exRemaining)}

@@ -28,6 +28,7 @@ export interface MobilityLibraryExercise {
   durationSec: number
   description: string
   note?: string // injury/caution note
+  bilateral?: boolean // performed one side at a time — cue a switch at the halfway mark
 }
 
 export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
@@ -68,6 +69,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     durationSec: 60,
     description: 'Slow, full-range circular rotation of the shoulder. Keep core braced, limit thoracic compensation. Both directions, both sides.',
     note: 'Perform at pain-free range; never push into AC joint discomfort.',
+    bilateral: true,
   },
   {
     id: 'lib-sleeper-stretch',
@@ -83,6 +85,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['scapula-shoulder', 'posture'],
     durationSec: 45,
     description: 'Arm on doorframe at 90°. Gently rotate body away. Reduces anterior shoulder tension that stresses AC joint.',
+    bilateral: true,
   },
   {
     id: 'lib-cross-body-stretch',
@@ -91,6 +94,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     durationSec: 45,
     description: 'Pull arm across chest at shoulder height. Gentle posterior shoulder stretch. Keep shoulder down, not shrugged.',
     note: 'Avoid overpressure on the AC joint side.',
+    bilateral: true,
   },
   {
     id: 'lib-thoracic-rotation',
@@ -98,6 +102,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['scapula-shoulder', 'general', 'posture'],
     durationSec: 60,
     description: 'Lie on side, knees stacked. Rotate top arm open toward ceiling, following with eyes. Opens thoracic spine for shoulder health.',
+    bilateral: true,
   },
 
   // ── Ankle & Achilles ──────────────────────────────────────────────────
@@ -240,6 +245,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['posture'],
     durationSec: 45,
     description: 'Tilt ear to shoulder, apply gentle hand pressure. Hold 30 sec per side. Releases chronically tight upper trap from forward head.',
+    bilateral: true,
   },
   {
     id: 'lib-levator-stretch',
@@ -247,6 +253,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['posture', 'scapula-shoulder'],
     durationSec: 45,
     description: 'Turn head 45° to side, chin toward armpit, apply gentle pressure. Targets levator scapulae — key neck-shoulder tension link.',
+    bilateral: true,
   },
   {
     id: 'lib-thoracic-extension',
@@ -270,6 +277,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['general'],
     durationSec: 60,
     description: 'Sit with front and back leg at 90°. Tall spine, lean over front shin. Switch sides. Hip rotation and capsule mobility.',
+    bilateral: true,
   },
   {
     id: 'lib-worlds-greatest',
@@ -277,6 +285,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['general'],
     durationSec: 60,
     description: 'Lunge with same-side elbow to floor, rotate top arm to sky, extend to hamstring stretch. Full-body movement chain.',
+    bilateral: true,
   },
   {
     id: 'lib-cat-cow',
@@ -291,6 +300,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['general', 'posture'],
     durationSec: 60,
     description: 'On all fours. Slide one arm under body to rotate thoracic spine. Great thoracic mobility and shoulder opener.',
+    bilateral: true,
   },
   {
     id: 'lib-pigeon-pose',
@@ -298,6 +308,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['general'],
     durationSec: 60,
     description: 'Front leg bent at 90°, back leg extended. Deep hip external rotator and flexor stretch. Hold each side.',
+    bilateral: true,
   },
   {
     id: 'lib-couch-stretch',
@@ -305,6 +316,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['general'],
     durationSec: 60,
     description: 'Foot up on couch/wall behind, front knee on floor. Intense hip flexor and quad stretch. Counteracts sitting.',
+    bilateral: true,
   },
   {
     id: 'lib-deep-squat',
@@ -320,6 +332,7 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['general'],
     durationSec: 60,
     description: 'Standing on one leg. Slow, controlled full-range hip circles. Maintains hip joint health and ROM.',
+    bilateral: true,
   },
 ]
 
@@ -457,4 +470,17 @@ export const MOBILITY_PRESETS: MobilityPreset[] = [
 
 export function getLibraryExerciseById(id: string): MobilityLibraryExercise | undefined {
   return MOBILITY_LIBRARY.find(e => e.id === id)
+}
+
+// Whether a routine exercise is done one side at a time (so a "switch sides" cue
+// makes sense at its halfway point). Library exercises carry an explicit flag;
+// the built-in default routine and hand-added exercises use their own ids, so we
+// fall back to matching the library by name.
+export function isBilateralExercise(exercise: { id: string; name: string }): boolean {
+  const byId = MOBILITY_LIBRARY.find(e => e.id === exercise.id)
+  if (byId) return byId.bilateral === true
+  const byName = MOBILITY_LIBRARY.find(
+    e => e.name.toLowerCase() === exercise.name.trim().toLowerCase(),
+  )
+  return byName?.bilateral === true
 }
