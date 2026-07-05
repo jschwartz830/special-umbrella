@@ -95,6 +95,39 @@ function CompletedWorkoutsRing({
   )
 }
 
+function estimateRunDurationMin(
+  slot: {
+    durationMin?: number
+    runConfig?: { targetDurationMin?: number | null; targetDistanceMiles?: number | null } | null
+    segments?: Array<{ type?: string; duration?: string; distance?: string }>
+  },
+  programVars: Record<string, unknown> = {},
+): number {
+  if (slot.durationMin) return slot.durationMin
+  if (slot.runConfig?.targetDurationMin) return slot.runConfig.targetDurationMin
+  let totalMin = 0
+  for (const seg of slot.segments ?? []) {
+    if (seg.duration) {
+      const mMatch = seg.duration.match(/^(\d+(?:\.\d+)?)\s*m(?:in)?$/)
+      if (mMatch) { totalMin += parseFloat(mMatch[1]); continue }
+    }
+    if (seg.distance) {
+      const resolved = seg.distance.replace(/\b([a-zA-Z_]\w*)\b/g, (m: string) =>
+        programVars[m] !== undefined ? String(programVars[m]) : m,
+      )
+      const miles = parseFloat(resolved)
+      if (!isNaN(miles)) {
+        const minPerMile = seg.type === 'tempo' ? 8 : seg.type === 'warmup' || seg.type === 'cooldown' ? 12 : 11
+        totalMin += miles * minPerMile
+      }
+    }
+  }
+  if (totalMin > 0) return Math.ceil(totalMin)
+  const dist = slot.runConfig?.targetDistanceMiles
+  if (dist) return Math.ceil(dist * 11)
+  return 20
+}
+
 /** Find the most recent outcome with weights data for this plan (excluding today). */
 function findPreviousWeightsOutcome(
   planId: string,
@@ -405,36 +438,10 @@ export function TodayPage() {
     0,
   )
 
-  function estimateRunDurationMin(slot: { durationMin?: number; runConfig?: { targetDurationMin?: number | null; targetDistanceMiles?: number | null } | null; segments?: Array<{ type?: string; duration?: string; distance?: string }> }): number {
-    if (slot.durationMin) return slot.durationMin
-    if (slot.runConfig?.targetDurationMin) return slot.runConfig.targetDurationMin
-    let totalMin = 0
-    for (const seg of slot.segments ?? []) {
-      if (seg.duration) {
-        const mMatch = seg.duration.match(/^(\d+(?:\.\d+)?)\s*m(?:in)?$/)
-        if (mMatch) { totalMin += parseFloat(mMatch[1]); continue }
-      }
-      if (seg.distance) {
-        const resolved = seg.distance.replace(/\b([a-zA-Z_]\w*)\b/g, (m: string) =>
-          planProgramVars[m] !== undefined ? String(planProgramVars[m]) : m,
-        )
-        const miles = parseFloat(resolved)
-        if (!isNaN(miles)) {
-          const minPerMile = seg.type === 'tempo' ? 8 : seg.type === 'warmup' || seg.type === 'cooldown' ? 12 : 11
-          totalMin += miles * minPerMile
-        }
-      }
-    }
-    if (totalMin > 0) return Math.ceil(totalMin)
-    const dist = slot.runConfig?.targetDistanceMiles
-    if (dist) return Math.ceil(dist * 11)
-    return 20
-  }
-
   // Estimated workout duration for the compact card
   const estimatedDurationMin: number | null = (() => {
     if (!primarySlot) return null
-    if (isRunType(primarySlot.type)) return estimateRunDurationMin(primarySlot)
+    if (isRunType(primarySlot.type)) return estimateRunDurationMin(primarySlot, planProgramVars)
     if (primarySlot.targetTime != null) return primarySlot.targetTime
     if ((primarySlot.exercises?.length ?? 0) > 0) return null
     return null
@@ -448,7 +455,7 @@ export function TodayPage() {
 
     const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
     if (runSlot) {
-      const runEstimate = estimateRunDurationMin(runSlot)
+      const runEstimate = estimateRunDurationMin(runSlot, planProgramVars)
       const totalEstimate = (elapsedMin ?? 0) + runEstimate
       setCardioState(totalEstimate < 60 ? 'open' : 'prompt')
     } else {
@@ -660,9 +667,9 @@ export function TodayPage() {
         </div>
         <div className="ml-auto flex items-center gap-1.5">
           <CompletedWorkoutsRing
-            count={planCompletionPercent}
+            count={stats.totalCompleted}
             percent={planCompletionPercent}
-            accessibilityLabel={`${planCompletionPercent}% of plan complete`}
+            accessibilityLabel={`${stats.totalCompleted} workouts completed · ${planCompletionPercent}% of plan`}
           />
           <span className="text-xs text-slate-500">plan</span>
         </div>
