@@ -38,7 +38,9 @@ interface MobilityState {
   routine: MobilityExercise[]
   completions: Record<string, MobilityCompletion>
   activeSession: MobilitySessionCheckpoint | null
+  soundEnabled: boolean
 
+  setSoundEnabled: (enabled: boolean) => void
   setRoutine: (exercises: MobilityExercise[]) => void
   addExercise: (name: string, durationSec: number) => void
   addExerciseFromLibrary: (libraryId: string) => void
@@ -58,6 +60,11 @@ export const useMobilityStore = create<MobilityState>()(
       routine: DEFAULT_ROUTINE,
       completions: {},
       activeSession: null,
+      soundEnabled: true,
+
+      setSoundEnabled(enabled) {
+        set({ soundEnabled: enabled })
+      },
 
       setRoutine(exercises) {
         set({ routine: exercises })
