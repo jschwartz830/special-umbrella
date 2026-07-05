@@ -46,7 +46,7 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, WorkoutType, WorkoutSlot, PlanDay } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
@@ -392,6 +392,11 @@ export function TodayPage() {
     ? new Set(planEntries.filter(e => e.action === 'complete' || e.action === 'skip').map(e => e.calendarDate)).size
     : 0
 
+  // Cycle progress for rotation-duration plans (null for weeks-duration plans)
+  const cycleProgress = plan.duration.type === 'rotations'
+    ? computeRotationCycleProgress(plan, planEntries, today)
+    : null
+
   // Plan completion percentage for the ring visual
   const planCompletionPercent = weekProgress !== null && weekProgress.total > 0
     ? Math.round((weekProgress.completed / weekProgress.total) * 100)
@@ -665,6 +670,12 @@ export function TodayPage() {
           <span className="text-sm font-bold text-white">{stats.totalCompleted}</span>
           <span className="text-xs text-slate-400">workouts</span>
         </div>
+        {cycleProgress && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-bold text-white">{cycleProgress.doneInCycle}/{cycleProgress.rotationLength}</span>
+            <span className="text-xs text-slate-400">cycle</span>
+          </div>
+        )}
         <div className="ml-auto flex items-center gap-1.5">
           <CompletedWorkoutsRing
             count={stats.totalCompleted}
