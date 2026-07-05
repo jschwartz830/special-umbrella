@@ -1,5 +1,51 @@
 # Test Results
 
+## 2026-07-05 (seventy-second pass) — branch `claude/dreamy-mccarthy-80hikp`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  28 passed (28)
+     Tests  1017 passed (1017)
+  Duration  ~3.4s
+```
+
+### Final (after all changes)
+
+```
+Test Files  28 passed (28)
+     Tests  1017 passed (1017)
+  Duration  ~3.3s
+```
+
+**No new tests added. No regressions.**
+
+---
+
+### Why no new tests
+
+All changes this pass are confined to `src/pages/TodayPage.tsx` and are UI-only:
+
+1. **`estimateRunDurationMin` extraction**: The function logic is unchanged; only the calling convention changed (added a `programVars` parameter with a default of `{}`). The function is now in module scope and testable independently, but the existing tests that exercise it indirectly (via TodayPage rendering paths) are not part of the Vitest suite (which uses a node environment without JSDOM). A unit test for `estimateRunDurationMin` could be added in a future pass since it is now a pure exported function — the main value would be regression-guarding the estimation heuristics (min-per-mile constants, segment parsing, fallback to target distance).
+
+2. **`CompletedWorkoutsRing` count prop**: The change is to which value is passed as a prop. No new logic was added; `stats.totalCompleted` is already covered by `computeHistoryStats` tests in `historyStats.test.ts`.
+
+3. **Cycle progress chip**: Purely additive JSX conditioned on `computeRotationCycleProgress` returning non-null. `computeRotationCycleProgress` itself is already tested in `historyStats.test.ts` (12 tests, including deduplication regression test from pass 62). The JSX rendering is not covered by the Vitest node suite (no JSDOM).
+
+---
+
+### Tests reviewed (all passing)
+
+| Scope | File | Tests |
+|---|---|---|
+| `computeRotationCycleProgress` (cycle progress feature) | `src/lib/__tests__/historyStats.test.ts` | 12 tests (including dedup regression) |
+| `computeHistoryStats` (ring count fix) | `src/lib/__tests__/historyStats.test.ts` | Multiple |
+| Full suite | All 28 files | 1017 / 1017 |
+
+---
+
 ## 2026-07-03 (seventy-first pass) — branch `claude/dreamy-mccarthy-4ywaek`
 
 ---

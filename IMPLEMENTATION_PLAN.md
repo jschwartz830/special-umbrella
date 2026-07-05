@@ -1,5 +1,50 @@
 # Implementation Plan
 
+## Pass 72 — 2026-07-05 (branch `claude/dreamy-mccarthy-80hikp`)
+
+### Baseline
+
+- Branch reset from latest `main` after PR #180 merge (commit `2d08975`).
+- **1017 tests passing** across 28 test files at start of pass.
+- **1017 tests passing** at end of pass (no new tests — all changes are UI/render-only).
+
+### Architecture Summary
+
+React 18 + TypeScript + Zustand PWA. No new dependencies. All changes are confined to `src/pages/TodayPage.tsx`.
+
+### What is Strong (reaffirmed)
+
+- Rotation engine: well-tested, no bugs found.
+- `computeRotationCycleProgress` / `computeRotationPlanRemaining`: exported, tested, and deduplication-guarded since pass 62 — but had no UI caller. This pass surfaces cycle progress to users.
+- `historyStats.ts` overall: correct, stable, deduplication consistent across all counting functions.
+
+### Key Issues Found
+
+#### Bugs / Correctness
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Low | `TodayPage.tsx:662` | `CompletedWorkoutsRing` receives `planCompletionPercent` (0–100 %) as `count` but its docstring says center number is "total completed workout count" | **Fixed** |
+
+#### Code Quality
+
+| File | Issue | Status |
+|---|---|---|
+| `TodayPage.tsx:408` | `estimateRunDurationMin` defined inside component body — recreated every render, captures `planProgramVars` from closure | **Fixed** |
+
+#### Dead Code / Unused Features
+
+| File | Issue | Status |
+|---|---|---|
+| `historyStats.ts` | `computeRotationCycleProgress` exported and tested but no UI caller | **Fixed — surfaced in Today habit row** |
+
+### Changes Implemented
+
+1. `refactor + fix: extract estimateRunDurationMin to module scope; fix CompletedWorkoutsRing count`
+2. `feat: show rotation cycle progress in TodayPage habit summary row`
+
+---
+
 ## Pass 71 — 2026-07-03 (branch `claude/dreamy-mccarthy-4ywaek`)
 
 ### Baseline

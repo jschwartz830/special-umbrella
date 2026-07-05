@@ -1,5 +1,58 @@
 # Feature Reviews
 
+## Pass 72 — 2026-07-05 (branch `claude/dreamy-mccarthy-80hikp`)
+
+### Feature: Rotation Cycle Progress Chip
+
+---
+
+#### What was actually built
+
+A conditional chip in `TodayPage.tsx`'s compact habit summary row:
+
+```tsx
+{cycleProgress && (
+  <div className="flex items-center gap-1.5">
+    <span className="text-sm font-bold text-white">{cycleProgress.doneInCycle}/{cycleProgress.rotationLength}</span>
+    <span className="text-xs text-slate-400">cycle</span>
+  </div>
+)}
+```
+
+Where `cycleProgress = plan.duration.type === 'rotations' ? computeRotationCycleProgress(plan, planEntries, today) : null`.
+
+---
+
+#### What was NOT built
+
+- The chip does not show the `justCompletedRotation` state — a "rotation complete 🎉" moment was considered but felt like noise that would appear briefly every N workouts and distract from the main view.
+- The `remaining` field is not shown — "2/4 cycle" is equivalent to "2 remaining" for a 4-day rotation; adding both would be redundant.
+
+---
+
+#### What assumptions were encoded
+
+- A cycle slot counts when it has a `complete` or `skip` history entry (same semantics as `isPlanExpired`). Day-off entries do NOT count toward cycle progress.
+- For a fresh plan with 0 entries, `doneInCycle === 0` — the chip shows "0/N cycle". This is correct and not hidden, so users understand the starting state.
+- Deduplication: if the same calendar date has two entries (e.g., after a CSV re-import), it counts as 1, not 2. This was fixed in pass 62 and is covered by a dedicated regression test.
+
+---
+
+#### What worked well
+
+- Zero scope creep. The feature is exactly one conditional chip — 7 lines of JSX, 4 lines of computation.
+- Reuses a battle-tested, already-exported function. The implementation risk was purely JSX placement, not logic.
+- TypeScript clean on first compile. No new types or interfaces needed.
+
+---
+
+#### Potential follow-up
+
+- If `justCompletedRotation` is true (doneInCycle === 0 and totalDone > 0), consider a brief "Cycle complete!" state instead of "0/N cycle". This could be shown for one calendar day after the reset, then revert to "0/N cycle". A low-priority cosmetic enhancement.
+- A tooltip on the chip explaining what "cycle" means for new users who haven't internalized the rotation model.
+
+---
+
 ## Pass 71 — 2026-07-03 (branch `claude/dreamy-mccarthy-4ywaek`)
 
 ### Feature: PR Badges in History View

@@ -1,5 +1,50 @@
 # Feature Proposals
 
+## Pass 72 — 2026-07-05 (branch `claude/dreamy-mccarthy-80hikp`)
+
+---
+
+### Proposal: Rotation Cycle Progress Chip
+
+**Status**: Implemented in this pass.
+
+---
+
+#### Feature selected
+
+**"X/Y cycle" progress indicator in the Today page habit summary row (rotation plans only)**
+
+For users on rotation-duration plans (e.g., a 4-day upper/lower split running 12 rotations), the habit summary row now shows how far through the current rotation cycle they are: "2/4 cycle" means 2 of 4 days are logged in this rotation pass.
+
+---
+
+#### Why this feature
+
+The infrastructure was already fully built and tested:
+- `computeRotationCycleProgress` in `historyStats.ts` has been exported, documented, and tested since pass 62.
+- It uses the same deduplication guards as `isPlanExpired` — consistent semantics.
+- It returns `{ doneInCycle, rotationLength, remaining, justCompletedRotation }`.
+
+Despite being production-ready, no UI component called it. The Today habit row is the natural home — it already shows streak and total workouts. For a rotation plan user, "where am I in this cycle" is the third most relevant piece of information (after streak and total count).
+
+---
+
+#### Why this is low-risk
+
+- Zero new state — reads from existing `planEntries` already subscribed by `useActivePlan`.
+- Zero new imports to new modules — `computeRotationCycleProgress` is in the already-imported `historyStats`.
+- Conditional render — chip is absent for weeks-duration plans (returns null), so no weeks-plan UI regression.
+- No data mutation — purely additive display.
+- The number displayed cannot go out of sync because `computeRotationCycleProgress` is computed from the same `planEntries` array that drives all other stats on the page.
+
+---
+
+#### Alternative considered
+
+Show the cycle chip as a progress bar instead of a text fraction. Rejected — the existing plan ring already encodes overall plan progress as an arc, and a second bar would create visual noise. The text fraction "2/4 cycle" is information-dense and matches the style of the streak/workouts chips.
+
+---
+
 ## Pass 71 — 2026-07-03 (branch `claude/dreamy-mccarthy-4ywaek`)
 
 ---
