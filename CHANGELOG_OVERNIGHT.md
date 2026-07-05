@@ -1,3 +1,43 @@
+# Overnight Changelog — Pass 72 (2026-07-05)
+
+## Branch: `claude/dreamy-mccarthy-80hikp`
+
+### Commit 1 — `3b3eb5b`
+
+**refactor + fix: extract estimateRunDurationMin to module scope; fix CompletedWorkoutsRing count**
+
+#### Change A — estimateRunDurationMin extraction
+
+- `src/pages/TodayPage.tsx`: Moved `estimateRunDurationMin` from inside the `TodayPage` component body to module scope. The function was previously recreated on every render because it was defined as a regular function inside the component closure. It captured `planProgramVars` from the enclosing component scope; this dependency is now an explicit second parameter (`programVars: Record<string, unknown> = {}`), making the function a pure module-level utility.
+- Both call sites updated: `estimateRunDurationMin(primarySlot)` → `estimateRunDurationMin(primarySlot, planProgramVars)`, `estimateRunDurationMin(runSlot)` → `estimateRunDurationMin(runSlot, planProgramVars)`.
+- Why: Eliminates per-render function recreation. The function is stable — it does not need access to React state — and is now independently testable.
+- Risk: None. No behavior change. The function body is identical; only the calling convention changed.
+- Rollback: Move the function back inside the component and remove the `programVars` parameter.
+
+#### Change B — CompletedWorkoutsRing count prop
+
+- `src/pages/TodayPage.tsx`: Changed `count={planCompletionPercent}` to `count={stats.totalCompleted}`. The `CompletedWorkoutsRing` component shows a number in the center of the SVG ring. Its JSDoc says "total completed workout count" but the prop was receiving `planCompletionPercent` (a 0–100% integer). A user with e.g. 34 workouts at 34% plan progress would see "34" — coincidentally accurate — but a user at 71% with 120 workouts would see "71" (the percent, not the count). The accessibility label correctly said "71% of plan complete", making the visual number and the accessible description inconsistent.
+- Accessibility label updated to `"N workouts completed · P% of plan"` to be fully self-describing.
+- Why: Semantic correctness. The center number should be the thing the component's name describes: a count of completed workouts.
+- Risk: Low. Users who previously read the center number as a percentage will now see a different (and correct) value. The ring arc still encodes the percentage, so plan progress remains visible.
+- Rollback: Revert `count` and `accessibilityLabel` to their prior values.
+
+---
+
+### Commit 2 — `ade8e4b`
+
+**feat: show rotation cycle progress in TodayPage habit summary row**
+
+- `src/pages/TodayPage.tsx`:
+  - Added `computeRotationCycleProgress` to the `historyStats` import.
+  - Added `cycleProgress` computation: `plan.duration.type === 'rotations' ? computeRotationCycleProgress(plan, planEntries, today) : null`.
+  - Added a conditional chip in the habit summary row (between "workouts" and the plan ring): renders `"X/Y cycle"` where X = `cycleProgress.doneInCycle` and Y = `cycleProgress.rotationLength`. Only visible for rotation-duration plans; the chip is absent for weeks-duration plans.
+- Why: `computeRotationCycleProgress` has been exported, tested, and documented since pass 62. It deduplicates by calendarDate and mirrors `isPlanExpired` semantics. Despite being fully production-ready, it had no UI caller. For rotation-plan users, "where am I in this cycle" is directly actionable — e.g., knowing you're at 3/5 tells you how many days remain before the rotation resets.
+- Risk: Low. Purely additive UI change. No new state, no new store interactions. The chip renders only when `computeRotationCycleProgress` returns non-null (rotation plans only). For a fresh plan with 0 logged days, `doneInCycle === 0` and `rotationLength === plan.days.length` — "0/N cycle" is rendered, which is accurate and harmless.
+- Rollback: Remove the import addition, `cycleProgress` computation, and the conditional chip JSX.
+
+---
+
 # Overnight Changelog — Pass 71 (2026-07-03)
 
 ## Branch: `claude/dreamy-mccarthy-4ywaek`

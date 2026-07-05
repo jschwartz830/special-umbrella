@@ -1,5 +1,61 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-05 (seventy-second pass) — branch `claude/dreamy-mccarthy-80hikp`
+
+---
+
+### Executive summary
+
+1. **What changed**: 1 bug fix + 1 code quality refactor + 1 additive feature. 2 commits, all in `TodayPage.tsx`. Tests held at 1017 (changes are UI-only; no new logic to test).
+2. **What is highest confidence**: Both the refactor and the ring count fix are mechanical. The ring count fix changes what number appears in the ring center — this is the most visible part of the UI change and worth eyeballing.
+3. **What changed in UX**: The ring center in the Today habit summary row now shows the real workout count (e.g., 47) instead of the plan completion percentage (e.g., 71). For rotation-plan users, a "X/Y cycle" chip appears between the workouts count and the ring.
+4. **What to review first**: The `CompletedWorkoutsRing` prop change (commit `3b3eb5b`) and the cycle chip (commit `ade8e4b`).
+
+---
+
+### Issues found
+
+| Priority | Issue | File | Disposition |
+|---|---|---|---|
+| Low–Medium | `CompletedWorkoutsRing` received plan completion % as `count` prop instead of workout count | `TodayPage.tsx:662` | Fixed |
+| Low | `estimateRunDurationMin` defined inside component body — recreated every render | `TodayPage.tsx:408` | Fixed |
+| Low | `computeRotationCycleProgress` has no UI caller despite being exported and tested | `historyStats.ts` | Fixed — surfaced in Today |
+
+### Non-issues confirmed (from extended background audit)
+
+| Item | Verdict |
+|---|---|
+| Rotation engine correctness | Sound. No bugs found. |
+| All stat deduplication guards (isPlanExpired, computeRotationCycleProgress, computeRotationPlanRemaining, countTotalUnloggedDays, etc.) | Consistently use `new Set(dates)` — correct after pass 62 fixes |
+| `addEntry` deduplication (keeps newest by planId+calendarDate) | Correct invariant |
+| `importEntries` merge (newest `createdAt` wins within batch) | Correct |
+| `outcomeSortKey` fallback chain | Correct (`completedAt` → extracted date from instanceId → '') |
+| `logOutcomeWithProgression` try/catch around run engine | Intentional — always saves outcome even if progression throws |
+| Progressive YAML rules gating on `session_complete` | Correct — deferred outcomes excluded |
+| Plan deletion non-atomicity (6 separate store calls) | Known design debt; no rollback if one fails. Documented only. |
+| `nanoid` uses `Math.random` (not `crypto.getRandomValues`) | Low collision risk for personal-tracker usage; documented. |
+
+---
+
+### Improvements completed
+
+| # | Commit | Type | Confidence |
+|---|---|---|---|
+| 1 | Extract `estimateRunDurationMin` to module scope | Refactor | Very high |
+| 2 | Fix `CompletedWorkoutsRing` count prop | Bug fix | High |
+| 3 | Add cycle progress chip (rotation plans) | Feature | High |
+
+### Items documented only (not implemented)
+
+| Item | Reason |
+|---|---|
+| `storeSync.ts` 1500ms debounce data loss window | Infrastructure decision; risky without careful testing |
+| `storeSync.ts` last-login-wins conflict resolution | Product/sync strategy decision |
+| Plan deletion non-atomicity | Would require a transaction abstraction; architectural change |
+| `nanoid` non-cryptographic PRNG | Negligible collision risk for personal-tracker usage |
+
+---
+
 ## 2026-07-03 (seventy-first pass) — branch `claude/dreamy-mccarthy-4ywaek`
 
 ---
