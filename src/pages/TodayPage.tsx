@@ -790,7 +790,7 @@ export function TodayPage() {
               onDelete={() => {
                 removeOutcome(makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id))
                 removeExtraEntry(extra.id)
-                if (extra.advancedRotation ?? extra.source === 'double_day') removeLastOverrideByType(plan.id, 'advance')
+                if (extra.advancedRotation ?? (extra.source === 'double_day')) removeLastOverrideByType(plan.id, 'advance')
               }}
             >
               <button
@@ -996,7 +996,7 @@ export function TodayPage() {
                 ) {
                   removeOutcome(makeExtraWorkoutInstanceId(plan.id, today, ex.id))
                   removeExtraEntry(ex.id)
-                  if (ex.advancedRotation ?? ex.source === 'double_day') removedDoubleDay = true
+                  if (ex.advancedRotation ?? (ex.source === 'double_day')) removedDoubleDay = true
                 }
               }
               if (removedDoubleDay) removeLastOverrideByType(plan.id, 'advance')

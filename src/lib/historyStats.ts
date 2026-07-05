@@ -539,6 +539,43 @@ export function computePersonalRecords(
   return [...byExercise.values()].sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
 }
 
+/**
+ * Determine whether a specific workout session set any all-time PR at the time
+ * it was logged. A session sets a load PR when its maxLoad strictly exceeded
+ * every prior session for that exercise (by calendarDate). Same for reps.
+ *
+ * Used to show PR badges on history items without relying on today's aggregate,
+ * so that the badge reflects the state at log time (a session that was a PR
+ * when logged stays marked as a PR even if it has since been surpassed).
+ */
+export function computeWorkoutPRFlags(
+  workoutInstanceId: string,
+  allRecords: ExerciseSessionRecord[],
+): { hasLoadPR: boolean; hasRepsPR: boolean } {
+  const sessionRecords = allRecords.filter(r => r.workoutInstanceId === workoutInstanceId)
+  if (!sessionRecords.length) return { hasLoadPR: false, hasRepsPR: false }
+
+  let hasLoadPR = false
+  let hasRepsPR = false
+
+  for (const session of sessionRecords) {
+    const prior = allRecords.filter(
+      r => r.exerciseName === session.exerciseName && r.calendarDate < session.calendarDate,
+    )
+    const priorMaxLoad = prior.reduce((m, r) => (r.maxLoad !== null ? Math.max(m, r.maxLoad) : m), 0)
+    const priorMaxReps = prior.reduce((m, r) => (r.maxReps !== null ? Math.max(m, r.maxReps) : m), 0)
+
+    if (session.maxLoad !== null && session.maxLoad > 0 && session.maxLoad > priorMaxLoad) {
+      hasLoadPR = true
+    }
+    if (session.maxReps !== null && session.maxReps > 0 && session.maxReps > priorMaxReps) {
+      hasRepsPR = true
+    }
+  }
+
+  return { hasLoadPR, hasRepsPR }
+}
+
 // ── Streakable dates set ──────────────────────────────────────────────────────
 
 /**

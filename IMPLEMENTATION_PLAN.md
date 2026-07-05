@@ -1,5 +1,93 @@
 # Implementation Plan
 
+## Pass 71 — 2026-07-03 (branch `claude/dreamy-mccarthy-4ywaek`)
+
+### Baseline
+
+- Branch reset from latest `main` after pass 70 merge (commit `5a6f48f`).
+- **992 tests passing** across 26 test files at start of pass.
+- **1010 tests passing** at end of pass (+18 new tests).
+
+### Architecture Summary
+
+React 18 + TypeScript 5.5 + Zustand 4.5 PWA, deployed to GitHub Pages via GitHub Actions.
+Build tool: Vite. Testing: Vitest (node environment — no DOM). CSS: Tailwind.
+Auth: Supabase Google OAuth. Sync: custom storeSync.ts with 1500ms debounce.
+
+### Layer map
+
+```
+pages/           — Route-level views (TodayPage, CalendarPage, HistoryPage, PlansPage, …)
+components/      — Shared UI primitives + workout-specific components
+engine/          — Core scheduling / rotation logic (rotationEngine, calendarProjection, programParser)
+modules/         — Domain logic units: run-adaptation, recommendation, workout-metadata, workout-outcomes
+store/           — Zustand stores (historyStore, outcomeStore, planStore, exerciseHistoryStore, …)
+lib/             — Pure utilities: csv, expressionEval, sessionSummary, historyStats, storeSync, …
+hooks/           — Shared React hooks
+types/           — TypeScript type definitions
+```
+
+### What is Strong
+
+- Rotation engine is well-tested and handles edge cases (jump/advance/go_back overrides, wrap-around)
+- Zustand stores have good migration guards and idempotent upsert patterns
+- `exerciseHistoryStore` pre-computes summaries (maxLoad, maxReps, totalVolume) at write time
+- `sessionSummary.ts` is clean and well-documented with correct PB detection
+- Progression test coverage is extensive (regression guards, edge cases)
+- Plan delete cascade correctly clears all dependent stores
+- CSV import/export is robust with good error handling
+
+### Key Issues Found
+
+#### Bugs / Correctness
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Medium | `progression.ts:103` | `buildWeightsRecommendation` uses `exercises[0].progressionMode` even when exercises[0] has no mode | **Fixed** |
+| Low | `planDayUtils.ts:9` | `extraToPlanDay` gives same `id` to both the day and its only slot | Document only |
+| Low | `AuthGate.tsx:14` | Dead `unsubscribeStores` variable in first `useEffect` | **Fixed** |
+
+#### DRY Violations
+
+| File | Issue | Status |
+|---|---|---|
+| `ActiveWorkoutTracker.tsx:58` + `OutcomeModal.tsx:87` | `deriveProgressionMode` duplicated identically | **Fixed** |
+| `useExpiryDismiss.ts` + `useStallNudgeDismiss.ts` | Near-identical hook implementations | Document only |
+
+#### Code Quality
+
+| File | Issue | Status |
+|---|---|---|
+| `PlansPage.tsx:83` | `PlanCard` defined inside `PlansPage` — causes React unmount/remount cycles | **Fixed** |
+| `TodayPage.tsx:793,999` | `x ?? y === 'z'` reads misleadingly without explicit parens | **Fixed** |
+| `programParser.ts:3` | Imports `nanoid` via `rotationEngine` instead of directly from `lib/utils` | **Fixed** |
+| `PlanBuilderPage.tsx:978` | `setTimeout(navigate, 600)` — no cleanup on unmount | **Fixed** |
+
+#### Architecture / Design Debt (document only)
+
+| File | Issue |
+|---|---|
+| `storeSync.ts:95` | 1500ms debounce creates data loss window if app closes mid-debounce |
+| `storeSync.ts:76-82` | Last-login-wins conflict resolution can silently overwrite data from another device |
+| `outcomeStore.ts:248` | `migrate` is a no-op type cast — future schema versions need real migrations |
+| `outcomeStore.ts:197` | `clearPlanOutcomes` prefix-match could theoretically match a different plan's ID |
+| `supabase.ts:3-6` | URL and anon key hardcoded in source |
+| `exerciseLibrary.ts` | ~30-40 exercises have `synergist` arrays containing exercise names instead of muscle groups |
+
+### Changes Implemented
+
+1. `refactor: import nanoid from lib/utils directly in programParser`
+2. `fix: remove dead unsubscribeStores variable from AuthGate initialize effect`
+3. `fix: add explicit parentheses to clarify ?? operator precedence in TodayPage`
+4. `refactor: extract deriveProgressionMode to shared module`
+5. `fix: move PlanCard to module scope in PlansPage`
+6. `fix: use first exercise with progressionMode in buildWeightsRecommendation`
+7. `fix: cancel post-save navigate timer on PlanBuilderPage unmount`
+8. `test: add unit tests for deriveProgressionMode` (9 new tests)
+9. `feat: PR badges on history workout items for weight exercises` (10 new tests)
+
+---
+
 ## Pass 70 — 2026-07-02 (branch `claude/dreamy-mccarthy-jy89cx`)
 
 ### Observations on entry

@@ -1,5 +1,110 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-03 (seventy-first pass) — branch `claude/dreamy-mccarthy-4ywaek`
+
+---
+
+### Executive summary
+
+1. **What changed**: 7 bug/quality fixes + 2 test additions + 1 additive feature (PR badges in history). All 9 commits are small and logically separated. Tests went from 992 → 1010 (+18).
+2. **What is highest confidence**: The nanoid import fix, AuthGate dead variable removal, operator precedence parens, and `deriveProgressionMode` extraction are all mechanical/zero-behavior-change. Strong candidates to keep without review.
+3. **What is risky**: The `PlanCard` module-scope move is structural (React component hierarchy change) — test it by opening Plans and verifying the activate/delete/copy actions still work. The `buildWeightsRecommendation` fix changes behavior when exercises[0] has no `progressionMode`.
+4. **What to review first**: Commit `b9bf3cd` (PlanCard) and `a58fce8` (buildWeightsRecommendation). Both are low-risk but have the most behavioral surface area.
+
+---
+
+### Biggest issues found in this pass
+
+| Priority | Issue | File | Disposition |
+|---|---|---|---|
+| Medium | `buildWeightsRecommendation` used `exercises[0]` for mode even when exercises[0] had no mode configured | `progression.ts:103` | Fixed |
+| Medium | `PlanCard` defined inside parent component — causes unmount/remount on every parent render | `PlansPage.tsx:83` | Fixed |
+| Low | `deriveProgressionMode` duplicated in two files | `ActiveWorkoutTracker.tsx` + `OutcomeModal.tsx` | Fixed |
+| Low | Dead `unsubscribeStores` variable in AuthGate | `AuthGate.tsx:14` | Fixed |
+| Low | Indirect nanoid import through rotationEngine | `programParser.ts:3` | Fixed |
+| Low | Operator precedence ambiguity | `TodayPage.tsx:793,999` | Fixed |
+| Low | setTimeout without cleanup | `PlanBuilderPage.tsx:978` | Fixed |
+
+### Issues documented only (not implemented)
+
+| Issue | Reason not implemented |
+|---|---|
+| `storeSync.ts` debounce data loss window | Product/infrastructure decision; risky to change without careful testing |
+| `storeSync.ts` last-login-wins conflict resolution | Major product decision about sync strategy |
+| `outcomeStore.ts` migrate is a no-op | Requires careful versioning strategy to add real migrations |
+| `exerciseLibrary.ts` synergist data errors (~30-40 exercises) | Requires data audit; data-only change but large and tedious |
+| `supabase.ts` credentials in source | Requires environment variable infrastructure changes |
+| `useExpiryDismiss`/`useStallNudgeDismiss` near-identical hooks | Nice-to-have; no correctness impact |
+| `planDayUtils.ts` shared day+slot id | Cosmetic; no observed downstream issue |
+
+---
+
+### Improvements completed
+
+| # | Commit | Confidence |
+|---|---|---|
+| 1 | `refactor: import nanoid from lib/utils directly in programParser` | Very high |
+| 2 | `fix: remove dead unsubscribeStores variable from AuthGate` | Very high |
+| 3 | `fix: operator precedence clarification in TodayPage` | Very high |
+| 4 | `refactor: extract deriveProgressionMode to shared module` | High |
+| 5 | `fix: move PlanCard to module scope in PlansPage` | High |
+| 6 | `fix: use first exercise with progressionMode in buildWeightsRecommendation` | High |
+| 7 | `fix: cancel post-save navigate timer on PlanBuilderPage unmount` | High |
+| 8 | `test: add unit tests for deriveProgressionMode` (9 tests) | High |
+| 9 | `feat: PR badges on history workout items` (10 tests) | High |
+
+---
+
+### Feature added: PR badges in History view
+
+When browsing the History page, weight-training workouts that set a new all-time load or reps record at the time they were logged show a small "Load PR" / "Reps PR" / "Load & reps PR" badge inline with the set count. Detection is strict (must exceed, not tie, prior best) and relative to log date.
+
+See FEATURE_PROPOSAL.md and FEATURE_REVIEW.md for full detail.
+
+**Verdict: Keep** — purely additive, well-tested, closes the PR tracking story.
+
+---
+
+### Keep / revise / reject classification
+
+**Definitely keep**
+- nanoid import fix
+- AuthGate dead variable removal
+- Operator precedence parens
+- `deriveProgressionMode` extraction + tests
+- PR badges feature
+
+**Probably keep but verify manually**
+- `PlanCard` module scope move — verify Plans page works (activate, deactivate, copy, archive, delete)
+- `buildWeightsRecommendation` first-with-mode fix — verify outcome recommendations still appear correctly after a weights workout
+
+**Low priority, keep or skip**
+- `PlanBuilderPage` setTimeout cleanup — correct but extremely unlikely to matter in practice
+
+---
+
+### Open questions for you
+
+1. **PR badge semantics**: Should tied (equal-to-prior-best) sessions get a badge? Current: no. This means if you hit 185lb Bench Press twice, only the first session shows the badge.
+2. **`buildWeightsRecommendation` change**: Are there plans where exercises[0] intentionally has no progressionMode? If so, verify the recommendation behavior is still correct.
+3. **`storeSync.ts` conflict resolution**: The last-login-wins behavior is a real risk for multi-device users. Worth addressing in a dedicated pass with explicit product decisions.
+4. **Exercise library synergist data**: ~30-40 exercises have exercise names in the `synergist` field instead of muscle groups. This affects the exercise detail view. Worth a dedicated data-fix pass.
+
+---
+
+### Known issues or incomplete work
+
+- `computeWorkoutPRFlags` is called per-rendered-item in HistoryPage without memoization. For users with large exercise history (thousands of records, hundreds of workout entries), this could be slow. If performance is an issue, pre-index by exercise name.
+- The PR badge doesn't name which exercise set the record — it just says "Load PR". Future enhancement: list the exercises.
+
+---
+
+### Dependencies added
+
+None.
+
+---
+
 ## 2026-07-02 (seventieth pass) — branch `claude/dreamy-mccarthy-jy89cx`
 
 ---

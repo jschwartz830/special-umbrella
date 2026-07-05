@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -2547,5 +2547,103 @@ describe('getUnloggedPastDates 14-day window', () => {
     expect(gaps14).toHaveLength(7) // days 8–14 ago are unlogged
     expect(gaps14[0]).toBe('2026-04-20') // newest first
     expect(gaps14[6]).toBe('2026-04-14') // oldest last
+  })
+})
+
+// ── computeWorkoutPRFlags ─────────────────────────────────────────────────────
+
+function makeExRecord(
+  workoutInstanceId: string,
+  exerciseName: string,
+  calendarDate: string,
+  maxLoad: number | null,
+  maxReps: number | null,
+): ExerciseSessionRecord {
+  return {
+    id: `${workoutInstanceId}_${exerciseName}`,
+    exerciseName,
+    calendarDate,
+    planId: 'plan-1',
+    planName: 'Test Plan',
+    workoutName: 'Test Workout',
+    workoutInstanceId,
+    sets: [],
+    totalVolume: maxLoad !== null && maxReps !== null ? maxLoad * maxReps : null,
+    maxLoad,
+    maxReps,
+    createdAt: `${calendarDate}T12:00:00Z`,
+  }
+}
+
+describe('computeWorkoutPRFlags', () => {
+  it('returns false/false when no records exist for the given instanceId', () => {
+    const result = computeWorkoutPRFlags('plan-1_2026-01-10', [])
+    expect(result).toEqual({ hasLoadPR: false, hasRepsPR: false })
+  })
+
+  it('marks load PR when first-ever session for an exercise', () => {
+    const records = [makeExRecord('plan-1_2026-01-10', 'Bench Press', '2026-01-10', 185, 5)]
+    const result = computeWorkoutPRFlags('plan-1_2026-01-10', records)
+    expect(result.hasLoadPR).toBe(true)
+  })
+
+  it('marks reps PR when first-ever session for an exercise', () => {
+    const records = [makeExRecord('plan-1_2026-01-10', 'Push-up', '2026-01-10', null, 20)]
+    const result = computeWorkoutPRFlags('plan-1_2026-01-10', records)
+    expect(result.hasRepsPR).toBe(true)
+  })
+
+  it('marks load PR when session exceeds all prior sessions for that exercise', () => {
+    const records = [
+      makeExRecord('plan-1_2026-01-01', 'Squat', '2026-01-01', 225, 5),
+      makeExRecord('plan-1_2026-01-08', 'Squat', '2026-01-08', 230, 5), // new PR
+    ]
+    const result = computeWorkoutPRFlags('plan-1_2026-01-08', records)
+    expect(result.hasLoadPR).toBe(true)
+  })
+
+  it('does NOT mark load PR when session matches but does not exceed prior best', () => {
+    const records = [
+      makeExRecord('plan-1_2026-01-01', 'Squat', '2026-01-01', 225, 5),
+      makeExRecord('plan-1_2026-01-08', 'Squat', '2026-01-08', 225, 5), // tied, not exceeded
+    ]
+    const result = computeWorkoutPRFlags('plan-1_2026-01-08', records)
+    expect(result.hasLoadPR).toBe(false)
+  })
+
+  it('does NOT mark load PR when session is below prior best', () => {
+    const records = [
+      makeExRecord('plan-1_2026-01-01', 'Deadlift', '2026-01-01', 315, 3),
+      makeExRecord('plan-1_2026-01-08', 'Deadlift', '2026-01-08', 300, 3), // regression
+    ]
+    const result = computeWorkoutPRFlags('plan-1_2026-01-08', records)
+    expect(result.hasLoadPR).toBe(false)
+    expect(result.hasRepsPR).toBe(false)
+  })
+
+  it('returns true if ANY exercise in the session set a PR (not all)', () => {
+    const records = [
+      makeExRecord('plan-1_2026-01-01', 'Bench Press', '2026-01-01', 185, 8),
+      makeExRecord('plan-1_2026-01-01', 'OHP', '2026-01-01', 115, 8),
+      // Session 2: Bench stays flat, OHP hits new PR
+      makeExRecord('plan-1_2026-01-08', 'Bench Press', '2026-01-08', 185, 8),
+      makeExRecord('plan-1_2026-01-08', 'OHP', '2026-01-08', 120, 8), // new PR
+    ]
+    const result = computeWorkoutPRFlags('plan-1_2026-01-08', records)
+    expect(result.hasLoadPR).toBe(true)
+  })
+
+  it('ignores zero and null loads when checking PRs', () => {
+    const records = [makeExRecord('plan-1_2026-01-10', 'Plank', '2026-01-10', 0, null)]
+    const result = computeWorkoutPRFlags('plan-1_2026-01-10', records)
+    expect(result.hasLoadPR).toBe(false)
+    expect(result.hasRepsPR).toBe(false)
+  })
+
+  it('returns both flags when load and reps both set PRs in same session', () => {
+    const records = [makeExRecord('plan-1_2026-01-10', 'Pull-up', '2026-01-10', 25, 12)]
+    const result = computeWorkoutPRFlags('plan-1_2026-01-10', records)
+    expect(result.hasLoadPR).toBe(true)
+    expect(result.hasRepsPR).toBe(true)
   })
 })

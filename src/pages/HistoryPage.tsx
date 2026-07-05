@@ -23,7 +23,7 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv, personalRecordsToCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate, findBestWeek } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate, findBestWeek, computeWorkoutPRFlags } from '../lib/historyStats'
 import type { PersonalRecord, WeeklyBreakdown, WorkoutTypeBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -570,7 +570,11 @@ export function HistoryPage() {
                       {/* Outcome actuals */}
                       {outcome && (
                         <div className="mt-2">
-                          <OutcomeMetrics outcome={outcome} progressionState={progressionState} />
+                          <OutcomeMetrics
+                            outcome={outcome}
+                            progressionState={progressionState}
+                            prFlags={computeWorkoutPRFlags(instanceId, allExerciseRecords)}
+                          />
                         </div>
                       )}
 
@@ -661,7 +665,10 @@ export function HistoryPage() {
 
                     {extraOutcome && (
                       <div className="mt-2">
-                        <OutcomeMetrics outcome={extraOutcome} />
+                        <OutcomeMetrics
+                          outcome={extraOutcome}
+                          prFlags={computeWorkoutPRFlags(instanceId, allExerciseRecords)}
+                        />
                       </div>
                     )}
 

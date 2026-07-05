@@ -11,7 +11,6 @@ export function AuthGate({ children }: Props) {
 
   useEffect(() => {
     let cleanup: (() => void) | undefined
-    let unsubscribeStores: (() => void) | undefined
 
     initialize().then(unsub => {
       cleanup = unsub
@@ -19,7 +18,6 @@ export function AuthGate({ children }: Props) {
 
     return () => {
       cleanup?.()
-      unsubscribeStores?.()
     }
   }, [initialize])
 

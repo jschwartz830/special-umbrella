@@ -174,20 +174,30 @@ describe('buildProgressionRecommendation — weights: single mode (default)', ()
     expect(result?.note).toMatch(/load reduction/i)
   })
 
-  it('uses progressionMode from the first exercise', () => {
+  it('uses progressionMode from the first exercise that has one configured', () => {
+    // When exercises[0] has no progressionMode, the recommendation uses the
+    // first exercise in the list that does — rather than silently defaulting
+    // to 'single' from a missing value.
     const result = buildProgressionRecommendation(
       makeSlot('weights'),
       makeOutcome({
         weightsActual: {
-          exercises: [{
-            exercise: 'OHP',
-            progressionMode: 'single',
-            sets: [completedSet()],
-          }],
+          exercises: [
+            {
+              exercise: 'Warmup',
+              // no progressionMode — should be skipped when finding primary
+              sets: [completedSet()],
+            },
+            {
+              exercise: 'OHP',
+              progressionMode: 'double',
+              sets: [completedSet()],
+            },
+          ],
         },
       }),
     )
-    expect(result?.mode).toBe('single')
+    expect(result?.mode).toBe('double')
   })
 })
 
