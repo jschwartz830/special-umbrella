@@ -435,6 +435,17 @@ export function TodayPage() {
     )
   }, [plan, upcoming, planEntries])
 
+  // Last-session summaries for upcoming cards (one line each, e.g. "Squat 135 lb · 3×8")
+  const upcomingSessionSummaries = useMemo(() => {
+    if (!plan) return {} as Record<string, string | null>
+    return Object.fromEntries(
+      upcoming.map(rd => {
+        const outcome = findPreviousSessionForPlanDay(plan.id, rd.planDayIndex, today, planEntries, allOutcomes)
+        return [rd.calendarDate, outcome ? buildLastSessionSummary(outcome, maxLoadByExercise) : null]
+      }),
+    )
+  }, [plan, upcoming, today, planEntries, allOutcomes, maxLoadByExercise])
+
   // Exercise count and meta for the compact workout card
   const primarySlot = primaryPlanDay.slots[0]
   const primarySlotMeta = primarySlot ? WORKOUT_META[primarySlot.type] : null
@@ -1115,6 +1126,11 @@ export function TodayPage() {
                     {upcomingNote && (
                       <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
                         <TrendingUp size={10} />{upcomingNote}
+                      </p>
+                    )}
+                    {upcomingSessionSummaries[rd.calendarDate] && (
+                      <p className="text-[10px] text-slate-500 mt-0.5 ml-1 truncate">
+                        Last: {upcomingSessionSummaries[rd.calendarDate]}
                       </p>
                     )}
                   </div>
