@@ -435,6 +435,17 @@ export function TodayPage() {
     )
   }, [plan, upcoming, planEntries])
 
+  // Last-session summaries for upcoming cards (one line each, e.g. "Squat 135 lb · 3×8")
+  const upcomingSessionSummaries = useMemo(() => {
+    if (!plan) return {} as Record<string, string | null>
+    return Object.fromEntries(
+      upcoming.map(rd => {
+        const outcome = findPreviousSessionForPlanDay(plan.id, rd.planDayIndex, today, planEntries, allOutcomes)
+        return [rd.calendarDate, outcome ? buildLastSessionSummary(outcome, maxLoadByExercise) : null]
+      }),
+    )
+  }, [plan, upcoming, today, planEntries, allOutcomes, maxLoadByExercise])
+
   // Exercise count and meta for the compact workout card
   const primarySlot = primaryPlanDay.slots[0]
   const primarySlotMeta = primarySlot ? WORKOUT_META[primarySlot.type] : null
@@ -1117,6 +1128,11 @@ export function TodayPage() {
                         <TrendingUp size={10} />{upcomingNote}
                       </p>
                     )}
+                    {upcomingSessionSummaries[rd.calendarDate] && (
+                      <p className="text-[10px] text-slate-500 mt-0.5 ml-1 truncate">
+                        Last: {upcomingSessionSummaries[rd.calendarDate]}
+                      </p>
+                    )}
                   </div>
                 </div>
               )
@@ -1190,7 +1206,7 @@ export function TodayPage() {
       {cardioState === 'prompt' && (() => {
         const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
         if (!runSlot) return null
-        const runEst = estimateRunDurationMin(runSlot)
+        const runEst = estimateRunDurationMin(runSlot, planProgramVars)
         return (
           <Modal title="Nice work on the lifts!" onClose={handleCardioCancel}>
             <div className="space-y-4">

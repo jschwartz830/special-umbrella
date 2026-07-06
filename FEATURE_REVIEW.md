@@ -336,3 +336,38 @@ if (outcome.weightsActual?.exercises?.length) {
 #### Keep / revise / prototype / reject
 
 **Keep with revisions** — the core feature is correct and valuable. The edit-flow false positive and first-session surge are worth addressing before considering it "done."
+
+---
+
+## Pass 73 Feature Review: Last session summary on upcoming workout cards
+
+### Implementation summary
+
+**Files changed:** `src/pages/TodayPage.tsx` only.
+
+**New code:**
+1. `upcomingSessionSummaries` `useMemo` (~10 lines) — calls `findPreviousSessionForPlanDay` + `buildLastSessionSummary` for each upcoming rotation slot.
+2. `<p>` element under each upcoming card — renders `Last: {summary}` when a prior session exists; hidden when null.
+
+### What I like
+
+- Zero new dependencies, zero new abstractions. Re-uses the exact pattern already in the file for today's card.
+- Gracefully absent: the line only appears if there's prior history. First-time users see nothing different.
+- `truncate` class prevents long summaries from wrapping on narrow viewports.
+- Muted text (`text-slate-500`) keeps it visually subordinate to the card content.
+
+### What feels risky or incomplete
+
+1. **Performance at scale**: `findPreviousSessionForPlanDay` iterates `allOutcomes` for each upcoming slot. With 5 upcoming slots and years of history, this is ~5 × O(n) scans per render cycle (mitigated by the `useMemo`). Acceptable for the PWA scale, but worth noting.
+2. **`maxLoadByExercise` memo lag**: the summary for weights workouts uses the global max-load map (computed once over all history). If the same session contains both the prior max and a current edit in flight, the "Last:" line is slightly stale. Not a real issue in practice — the memo re-fires on outcome changes.
+3. **No unit test coverage**: the summary string comes from `buildLastSessionSummary` (already tested in `sessionSummary.test.ts`). The rendering integration is untested (requires component tests).
+
+### Recommended next steps
+
+1. **Manual smoke test**: log a weights session, navigate away and back. Confirm the next upcoming occurrence of the same plan day shows the one-liner.
+2. **Run/swim test**: log a run and verify the format shows pace/distance (not exercise names).
+3. **Edge case**: plan with a single rotation slot — the same slot appears tomorrow, in 2 days, etc. Confirm the same last-session summary appears on all of them (correct, since `planDayIndex` matches).
+
+### Keep / revise / prototype / reject
+
+**Keep** — low risk, good utility, zero new dependencies.

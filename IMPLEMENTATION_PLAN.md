@@ -743,3 +743,76 @@ No other genuine correctness bugs were found. All other audit items were either 
 | Redundant `removeEntry` before `updateEntryDate` in `handleOutcomeConfirm` | Harmless — `updateEntryDate` already removes collisions internally; no bug, no impact, not worth touching |
 | Feature: last-session summary on upcoming cards | Medium complexity; TodayPage already shows this for today's card via `prevSessionOutcome`; extending to the upcoming list is a larger UI change |
 | Component/integration tests | Requires jsdom or Playwright setup; out of scope for a targeted overnight pass |
+
+---
+
+## Pass 73 — 2026-07-06 (branch `claude/dreamy-mccarthy-od2r9n`)
+
+### Observations on entry
+
+- Branch starts clean; 1017 tests passing across 28 test files before any changes.
+- Codebase quality: 8.7/10. No architectural issues. Core logic sound and well-tested.
+- Full audit of rotationEngine, historyStore, outcomeStore, exerciseHistoryStore, TodayPage, CalendarPage, historyStats, sessionSummary, workoutInstanceId, all hooks, all stores.
+
+### Bugs found and fixed
+
+**Bug 1 — `estimateRunDurationMin` missing `planProgramVars` argument in cardio prompt**
+
+`src/pages/TodayPage.tsx` line 1193: the cardio prompt section called `estimateRunDurationMin(runSlot)` without the second argument. Every other call site in the file (lines 449 and 463) passes `planProgramVars`. Without it, expression-based `targetTime` values (from YAML program slots) silently fall back to a default estimate, showing incorrect estimated durations in the post-weights cardio suggestion modal.
+
+**Bug 2 — `exerciseHistoryStore` missing `version` / `migrate` in persist config**
+
+`src/store/exerciseHistoryStore.ts`: the `persist` call used `{ name: 'wpt_exercise_history' }` with no `version` or `migrate` option — the only Zustand store without a schema-version guard. All other stores (`historyStore`, `outcomeStore`, `planStore`) have `version: N, migrate: ...`. Without the guard, any future schema change to `ExerciseSessionRecord` risks corrupt reads from old localStorage data (fields misread as wrong types, missing pre-computed fields, etc.). Added `version: 1, migrate: (persisted: unknown) => persisted as ExerciseHistoryState` as a passthrough guard.
+
+### Refactoring
+
+**`useDismissableBanner` — shared hook to eliminate duplication**
+
+`useExpiryDismiss.ts` and `useStallNudgeDismiss.ts` were identical except for their `KEY_PREFIX` constant: same `readDismissed`/`writeDismissed` helpers, same `useState` + `useCallback` structure, same JSDoc shape. Extracted to `src/hooks/useDismissableBanner.ts`. Both original hooks now delegate to it with their respective prefixes. Keys and runtime behavior unchanged.
+
+### Tests added
+
+`src/hooks/__tests__/useDismissableBanner.test.ts` — 10 tests covering the localStorage contract: absent key starts false, write sets to "1", isolation by prefix and by planId, null planId no-ops, read/write failure degrades gracefully, real consumer prefixes are distinct.
+
+Test count: 1017 → 1027 (+10).
+
+### Feature added
+
+**Last session summary on upcoming workout cards**
+
+`src/pages/TodayPage.tsx`: added `upcomingSessionSummaries` memo that calls `findPreviousSessionForPlanDay` + `buildLastSessionSummary` for each upcoming rotation slot. The result is rendered as a single muted line under each upcoming card: `Last: Squat 135 lb · 3×8` (or equivalent for runs/swims). The infrastructure (`findPreviousSessionForPlanDay`, `buildLastSessionSummary`) was already used for today's card — this extends the same pattern to the upcoming list. No new dependencies.
+
+---
+
+### Work Completed
+
+#### 1. Fix: pass planProgramVars to estimateRunDurationMin in cardio prompt
+
+`src/pages/TodayPage.tsx` — changed `estimateRunDurationMin(runSlot)` → `estimateRunDurationMin(runSlot, planProgramVars)` at the one call site in the cardio-prompt section. All other call sites already passed this argument.
+
+#### 2. Fix: add version guard to exerciseHistoryStore persist config
+
+`src/store/exerciseHistoryStore.ts` — added `version: 1, migrate: (persisted: unknown) => persisted as ExerciseHistoryState` to the persist options. Aligns this store with all other persisted stores in the codebase.
+
+#### 3. Refactor: extract useDismissableBanner shared hook
+
+`src/hooks/useDismissableBanner.ts` — new file, ~35 lines. `useExpiryDismiss.ts` and `useStallNudgeDismiss.ts` now each delegate to it in ~10 lines each. Net -56 lines of duplication.
+
+#### 4. Test: add unit tests for useDismissableBanner
+
+`src/hooks/__tests__/useDismissableBanner.test.ts` — 10 new tests validating localStorage contract, null planId handling, isolation, and graceful degradation under localStorage failure.
+
+#### 5. Feature: show last session summary on upcoming workout cards
+
+`src/pages/TodayPage.tsx` — added `upcomingSessionSummaries` `useMemo` (~10 lines) and a `<p>` under each upcoming card showing the last session one-liner when available.
+
+---
+
+### What was NOT done (and why)
+
+| Considered | Decision |
+|---|---|
+| `computeWorkoutPRFlags` O(n²) loop | Performance only matters at large record counts; current users unlikely to hit the threshold; flagged in REVIEW_NOTES.md for a future pass |
+| `removeLastOverrideByType` footgun API | No callers pass wrong `type`; rename/docs improvement, low urgency |
+| Component/integration tests | Still requires `@testing-library/react` not in devDeps; out of scope for this pass |
+| Run progression state surfacing in HistoryPage | Medium-scope UI feature; deferred |

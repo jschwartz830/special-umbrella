@@ -162,6 +162,6 @@ export const useExerciseHistoryStore = create<ExerciseHistoryState>()(
         return [...new Set(get().records.map(r => r.exerciseName))].sort()
       },
     }),
-    { name: 'wpt_exercise_history' },
+    { name: 'wpt_exercise_history', version: 1, migrate: (persisted: unknown) => persisted as ExerciseHistoryState },
   ),
 )
