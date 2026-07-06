@@ -432,3 +432,40 @@ could cause the "Session N" label in TodayPage to report an incorrect (inflated)
 - `src/lib/__tests__/historyStats.test.ts` — new regression test: two entries for the same date count as one
 
 **Risk**: Low. Pure function change; semantics for the normal case (one entry per date) are identical. Only the duplicate-entry edge case is affected.
+
+---
+
+## Pass 73 — 2026-07-06
+
+### Bug Fixes
+
+**fix: pass planProgramVars to estimateRunDurationMin in cardio prompt**
+- File: `src/pages/TodayPage.tsx`
+- Commit: `08e6145`
+- The cardio-prompt modal called `estimateRunDurationMin(runSlot)` without `planProgramVars`. All other call sites pass it. YAML-based `targetTime` expressions silently fell back to a default estimate, showing wrong duration in the post-weights cardio suggestion. Fixed to `estimateRunDurationMin(runSlot, planProgramVars)`.
+
+**fix: add version guard to exerciseHistoryStore persist config**
+- File: `src/store/exerciseHistoryStore.ts`
+- Commit: `54d361d`
+- The only Zustand store without `version`/`migrate` in its persist config. Added `version: 1, migrate: (persisted: unknown) => persisted as ExerciseHistoryState` — a passthrough that establishes schema versioning for safe future migrations.
+
+### Refactoring
+
+**refactor: extract useDismissableBanner shared hook to eliminate duplication**
+- Files: `src/hooks/useDismissableBanner.ts` (new), `src/hooks/useExpiryDismiss.ts`, `src/hooks/useStallNudgeDismiss.ts`
+- Commit: `33f7db5`
+- Both hooks were identical except for their `KEY_PREFIX`. Extracted shared logic to `useDismissableBanner(keyPrefix, planId)`. Original hooks now delegate in ~10 lines each. Net -56 lines of duplication. Zero behavior change.
+
+### New Tests
+
+**test: add unit tests for useDismissableBanner shared hook**
+- File: `src/hooks/__tests__/useDismissableBanner.test.ts` (new, 10 tests)
+- Commit: `75b58c6`
+- Covers: absent-key starts false, write sets to "1", isolation by prefix and planId, null planId no-op, read/write failure graceful degradation, consumer prefix uniqueness.
+
+### New Features
+
+**feat: show last session summary on upcoming workout cards**
+- File: `src/pages/TodayPage.tsx`
+- Commit: `b49902f`
+- Adds a muted "Last: …" line under each upcoming workout card using the existing `findPreviousSessionForPlanDay` + `buildLastSessionSummary` infrastructure (already used for today's card). No new dependencies.

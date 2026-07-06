@@ -537,3 +537,34 @@ Test Files  24 passed (24)
 | `sessionSummary.ts` | ~20 | Pace derivation, stored-zero fallback, PB detection |
 | `workoutInstanceId.ts` | ~10 | Round-trip parse, underscore-in-planId |
 | Other utilities | ~30 | outcomeSortKey, planDayUtils, addOverride |
+
+---
+
+## Pass 73 — 2026-07-06
+
+### Baseline
+
+1017 tests passing across 28 test files (before any changes).
+
+### Changes
+
+**New test file: `src/hooks/__tests__/useDismissableBanner.test.ts`**
+- 10 tests added covering the `useDismissableBanner` localStorage contract
+- Topics: absent-key returns false, write sets to "1", prefix isolation, planId isolation, null planId no-op, read-error degrades gracefully, write-error degrades gracefully (no throw), consumer prefixes distinct
+
+### Final results
+
+```
+Test Files  29 passed (29)
+     Tests  1027 passed (1027)
+  Start at  07:20:47
+  Duration  3.56s (transform 1.73s, setup 0ms, import 3.69s, tests 644ms)
+```
+
+No test failures. Net +10 tests vs. baseline.
+
+### Coverage notes (additions)
+
+| Module | New Tests | What's covered |
+|---|---|---|
+| `useDismissableBanner.ts` | 10 | localStorage read/write contract, isolation, null planId, error degradation |

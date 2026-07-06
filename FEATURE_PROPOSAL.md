@@ -345,3 +345,30 @@ No data migrations, no schema changes.
 - Toast-style notification (bottom of screen)
 - Modal celebration (too disruptive for routine logging)
 - PR history / streak ("3rd week in a row hitting a PR on Bench Press")
+
+---
+
+## Pass 73 Feature: Last session summary on upcoming workout cards
+
+### Problem
+
+Upcoming workout cards in TodayPage show the workout name and a session count chip, but no contextual history. A user looking at "Tomorrow: Squat / Bench / Deadlift" has no quick way to see what they did last time without navigating away. The prior-session context is already computed for today's card — the upcoming list uses identical logic.
+
+### Proposed solution
+
+Add a single muted "Last: …" line below each upcoming card using existing infrastructure:
+- `findPreviousSessionForPlanDay(planId, planDayIndex, today, planEntries, allOutcomes)` — already imported, used for today's card
+- `buildLastSessionSummary(outcome, maxLoadByExercise)` — already imported, formats a one-liner
+
+Wrap in a `useMemo` keyed to `[plan, upcoming, today, planEntries, allOutcomes, maxLoadByExercise]`. Render the string as a `<p className="text-[10px] text-slate-500 mt-0.5 ml-1 truncate">Last: …</p>` below the existing `upcomingNote` (adaptation note).
+
+### Constraints
+
+- No new dependencies
+- No new store state or localStorage keys
+- No schema changes
+- Purely additive JSX; card is unchanged when no prior session exists
+
+### Status
+
+**Implemented in pass 73.**

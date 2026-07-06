@@ -744,3 +744,41 @@ Test suite on entry: **935 tests passing** across 24 test files.
 2. **CalendarPage copy-workout button** — TodayPage has clipboard copy (pass 61). Extending it to the CalendarPage day-detail view would let users share any historical or future workout, not just today's.
 
 3. **Component/integration test layer** — The unit test suite is excellent. The natural next quality frontier is a thin RTL or Playwright smoke-test over the key flows (log workout, skip, day off, undo).
+
+---
+
+## Pass 73 — 2026-07-06
+
+### Audit findings
+
+**Confirmed bugs fixed this pass:**
+
+1. **`estimateRunDurationMin` missing `planProgramVars`** (`TodayPage.tsx:1193`)
+   - Severity: Low-medium (incorrect duration estimate in cardio prompt, affects YAML-program users only)
+   - Fixed: `estimateRunDurationMin(runSlot)` → `estimateRunDurationMin(runSlot, planProgramVars)`
+
+2. **`exerciseHistoryStore` missing persist version guard** (`exerciseHistoryStore.ts`)
+   - Severity: Low now, medium if schema changes
+   - Fixed: added `version: 1, migrate: (persisted) => persisted as ExerciseHistoryState`
+
+**Confirmed non-issues (re-examined this pass):**
+
+- `outcomeStore.clearPlanOutcomes` prefix match: safe — nanoid base-36 contains no underscores
+- `deduplicateByDate` in historyStore: keeps newest `createdAt`, correct semantic
+- `removeRetroJumpForDate` timezone handling: consistent round-trip in single-device PWA
+- `swap_slot` override not incrementing pointer: correct, documented
+- `mod` negative input: correct symmetric modulo, tested
+- `computeLoggedRate` returning `0` (not `null`) when `activeDays === 0`: guarded by `planActiveDays >= 7` (pass 64)
+
+**Lower-priority items noted but not addressed:**
+
+- `computeWorkoutPRFlags` inner loop (`historyStats.ts:~795`): O(n²) over exercise records. Fine at normal scale; could become slow for users with years of daily lifting history. Recommend a `Map<exerciseName, maxLoad>` pre-index if performance ever becomes an issue.
+- `removeLastOverrideByType` (`historyStore.ts`): `type` parameter is never used — the function removes the most-recent override regardless. All callers pass the correct type today, but the signature implies filtering that doesn't happen. A rename to `removeLastOverride` + doc update would clarify intent.
+- `ExtraWorkoutEntry.advancedRotation` undefined on pre-v1 records: handled conservatively (treated as true), documented in the type. No change needed.
+
+### Recommendations for future passes
+
+1. **`@testing-library/react` devDep** — Add it to `devDependencies` to enable proper hook integration tests. The current hook tests validate localStorage contracts but cannot test React state transitions. Cost: one devDep, low risk.
+2. **`computeWorkoutPRFlags` performance** — Pre-index `maxLoad` by exercise name to reduce from O(n²) to O(n). Only matters at large record counts.
+3. **`removeLastOverrideByType` clarity** — Rename to `removeLastOverride` and update JSDoc. Zero behavior change.
+4. **Run progression UI** — `RunProgressionState.lastResult` is stored but never surfaced. A "Progressed ↑" chip on HistoryPage would close the feedback loop for runners.
