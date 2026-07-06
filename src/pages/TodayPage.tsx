@@ -1190,7 +1190,7 @@ export function TodayPage() {
       {cardioState === 'prompt' && (() => {
         const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
         if (!runSlot) return null
-        const runEst = estimateRunDurationMin(runSlot)
+        const runEst = estimateRunDurationMin(runSlot, planProgramVars)
         return (
           <Modal title="Nice work on the lifts!" onClose={handleCardioCancel}>
             <div className="space-y-4">
