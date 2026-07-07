@@ -1,5 +1,95 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-07 (sixty-seventh pass) — branch `claude/dreamy-mccarthy-zav7nw`
+
+---
+
+### Executive Summary
+
+1. **What changed**: Three correctness fixes — stale-closure conflict detection in HistoryPage, date-consistency in usePlanActions, and incorrect ARIA fallback in CompletedWorkoutsRing.
+2. **Highest confidence**: The stale-closure fix in `saveAndClose` — it's a clear read-before-write bug with no ambiguity about intent. The usePlanActions change is equally safe and makes an implicit dependency explicit.
+3. **Risky**: Nothing in this pass is risky. All changes are additive or narrow correctness patches.
+4. **Review first**: The usePlanActions change moves `useToday()` earlier in `TodayPage` (line 119 instead of 135). Verify the hook order hasn't disturbed any surrounding logic.
+
+---
+
+### Audit Scope
+
+Full read of all source files: engine, all stores, all pages, all hooks, all lib utilities, all modules, all test files. No files skipped.
+
+**Baseline**: 961 tests passing (25 test files).
+
+---
+
+### Biggest Issues Found
+
+| Severity | Issue | Status |
+|----------|-------|--------|
+| Medium | HistoryPage `saveAndClose` stale closure misses background-sync entries | **Fixed** |
+| Low-Medium | `usePlanActions` wall-clock date can diverge from `useToday` at midnight | **Fixed** |
+| Low | `CompletedWorkoutsRing` default ARIA fallback says "workouts completed" when value is a percent | **Fixed** |
+| Low | `buildProgressionRecommendation` treats `completedAsPlanned = null` as "completed as planned" → optimistic progression | Documented only |
+| Medium | `storeSync`: cloud always wins on login; newer local data is silently overwritten | Documented only |
+| Low | `progressionStates`/`programVars` not cleaned up on plan archive | Documented only |
+| Low | `parseNumericLoad` in OutcomeModal shows wrong placeholder for expression loads | Documented only |
+
+---
+
+### Improvements Completed
+
+| # | Change | Files |
+|---|--------|-------|
+| 1 | Stale `entries` closure → fresh state in `HistoryPage.saveAndClose` | `src/pages/HistoryPage.tsx` |
+| 2 | `usePlanActions` accepts `today` from caller | `src/hooks/usePlanActions.ts`, `src/pages/TodayPage.tsx` |
+| 3 | `CompletedWorkoutsRing` default ARIA fallback corrected | `src/pages/TodayPage.tsx` |
+
+---
+
+### Definitely Keep
+
+- All three fixes are high-confidence correctness improvements with no tradeoffs.
+
+### Probably Keep But Tweak
+
+- None this pass.
+
+### Do Not Keep
+
+- Nothing to reject.
+
+### Recommendations Only (not implemented)
+
+1. **`storeSync` conflict resolution**: When Supabase sync downloads cloud data on login, compare timestamps before overwriting local state. At minimum, prompt the user: "Cloud data is from X; your local data is newer — which should win?" This protects multi-device users who edit while offline.
+
+2. **`parseNumericLoad` → `resolveLoad` in OutcomeModal**: The set table in OutcomeModal uses `parseNumericLoad` to prefill `actualLoad`. For expression-based loads like `"0.75 * squat"`, it extracts `0.75` instead of the resolved value. `resolveLoad` (already used in ActiveWorkoutTracker) would fix this but requires wiring `programStore` vars into the OutcomeModal's prefill logic more deeply.
+
+3. **`buildProgressionRecommendation` null handling**: `completedAsPlanned !== false` treats null as "completed as planned," triggering progression even when the user left the field unset. Consider changing to explicit `=== true` if conservative progression is preferable; or add a UI prompt making "Completed as planned?" mandatory for run workouts.
+
+4. **progressionStates cleanup on archive**: `removeProgressionStates` is only called during plan deletion, not archiving. Add it to the archive path in `PlansPage` to avoid indefinite localStorage growth.
+
+5. **Component decomposition**: `TodayPage.tsx` (~1550 lines), `ActiveWorkoutTracker.tsx` (~1878 lines). Both are candidates for splitting into smaller focused components. Not urgent — code is well-organized despite size — but long-term maintainability would benefit.
+
+---
+
+### Open Questions
+
+1. Should `completedAsPlanned` be treated as "unknown" (hold) rather than "planned" (progress) when null? This is a product decision.
+2. For `storeSync`: is the intended behavior "cloud is truth" (suitable for multi-device restore) or "last-write wins" (suitable for offline-first)? This shapes the right conflict strategy.
+3. Is the 1500ms Supabase sync debounce sufficient to avoid race conditions when multiple stores update in rapid succession (e.g., on plan deletion cascade)?
+
+---
+
+### Known Issues / Incomplete Work
+
+- `parseNumericLoad` expression placeholder bug is acknowledged but not fixed. It only affects users with YAML programs that use expression-based loads.
+- No new unit tests added this pass — the three fixes are in UI code paths not covered by the existing test environment (node + Vitest, no jsdom).
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-06-28 (sixty-sixth pass) — branch `claude/dreamy-mccarthy-7v05ht`
 
 ---

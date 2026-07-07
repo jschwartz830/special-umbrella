@@ -1,5 +1,79 @@
 # Implementation Plan
 
+## Pass 67 — 2026-07-07 (branch `claude/dreamy-mccarthy-zav7nw`)
+
+### Observations on entry
+
+- Branch is at `9b00892` (merged PR #165: Supabase auth and cloud sync).
+- 961 tests passing across 25 test files before any changes.
+- Codebase quality: 8.5/10. Core logic remains sound; test suite is comprehensive.
+- Full re-audit of all source files (engine, stores, pages, hooks, lib, modules, components).
+
+---
+
+### Audit findings
+
+#### Bug (MEDIUM): HistoryPage `saveAndClose` uses stale `entries` closure for conflict detection
+
+**Location**: `src/pages/HistoryPage.tsx` — `saveAndClose()` function (~line 248)
+
+**Mechanism**: The edit modal captures the `entries` array from the component's render closure at the time the modal opened. If a background sync (Supabase) or another tab adds a new entry for the target date after the modal opens, the stale closure will miss the collision and write a duplicate `(planId, calendarDate)` pair — violating the single-entry-per-date invariant.
+
+**Contrast**: `handleOutcomeConfirm` in the same file (and in CalendarPage) already correctly reads `useHistoryStore.getState().entries` for post-mutation lookups.
+
+**Fix**: Replace `entries.some(...)` with `useHistoryStore.getState().entries.some(...)` in `saveAndClose`.
+
+#### Bug (LOW-MEDIUM): `usePlanActions` computes `today` from wall clock instead of accepting caller's date
+
+**Location**: `src/hooks/usePlanActions.ts` — line 8
+
+**Mechanism**: `const today = format(new Date(), 'yyyy-MM-dd')` is evaluated on each hook call (each render). While `useToday` in TodayPage updates at midnight via a timeout, there is a narrow window where `useToday()` has already advanced to the new date but a `usePlanActions` call in an intermediate render could use the old date (if the component hasn't re-rendered yet after the `useToday` state update). More importantly, passing `today` from the caller ensures that the logged date is always the same value the UI displays — making the behavior explicit and testable.
+
+**Fix**: Accept `today?: string` as second parameter; fall back to `format(new Date(), ...)` only when not provided. Pass `today` from `useToday()` at the TodayPage call site.
+
+#### Bug (LOW): `CompletedWorkoutsRing` default ARIA fallback is incorrect
+
+**Location**: `src/pages/TodayPage.tsx` — `CompletedWorkoutsRing` component
+
+**Mechanism**: The component receives `count={planCompletionPercent}` and `percent={planCompletionPercent}`. The default ARIA fallback reads `"${count} workouts completed, ${percent}% of plan"` — when both are the same percent value, this produces "42 workouts completed, 42% of plan" which is incorrect for screen reader users (42 is not a workout count). The call site always provides `accessibilityLabel`, so the fallback never triggers in practice, but it is still wrong code.
+
+**Fix**: Change fallback to `"${percent}% of plan complete"`, which is accurate regardless of what `count` holds.
+
+---
+
+### Non-issues confirmed this pass
+
+| Item | Verdict |
+|---|---|
+| CalendarPage/HistoryPage `split('_extra_')` extraId extraction | Safe — nanoid uses base-36 (0-9, a-z), no underscores; the separator `_extra_` cannot appear in the extraId |
+| `buildProgressionRecommendation` `completedAsPlanned !== false` | Intentional optimistic design; `null` = "user didn't say it went wrong" = allow progression |
+| `updateExtraEntryDate` missing deduplication | Two extras on the same date is valid; no invariant violation |
+| Stale draft in `ActiveWorkoutTracker` on crash | Intentional recovery behavior; the modal offers resume or discard |
+| `expressionEval` silent 0 fallback | Low real-world impact; malformed YAML is caught at import time |
+
+---
+
+### Work Completed This Pass
+
+1. **[FIX] HistoryPage stale closure in saveAndClose** — `useHistoryStore.getState().entries` for conflict detection
+2. **[FIX] usePlanActions accept today as parameter** — explicit date propagation, backward-compatible
+3. **[FIX] CompletedWorkoutsRing default ARIA label** — corrected fallback copy
+
+Test count: 961 → 961 (no new tests needed; all fixes are correctness patches in UI code not covered by unit tests).
+
+---
+
+### What was NOT done (and why)
+
+| Considered | Decision |
+|---|---|
+| `storeSync` timestamp-based conflict resolution | Architectural scope; high risk; deferred |
+| `parseNumericLoad` → `resolveLoad` in OutcomeModal | Product-visible change; test coverage limited; deferred |
+| `progressionStates` cleanup on archive | Low storage impact; no real-world data loss; deferred |
+| Component decomposition (TodayPage, ActiveWorkoutTracker) | Structural refactor; out of scope for overnight pass |
+
+---
+
 ## Pass 66 — 2026-06-28 (branch `claude/dreamy-mccarthy-7v05ht`)
 
 ### Observations on entry

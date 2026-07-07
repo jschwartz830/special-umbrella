@@ -1,3 +1,51 @@
+# Overnight Changelog — 2026-07-07
+
+## [1] fix: HistoryPage date-conflict check reads fresh store state
+
+**Summary**: In `HistoryPage.saveAndClose()`, the collision check for moving a rotation entry to a new date now reads `useHistoryStore.getState().entries` instead of the stale `entries` closure captured at render time.
+
+**Why it matters**: With Supabase sync active, a background push can add entries between when the edit modal opens and when Save is pressed. The stale closure would miss the new entry and silently write a second `(planId, calendarDate)` pair, violating the one-entry-per-date invariant that the rotation engine depends on.
+
+**Files changed**:
+- `src/pages/HistoryPage.tsx` — `saveAndClose()` lines 247–251
+
+**Risk**: None. Reading fresh state is strictly safer than a stale closure.
+
+**Rollback**: `git revert 6a3d6a9`
+
+---
+
+## [2] fix: usePlanActions accepts today from caller to match useToday
+
+**Summary**: `usePlanActions` now accepts an optional `today?: string` parameter. `TodayPage` passes its `useToday()` value explicitly. The internal fallback still calls `format(new Date(), ...)` so the hook remains backward-compatible for any future callers that don't pass a date.
+
+**Why it matters**: The hook previously computed `today` from the wall clock independently of what `useToday()` had given the component. At a midnight boundary while the app stays open, there is a narrow window where `useToday` updates first but `usePlanActions`' internal computation hasn't resolved yet, causing the logged date and the displayed date to diverge. Passing `today` from the caller eliminates this gap and makes the dependency explicit and testable.
+
+**Files changed**:
+- `src/hooks/usePlanActions.ts` — added optional `today` param, renamed internal to `resolvedToday`
+- `src/pages/TodayPage.tsx` — moved `useToday()` call earlier, passes result to `usePlanActions`
+
+**Risk**: None. Backward-compatible; existing fallback preserved.
+
+**Rollback**: `git revert 306313c`
+
+---
+
+## [3] fix: CompletedWorkoutsRing default ARIA label corrected
+
+**Summary**: Changed the fallback `aria-label` in `CompletedWorkoutsRing` from `"${count} workouts completed, ${percent}% of plan"` to `"${percent}% of plan complete"`.
+
+**Why it matters**: The component receives `count={planCompletionPercent}` — a 0-100 percentage value, not a workout count. The old fallback would tell screen reader users "42 workouts completed" when the user has completed 42% of their plan, not 42 individual workouts. (In current usage the `accessibilityLabel` prop is always provided so the fallback never triggers, but correcting it is still the right thing to do.)
+
+**Files changed**:
+- `src/pages/TodayPage.tsx` — `CompletedWorkoutsRing` component, line 81
+
+**Risk**: None. The fallback is never triggered in current usage; only the default improves.
+
+**Rollback**: `git revert 9d66362`
+
+---
+
 # Overnight Changelog — 2026-06-28
 
 ## [1] feat: copy-workout button on CalendarPage day detail view

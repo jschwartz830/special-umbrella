@@ -1,5 +1,48 @@
 # Test Results
 
+## 2026-07-07 (sixty-seventh pass) — branch `claude/dreamy-mccarthy-zav7nw`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  25 passed (25)
+     Tests  961 passed (961)
+  Duration  ~2.9s
+```
+
+### Tests Added / Updated
+
+None. All three fixes are in React component/hook code. The existing test environment runs Vitest in a Node context with no DOM/jsdom, so component-level behavior (stale closures, ARIA attributes, hook call order) is not covered by the current test suite.
+
+The store behaviors already tested:
+- `updateEntryDate` deduplication: `historyStore.test.ts` line 422 (confirms the store correctly prevents collisions; the stale-closure bug in HistoryPage was at the component layer above the store)
+- No test existed for `usePlanActions` date computation — the change is a straightforward parameter propagation that doesn't warrant a store-level test
+
+### Final State
+
+```
+Test Files  25 passed (25)
+     Tests  961 passed (961)
+  Duration  ~2.9s
+```
+
+All 961 tests pass with no regressions.
+
+### Important Areas Still Untested
+
+| Area | Gap | Risk |
+|------|-----|------|
+| HistoryPage `saveAndClose` conflict detection | Component-level; no jsdom | Low — now uses fresh store state |
+| `usePlanActions` date propagation | Hook-level; no jsdom | Very low — trivial parameter pass |
+| `CompletedWorkoutsRing` ARIA output | Component rendering; no jsdom | Very low — cosmetic |
+| `storeSync` conflict behavior | Requires Supabase mock | Medium — cloud-always-wins on login |
+| ActiveWorkoutTracker draft recovery | Complex component state | Low — intentional behavior |
+| `OutcomeModal` expression load prefill | Requires jsdom + programStore | Low — cosmetic (wrong placeholder only) |
+
+---
+
 ## 2026-06-28 (sixty-sixth pass) — branch `claude/dreamy-mccarthy-7v05ht`
 
 ---
