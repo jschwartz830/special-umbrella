@@ -78,7 +78,7 @@ function CompletedWorkoutsRing({
   return (
     <div
       className="relative flex items-center justify-center w-10 h-10 flex-shrink-0"
-      aria-label={accessibilityLabel ?? `${count} workouts completed, ${percent}% of plan`}
+      aria-label={accessibilityLabel ?? `${percent}% of plan complete`}
       role="img"
     >
       <svg className="absolute inset-0 -rotate-90" width="40" height="40" viewBox="0 0 40 40">
