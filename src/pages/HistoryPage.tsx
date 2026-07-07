@@ -245,7 +245,10 @@ export function HistoryPage() {
     const newDate = editingEntryDate
     if (!newDate) { setDateConflict(true); return }
     if (newDate !== oldDate) {
-      const conflict = entries.some(
+      // Read fresh store state — the closure-captured `entries` may be stale
+      // if a background sync or another tab added an entry after the modal opened.
+      const freshEntries = useHistoryStore.getState().entries
+      const conflict = freshEntries.some(
         e => e.id !== editingEntry.id && e.planId === editingEntry.planId && e.calendarDate === newDate,
       )
       if (conflict) { setDateConflict(true); return }
