@@ -2,24 +2,24 @@ import { format } from 'date-fns'
 import { useHistoryStore } from '../store/historyStore'
 import type { WorkoutType } from '../types'
 
-export function usePlanActions(planId: string | null) {
+export function usePlanActions(planId: string | null, today?: string) {
   const logAction = useHistoryStore(s => s.logAction)
   const logOverride = useHistoryStore(s => s.logOverride)
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const resolvedToday = today ?? format(new Date(), 'yyyy-MM-dd')
 
   function complete(planDayIndex: number, notes?: string) {
     if (!planId) return
-    logAction(planId, today, planDayIndex, 'complete', notes)
+    logAction(planId, resolvedToday, planDayIndex, 'complete', notes)
   }
 
   function skip(planDayIndex: number) {
     if (!planId) return
-    logAction(planId, today, planDayIndex, 'skip')
+    logAction(planId, resolvedToday, planDayIndex, 'skip')
   }
 
   function dayOff() {
     if (!planId) return
-    logAction(planId, today, undefined, 'day_off')
+    logAction(planId, resolvedToday, undefined, 'day_off')
   }
 
   function advance() {

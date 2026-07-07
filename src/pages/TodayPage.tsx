@@ -116,7 +116,8 @@ function findPreviousWeightsOutcome(
 export function TodayPage() {
   const navigate = useNavigate()
   const { plan, todayResolved, upcoming, planEntries } = useActivePlan()
-  const actions = usePlanActions(plan?.id ?? null)
+  const today = useToday()
+  const actions = usePlanActions(plan?.id ?? null, today)
   const logAction = useHistoryStore(s => s.logAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
   const updateEntryDate = useHistoryStore(s => s.updateEntryDate)
@@ -131,7 +132,6 @@ export function TodayPage() {
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const moveOutcome = useOutcomeStore(s => s.moveOutcome)
-  const today = useToday()
   const { isDismissed: expiryBannerDismissed, dismiss: dismissExpiryBanner } = useExpiryDismiss(plan?.id ?? null)
   const { isDismissed: stallNudgeDismissed, dismiss: dismissStallNudge } = useStallNudgeDismiss(plan?.id ?? null)
 
