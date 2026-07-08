@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
   SkipForward,
   Coffee,
@@ -379,13 +379,9 @@ export function TodayPage() {
   const prevSessionDate = prevSessionOutcome
     ? parseWorkoutInstanceId(prevSessionOutcome.workoutInstanceId)?.calendarDate ?? null
     : null
-  const prevSessionDaysAgo: number | null = (() => {
-    if (!prevSessionDate) return null
-    const [ty, tm, td] = today.split('-').map(Number)
-    const [dy, dm, dd] = prevSessionDate.split('-').map(Number)
-    const d = Math.floor((Date.UTC(ty, tm - 1, td) - Date.UTC(dy, dm - 1, dd)) / 86_400_000)
-    return d > 0 ? d : null
-  })()
+  const prevSessionDaysAgo: number | null = prevSessionDate
+    ? (d => d > 0 ? d : null)(differenceInCalendarDays(parseISO(today), parseISO(prevSessionDate)))
+    : null
 
   const todaySessionCount = isPending
     ? countPlanDayCompletions(plan.id, primaryPlanDayIndex, planEntries, today)
