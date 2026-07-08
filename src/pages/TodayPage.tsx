@@ -354,9 +354,12 @@ export function TodayPage() {
   const rotationTotalWorkouts = plan.duration.type === 'rotations' && plan.duration.value > 1
     ? plan.days.length * plan.duration.value
     : 0
-  const rotationLoggedCount = rotationTotalWorkouts > 0
-    ? new Set(planEntries.filter(e => e.action === 'complete' || e.action === 'skip').map(e => e.calendarDate)).size
-    : 0
+  const rotationLoggedCount = useMemo(
+    () => rotationTotalWorkouts > 0
+      ? new Set(planEntries.filter(e => e.action === 'complete' || e.action === 'skip').map(e => e.calendarDate)).size
+      : 0,
+    [planEntries, rotationTotalWorkouts],
+  )
 
   // Cycle progress for rotation-duration plans (null for weeks-duration plans)
   const cycleProgress = plan.duration.type === 'rotations'
