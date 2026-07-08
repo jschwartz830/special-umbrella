@@ -1,5 +1,94 @@
 # Test Results
 
+## 2026-07-08 (seventy-fourth pass) — branch `claude/dreamy-mccarthy-ugdev5`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  29 passed (29)
+     Tests  1027 passed (1027)
+  Duration  ~3.2s
+```
+
+### After commit 1 (estimateRunDurationMin extraction + 22 tests)
+
+```
+Test Files  30 passed (30)
+     Tests  1049 passed (1049)
+  Duration  ~2.9s
+```
+
+### After commit 2 (prevSessionDaysAgo refactor)
+
+```
+Test Files  30 passed (30)
+     Tests  1049 passed (1049)
+  Duration  ~2.9s
+```
+
+### After commit 3 (rotationLoggedCount memoize)
+
+```
+Test Files  30 passed (30)
+     Tests  1049 passed (1049)
+  Duration  ~2.9s
+```
+
+### After commit 4 (cycle done chip)
+
+```
+Test Files  30 passed (30)
+     Tests  1049 passed (1049)
+  Duration  ~2.9s
+```
+
+**Final: +22 tests, 0 regressions.**
+
+---
+
+### New tests added — `src/lib/__tests__/estimateRunDuration.test.ts`
+
+22 tests in `describe('estimateRunDurationMin')`:
+
+| Test | What it verifies |
+|---|---|
+| `returns slot.durationMin when set (highest priority)` | `durationMin` beats all other sources |
+| `returns runConfig.targetDurationMin when durationMin is absent` | Second priority branch |
+| `returns 20 (default) when slot has no duration info at all` | Default fallback |
+| `parses a segment with integer minutes ("30min")` | Duration unit: `min` suffix |
+| `parses a segment with abbreviated "m" unit ("20m")` | Duration unit: `m` suffix |
+| `parses a segment with decimal minutes ("22.5min")` | Decimal value → Math.ceil |
+| `sums multiple segment durations` | Multi-segment accumulation |
+| `ignores segment duration with unknown unit (no match)` | `"30km"` — not a time unit, falls to default |
+| `estimates duration from segment distance using default 11 min/mi pace` | Default pace path |
+| `uses 8 min/mi for tempo segments` | Pace-by-type: tempo |
+| `uses 12 min/mi for warmup segments` | Pace-by-type: warmup |
+| `uses 12 min/mi for cooldown segments` | Pace-by-type: cooldown |
+| `skips a distance segment whose value is not parseable` | NaN guard |
+| `sums multiple mixed segments (duration + distance)` | Mixed segment types |
+| `substitutes programVar references in segment distance` | Variable substitution (number value) |
+| `substitutes programVar reference when var value is a string` | Variable substitution (string value) |
+| `leaves unknown variables unsubstituted (segment is skipped)` | Unknown var → NaN → skip |
+| `derives duration from targetDistanceMiles at 11 min/mi when segments produce nothing` | targetDistanceMiles fallback |
+| `ceils a fractional targetDistanceMiles result` | Math.ceil on fractional result |
+| `returns 20 when segments array is empty` | Empty array edge case |
+| `returns 20 when runConfig is null` | Null runConfig edge case |
+| `handles default programVars (empty) when omitted` | Default second parameter |
+
+---
+
+### Tests added in prior passes (for reference)
+
+- Pass 71: +18 tests (deriveProgressionMode + PR badges)
+- Pass 70: +5 tests (csv.ts plansToCsv location + weightsFocusArea)
+- Pass 72: +0 tests (UI-only changes)
+- Pass 73: (not in this branch)
+- Pass 74: +22 tests (this pass)
+
+---
+
 ## 2026-07-05 (seventy-second pass) — branch `claude/dreamy-mccarthy-80hikp`
 
 ---

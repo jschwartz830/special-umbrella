@@ -1,3 +1,49 @@
+# Overnight Changelog — Pass 74 (2026-07-08)
+
+## Branch: `claude/dreamy-mccarthy-ugdev5`
+
+### Commit 1 — `bd8907d`
+
+**refactor: extract estimateRunDurationMin to lib + add 22 unit tests**
+
+- **New file** `src/lib/estimateRunDuration.ts`: Pure utility function extracted from `TodayPage.tsx` module scope. Estimates planned run duration in minutes from slot metadata using the following resolution order: `slot.durationMin` → `runConfig.targetDurationMin` → sum of segment durations → sum of segment distances × pace-by-type → `runConfig.targetDistanceMiles × 11` → 20 (default). Pace constants: tempo = 8 min/mi, warmup/cooldown = 12 min/mi, all other types = 11 min/mi.
+- **New file** `src/lib/__tests__/estimateRunDuration.test.ts`: 22 tests covering every resolution branch, segment duration unit parsing (`"30min"`, `"20m"`, decimal values), segment distance with pace-by-type, `programVars` substitution (numeric and string var values), unknown variable skipping, `targetDistanceMiles` fallback, and all edge cases (empty slot, null runConfig, empty segments).
+- **Modified** `src/pages/TodayPage.tsx`: Removed the inline 35-line `estimateRunDurationMin` definition; added `import { estimateRunDurationMin } from '../lib/estimateRunDuration'`. The function already accepted `programVars` as a second parameter since it was extracted to module scope in pass 72 — no call-site changes needed. Also added `differenceInCalendarDays` to the date-fns import (used in commit 2).
+- **Why**: The function was untestable in isolation while living in a component file. Extracting it enables the 22 new tests and makes the logic independently reviewable.
+- **Risk**: None. Function body is identical; only file location changed.
+
+---
+
+### Commit 2 — `047f8a1`
+
+**refactor: replace manual date arithmetic in prevSessionDaysAgo with differenceInCalendarDays**
+
+- **Modified** `src/pages/TodayPage.tsx`: Replaced an 8-line IIFE that used raw `Date.UTC(y, m, d)` subtraction to compute `prevSessionDaysAgo` with a single expression using `differenceInCalendarDays(parseISO(today), parseISO(prevSessionDate))` from date-fns.
+- **Why**: The manual arithmetic was correct but verbose, hard to scan, and inconsistent with the rest of the codebase which uses date-fns throughout. The new expression is semantically equivalent: it computes the calendar-day difference (not wall-clock millisecond difference) between `today` and `prevSessionDate`, then returns `null` if the result is ≤ 0 (e.g., same-day session).
+- **Risk**: Low. `differenceInCalendarDays` is already used extensively in the project. The guard `d => d > 0 ? d : null` preserves the same null-return behavior for same-day or future dates.
+
+---
+
+### Commit 3 — `1a29a3a`
+
+**perf: memoize rotationLoggedCount Set creation in TodayPage**
+
+- **Modified** `src/pages/TodayPage.tsx`: Wrapped the `rotationLoggedCount` computation in `useMemo([planEntries, rotationTotalWorkouts])`. Previously, `new Set(planEntries.filter(...).map(...)).size` ran on every render including modal open/close, which could be frequent. Now it only recomputes when `planEntries` or `rotationTotalWorkouts` change.
+- **Why**: The Set construction is O(n) in `planEntries.length`. Users who open modals or interact with other parts of TodayPage would previously trigger unnecessary rebuilds. Memoizing it is low-risk and keeps the Today view lean as plan history grows.
+- **Risk**: None. `planEntries` and `rotationTotalWorkouts` are the only real dependencies. The `useMemo` result is stable across unrelated renders.
+
+---
+
+### Commit 4 — `c337fa3`
+
+**feat: Show "Cycle done" visual cue when rotation cycle just completed**
+
+- **Modified** `src/pages/TodayPage.tsx`: In the habit summary row cycle chip (around line 649), added a conditional branch: when `cycleProgress.justCompletedRotation === true`, render an emerald `<CheckCircle2 size={13} />` icon + `"Cycle done"` label in `text-emerald-300`. When false, render the existing `"X/N cycle"` counter.
+- **Why**: `computeRotationCycleProgress` sets `justCompletedRotation = true` when `doneInCycle === 0 && totalDone > 0` — i.e. the user just finished a full rotation and the counter has wrapped back to 0. Previously this showed as "0/N cycle", which looks like no progress when the user just achieved a full cycle. A positive completion indicator is more motivating and accurate.
+- **Risk**: Low. The `justCompletedRotation` field has been tested in `historyStats.test.ts` since pass 62. The UI change only affects the chip rendering; no state or logic changes.
+
+---
+
 # Overnight Changelog — Pass 72 (2026-07-05)
 
 ## Branch: `claude/dreamy-mccarthy-80hikp`

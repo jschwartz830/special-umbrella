@@ -1,5 +1,57 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-08 (seventy-fourth pass) — branch `claude/dreamy-mccarthy-ugdev5`
+
+---
+
+### Executive summary
+
+1. **What changed**: 1 extraction + 22 new tests; 1 date-math simplification; 1 perf memoization; 1 UX fix for cycle completion chip. 4 commits, 3 files modified, 1 new lib file, 1 new test file.
+2. **Test delta**: +22 tests (1027 → 1049), all in the new `estimateRunDuration.test.ts`.
+3. **Highest confidence**: The `estimateRunDurationMin` extraction is purely mechanical — the function body is unchanged, just moved. The cycle chip fix is the only user-visible change and is constrained to a single conditional render.
+4. **What to review first**: Commit 4 (cycle chip) is the only externally visible UX change. Commit 1 (extraction + tests) is the most impactful for code quality. Commits 2 and 3 are refactor/perf with no behavior change.
+
+---
+
+### Issues found and fixed
+
+| Priority | Issue | File | Disposition |
+|---|---|---|---|
+| Low | Cycle completion showed "0/N cycle" instead of a positive indicator | `TodayPage.tsx` | **Fixed** (commit 4) |
+| Low | `estimateRunDurationMin` was untestable in isolation (defined in component file) | `TodayPage.tsx` | **Fixed** (commit 1 — extracted to lib) |
+| Low | `prevSessionDaysAgo` used manual Date.UTC arithmetic instead of date-fns | `TodayPage.tsx` | **Fixed** (commit 2) |
+| Low | `rotationLoggedCount` Set rebuilt on every render | `TodayPage.tsx` | **Fixed** (commit 3 — memoized) |
+
+### Issues documented only (not implemented)
+
+From the background audit agent (Explore agent) findings at start of pass. Included here for future pass consideration:
+
+| Priority | Code | File | Description |
+|---|---|---|---|
+| Medium | BUG-1 | `HistoryPage.tsx` | `id.includes('_extra_')` split heuristic is fragile — if nanoid produces `_extra_`, it silently mis-classifies an entry |
+| Medium | BUG-2 | `CalendarPage.tsx` | `handleMoveWorkout` → `updateEntryDate` can silently collide on destination date if a same-day entry already exists |
+| Medium | BUG-3 | `rotationEngine.ts` | `computeCurrentDayIndex` with `jump` override: if `targetDayIndex` > plan length, modulo wraps silently rather than erroring |
+| Low | BUG-4 | `storeSync.ts` | 1500ms debounce window: app close mid-debounce loses last write |
+| Low | BUG-5 | `historyStore.ts` | `removeRetroJumpForDate` uses `new Date(o.appliedAt)` — if `appliedAt` is already a local-date string (no timezone), DST can shift the parsed date |
+| Low | BUG-6 | `planStore.ts` | `clearPlanHistory` clears entries but not the plan's `startDate` — a deleted plan that is re-imported can pick up a stale start date |
+| Low | BUG-7 | `CalendarPage.tsx` | Retroactive log date-picker: no max-date guard — user can pick future dates |
+| Low | BUG-8 | `outcomeStore.ts` | `clearPlanOutcomes` uses prefix-match on plan ID — theoretically collides with IDs that share a prefix |
+| Low | BUG-9 | `expressionEval.ts` | Division by zero returns `Infinity` rather than `0` or an error |
+| Low | BUG-10 | `programParser.ts` | YAML parse errors are caught and silently return empty plan rather than surfacing the error to the user |
+| Low | BUG-11 | `sessionSummary.ts` | `computeSessionSummary` returns empty summary for mobility-only sessions that have no exercise data |
+| Info | BUG-12 | `TodayPage.tsx` | `planCompletionPercent`'s `loggedRate ?? 0` fallback — NOT dead code but only reachable for degenerate zero-duration plans |
+
+### Non-issues confirmed
+
+| Item | Verdict |
+|---|---|
+| `computeRotationCycleProgress.justCompletedRotation` semantics | Correct: `doneInCycle === 0 && totalDone > 0` — tested in historyStats.test.ts |
+| `planCompletionPercent` `loggedRate ?? 0` branch | Not dead code — reachable for plans with `duration.value === 0` or `days.length === 0` |
+| `deduplicateByDate` in historyStore | Keeps newest `createdAt` per `(planId, calendarDate)` — correct invariant |
+| `estimateRunDurationMin` pace constants | 8 / 11 / 12 min/mi for tempo / default / warmup/cooldown — verified by 22 tests |
+
+---
+
 ## 2026-07-05 (seventy-second pass) — branch `claude/dreamy-mccarthy-80hikp`
 
 ---

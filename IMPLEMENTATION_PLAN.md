@@ -1,5 +1,61 @@
 # Implementation Plan
 
+## Pass 74 — 2026-07-08 (branch `claude/dreamy-mccarthy-ugdev5`)
+
+### Baseline
+
+- Branch reset from latest `main` after PR #181 merge.
+- **1027 tests passing** across 29 test files at start of pass (confirmed via `npx vitest run`).
+- **1049 tests passing** at end of pass (+22 new tests across 30 test files).
+
+### Architecture Summary
+
+React 18 + TypeScript 5.5 + Zustand 4.5 PWA, deployed to GitHub Pages via GitHub Actions.
+No new dependencies added this pass. All changes are in `src/pages/TodayPage.tsx` and the new `src/lib/estimateRunDuration.ts`.
+
+### What is Strong (reaffirmed)
+
+- `historyStats.ts`: all exported functions have thorough test coverage (2649-line test file).
+- `historyStore.ts`: deduplication semantics (`deduplicateByDate`), upsert patterns, and migration guard are correct.
+- `computeRotationCycleProgress` correctly computes `justCompletedRotation = doneInCycle === 0 && totalDone > 0`, which was being shown as "0/N cycle" in the UI — now shows a positive completion indicator.
+- `planCompletionPercent`'s `loggedRate ?? 0` fallback is NOT dead code — it covers degenerate plans where `duration.value === 0` or `days.length === 0`.
+
+### Key Issues Found
+
+#### Bugs / Correctness
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Low | `TodayPage.tsx` | After completing a rotation cycle, the cycle chip displayed "0/N cycle" — confusing because it looks like no progress when the user just finished a full rotation | **Fixed** |
+
+#### Code Quality
+
+| File | Issue | Status |
+|---|---|---|
+| `TodayPage.tsx` | `estimateRunDurationMin` was a 35-line function defined at module scope inside `TodayPage.tsx` — untestable in isolation, distant from its type documentation | **Fixed — extracted to `src/lib/estimateRunDuration.ts`** |
+| `TodayPage.tsx` | `prevSessionDaysAgo` used manual Date.UTC arithmetic (8-line IIFE) instead of date-fns | **Fixed — replaced with `differenceInCalendarDays`** |
+| `TodayPage.tsx` | `rotationLoggedCount` rebuilt a Set on every render (including modal state changes) when `planEntries` hadn't changed | **Fixed — wrapped in `useMemo`** |
+
+#### Items Documented Only (not implemented)
+
+From background audit agent findings (BUG-1 through BUG-12 from the Explore agent):
+
+| Priority | File | Issue |
+|---|---|---|
+| Medium | `HistoryPage.tsx:~295` | `_extra_` string split on id to distinguish extra entries is fragile — if nanoid ever generates `_extra_`, it silently collides |
+| Medium | `CalendarPage.tsx` | `handleMoveWorkout` defers to `updateEntryDate` which can silently collide on the destination date |
+| Low | `storeSync.ts` | 1500ms debounce window: app closing mid-debounce loses the last write |
+| Low | Various | `loggedRate ?? 0` coverage note: only triggered for degenerate zero-duration plans |
+
+### Changes Implemented
+
+1. `bd8907d` — `refactor: extract estimateRunDurationMin to lib + add 22 unit tests`
+2. `047f8a1` — `refactor: replace manual date arithmetic in prevSessionDaysAgo with differenceInCalendarDays`
+3. `1a29a3a` — `perf: memoize rotationLoggedCount Set creation in TodayPage`
+4. `c337fa3` — `feat: Show "Cycle done" visual cue when rotation cycle just completed`
+
+---
+
 ## Pass 72 — 2026-07-05 (branch `claude/dreamy-mccarthy-80hikp`)
 
 ### Baseline

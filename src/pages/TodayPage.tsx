@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
   SkipForward,
   Coffee,
@@ -60,8 +60,7 @@ import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 import { outcomeSortKey } from '../lib/outcomeSortKey'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { WORKOUT_META } from '../lib/constants'
-
-
+import { estimateRunDurationMin } from '../lib/estimateRunDuration'
 
 /** Circular completion ring that wraps the total completed workout count. */
 function CompletedWorkoutsRing({
@@ -93,39 +92,6 @@ function CompletedWorkoutsRing({
       <span className="text-sm font-bold text-white relative z-10">{count}</span>
     </div>
   )
-}
-
-function estimateRunDurationMin(
-  slot: {
-    durationMin?: number
-    runConfig?: { targetDurationMin?: number | null; targetDistanceMiles?: number | null } | null
-    segments?: Array<{ type?: string; duration?: string; distance?: string }>
-  },
-  programVars: Record<string, unknown> = {},
-): number {
-  if (slot.durationMin) return slot.durationMin
-  if (slot.runConfig?.targetDurationMin) return slot.runConfig.targetDurationMin
-  let totalMin = 0
-  for (const seg of slot.segments ?? []) {
-    if (seg.duration) {
-      const mMatch = seg.duration.match(/^(\d+(?:\.\d+)?)\s*m(?:in)?$/)
-      if (mMatch) { totalMin += parseFloat(mMatch[1]); continue }
-    }
-    if (seg.distance) {
-      const resolved = seg.distance.replace(/\b([a-zA-Z_]\w*)\b/g, (m: string) =>
-        programVars[m] !== undefined ? String(programVars[m]) : m,
-      )
-      const miles = parseFloat(resolved)
-      if (!isNaN(miles)) {
-        const minPerMile = seg.type === 'tempo' ? 8 : seg.type === 'warmup' || seg.type === 'cooldown' ? 12 : 11
-        totalMin += miles * minPerMile
-      }
-    }
-  }
-  if (totalMin > 0) return Math.ceil(totalMin)
-  const dist = slot.runConfig?.targetDistanceMiles
-  if (dist) return Math.ceil(dist * 11)
-  return 20
 }
 
 /** Find the most recent outcome with weights data for this plan (excluding today). */
@@ -388,9 +354,12 @@ export function TodayPage() {
   const rotationTotalWorkouts = plan.duration.type === 'rotations' && plan.duration.value > 1
     ? plan.days.length * plan.duration.value
     : 0
-  const rotationLoggedCount = rotationTotalWorkouts > 0
-    ? new Set(planEntries.filter(e => e.action === 'complete' || e.action === 'skip').map(e => e.calendarDate)).size
-    : 0
+  const rotationLoggedCount = useMemo(
+    () => rotationTotalWorkouts > 0
+      ? new Set(planEntries.filter(e => e.action === 'complete' || e.action === 'skip').map(e => e.calendarDate)).size
+      : 0,
+    [planEntries, rotationTotalWorkouts],
+  )
 
   // Cycle progress for rotation-duration plans (null for weeks-duration plans)
   const cycleProgress = plan.duration.type === 'rotations'
@@ -413,13 +382,9 @@ export function TodayPage() {
   const prevSessionDate = prevSessionOutcome
     ? parseWorkoutInstanceId(prevSessionOutcome.workoutInstanceId)?.calendarDate ?? null
     : null
-  const prevSessionDaysAgo: number | null = (() => {
-    if (!prevSessionDate) return null
-    const [ty, tm, td] = today.split('-').map(Number)
-    const [dy, dm, dd] = prevSessionDate.split('-').map(Number)
-    const d = Math.floor((Date.UTC(ty, tm - 1, td) - Date.UTC(dy, dm - 1, dd)) / 86_400_000)
-    return d > 0 ? d : null
-  })()
+  const prevSessionDaysAgo: number | null = prevSessionDate
+    ? (d => d > 0 ? d : null)(differenceInCalendarDays(parseISO(today), parseISO(prevSessionDate)))
+    : null
 
   const todaySessionCount = isPending
     ? countPlanDayCompletions(plan.id, primaryPlanDayIndex, planEntries, today)
@@ -682,10 +647,17 @@ export function TodayPage() {
           <span className="text-xs text-slate-400">workouts</span>
         </div>
         {cycleProgress && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-bold text-white">{cycleProgress.doneInCycle}/{cycleProgress.rotationLength}</span>
-            <span className="text-xs text-slate-400">cycle</span>
-          </div>
+          cycleProgress.justCompletedRotation ? (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 size={13} className="text-emerald-400" />
+              <span className="text-xs text-emerald-300">Cycle done</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-white">{cycleProgress.doneInCycle}/{cycleProgress.rotationLength}</span>
+              <span className="text-xs text-slate-400">cycle</span>
+            </div>
+          )
         )}
         <div className="ml-auto flex items-center gap-1.5">
           <CompletedWorkoutsRing
