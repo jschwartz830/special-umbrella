@@ -60,8 +60,7 @@ import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 import { outcomeSortKey } from '../lib/outcomeSortKey'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { WORKOUT_META } from '../lib/constants'
-
-
+import { estimateRunDurationMin } from '../lib/estimateRunDuration'
 
 /** Circular completion ring that wraps the total completed workout count. */
 function CompletedWorkoutsRing({
@@ -93,39 +92,6 @@ function CompletedWorkoutsRing({
       <span className="text-sm font-bold text-white relative z-10">{count}</span>
     </div>
   )
-}
-
-function estimateRunDurationMin(
-  slot: {
-    durationMin?: number
-    runConfig?: { targetDurationMin?: number | null; targetDistanceMiles?: number | null } | null
-    segments?: Array<{ type?: string; duration?: string; distance?: string }>
-  },
-  programVars: Record<string, unknown> = {},
-): number {
-  if (slot.durationMin) return slot.durationMin
-  if (slot.runConfig?.targetDurationMin) return slot.runConfig.targetDurationMin
-  let totalMin = 0
-  for (const seg of slot.segments ?? []) {
-    if (seg.duration) {
-      const mMatch = seg.duration.match(/^(\d+(?:\.\d+)?)\s*m(?:in)?$/)
-      if (mMatch) { totalMin += parseFloat(mMatch[1]); continue }
-    }
-    if (seg.distance) {
-      const resolved = seg.distance.replace(/\b([a-zA-Z_]\w*)\b/g, (m: string) =>
-        programVars[m] !== undefined ? String(programVars[m]) : m,
-      )
-      const miles = parseFloat(resolved)
-      if (!isNaN(miles)) {
-        const minPerMile = seg.type === 'tempo' ? 8 : seg.type === 'warmup' || seg.type === 'cooldown' ? 12 : 11
-        totalMin += miles * minPerMile
-      }
-    }
-  }
-  if (totalMin > 0) return Math.ceil(totalMin)
-  const dist = slot.runConfig?.targetDistanceMiles
-  if (dist) return Math.ceil(dist * 11)
-  return 20
 }
 
 /** Find the most recent outcome with weights data for this plan (excluding today). */
