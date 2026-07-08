@@ -647,10 +647,17 @@ export function TodayPage() {
           <span className="text-xs text-slate-400">workouts</span>
         </div>
         {cycleProgress && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-bold text-white">{cycleProgress.doneInCycle}/{cycleProgress.rotationLength}</span>
-            <span className="text-xs text-slate-400">cycle</span>
-          </div>
+          cycleProgress.justCompletedRotation ? (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 size={13} className="text-emerald-400" />
+              <span className="text-xs text-emerald-300">Cycle done</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-white">{cycleProgress.doneInCycle}/{cycleProgress.rotationLength}</span>
+              <span className="text-xs text-slate-400">cycle</span>
+            </div>
+          )
         )}
         <div className="ml-auto flex items-center gap-1.5">
           <CompletedWorkoutsRing
