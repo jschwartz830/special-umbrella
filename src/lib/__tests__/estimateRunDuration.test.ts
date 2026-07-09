@@ -2,10 +2,6 @@ import { describe, it, expect } from 'vitest'
 import { estimateRunDurationMin } from '../estimateRunDuration'
 
 // Helpers to build minimal slot shapes
-function withDurationMin(durationMin: number) {
-  return { durationMin }
-}
-
 function withTargetDurationMin(targetDurationMin: number) {
   return { runConfig: { targetDurationMin, targetDistanceMiles: null } }
 }
