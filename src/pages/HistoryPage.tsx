@@ -23,7 +23,7 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv, personalRecordsToCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate, findBestWeek, computeWorkoutPRFlags } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate, findBestWeek, buildPRFlagsMap } from '../lib/historyStats'
 import type { PersonalRecord, WeeklyBreakdown, WorkoutTypeBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -218,6 +218,7 @@ export function HistoryPage() {
   }, [typeBreakdown, typeCountMapFallback])
 
   const allExerciseRecords = useExerciseHistoryStore(s => s.records)
+  const prFlagsMap = useMemo(() => buildPRFlagsMap(allExerciseRecords), [allExerciseRecords])
   const personalRecords = useMemo(
     () => computePersonalRecords(allExerciseRecords, filterPlanId === 'all' ? null : filterPlanId),
     [allExerciseRecords, filterPlanId],
@@ -573,7 +574,7 @@ export function HistoryPage() {
                           <OutcomeMetrics
                             outcome={outcome}
                             progressionState={progressionState}
-                            prFlags={computeWorkoutPRFlags(instanceId, allExerciseRecords)}
+                            prFlags={prFlagsMap.get(instanceId)}
                           />
                         </div>
                       )}
@@ -667,7 +668,7 @@ export function HistoryPage() {
                       <div className="mt-2">
                         <OutcomeMetrics
                           outcome={extraOutcome}
-                          prFlags={computeWorkoutPRFlags(instanceId, allExerciseRecords)}
+                          prFlags={prFlagsMap.get(instanceId)}
                         />
                       </div>
                     )}
@@ -767,6 +768,7 @@ export function HistoryPage() {
               <input
                 type="date"
                 value={editingEntryDate}
+                max={today}
                 onChange={e => { setEditingEntryDate(e.target.value); setDateConflict(false) }}
                 className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
@@ -862,6 +864,7 @@ export function HistoryPage() {
               <input
                 type="date"
                 value={editingExtraDate}
+                max={today}
                 onChange={e => setEditingExtraDate(e.target.value)}
                 className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
               />

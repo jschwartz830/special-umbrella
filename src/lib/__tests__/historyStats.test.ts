@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags, buildPRFlagsMap } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -2645,5 +2645,75 @@ describe('computeWorkoutPRFlags', () => {
     const result = computeWorkoutPRFlags('plan-1_2026-01-10', records)
     expect(result.hasLoadPR).toBe(true)
     expect(result.hasRepsPR).toBe(true)
+  })
+})
+
+// ── buildPRFlagsMap ───────────────────────────────────────────────────────────
+
+describe('buildPRFlagsMap', () => {
+  it('returns empty map when given no records', () => {
+    expect(buildPRFlagsMap([]).size).toBe(0)
+  })
+
+  it('marks load and reps PR for the first-ever session', () => {
+    const records = [makeExRecord('plan-1_2026-01-10', 'Bench Press', '2026-01-10', 185, 5)]
+    const map = buildPRFlagsMap(records)
+    expect(map.get('plan-1_2026-01-10')).toEqual({ hasLoadPR: true, hasRepsPR: true })
+  })
+
+  it('marks load PR only when new session exceeds prior', () => {
+    const records = [
+      makeExRecord('plan-1_2026-01-01', 'Squat', '2026-01-01', 225, 5),
+      makeExRecord('plan-1_2026-01-08', 'Squat', '2026-01-08', 230, 5),
+    ]
+    const map = buildPRFlagsMap(records)
+    expect(map.get('plan-1_2026-01-08')?.hasLoadPR).toBe(true)
+    expect(map.get('plan-1_2026-01-01')?.hasLoadPR).toBe(true) // first session is always a PR
+  })
+
+  it('does not mark load PR on a tie', () => {
+    const records = [
+      makeExRecord('plan-1_2026-01-01', 'Squat', '2026-01-01', 225, 5),
+      makeExRecord('plan-1_2026-01-08', 'Squat', '2026-01-08', 225, 5),
+    ]
+    const map = buildPRFlagsMap(records)
+    expect(map.get('plan-1_2026-01-08')?.hasLoadPR).toBe(false)
+  })
+
+  it('same-date records see the same prior max (not each other)', () => {
+    const records = [
+      makeExRecord('plan-1_2026-01-01', 'OHP', '2026-01-01', 115, 5),
+      // Two separate sessions on the same date
+      makeExRecord('plan-1_2026-01-08', 'OHP', '2026-01-08', 120, 5),
+      makeExRecord('plan-2_2026-01-08', 'OHP', '2026-01-08', 120, 5),
+    ]
+    const map = buildPRFlagsMap(records)
+    // Both same-date sessions beat the prior max of 115, so both get flagged
+    expect(map.get('plan-1_2026-01-08')?.hasLoadPR).toBe(true)
+    expect(map.get('plan-2_2026-01-08')?.hasLoadPR).toBe(true)
+  })
+
+  it('produces same results as calling computeWorkoutPRFlags per instance', () => {
+    const records = [
+      makeExRecord('plan-1_2026-01-01', 'Bench Press', '2026-01-01', 185, 8),
+      makeExRecord('plan-1_2026-01-01', 'OHP', '2026-01-01', 115, 8),
+      makeExRecord('plan-1_2026-01-08', 'Bench Press', '2026-01-08', 185, 8), // tie
+      makeExRecord('plan-1_2026-01-08', 'OHP', '2026-01-08', 120, 8), // new PR
+      makeExRecord('plan-1_2026-01-15', 'Bench Press', '2026-01-15', 190, 8), // new PR
+      makeExRecord('plan-1_2026-01-15', 'OHP', '2026-01-15', 115, 8), // regression
+    ]
+    const map = buildPRFlagsMap(records)
+    const instances = ['plan-1_2026-01-01', 'plan-1_2026-01-08', 'plan-1_2026-01-15']
+    for (const id of instances) {
+      const expected = computeWorkoutPRFlags(id, records)
+      const actual = map.get(id) ?? { hasLoadPR: false, hasRepsPR: false }
+      expect(actual).toEqual(expected)
+    }
+  })
+
+  it('ignores zero and null loads', () => {
+    const records = [makeExRecord('plan-1_2026-01-10', 'Plank', '2026-01-10', 0, null)]
+    const map = buildPRFlagsMap(records)
+    expect(map.get('plan-1_2026-01-10')).toEqual({ hasLoadPR: false, hasRepsPR: false })
   })
 })
