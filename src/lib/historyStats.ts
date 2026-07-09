@@ -576,6 +576,65 @@ export function computeWorkoutPRFlags(
   return { hasLoadPR, hasRepsPR }
 }
 
+/**
+ * Pre-compute load/reps PR flags for ALL workout instances in a single O(N log N) pass.
+ * Returns a Map from workoutInstanceId → {hasLoadPR, hasRepsPR}.
+ *
+ * Use this in list views (e.g. HistoryPage) rather than calling computeWorkoutPRFlags
+ * per item, which scans all records for each item and is O(N²) overall.
+ *
+ * Same-calendarDate records all see the same "prior max" (records before that date only),
+ * matching the semantics of computeWorkoutPRFlags.
+ */
+export function buildPRFlagsMap(
+  allRecords: ExerciseSessionRecord[],
+): Map<string, { hasLoadPR: boolean; hasRepsPR: boolean }> {
+  if (!allRecords.length) return new Map()
+
+  const byDate = new Map<string, ExerciseSessionRecord[]>()
+  for (const r of allRecords) {
+    const group = byDate.get(r.calendarDate)
+    if (group) group.push(r)
+    else byDate.set(r.calendarDate, [r])
+  }
+
+  const sortedDates = [...byDate.keys()].sort()
+  const runningMaxLoad = new Map<string, number>()
+  const runningMaxReps = new Map<string, number>()
+  const result = new Map<string, { hasLoadPR: boolean; hasRepsPR: boolean }>()
+
+  for (const date of sortedDates) {
+    const records = byDate.get(date)!
+
+    for (const record of records) {
+      if (!result.has(record.workoutInstanceId)) {
+        result.set(record.workoutInstanceId, { hasLoadPR: false, hasRepsPR: false })
+      }
+      const flags = result.get(record.workoutInstanceId)!
+      const priorLoad = runningMaxLoad.get(record.exerciseName) ?? 0
+      const priorReps = runningMaxReps.get(record.exerciseName) ?? 0
+
+      if (record.maxLoad !== null && record.maxLoad > 0 && record.maxLoad > priorLoad) {
+        flags.hasLoadPR = true
+      }
+      if (record.maxReps !== null && record.maxReps > 0 && record.maxReps > priorReps) {
+        flags.hasRepsPR = true
+      }
+    }
+
+    for (const record of records) {
+      if (record.maxLoad !== null && record.maxLoad > (runningMaxLoad.get(record.exerciseName) ?? 0)) {
+        runningMaxLoad.set(record.exerciseName, record.maxLoad)
+      }
+      if (record.maxReps !== null && record.maxReps > (runningMaxReps.get(record.exerciseName) ?? 0)) {
+        runningMaxReps.set(record.exerciseName, record.maxReps)
+      }
+    }
+  }
+
+  return result
+}
+
 // ── Streakable dates set ──────────────────────────────────────────────────────
 
 /**

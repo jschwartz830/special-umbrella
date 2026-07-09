@@ -1,5 +1,53 @@
 # Test Results
 
+## 2026-07-09 (seventy-fifth pass) — branch `claude/dreamy-mccarthy-vpg2n1`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  30 passed (30)
+     Tests  1049 passed (1049)
+  Duration  ~2.8s
+```
+
+### After commit 1 (buildPRFlagsMap + max-date fix + 7 new tests)
+
+```
+Test Files  30 passed (30)
+     Tests  1056 passed (1056)
+  Duration  ~2.8s
+```
+
+### After commit 2 (unused helper removal)
+
+```
+Test Files  30 passed (30)
+     Tests  1056 passed (1056)
+  Duration  ~2.8s
+```
+
+**Final: +7 tests, 0 regressions. TypeScript: clean (0 errors).**
+
+---
+
+### New tests added — `src/lib/__tests__/historyStats.test.ts`
+
+7 tests in `describe('buildPRFlagsMap')`:
+
+| Test | What it verifies |
+|---|---|
+| `returns empty map when given no records` | Empty input edge case |
+| `marks load and reps PR for the first-ever session` | Both flags set for inaugural session |
+| `marks load PR only when new session exceeds prior` | PR on strict improvement; first session also flagged |
+| `does not mark load PR on a tie` | Tied value does not count as PR |
+| `same-date records see the same prior max (not each other)` | Two sessions on same date both see the same prior max of 115 — both get flagged as PRs independently |
+| `produces same results as calling computeWorkoutPRFlags per instance` | Parity test across 3 sessions with bench/OHP (tie, PR, regression) |
+| `ignores zero and null loads` | Zero load excluded from PR consideration |
+
+---
+
 ## 2026-07-08 (seventy-fourth pass) — branch `claude/dreamy-mccarthy-ugdev5`
 
 ---

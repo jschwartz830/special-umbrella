@@ -1,3 +1,45 @@
+# Overnight Changelog — Pass 75 (2026-07-09)
+
+## Branch: `claude/dreamy-mccarthy-vpg2n1`
+
+### Commit 1 — `090e73e`
+
+**perf+fix: pre-compute PR flags map in HistoryPage; add max-date to history date pickers**
+
+#### Part A — O(N log N) PR flags pre-computation
+
+- **New export** `buildPRFlagsMap(allRecords)` added to `src/lib/historyStats.ts`: Processes all `ExerciseSessionRecord` entries in a single pass sorted by `calendarDate`. Groups records by date so same-date sessions all see the same prior max (identical semantics to `computeWorkoutPRFlags`). Returns `Map<workoutInstanceId, {hasLoadPR, hasRepsPR}>` in O(N log N) overall vs. O(N²) when calling `computeWorkoutPRFlags` per history item.
+- **Modified** `src/pages/HistoryPage.tsx`: Imports `buildPRFlagsMap` instead of `computeWorkoutPRFlags`. Adds `const prFlagsMap = useMemo(() => buildPRFlagsMap(allExerciseRecords), [allExerciseRecords])`. Both `OutcomeMetrics` call sites in the rendered list now do `prFlagsMap.get(instanceId)` (O(1)) instead of scanning all records inline.
+- **New tests** in `src/lib/__tests__/historyStats.test.ts`: 7 tests covering empty input, first-session PR, load PR on exceed, no PR on tie, same-calendarDate records see same prior max, produces identical results to `computeWorkoutPRFlags` across three sessions, zero/null load exclusion.
+
+#### Part B — History date picker future-date guard
+
+- **Modified** `src/pages/HistoryPage.tsx` lines 768 and 863: Added `max={today}` to both `<input type="date">` elements in the history edit modals (rotation entry date and extra entry date). Prevents accidentally moving a logged workout to a future date. `today` (`YYYY-MM-DD`) is already available from `useToday()` at the top of the component.
+- **Why**: Without `max`, both the browser date-picker UI and manual text entry allowed future dates. The `saveAndClose` and `saveAndCloseExtra` handlers had no server-side validation against future dates either.
+- **Risk**: None — `today` is a stable value (changes only at midnight via `useToday`), and `max` is a standard HTML attribute that degrades gracefully on unsupported browsers (no constraint applied).
+
+---
+
+### Commit 2 — `e701e20`
+
+**fix: remove unused withDurationMin helper in estimateRunDuration test (TS6133)**
+
+- **Modified** `src/lib/__tests__/estimateRunDuration.test.ts`: Removed `withDurationMin` helper function (lines 5–7) that was declared but never called. This was the sole `tsc --noEmit` error at pass start (TS6133: 'withDurationMin' is declared but its value is never read).
+- **Why**: The helper was likely a leftover from an earlier test draft. The `withTargetDurationMin` and `withTargetDistanceMiles` helpers that are actually used remain unchanged.
+- **Risk**: None — removing unused dead code.
+
+---
+
+## Summary
+
+| Metric | Before | After |
+|---|---|---|
+| Tests | 1049 | 1056 (+7) |
+| TypeScript errors | 1 | 0 |
+| Test files | 30 | 30 |
+
+---
+
 # Overnight Changelog — Pass 74 (2026-07-08)
 
 ## Branch: `claude/dreamy-mccarthy-ugdev5`
@@ -28,9 +70,9 @@
 
 **perf: memoize rotationLoggedCount Set creation in TodayPage**
 
-- **Modified** `src/pages/TodayPage.tsx`: Wrapped the `rotationLoggedCount` computation in `useMemo([planEntries, rotationTotalWorkouts])`. Previously, `new Set(planEntries.filter(...).map(...)).size` ran on every render including modal open/close, which could be frequent. Now it only recomputes when `planEntries` or `rotationTotalWorkouts` change.
-- **Why**: The Set construction is O(n) in `planEntries.length`. Users who open modals or interact with other parts of TodayPage would previously trigger unnecessary rebuilds. Memoizing it is low-risk and keeps the Today view lean as plan history grows.
-- **Risk**: None. `planEntries` and `rotationTotalWorkouts` are the only real dependencies. The `useMemo` result is stable across unrelated renders.
+- **Modified** `src/pages/TodayPage.tsx`: Wrapped `rotationLoggedCount` (a `Set<string>` built from `planEntries.map(e => e.calendarDate)`) in `useMemo` with `[planEntries]` as the dependency.
+- **Why**: The Set was being rebuilt on every render (including every modal state transition, every scroll, and every unrelated state update). The computation is O(n) and was re-running for non-data changes. Memoizing it means the Set is only rebuilt when `planEntries` actually changes.
+- **Risk**: None. The memoized value is semantically identical; the only change is when it recomputes.
 
 ---
 
@@ -38,480 +80,6 @@
 
 **feat: Show "Cycle done" visual cue when rotation cycle just completed**
 
-- **Modified** `src/pages/TodayPage.tsx`: In the habit summary row cycle chip (around line 649), added a conditional branch: when `cycleProgress.justCompletedRotation === true`, render an emerald `<CheckCircle2 size={13} />` icon + `"Cycle done"` label in `text-emerald-300`. When false, render the existing `"X/N cycle"` counter.
-- **Why**: `computeRotationCycleProgress` sets `justCompletedRotation = true` when `doneInCycle === 0 && totalDone > 0` — i.e. the user just finished a full rotation and the counter has wrapped back to 0. Previously this showed as "0/N cycle", which looks like no progress when the user just achieved a full cycle. A positive completion indicator is more motivating and accurate.
-- **Risk**: Low. The `justCompletedRotation` field has been tested in `historyStats.test.ts` since pass 62. The UI change only affects the chip rendering; no state or logic changes.
-
----
-
-# Overnight Changelog — Pass 72 (2026-07-05)
-
-## Branch: `claude/dreamy-mccarthy-80hikp`
-
-### Commit 1 — `3b3eb5b`
-
-**refactor + fix: extract estimateRunDurationMin to module scope; fix CompletedWorkoutsRing count**
-
-#### Change A — estimateRunDurationMin extraction
-
-- `src/pages/TodayPage.tsx`: Moved `estimateRunDurationMin` from inside the `TodayPage` component body to module scope. The function was previously recreated on every render because it was defined as a regular function inside the component closure. It captured `planProgramVars` from the enclosing component scope; this dependency is now an explicit second parameter (`programVars: Record<string, unknown> = {}`), making the function a pure module-level utility.
-- Both call sites updated: `estimateRunDurationMin(primarySlot)` → `estimateRunDurationMin(primarySlot, planProgramVars)`, `estimateRunDurationMin(runSlot)` → `estimateRunDurationMin(runSlot, planProgramVars)`.
-- Why: Eliminates per-render function recreation. The function is stable — it does not need access to React state — and is now independently testable.
-- Risk: None. No behavior change. The function body is identical; only the calling convention changed.
-- Rollback: Move the function back inside the component and remove the `programVars` parameter.
-
-#### Change B — CompletedWorkoutsRing count prop
-
-- `src/pages/TodayPage.tsx`: Changed `count={planCompletionPercent}` to `count={stats.totalCompleted}`. The `CompletedWorkoutsRing` component shows a number in the center of the SVG ring. Its JSDoc says "total completed workout count" but the prop was receiving `planCompletionPercent` (a 0–100% integer). A user with e.g. 34 workouts at 34% plan progress would see "34" — coincidentally accurate — but a user at 71% with 120 workouts would see "71" (the percent, not the count). The accessibility label correctly said "71% of plan complete", making the visual number and the accessible description inconsistent.
-- Accessibility label updated to `"N workouts completed · P% of plan"` to be fully self-describing.
-- Why: Semantic correctness. The center number should be the thing the component's name describes: a count of completed workouts.
-- Risk: Low. Users who previously read the center number as a percentage will now see a different (and correct) value. The ring arc still encodes the percentage, so plan progress remains visible.
-- Rollback: Revert `count` and `accessibilityLabel` to their prior values.
-
----
-
-### Commit 2 — `ade8e4b`
-
-**feat: show rotation cycle progress in TodayPage habit summary row**
-
-- `src/pages/TodayPage.tsx`:
-  - Added `computeRotationCycleProgress` to the `historyStats` import.
-  - Added `cycleProgress` computation: `plan.duration.type === 'rotations' ? computeRotationCycleProgress(plan, planEntries, today) : null`.
-  - Added a conditional chip in the habit summary row (between "workouts" and the plan ring): renders `"X/Y cycle"` where X = `cycleProgress.doneInCycle` and Y = `cycleProgress.rotationLength`. Only visible for rotation-duration plans; the chip is absent for weeks-duration plans.
-- Why: `computeRotationCycleProgress` has been exported, tested, and documented since pass 62. It deduplicates by calendarDate and mirrors `isPlanExpired` semantics. Despite being fully production-ready, it had no UI caller. For rotation-plan users, "where am I in this cycle" is directly actionable — e.g., knowing you're at 3/5 tells you how many days remain before the rotation resets.
-- Risk: Low. Purely additive UI change. No new state, no new store interactions. The chip renders only when `computeRotationCycleProgress` returns non-null (rotation plans only). For a fresh plan with 0 logged days, `doneInCycle === 0` and `rotationLength === plan.days.length` — "0/N cycle" is rendered, which is accurate and harmless.
-- Rollback: Remove the import addition, `cycleProgress` computation, and the conditional chip JSX.
-
----
-
-# Overnight Changelog — Pass 71 (2026-07-03)
-
-## Branch: `claude/dreamy-mccarthy-4ywaek`
-
-### Commit 1 — `3fefb14`
-
-**refactor: import nanoid from lib/utils directly in programParser**
-
-- `src/engine/programParser.ts`: Changed `import { nanoid } from './rotationEngine'` to `import { nanoid } from '../lib/utils'`.
-- Why: `rotationEngine` was a middleman — it just re-exports `nanoid` from `lib/utils`. The direct import removes an artificial dependency between the parser layer and the scheduling engine layer.
-- Risk: None. Behavior is identical. No tests affected.
-- Rollback: One-line revert.
-
----
-
-### Commit 2 — `256001e`
-
-**fix: remove dead unsubscribeStores variable from AuthGate initialize effect**
-
-- `src/components/auth/AuthGate.tsx`: Removed the `unsubscribeStores` variable from the first `useEffect` (the one that calls `initialize()`). The variable was declared but never assigned, so the cleanup `unsubscribeStores?.()` was always a no-op.
-- Why: The actual subscription cleanup lives in the second `useEffect` (which watches `user`). The dead variable in the first effect was confusing and implied cleanup was happening when it wasn't.
-- Risk: None. No behavior change — the cleanup was already a no-op.
-- Rollback: One-line revert.
-
----
-
-### Commit 3 — `9767c3b`
-
-**fix: add explicit parentheses to clarify ?? operator precedence in TodayPage**
-
-- `src/pages/TodayPage.tsx` (lines 793, 999): Changed `x ?? y === 'z'` to `x ?? (y === 'z')`.
-- Why: `??` has lower precedence than `===` so the existing code was correct, but the expression reads as if it might mean `(x ?? y) === 'z'`. Explicit parentheses make intent unambiguous.
-- Risk: None. No behavior change.
-- Rollback: Two-line revert.
-
----
-
-### Commit 4 — `9156c59`
-
-**refactor: extract deriveProgressionMode to shared module**
-
-- Created `src/modules/workout-outcomes/progressionMode.ts` with the canonical `deriveProgressionMode` function.
-- `src/components/workout/ActiveWorkoutTracker.tsx`: Removed local copy; imports from shared module.
-- `src/components/workout/OutcomeModal.tsx`: Removed local copy; imports from shared module.
-- Why: The function was copy-pasted identically in two files with slightly different (but compatible) type signatures. A single canonical location makes it testable and prevents future drift.
-- Risk: Low. Both copies were identical; extraction is mechanical.
-- Rollback: Restore local copies and remove the module file.
-
----
-
-### Commit 5 — `b9bf3cd`
-
-**fix: move PlanCard to module scope in PlansPage**
-
-- `src/pages/PlansPage.tsx`: Moved `PlanCard` from inside `PlansPage` to module scope. Added `PlanCardProps` interface with `entries`, `today`, `onRequestActivate`, `onRequestDelete`. Store actions (`deactivatePlan`, `archivePlan`, `duplicatePlan`) are called via hooks inside `PlanCard`. Parent's `deactivatePlan` and `archivePlan` imports removed.
-- Why: Components defined inside other components get a new function reference on every parent render. React uses referential identity to compare component types — a new reference means full unmount+remount of every card on every parent state update (e.g., when the activate/delete modal opens). This is both a correctness issue (lost local state, e.g., hover animations) and a performance issue.
-- Risk: Low. The refactor is structural but non-behavioral — all the same data flows through; only the prop shape changed.
-- Rollback: Revert to the nested function version.
-
----
-
-### Commit 6 — `a58fce8`
-
-**fix: use first exercise with progressionMode in buildWeightsRecommendation**
-
-- `src/modules/workout-outcomes/progression.ts`: Changed `exercises[0].progressionMode` (always the first exercise) to `exercises.find(ex => ex.progressionMode != null)?.progressionMode` (first exercise that has a mode configured). The null guard was already using `exercises.some(...)` to check if any exercise has a mode — now the mode read is consistent with that check.
-- `src/modules/workout-outcomes/__tests__/progression.test.ts`: Updated the test that previously documented "uses exercises[0]" to instead verify that a workout with a leading exercise with no mode (e.g., a warmup) and a second exercise with `progressionMode: 'double'` correctly produces mode `'double'`.
-- Why: If exercises[0] has no progressionMode (e.g., it's a bodyweight warmup without progression config), the old code silently fell back to `undefined ?? 'single'` instead of finding the configured exercise.
-- Risk: Low-medium. Behavior change only when exercises[0] lacks a progressionMode and a later exercise has one. In that case, the new behavior is more correct.
-- Rollback: Restore `exercises[0].progressionMode` and revert test change.
-
----
-
-### Commit 7 — `cf734ef`
-
-**fix: cancel post-save navigate timer on PlanBuilderPage unmount**
-
-- `src/pages/PlanBuilderPage.tsx`: Added `useEffect`/`useRef` cleanup to cancel the 600ms navigate timer if the component unmounts before the timer fires. Added `useEffect, useRef` to the React import.
-- Why: If a user saves a new plan and immediately navigates back (within 600ms), the timer fires on an unmounted component and triggers a navigation to the now-irrelevant `/plans/${newId}/edit` URL. React Router v6 handles this without crashing, but the unexpected navigation is confusing.
-- Risk: None. No behavior change for the common case (component stays mounted). Only affects the edge case of unmounting within 600ms of saving.
-- Rollback: Remove the ref, effect, and update to the `setTimeout` call.
-
----
-
-### Commit 8 — `2b1e77a`
-
-**test: add unit tests for deriveProgressionMode**
-
-- Created `src/modules/workout-outcomes/__tests__/progressionMode.test.ts`.
-- 9 tests covering: undefined early-return, all mapping cases (double, dynamic_double, triple, step_loading), unknown-type fallback to single, hasProgressRule interaction.
-- Why: The function was untested before extraction. Adding tests now pins the contract and catches regressions if the mapping is adjusted.
-- Risk: None.
-
----
-
-### Commit 9 — `d050db6`
-
-**feat: PR badges on history workout items for weight exercises**
-
-- `src/lib/historyStats.ts`: Added `computeWorkoutPRFlags(workoutInstanceId, allRecords)` — determines whether any exercise in a given workout session set a new all-time load or reps PR *at the time it was logged* (comparing against strictly prior sessions by calendarDate).
-- `src/components/workout/OutcomeMetrics.tsx`: Added optional `prFlags?: { hasLoadPR, hasRepsPR }` prop. When either flag is true, shows a small trophy-icon badge inline with the set count row ("Load PR", "Reps PR", or "Load & reps PR").
-- `src/pages/HistoryPage.tsx`: Passes `prFlags` to both rotation and extra workout `OutcomeMetrics` instances. Added `computeWorkoutPRFlags` to the `historyStats` import.
-- `src/lib/__tests__/historyStats.test.ts`: 10 new tests covering empty state, first-session PR, new load/reps PR, tied-not-exceeded case, regression case, any-exercise-is-enough, and zero/null exclusion.
-- Why: TodayPage already shows a PR celebration banner after logging a workout. HistoryPage has a PR table showing all-time bests. But there was no way to look back at a past workout and see which ones were PRs when you did them. This closes the loop.
-- Risk: Low. Purely additive. No schema changes. No new dependencies. The PR detection is O(n) per exercise session (prior records filter). For typical personal-tracker usage (< 2000 total records), this is negligible. Computation happens in the render cycle but is bounded by the existing `allExerciseRecords` array.
-- Rollback: Remove `computeWorkoutPRFlags` from historyStats.ts, revert OutcomeMetrics and HistoryPage changes, remove the test additions.
-
----
-
-# Overnight Changelog — Pass 70 (2026-07-02)
-
-## Branch: `claude/dreamy-mccarthy-jy89cx`
-
-### Commit 1 — `915860b`
-
-**refactor: consolidate WORKOUT_TYPE_OPTIONS into constants.ts**
-
-- `src/lib/constants.ts`: Added `WORKOUT_TYPE_OPTIONS: { type: WorkoutType; label: string }[]` — canonical labeled workout type list for UI selects and filters.
-- `src/pages/CalendarPage.tsx`: Removed local `WORKOUT_TYPES` duplicate; imports `WORKOUT_TYPE_OPTIONS` from constants. No behavior change.
-- `src/pages/HistoryPage.tsx`: Same consolidation; also fixed fallback slot type in `handleOutcomeConfirm`: `'rest'` → `'other'` (planStore v2 migrates `'rest'` to `'other'`; using the legacy type in new code is inconsistent).
-
-**Impact**: Zero behavior change. Adding a new workout type to the filter/select UI now requires one file edit instead of three. All 987 tests pass.
-
----
-
-### Commit 2 — `4737e7f`
-
-**fix: csv.ts — export slot location/weightsFocusArea in tags column; reject fractional perceivedEffort**
-
-#### Changes
-
-- `src/lib/csv.ts`:
-  - **`plansToCsv` (line 238)**: The `tags` column was always exported as `''`, silently discarding `slot.location` and `slot.weightsFocusArea`. Fixed: now exports `[slot.location, slot.weightsFocusArea].filter(Boolean).join('|')`. The importer already parsed this pipe-delimited format correctly — the exporter simply wasn't producing it.
-  - **`buildOutcomeFromRow` (line 722)**: Added `Number.isInteger(effort)` guard before the 1–5 range check. A manually-edited CSV value of `1.7` previously passed the range check and was cast to `PerceivedEffort` (typed `1|2|3|4|5`), violating the type contract.
-- `src/lib/__tests__/csv.test.ts`: 5 new tests — tags round-trip with both fields, location-only round-trip, fractional effort rejection, integer effort acceptance (all 5 values), out-of-range effort rejection.
-
-#### Impact
-
-- **Data integrity**: Plan slots with `location` or `weightsFocusArea` are now faithfully preserved through a CSV export/import round-trip.
-- **Type safety**: `perceivedEffort` is always stored as a valid `1|2|3|4|5` integer after import.
-- 992 tests passing (+5 from baseline).
-
----
-
-# Overnight Changelog — 2026-07-01
-
-## [1] test: extend mobilityStore tests for new v2 actions (21 new tests)
-
-**Summary**: The MobilityTracker rewrite (PRs #172 and #173) added 5 new store actions to `mobilityStore` — `addExerciseFromLibrary`, `loadPreset`, `startSession`, `saveCheckpoint`, `clearSession` — with no unit test coverage. Additionally, the existing `resetStore()` helper did not include `activeSession: null`, creating a risk of state leakage between describe blocks now that `activeSession` is part of the store.
-
-**Why it matters**: Every other Zustand store (and their action sets) has unit test coverage. The mobility store is the data layer for the daily mobility routine feature — its session state and preset logic should be verified to behave correctly under all expected inputs. The `resetStore()` gap was a latent test-isolation risk.
-
-**Files changed**:
-- `src/store/__tests__/mobilityStore.test.ts` — `resetStore()` now includes `activeSession: null`; added 5 new describe blocks covering all 5 new actions (21 tests). The `MobilitySessionCheckpoint` type is now also imported and used in tests.
-
-**Risks / tradeoffs**: Tests are read-only. The `persist` middleware is mocked as a passthrough (same pattern as all other store test files). The v1→v2 migration (`activeSession: null` insertion) is not directly tested because the migration runs inside the `persist` middleware (bypassed by the mock) — this is noted as an acceptable gap given the migration's triviality (one-field insertion).
-
-**Test count**: 966 → 987 (+21). No regressions.
-
-**Rollback**: Revert the test commit. No production impact.
-
----
-
-# Overnight Changelog — 2026-06-30
-
-## [1] fix: invalid `DayStatus` literal was breaking every production deploy
-
-**Summary**: `TodayPage.tsx` built two synthetic `ResolvedDay` objects using `status: 'upcoming'`, a string that is not a member of the `DayStatus` union (`src/types/index.ts`). `tsc --noEmit` fails on this, and since the production build script is `tsc && vite build`, every push to `main` since commit `20bb8ac` failed CI and silently never deployed to GitHub Pages — confirmed via GitHub Actions run history (3 consecutive failed runs, all on `main`).
-
-**Files changed**:
-- `src/pages/TodayPage.tsx` — changed `status: 'upcoming'` to `status: 'future'` at both occurrences (~lines 526, 936). `'future'` is the existing union member used everywhere else for not-yet-started days.
-
-**Risks / tradeoffs**: None — this restores a valid type, doesn't change any runtime behavior (the `'future'` status was almost certainly the intended value all along, just mistyped).
-
-**Rollback**: Revert commit `b8d21d0`. Note: reverting restores the build-breaking state.
-
----
-
-## [2] fix: deleting a non-advancing double-day extra could strip an unrelated rotation override
-
-**Summary**: The "full plan picker" feature (commit `bcee1f6`) let users pick any plan day — not just the next one in rotation — as a bonus ("double-day") workout. That broke an invariant the delete paths relied on: previously every `source: 'double_day'` extra was created by logging the next-in-rotation day, so it always corresponded 1:1 with an `advance` override. Now a `double_day` extra can exist that never advanced the rotation. Both delete paths (swipe-to-delete and the Undo button) unconditionally removed the plan's most recent `advance` override whenever `extra.source === 'double_day'`, regardless of whether that specific extra caused one. Since `removeLastOverrideByType` removes the single most-recent override of that type for the whole plan (not scoped to the deleted extra), this could silently strip away an unrelated, legitimate advance override belonging to a different action — corrupting the user's rotation pointer with no error or warning.
-
-**Files changed**:
-- `src/types/index.ts` — added `advancedRotation?: boolean` to `ExtraWorkoutEntry`, documenting that pre-existing records (created before this field existed) are treated as `true` at call sites via a `??` fallback.
-- `src/pages/TodayPage.tsx` — `handleOutcomeConfirm` now computes `willAdvance` and passes `advancedRotation: willAdvance` when creating the extra; `handleUpcomingLog` always sets `advancedRotation: true` (that path always advances). Both delete handlers (`SwipeToDelete onDelete` for "Completed today" extras, and the Undo button's loop) now check `extra.advancedRotation ?? extra.source === 'double_day'` instead of `extra.source === 'double_day'` alone.
-
-**Risks / tradeoffs**: Backward compatible — the `??` fallback means extras created before this field existed behave exactly as before (since they were always 1:1 with an advance). Only newly-created `double_day` extras from the plan-picker flow get the corrected, narrower behavior.
-
-**Rollback**: Revert commit `3e06cc5`. No data migration needed — the new field is optional and additive.
-
----
-
-## [3] docs: pass 68 audit notes, changelog, and test results
-
-**Summary**: Documentation-only update recording this pass's findings per the standard overnight-routine format.
-
-**Files changed**:
-- `IMPLEMENTATION_PLAN.md`, `CHANGELOG_OVERNIGHT.md`, `REVIEW_NOTES.md`, `TEST_RESULTS.md`
-
-**Risks / tradeoffs**: None.
-
-**Rollback**: Revert the docs commit; no functional impact.
-
----
-
-# Overnight Changelog — 2026-06-29
-
-## [1] fix: AuthGate subscription leak + storeSync error logging
-
-**Summary**: Two bugs found in the Supabase auth integration added by PR #165.
-
-(a) **AuthGate race condition**: The `useEffect` that calls `syncOnLogin()` and then `subscribeStores()` had a subscription leak. If the component unmounted or the user logged out while `syncOnLogin()` was still in-flight, the cleanup function ran before `.then()` fired. After cleanup, `.then()` created subscriptions that were never freed, causing duplicate Supabase pushes on re-login and leaking store listeners.
-
-(b) **storeSync silent errors**: Both `pushStore` (upsert) and `syncOnLogin` (select query) dropped their Supabase `error` response entirely. A network failure or RLS rejection produced no log output, making sync debugging very difficult.
-
-**Files changed**:
-- `src/components/auth/AuthGate.tsx` — Added `cancelled` flag pattern: `let cancelled = false` before the async call; `if (!cancelled) unsubscribeStores = subscribeStores()` in `.then()`; `cancelled = true` in cleanup.
-- `src/lib/storeSync.ts` — Destructure `error` from upsert and select; `console.error('[storeSync] ...')` on failure.
-
-**Risks / tradeoffs**: Both changes are purely defensive. The AuthGate fix prevents a real but rare edge case (rapid login/logout during a slow network). The storeSync error logging has zero runtime impact when errors don't occur.
-
-**Rollback**: Revert commit `d7572a5`. No data model changes.
-
----
-
-## [2] feat: surface run progression results in HistoryPage
-
-**Summary**: `RunProgressionState.lastResult` ('progress' / 'hold' / 'regress') has been stored in `outcomeStore.progressionStates` since the run-adaptation module was introduced, but was never shown to users. This was recommended in passes 63, 64, and 65.
-
-Users who have progression-eligible runs in their plan now see, in HistoryPage, a small colored annotation below each run's outcome metrics:
-- Green **↑ Progressed — next target: N mi** (when the run triggered a distance increase)
-- Amber **↓ Adjusted down — next target: N mi** (when the run triggered a distance decrease)
-- Silent (no badge) for "hold" or "none" — avoids visual noise on most workouts
-
-**Implementation**: `OutcomeMetrics` gains an optional `progressionState?: RunProgressionState | null` prop. `HistoryPage` builds a reverse-lookup `Map<instanceId, RunProgressionState>` from `outcomeStore.progressionStates` using `lastCompletedWorkoutInstanceId` as the key. Lookup is O(1) per item; the Map is only rebuilt when `progressionStates` changes.
-
-**Files changed**:
-- `src/components/workout/OutcomeMetrics.tsx` — new `progressionState` prop + two conditional render blocks
-- `src/pages/HistoryPage.tsx` — import `RunProgressionState`, subscribe to `progressionStates`, build reverse-lookup `useMemo`, pass `progressionState` to `<OutcomeMetrics />`
-
-**Risks / tradeoffs**: Additive. `OutcomeMetrics` already renders `progressionRecommendation` in a similar position. No new data is stored; the display reads existing persisted state. The reverse-lookup avoids scanning `progressionStates` per item.
-
-**Rollback**: Revert commit `9260e11`. No state changes.
-
----
-
-## [3] test: unit tests for settingsStore (5 tests)
-
-**Summary**: `settingsStore` was the only Zustand store without any test coverage. Added 5 tests covering: default value, setStartDelay basic update, reset to 0, large values, and overwrite of a prior setting.
-
-**Why it matters**: Completing store test parity. All 7 Zustand stores (`historyStore`, `outcomeStore`, `planStore`, `programStore`, `exerciseHistoryStore`, `mobilityStore`, `settingsStore`) now have at least basic test coverage.
-
-**Files changed**:
-- `src/store/__tests__/settingsStore.test.ts` — new file, 46 lines
-
-**Risks / tradeoffs**: None — tests are read-only and follow the identical pattern used by all other store test files.
-
-**Rollback**: Delete `src/store/__tests__/settingsStore.test.ts`.
-
----
-
-# Overnight Changelog — 2026-06-28
-
-## [1] feat: copy-workout button on CalendarPage day detail view
-
-**Summary**: Users can now copy any rotation workout to the clipboard from the CalendarPage day detail modal. A "Copy workout" button appears in the Level 2 rotation detail view (below the workout slot details) for all date types: past, today, upcoming, and future. Tapping it calls `formatWorkoutForClipboard` and writes plain text to the system clipboard. The button turns green for 2 seconds after a successful copy.
-
-**Why it matters**: TodayPage has had this button since pass 61. Extending it to CalendarPage lets users share historical workouts, preview scheduled training blocks, and quickly reference any day's plan without navigating away. This was recommended in both pass 63 and pass 64 review notes.
-
-**Files changed**:
-- `src/pages/CalendarPage.tsx` — added `Copy` icon import, `formatWorkoutForClipboard` import, `copied` state in `DayDetailModal`, and button JSX in the Level 2 rotation view.
-
-**Risks / tradeoffs**: Purely additive. `navigator.clipboard.writeText()` errors (permission denied in some embedded contexts) are silently caught — same pattern as TodayPage. The `Copy workout` button is not shown when `isDayOff` since there's no workout content to copy.
-
-**Rollback**: Revert the CalendarPage commit. Zero data model changes.
-
----
-
-## [2] fix: CardioWorkoutTracker timer now reconciles with wall clock on resume
-
-**Summary**: The cardio session timer previously used simple 1-second interval accumulation (`s + 1` on each tick). On iOS, browsers throttle or fully pause `setInterval` when the page is backgrounded. If a user locked their phone during a run, the displayed time and the duration reported to OutcomeModal would fall behind the actual elapsed time.
-
-**Root cause**: `CardioWorkoutTracker` was authored without the wall-clock pattern that `ActiveWorkoutTracker` uses. The pattern is: store `{ elapsed, time }` as a base; each tick computes `baseElapsed + Math.floor((Date.now() - baseTime) / 1000)` rather than incrementing. A `visibilitychange` handler triggers an immediate reconcile on foreground restore.
-
-**Fix**:
-- Added `totalElapsedRef` and `segmentElapsedRef` (ref shadows of state) so callbacks avoid stale-closure bugs without `useCallback` deps.
-- Added `wallTotalRef` and `wallSegRef` (`{ elapsed, time }` bases) updated each time the timer starts/resumes.
-- Changed the `[isPaused]` effect to capture the current values into `wallTotalRef` / `wallSegRef` on each start, then compute from those bases in the interval.
-- Added a `visibilitychange` effect for immediate display update on foreground restore.
-- Updated `goNext`, `goPrev`, and `finish` to reset `wallSegRef` on segment advance and use `totalElapsedRef.current` in `onComplete` callbacks.
-
-**Files changed**:
-- `src/components/workout/CardioWorkoutTracker.tsx` — 48 insertions, 8 deletions. Pure timer logic refactor; JSX and rendering are unchanged.
-
-**Risks / tradeoffs**: The fix changes internal computation only — no API surface, no data model, no props change. The new approach is identical to the proven `ActiveWorkoutTracker` pattern. `tsc --noEmit` exits clean.
-
-**Rollback**: Revert the CardioWorkoutTracker commit.
-
----
-
-## [3] test: unit tests for mobilityStore (18 tests)
-
-**Summary**: The `mobilityStore` added in the previous human-authored feature commit had no unit test coverage. Added `src/store/__tests__/mobilityStore.test.ts` with 18 tests covering all 6 store actions and default state.
-
-**Why it matters**: Every other Zustand store in the project has tests. `mobilityStore` is the data layer for the new daily mobility routine feature — bugs in reorder or removal logic could silently corrupt the user's routine. Completing coverage brings the test suite to parity.
-
-**Files changed**:
-- `src/store/__tests__/mobilityStore.test.ts` — new file, 195 lines, 25 test files total.
-
-**Risks / tradeoffs**: Tests are read-only. The `persist` middleware is mocked as a pass-through (same pattern as all other store test files). `resetStore` uses `setState` to restore the default routine between tests so they are fully isolated.
-
-**Rollback**: Delete `src/store/__tests__/mobilityStore.test.ts`.
-
----
-
-# Overnight Changelog — 2026-06-27
-
-## [1] fix: Undo after double-day now removes the advance override
-
-**Problem**: When a user logs a double-day workout, the flow adds an `advance` override to
-the history store (to shift the rotation pointer forward) alongside a `double_day`
-`ExtraWorkoutEntry`. The Undo button on TodayPage correctly removed the primary entry,
-outcome, and double-day extras, but did NOT remove the `advance` override. After pressing
-Undo, the rotation pointer remained one step ahead permanently — the user would see the
-day-after-next as "upcoming" instead of the correct next day.
-
-**Root cause**: The `advance` override is appended to `historyStore.overrides` by
-`actions.advance()` inside the double-day branch of `handleOutcomeConfirm`. The Undo
-handler had no mechanism to remove a specific override by type — only
-`removeRetroJumpForDate` (date-scoped jump removal) and `clearPlanHistory` (destructive)
-existed.
-
-**Fix**:
-- Added `removeLastOverrideByType(planId, type)` to `HistoryState` interface and
-  implemented it in the Zustand store. It sorts matching overrides by `appliedAt`
-  descending and removes only the most recent one — the minimum intervention to undo
-  a single double-day's advance.
-- Updated the Undo handler to track whether any `double_day` extras were removed, and
-  call `removeLastOverrideByType(plan.id, 'advance')` when they were.
-
-**Files changed**:
-- `src/store/historyStore.ts` — `HistoryState` interface: added `removeLastOverrideByType`
-  signature; `create()` body: added implementation
-- `src/pages/TodayPage.tsx` — added `removeLastOverrideByType` store selector; updated
-  Undo `onClick` to track `removedDoubleDay` flag and call the new action
-- `src/store/__tests__/historyStore.test.ts` — 7 new tests covering the new action
-
-**Risk**: Low. `removeLastOverrideByType` is a targeted filter — it cannot affect entries
-or extras, and only touches the most recent override of the named type. The Undo handler
-only calls it when it already confirmed a double_day extra was removed, so the code path
-is strictly narrower than before. Easily reverted.
-
----
-
-# Overnight Changelog — 2026-06-26
-
-## [1] fix: enforce 7-day minimum before showing adherence bar
-
-**Problem**: The comment on `loggedRate` in `TodayPage.tsx` stated the adherence bar
-was "shown after plan has been active ≥ 7 days so the percentage is meaningful."
-However, `computeLoggedRate` returns `0` (not `null`) once `activeDays >= 1`, so
-the existing `loggedRate !== null` guard allowed the bar to appear after just 2
-calendar days. The 7-day threshold was documented but not enforced in code.
-
-**Fix**: Added `differenceInCalendarDays` import and a `planActiveDays >= 7` guard
-alongside the existing null check so the implementation matches the documented intent.
-
-**Files changed**:
-- `src/pages/TodayPage.tsx` — `differenceInCalendarDays` import; `planActiveDays`
-  computed from `parseISO(today) - parseISO(plan.startDate)`; display condition changed
-  from `loggedRate !== null` to `loggedRate !== null && planActiveDays >= 7`
-
-**Risk**: Low. UI-only change; no state mutations, no data model changes. The bar
-simply becomes visible later than before (day 7 instead of day 2). Easily reverted.
-
----
-
-# Overnight Changelog — 2026-06-25
-
-## [1] fix: deduplicate `countPlanDayCompletions` by calendarDate
-
-**Problem**: `countPlanDayCompletions` in `historyStats.ts` counted raw entry records,
-not unique dates. Every other stat function (isPlanExpired, computeRotationCycleProgress,
-computeRotationPlanRemaining, countTotalUnloggedDays) uses a Set of calendarDates to prevent
-CSV-import duplicates from inflating counts. This function did not, so a re-imported CSV
-could cause the "Session N" label in TodayPage to report an incorrect (inflated) number.
-
-**Fix**: Collect matching entries' calendarDates into a `Set` and return `dates.size`.
-
-**Files changed**:
-- `src/lib/historyStats.ts` — `countPlanDayCompletions` now deduplicates by calendarDate
-- `src/lib/__tests__/historyStats.test.ts` — new regression test: two entries for the same date count as one
-
-**Risk**: Low. Pure function change; semantics for the normal case (one entry per date) are identical. Only the duplicate-entry edge case is affected.
-
----
-
-## Pass 73 — 2026-07-06
-
-### Bug Fixes
-
-**fix: pass planProgramVars to estimateRunDurationMin in cardio prompt**
-- File: `src/pages/TodayPage.tsx`
-- Commit: `08e6145`
-- The cardio-prompt modal called `estimateRunDurationMin(runSlot)` without `planProgramVars`. All other call sites pass it. YAML-based `targetTime` expressions silently fell back to a default estimate, showing wrong duration in the post-weights cardio suggestion. Fixed to `estimateRunDurationMin(runSlot, planProgramVars)`.
-
-**fix: add version guard to exerciseHistoryStore persist config**
-- File: `src/store/exerciseHistoryStore.ts`
-- Commit: `54d361d`
-- The only Zustand store without `version`/`migrate` in its persist config. Added `version: 1, migrate: (persisted: unknown) => persisted as ExerciseHistoryState` — a passthrough that establishes schema versioning for safe future migrations.
-
-### Refactoring
-
-**refactor: extract useDismissableBanner shared hook to eliminate duplication**
-- Files: `src/hooks/useDismissableBanner.ts` (new), `src/hooks/useExpiryDismiss.ts`, `src/hooks/useStallNudgeDismiss.ts`
-- Commit: `33f7db5`
-- Both hooks were identical except for their `KEY_PREFIX`. Extracted shared logic to `useDismissableBanner(keyPrefix, planId)`. Original hooks now delegate in ~10 lines each. Net -56 lines of duplication. Zero behavior change.
-
-### New Tests
-
-**test: add unit tests for useDismissableBanner shared hook**
-- File: `src/hooks/__tests__/useDismissableBanner.test.ts` (new, 10 tests)
-- Commit: `75b58c6`
-- Covers: absent-key starts false, write sets to "1", isolation by prefix and planId, null planId no-op, read/write failure graceful degradation, consumer prefix uniqueness.
-
-### New Features
-
-**feat: show last session summary on upcoming workout cards**
-- File: `src/pages/TodayPage.tsx`
-- Commit: `b49902f`
-- Adds a muted "Last: …" line under each upcoming workout card using the existing `findPreviousSessionForPlanDay` + `buildLastSessionSummary` infrastructure (already used for today's card). No new dependencies.
+- **Modified** `src/pages/TodayPage.tsx`: Added a "Cycle done" chip that appears in the cycle progress section when `justCompletedRotation === true` (returned by `computeRotationCycleProgress`). Previously, completing the last workout in a cycle would show "0/N cycle" which was confusing — it looked like no progress rather than 100% progress.
+- **Why**: The existing `justCompletedRotation` boolean was computed but the UI had no display path for it. The new chip ("Cycle done ✓") replaces the "0/N" text when the cycle is complete.
+- **Risk**: Low — purely additive JSX conditional. `justCompletedRotation` is only `true` when `doneInCycle === 0 && totalDone > 0`, which is already well-tested.

@@ -1,5 +1,51 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-09 (seventy-fifth pass) — branch `claude/dreamy-mccarthy-vpg2n1`
+
+---
+
+### Executive summary
+
+1. **What changed**: 1 new `buildPRFlagsMap` function in historyStats.ts (+7 tests); `HistoryPage.tsx` updated to use `useMemo` + O(1) lookup; `max={today}` added to 2 date pickers; 1 dead helper removed from a test file. 2 commits, 4 files modified.
+2. **Test delta**: +7 tests (1049 → 1056). TypeScript errors: 1 → 0.
+3. **Highest confidence**: The `buildPRFlagsMap` parity test (`produces same results as calling computeWorkoutPRFlags per instance`) directly compares the new function against the existing implementation across 3 sessions. The date picker `max` fix is a pure HTML attribute addition — zero logic change.
+4. **What to review first**: Commit 1 is the most impactful change. The `buildPRFlagsMap` correctness is verified by the parity test + 6 unit tests. The date input `max` fix is trivial.
+
+---
+
+### Issues found and fixed
+
+| Priority | Issue | File | Disposition |
+|---|---|---|---|
+| Medium | `computeWorkoutPRFlags` called O(N²) at render time (once per history item, scans all records each time) | `HistoryPage.tsx`, `historyStats.ts` | **Fixed** — `buildPRFlagsMap` pre-computes all flags in O(N log N), `useMemo` caches the Map |
+| Low | Date pickers in history edit modals had no `max` attribute — future dates were allowed | `HistoryPage.tsx` lines 768, 863 | **Fixed** — added `max={today}` |
+| Low | `withDurationMin` test helper defined but never used (TS6133) | `estimateRunDuration.test.ts` | **Fixed** — removed |
+
+### Issues documented only (not implemented)
+
+Carried forward from pass 74 (verified to be lower risk):
+
+| Priority | Code | File | Description | Verified |
+|---|---|---|---|---|
+| Low | BUG-2 | `CalendarPage.tsx` | `handleMoveWorkout` → `updateEntryDate` can silently collide on destination date | Not verified this pass |
+| Low | BUG-4 | `storeSync.ts` | 1500ms debounce: app close mid-debounce loses last write | Acknowledged architectural tradeoff |
+| Low | BUG-6 | `planStore.ts` | `clearPlanHistory` doesn't reset plan's `startDate` — re-imported plan picks up stale date | Not verified this pass |
+
+### Non-issues confirmed this pass
+
+| Item | Verdict |
+|---|---|
+| BUG-1: `_extra_` split heuristic in HistoryPage | Safe — nanoid is alphanumeric+hyphen, calendarDate uses only hyphens, `_extra_` is unambiguous |
+| BUG-5: `removeRetroJumpForDate` DST handling | Safe — CalendarPage always writes `${date}T12:00:00.000` (local noon, no Z), and `format(new Date(...))` reads local time |
+| BUG-8: `clearPlanOutcomes` prefix collision | Safe — nanoid alphanumeric+hyphen + `_` separator means no ambiguity |
+| BUG-9: `expressionEval.ts` division by zero | Non-issue — line 233 already returns `0`, not `Infinity` |
+| BUG-10: `programParser.ts` silent YAML errors | Non-issue — errors returned in `errors[]` array; both callers check `errors.length > 0` before import |
+| BUG-11: `sessionSummary.ts` empty for mobility-only | Intentional behavior — function returns `null` when no weights/run/swim data exists |
+| BUG-3: `jump` override with `targetDayIndex > plan.length` | By design — `mod()` wraps correctly |
+| Pass 73 doc error re `removeLastOverrideByType` | The `type` parameter IS used (line 298 filters `o.type === type`) — the pass 73 note was wrong |
+
+---
+
 ## 2026-07-08 (seventy-fourth pass) — branch `claude/dreamy-mccarthy-ugdev5`
 
 ---

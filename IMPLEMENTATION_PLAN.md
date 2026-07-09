@@ -1,5 +1,49 @@
 # Implementation Plan
 
+## Pass 75 — 2026-07-09 (branch `claude/dreamy-mccarthy-vpg2n1`)
+
+### Baseline
+
+- Branch started from `main` after PR #182 merge.
+- **1049 tests passing** across 30 test files at start of pass (confirmed via `npx vitest run`).
+- **1056 tests passing** at end of pass (+7 new tests).
+- TypeScript: `tsc --noEmit` had 1 pre-existing error (unused variable in test file); fixed this pass.
+
+### Architecture Summary
+
+No new dependencies. All changes are in `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts`, `src/pages/HistoryPage.tsx`, and `src/lib/__tests__/estimateRunDuration.test.ts`.
+
+### What is Strong (reaffirmed)
+
+- `expressionEval.ts`: division by zero at line 233 already returns `0` (not `Infinity`) — BUG-9 from pass 74 is a non-issue.
+- `historyStore.ts` `removeLastOverrideByType`: DOES filter by type — pass 73 docs were wrong.
+- `programParser.ts`: YAML parse errors are properly returned in the `errors` array and block import in both `ProgramImportPage.tsx` and `PlanBuilderPage.tsx` — BUG-10 is a non-issue.
+- `removeRetroJumpForDate`: Uses `format(new Date(o.appliedAt), ...)` (local time) and CalendarPage always writes `${date}T12:00:00.000` (local noon) — safe against DST — BUG-5 is a non-issue.
+- `clearPlanOutcomes` prefix collision (BUG-8): nanoid uses alphanumeric+hyphen so `_` separator is unambiguous.
+- `_extra_` detection in HistoryPage (BUG-1): calendarDate is YYYY-MM-DD (hyphens only) and nanoid has no underscores — safe.
+
+### Key Issues Found
+
+#### Bugs / Correctness
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Low | `HistoryPage.tsx` | Date pickers in edit modals had no `max` attribute — users could accidentally move history entries to future dates | **Fixed** |
+
+#### Code Quality / Performance
+
+| File | Issue | Status |
+|---|---|---|
+| `HistoryPage.tsx` + `historyStats.ts` | `computeWorkoutPRFlags(instanceId, allRecords)` was called inline during render for each history item — O(N²) per page load | **Fixed — `buildPRFlagsMap` pre-computes a Map in O(N log N); HistoryPage uses `useMemo` + O(1) lookup** |
+| `estimateRunDuration.test.ts` | `withDurationMin` helper defined but never called (TypeScript TS6133 error) | **Fixed — helper removed** |
+
+### Changes Implemented
+
+1. `090e73e` — `perf+fix: pre-compute PR flags map in HistoryPage; add max-date to history date pickers`
+2. `e701e20` — `fix: remove unused withDurationMin helper in estimateRunDuration test (TS6133)`
+
+---
+
 ## Pass 74 — 2026-07-08 (branch `claude/dreamy-mccarthy-ugdev5`)
 
 ### Baseline
