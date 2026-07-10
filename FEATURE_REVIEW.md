@@ -1,5 +1,41 @@
 # Feature Reviews
 
+## Pass 76 — 2026-07-10 (branch `claude/dreamy-mccarthy-ykrmd3`)
+
+### Feature: Run Progression Result Badge on TodayPage
+
+---
+
+#### What was actually built
+
+A dismissible banner in `TodayPage.tsx` that appears after a user logs a progression-eligible run. Positioned between the existing PR celebration banner and the today's workout card.
+
+Key implementation details:
+- `progressionStates = useOutcomeStore(s => s.progressionStates)` — reactive subscription (fixes the silent reactivity gap where `getProgressionState()` was called non-reactively)
+- `showProgressionBadge` condition: `lastCompletedWorkoutInstanceId === instanceId && lastResult != null && dismissedProgressionInstanceId !== instanceId`
+- `dismissedProgressionInstanceId` state keyed to the workout instanceId (not a boolean) — auto-resets between days
+- Color config map: 4 cases for progress/hold/regress/reset results
+- Uses existing `TrendingUp` + `X` icons
+
+#### What was NOT built
+
+- Per-run detail in the badge (e.g., exact pace targets) — too much text for a small banner
+- Persistence of dismissed state across reloads — low-value, the banner will already be gone the next day when a new instanceId is generated
+- Animation on badge appearance — keeping parity with PR celebration banner style
+
+#### Correctness notes
+
+The badge condition `lastCompletedWorkoutInstanceId === instanceId` is correct because:
+1. `logOutcomeWithProgression` sets `lastCompletedWorkoutInstanceId` via `applyRunProgressionDecision(outcome.workoutInstanceId, ...)`
+2. `instanceId = makeWorkoutInstanceId(plan.id, today)` — same key used for today's outcome
+3. The badge only fires on `action !== 'none'` in the engine, so 'none' results never write to `progressionStates` and never show the badge
+
+#### Risk
+
+None observed. The feature is purely additive — no store mutations beyond existing flow, no new data structures, no new dependencies.
+
+---
+
 ## Pass 72 — 2026-07-05 (branch `claude/dreamy-mccarthy-80hikp`)
 
 ### Feature: Rotation Cycle Progress Chip

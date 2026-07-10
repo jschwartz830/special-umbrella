@@ -1,32 +1,43 @@
-# Overnight Changelog — Pass 75 (2026-07-09)
+# Overnight Changelog — Pass 76 (2026-07-10)
 
-## Branch: `claude/dreamy-mccarthy-vpg2n1`
+## Branch: `claude/dreamy-mccarthy-ykrmd3`
 
-### Commit 1 — `090e73e`
+### Commit 1 — `fix: use 'other' instead of 'rest' as fallback slot type in CalendarPage`
 
-**perf+fix: pre-compute PR flags map in HistoryPage; add max-date to history date pickers**
+**File:** `src/pages/CalendarPage.tsx` line 224
 
-#### Part A — O(N log N) PR flags pre-computation
-
-- **New export** `buildPRFlagsMap(allRecords)` added to `src/lib/historyStats.ts`: Processes all `ExerciseSessionRecord` entries in a single pass sorted by `calendarDate`. Groups records by date so same-date sessions all see the same prior max (identical semantics to `computeWorkoutPRFlags`). Returns `Map<workoutInstanceId, {hasLoadPR, hasRepsPR}>` in O(N log N) overall vs. O(N²) when calling `computeWorkoutPRFlags` per history item.
-- **Modified** `src/pages/HistoryPage.tsx`: Imports `buildPRFlagsMap` instead of `computeWorkoutPRFlags`. Adds `const prFlagsMap = useMemo(() => buildPRFlagsMap(allExerciseRecords), [allExerciseRecords])`. Both `OutcomeMetrics` call sites in the rendered list now do `prFlagsMap.get(instanceId)` (O(1)) instead of scanning all records inline.
-- **New tests** in `src/lib/__tests__/historyStats.test.ts`: 7 tests covering empty input, first-session PR, load PR on exceed, no PR on tie, same-calendarDate records see same prior max, produces identical results to `computeWorkoutPRFlags` across three sessions, zero/null load exclusion.
-
-#### Part B — History date picker future-date guard
-
-- **Modified** `src/pages/HistoryPage.tsx` lines 768 and 863: Added `max={today}` to both `<input type="date">` elements in the history edit modals (rotation entry date and extra entry date). Prevents accidentally moving a logged workout to a future date. `today` (`YYYY-MM-DD`) is already available from `useToday()` at the top of the component.
-- **Why**: Without `max`, both the browser date-picker UI and manual text entry allowed future dates. The `saveAndClose` and `saveAndCloseExtra` handlers had no server-side validation against future dates either.
-- **Risk**: None — `today` is a stable value (changes only at midnight via `useToday`), and `max` is a standard HTML attribute that degrades gracefully on unsupported browsers (no constraint applied).
+- **Bug:** `handleOutcomeConfirm` used `'rest'` as the fallback slot type when `planDay.slots[0]` was undefined. `'rest'` is a legacy `WorkoutType` value that was migrated to `'other'` in `planStore` v2 (`migrateSlot`). Passing `'rest'` to `logOutcomeWithProgression` meant program-level progression rules for `other` type slots could silently fail to evaluate.
+- **Fix:** Changed `{ id: '', type: 'rest' as WorkoutType, name: '' }` → `{ id: '', type: 'other' as WorkoutType, name: '' }`.
+- **Same bug** was fixed in `HistoryPage.tsx` in Pass 70. CalendarPage was missed.
+- **Risk:** Minimal — the fallback is only reached when `planDay.slots` is empty (rare; only possible for days created before slot-required validation was added).
 
 ---
 
-### Commit 2 — `e701e20`
+### Commit 2 — `feat: add single-retry on storeSync push failure`
 
-**fix: remove unused withDurationMin helper in estimateRunDuration test (TS6133)**
+**File:** `src/lib/storeSync.ts`
 
-- **Modified** `src/lib/__tests__/estimateRunDuration.test.ts`: Removed `withDurationMin` helper function (lines 5–7) that was declared but never called. This was the sole `tsc --noEmit` error at pass start (TS6133: 'withDurationMin' is declared but its value is never read).
-- **Why**: The helper was likely a leftover from an earlier test draft. The `withTargetDurationMin` and `withTargetDistanceMiles` helpers that are actually used remain unchanged.
-- **Risk**: None — removing unused dead code.
+- **Problem:** `pushStore` logged errors but never retried. A single transient network failure permanently diverged local and Supabase state until the next successful write (next store change or next login).
+- **Fix:** Added `isRetry = false` parameter. On error, if `!isRetry`, schedules a single `setTimeout(..., 5000)` that re-reads fresh state from the store and retries once. The retry sets `isRetry = true` to prevent cascading retries.
+- **Why fresh state on retry:** The initial `data` argument captures the state at the moment of the failed write. If the user continued working during the 5-second delay, re-reading `store.getState()` at retry time sends the more current data.
+- **Risk:** Low. The retry only fires once per failure event. If the retry also fails, it logs the error and stops — no infinite loops. This is purely additive.
+
+---
+
+### Commit 3 — `feat: show run progression result badge on TodayPage after logging`
+
+**Files:** `src/pages/TodayPage.tsx`
+
+- **Problem:** `outcomeStore.progressionStates` stored run adaptation decisions (progress/hold/regress/reset) after every run log, but TodayPage never surfaced the result to the user after completion. The pre-workout adaptation note existed but the post-workout result was only visible in HistoryPage.
+- **Changes:**
+  1. Added reactive `progressionStates = useOutcomeStore(s => s.progressionStates)` subscription (line ~191) so the component re-renders when progression state changes.
+  2. Changed `todayProgressionState` computation from non-reactive `getProgressionState(id)` call to direct `progressionStates[groupId] ?? null` lookup.
+  3. Added `dismissedProgressionInstanceId` state (resets when a new run is logged — keyed to instanceId, not a simple boolean).
+  4. Added `showProgressionBadge` / `progressionBadgeConfig` derived variables with color config per `lastResult` ('progress' → sky, 'hold' → slate, 'regress' → amber, 'reset' → slate).
+  5. Added dismissible badge JSX between the PR celebration banner and the today's workout card.
+- **Badge shows when:** `todayProgressionState.lastCompletedWorkoutInstanceId === instanceId` (today's run just logged) and `lastResult != null` and not dismissed.
+- **Dismiss semantics:** Records the dismissed `instanceId` so the badge auto-reappears next time a new run is logged (new instanceId = new date).
+- **Risk:** Low. The feature is purely additive UI — no store mutations, no new data structures. Falls back to hidden when `todayProgressionState` is null (non-progression runs).
 
 ---
 
@@ -34,52 +45,6 @@
 
 | Metric | Before | After |
 |---|---|---|
-| Tests | 1049 | 1056 (+7) |
-| TypeScript errors | 1 | 0 |
+| Tests | 1056 | 1056 (unchanged) |
+| TypeScript errors | 0 | 0 |
 | Test files | 30 | 30 |
-
----
-
-# Overnight Changelog — Pass 74 (2026-07-08)
-
-## Branch: `claude/dreamy-mccarthy-ugdev5`
-
-### Commit 1 — `bd8907d`
-
-**refactor: extract estimateRunDurationMin to lib + add 22 unit tests**
-
-- **New file** `src/lib/estimateRunDuration.ts`: Pure utility function extracted from `TodayPage.tsx` module scope. Estimates planned run duration in minutes from slot metadata using the following resolution order: `slot.durationMin` → `runConfig.targetDurationMin` → sum of segment durations → sum of segment distances × pace-by-type → `runConfig.targetDistanceMiles × 11` → 20 (default). Pace constants: tempo = 8 min/mi, warmup/cooldown = 12 min/mi, all other types = 11 min/mi.
-- **New file** `src/lib/__tests__/estimateRunDuration.test.ts`: 22 tests covering every resolution branch, segment duration unit parsing (`"30min"`, `"20m"`, decimal values), segment distance with pace-by-type, `programVars` substitution (numeric and string var values), unknown variable skipping, `targetDistanceMiles` fallback, and all edge cases (empty slot, null runConfig, empty segments).
-- **Modified** `src/pages/TodayPage.tsx`: Removed the inline 35-line `estimateRunDurationMin` definition; added `import { estimateRunDurationMin } from '../lib/estimateRunDuration'`. The function already accepted `programVars` as a second parameter since it was extracted to module scope in pass 72 — no call-site changes needed. Also added `differenceInCalendarDays` to the date-fns import (used in commit 2).
-- **Why**: The function was untestable in isolation while living in a component file. Extracting it enables the 22 new tests and makes the logic independently reviewable.
-- **Risk**: None. Function body is identical; only file location changed.
-
----
-
-### Commit 2 — `047f8a1`
-
-**refactor: replace manual date arithmetic in prevSessionDaysAgo with differenceInCalendarDays**
-
-- **Modified** `src/pages/TodayPage.tsx`: Replaced an 8-line IIFE that used raw `Date.UTC(y, m, d)` subtraction to compute `prevSessionDaysAgo` with a single expression using `differenceInCalendarDays(parseISO(today), parseISO(prevSessionDate))` from date-fns.
-- **Why**: The manual arithmetic was correct but verbose, hard to scan, and inconsistent with the rest of the codebase which uses date-fns throughout. The new expression is semantically equivalent: it computes the calendar-day difference (not wall-clock millisecond difference) between `today` and `prevSessionDate`, then returns `null` if the result is ≤ 0 (e.g., same-day session).
-- **Risk**: Low. `differenceInCalendarDays` is already used extensively in the project. The guard `d => d > 0 ? d : null` preserves the same null-return behavior for same-day or future dates.
-
----
-
-### Commit 3 — `1a29a3a`
-
-**perf: memoize rotationLoggedCount Set creation in TodayPage**
-
-- **Modified** `src/pages/TodayPage.tsx`: Wrapped `rotationLoggedCount` (a `Set<string>` built from `planEntries.map(e => e.calendarDate)`) in `useMemo` with `[planEntries]` as the dependency.
-- **Why**: The Set was being rebuilt on every render (including every modal state transition, every scroll, and every unrelated state update). The computation is O(n) and was re-running for non-data changes. Memoizing it means the Set is only rebuilt when `planEntries` actually changes.
-- **Risk**: None. The memoized value is semantically identical; the only change is when it recomputes.
-
----
-
-### Commit 4 — `c337fa3`
-
-**feat: Show "Cycle done" visual cue when rotation cycle just completed**
-
-- **Modified** `src/pages/TodayPage.tsx`: Added a "Cycle done" chip that appears in the cycle progress section when `justCompletedRotation === true` (returned by `computeRotationCycleProgress`). Previously, completing the last workout in a cycle would show "0/N cycle" which was confusing — it looked like no progress rather than 100% progress.
-- **Why**: The existing `justCompletedRotation` boolean was computed but the UI had no display path for it. The new chip ("Cycle done ✓") replaces the "0/N" text when the cycle is complete.
-- **Risk**: Low — purely additive JSX conditional. `justCompletedRotation` is only `true` when `doneInCycle === 0 && totalDone > 0`, which is already well-tested.

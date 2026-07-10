@@ -1,5 +1,52 @@
 # Implementation Plan
 
+## Pass 76 — 2026-07-10 (branch `claude/dreamy-mccarthy-ykrmd3`)
+
+### Baseline
+
+- Branch started from `main` after PR #183 merge.
+- **1056 tests passing** across 30 test files at start and end of pass (no change — feature is React UI).
+- TypeScript: `tsc --noEmit` 0 errors at start and end.
+
+### Architecture Summary
+
+No new dependencies. Changes to 3 source files: `src/pages/CalendarPage.tsx`, `src/lib/storeSync.ts`, `src/pages/TodayPage.tsx`.
+
+### What is Strong (reaffirmed)
+
+All items from Pass 75 remain confirmed. Additionally:
+- `applyRunProgressionDecision` sets `lastCompletedWorkoutInstanceId` to `outcome.workoutInstanceId` — badge condition `=== instanceId` is correct.
+- Progression badge is gated on `action !== 'none'` (engine never writes to `progressionStates` for 'none') — no false-positive badges.
+
+### Key Issues Found
+
+#### Bugs / Correctness
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Low | `CalendarPage.tsx` line 224 | `'rest'` used as fallback slot type in `handleOutcomeConfirm` — legacy value retired in planStore v2 | **Fixed** |
+
+#### Code Quality / Resilience
+
+| File | Issue | Status |
+|---|---|---|
+| `storeSync.ts` | `pushStore` had no retry — transient network error permanently diverged local + cloud state | **Fixed — single retry after 5s with fresh state; `isRetry` guard prevents loops** |
+| `TodayPage.tsx` | `todayProgressionState` derived from non-reactive `getProgressionState()` call — component wouldn't re-render on progression state change | **Fixed — now subscribes to `progressionStates` directly** |
+
+### Feature
+
+| Feature | Status |
+|---|---|
+| Run progression result badge on TodayPage (show 'progress'/'hold'/'regress'/'reset' result after logging a run) | **Implemented** |
+
+### Changes Implemented
+
+1. Commit 1 — `fix: use 'other' instead of 'rest' as fallback slot type in CalendarPage`
+2. Commit 2 — `feat: add single-retry on storeSync push failure`
+3. Commit 3 — `feat: show run progression result badge on TodayPage after logging`
+
+---
+
 ## Pass 75 — 2026-07-09 (branch `claude/dreamy-mccarthy-vpg2n1`)
 
 ### Baseline

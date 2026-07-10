@@ -1,5 +1,47 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-10 (seventy-sixth pass) — branch `claude/dreamy-mccarthy-ykrmd3`
+
+---
+
+### Executive summary
+
+1. **What changed**: 3 focused changes across 3 files — 1 bug fix, 1 resilience improvement, 1 UI feature. 0 new test files (feature is React UI; logic lives in existing store/engine). 3 commits, 3 source files modified.
+2. **Test delta**: 0 (1056 → 1056). All existing tests continue to pass. TypeScript: 0 → 0.
+3. **Highest confidence**: The `'rest'` → `'other'` fix in CalendarPage is a direct mirror of the HistoryPage fix from Pass 70 — same line, same pattern, same risk profile. The storeSync retry is additive-only with a hard `isRetry` guard. The progression badge reads existing store data and is behind a tight condition.
+4. **What to review first**: Commit 1 (CalendarPage) is the highest-impact correctness fix. Commit 2 (storeSync) is the only change that affects cloud sync behavior. Commit 3 (TodayPage) is the most code but lowest risk.
+
+---
+
+### Issues found and fixed
+
+| Priority | Issue | File | Disposition |
+|---|---|---|---|
+| Low | `'rest'` used as fallback slot type in `handleOutcomeConfirm` — legacy value replaced by `'other'` in planStore v2 migration | `CalendarPage.tsx` line 224 | **Fixed** |
+| Low | `pushStore` in storeSync had no retry — transient network failure permanently diverged local + cloud state | `storeSync.ts` | **Fixed — single delayed retry with fresh state, `isRetry` guard prevents loops** |
+
+### Feature implemented
+
+| Feature | File | Notes |
+|---|---|---|
+| Run progression result badge on TodayPage | `TodayPage.tsx` | Shows after logging a progression-eligible run; dismissible; fixes reactivity gap in `todayProgressionState` derivation |
+
+### Issues documented only (not implemented)
+
+Carried forward:
+
+| Priority | Code | File | Description |
+|---|---|---|---|
+| Low | BUG-2 | `CalendarPage.tsx` | `handleMoveWorkout` → `updateEntryDate` can silently collide on destination date |
+| Low | BUG-4 | `storeSync.ts` | 1500ms debounce: app close mid-debounce loses last write (architectural tradeoff) |
+| Low | BUG-6 | `planStore.ts` | `clearPlanHistory` doesn't reset plan's `startDate` — re-imported plan picks up stale date |
+
+### Non-issues confirmed this pass
+
+All items from Pass 75 confirmed non-issues carry forward unchanged.
+
+---
+
 ## 2026-07-09 (seventy-fifth pass) — branch `claude/dreamy-mccarthy-vpg2n1`
 
 ---

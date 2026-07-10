@@ -348,6 +348,41 @@ No data migrations, no schema changes.
 
 ---
 
+## Pass 76 Feature: Run progression result badge on TodayPage
+
+### Problem
+
+After logging a progression-eligible run, `outcomeStore.logOutcomeWithProgression` evaluates the run-adaptation engine and may write a `lastResult` ('progress', 'hold', 'regress', 'reset') and updated `currentTargetDistanceMiles` to `progressionStates`. This data was surfaced in HistoryPage (Pass 67) but never on TodayPage — the page where the run was actually just logged.
+
+Additionally, `todayProgressionState` on TodayPage was derived from a non-reactive `getProgressionState()` call, meaning the component would not automatically re-render when progression state changed. This is a silent reactivity gap.
+
+### Proposed solution
+
+1. Subscribe to `progressionStates` directly: `const progressionStates = useOutcomeStore(s => s.progressionStates)` — fixes the reactivity gap.
+2. Compute `todayProgressionState` via `progressionStates[groupId] ?? null` (reactive) instead of `getProgressionState(groupId)` (non-reactive).
+3. Add `dismissedProgressionInstanceId` state — stores which run's badge was dismissed. Keyed to `instanceId` (date-based), so dismissing today's badge doesn't hide tomorrow's.
+4. After the PR celebration banner, show a small dismissible badge when `lastCompletedWorkoutInstanceId === instanceId` and `lastResult != null`.
+
+Color scheme matches existing banners:
+- 'progress' → sky (↑ Progressed! · Next run: X mi)
+- 'hold' → slate (→ Holding steady · Keeping at: X mi)
+- 'regress' → amber (↓ Distance adjusted · Next run: X mi)
+- 'reset' → slate (↺ Progression reset · Starting at: X mi)
+
+### Constraints
+
+- No new dependencies
+- No new store state or localStorage keys
+- No schema changes
+- Reuses `TrendingUp` and `X` icons already imported in TodayPage
+- Purely additive — hidden for non-progression runs
+
+### Status
+
+**Implemented in pass 76.**
+
+---
+
 ## Pass 73 Feature: Last session summary on upcoming workout cards
 
 ### Problem

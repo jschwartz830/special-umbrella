@@ -1,5 +1,31 @@
 # Test Results
 
+## 2026-07-10 (seventy-sixth pass) — branch `claude/dreamy-mccarthy-ykrmd3`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  30 passed (30)
+     Tests  1056 passed (1056)
+  Duration  ~3.9s
+TypeScript  0 errors
+```
+
+### After all 3 commits
+
+```
+Test Files  30 passed (30)
+     Tests  1056 passed (1056)
+  Duration  ~3.9s
+TypeScript  0 errors
+```
+
+No new tests added this pass — all changes are in React UI components. The CalendarPage and storeSync changes are pure TypeScript; TodayPage feature is UI-only with no extractable pure logic.
+
+---
+
 ## 2026-07-09 (seventy-fifth pass) — branch `claude/dreamy-mccarthy-vpg2n1`
 
 ---
