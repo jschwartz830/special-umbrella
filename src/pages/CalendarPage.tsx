@@ -221,7 +221,7 @@ export function CalendarPage() {
 
     // Find the slot for progression tracking (null-safe fallback)
     const planDay = outcomeTarget.planDay
-    const slot = planDay.slots[0] ?? { id: '', type: 'rest' as WorkoutType, name: '' }
+    const slot = planDay.slots[0] ?? { id: '', type: 'other' as WorkoutType, name: '' }
     logOutcomeWithProgression(finalOutcome, slot)
 
     // Ensure the history entry action is synced to the completion state.
