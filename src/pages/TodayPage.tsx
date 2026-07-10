@@ -188,6 +188,7 @@ export function TodayPage() {
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const getOutcome = useOutcomeStore(s => s.getOutcome)
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
+  const progressionStates = useOutcomeStore(s => s.progressionStates)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const moveOutcome = useOutcomeStore(s => s.moveOutcome)
   const today = useToday()
@@ -249,6 +250,8 @@ export function TodayPage() {
   const [editingExtra, setEditingExtra] = useState<ExtraWorkoutEntry | null>(null)
   // Preview toggle for today's workout exercises
   const [previewExpanded, setPreviewExpanded] = useState(false)
+  // Track which progression instanceId was dismissed so re-logging shows the badge again
+  const [dismissedProgressionInstanceId, setDismissedProgressionInstanceId] = useState<string | null>(null)
 
   // Active workout tracker state: hidden | open | minimized
   const [activeWorkoutState, setActiveWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
@@ -317,10 +320,31 @@ export function TodayPage() {
   // Resolve run adaptation note for today's workout
   const todayRunSlot = todayResolved.planDay.slots.find(s => isRunType(s.type))
   const todayProgressionState = todayRunSlot?.runConfig?.progressionGroupId
-    ? getProgressionState(todayRunSlot.runConfig.progressionGroupId)
+    ? (progressionStates[todayRunSlot.runConfig.progressionGroupId] ?? null)
     : null
   const todayAdaptationNote = todayRunSlot
     ? generateRunAdaptationNote(todayRunSlot, todayProgressionState)
+    : null
+
+  // Progression result badge — shown after logging today's run when a progression decision was made
+  const showProgressionBadge =
+    todayProgressionState != null &&
+    todayProgressionState.lastResult != null &&
+    todayProgressionState.lastCompletedWorkoutInstanceId === instanceId &&
+    dismissedProgressionInstanceId !== instanceId
+  const progressionBadgeConfig = showProgressionBadge && todayProgressionState
+    ? (() => {
+        const dist = todayProgressionState.currentTargetDistanceMiles != null
+          ? `${todayProgressionState.currentTargetDistanceMiles} mi`
+          : null
+        switch (todayProgressionState.lastResult) {
+          case 'progress': return { label: '↑ Progressed!', sub: dist ? `Next run: ${dist}` : 'Distance increased', cls: 'bg-sky-500/10 border-sky-500/25', textCls: 'text-sky-300', subCls: 'text-sky-400/70' }
+          case 'hold':     return { label: '→ Holding steady', sub: dist ? `Keeping at: ${dist}` : 'No change this week', cls: 'bg-slate-700/40 border-slate-600/30', textCls: 'text-slate-300', subCls: 'text-slate-500' }
+          case 'regress':  return { label: '↓ Distance adjusted', sub: dist ? `Next run: ${dist}` : 'Scaled back slightly', cls: 'bg-amber-500/10 border-amber-500/25', textCls: 'text-amber-300', subCls: 'text-amber-400/70' }
+          case 'reset':    return { label: '↺ Progression reset', sub: dist ? `Starting at: ${dist}` : 'Back to baseline', cls: 'bg-slate-700/40 border-slate-600/30', textCls: 'text-slate-300', subCls: 'text-slate-500' }
+          default:         return null
+        }
+      })()
     : null
 
   // Difficulty spacing warning (today vs tomorrow) — suppressed when an extra workout is queued
@@ -825,6 +849,24 @@ export function TodayPage() {
           <button
             onClick={() => setNewPRs(null)}
             className="text-amber-400/50 hover:text-amber-200 flex-shrink-0 transition-colors"
+            aria-label="Dismiss"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Run progression result badge */}
+      {progressionBadgeConfig && (
+        <div className={`flex items-start gap-2 px-3 py-2.5 rounded-xl border ${progressionBadgeConfig.cls}`}>
+          <TrendingUp size={14} className={`${progressionBadgeConfig.textCls} mt-0.5 flex-shrink-0`} />
+          <div className="flex-1 min-w-0">
+            <p className={`text-xs font-semibold ${progressionBadgeConfig.textCls}`}>{progressionBadgeConfig.label}</p>
+            <p className={`text-xs ${progressionBadgeConfig.subCls} mt-0.5`}>{progressionBadgeConfig.sub}</p>
+          </div>
+          <button
+            onClick={() => setDismissedProgressionInstanceId(instanceId)}
+            className={`${progressionBadgeConfig.textCls} opacity-50 hover:opacity-100 flex-shrink-0 transition-opacity`}
             aria-label="Dismiss"
           >
             <X size={13} />
