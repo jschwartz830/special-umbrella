@@ -34,7 +34,7 @@ async function getUserId(): Promise<string | null> {
   return user?.id ?? null
 }
 
-async function pushStore(storeName: string, data: Record<string, unknown>): Promise<void> {
+async function pushStore(storeName: string, data: Record<string, unknown>, isRetry = false): Promise<void> {
   const userId = await getUserId()
   if (!userId) return
   const { error } = await supabase.from('user_store_data').upsert({
@@ -45,6 +45,14 @@ async function pushStore(storeName: string, data: Record<string, unknown>): Prom
   })
   if (error) {
     console.error('[storeSync] pushStore failed for', storeName, ':', error.message)
+    if (!isRetry) {
+      // Schedule a single retry with fresh state — avoids stale closure data
+      // and prevents cascading retries on repeated failures.
+      setTimeout(() => {
+        const entry = STORES.find(s => s.name === storeName)
+        if (entry) pushStore(storeName, serializeState(entry.store.getState()), true)
+      }, 5000)
+    }
   }
 }
 
