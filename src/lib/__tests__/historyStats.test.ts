@@ -1373,6 +1373,23 @@ describe('computePlanStreak', () => {
     const extras = [planExtra('2099-01-01')] // far-future extra
     expect(computePlanStreak('plan-1', entries, extras, TODAY)).toBe(1)
   })
+
+  it('additionalDates (e.g. mobility completions) count toward the streak', () => {
+    // Mobility session on yesterday and today bridges a gap where there are no
+    // rotation entries or extra workouts.
+    const YESTERDAY = '2026-05-11'
+    const mobility = new Set([TODAY, YESTERDAY])
+    expect(computePlanStreak('plan-1', [], [], TODAY, mobility)).toBe(2)
+  })
+
+  it('additionalDates does not cross a gap day', () => {
+    // TODAY has mobility; two days ago has a complete entry; yesterday is empty.
+    const D2 = '2026-05-10'
+    const mobility = new Set([TODAY])
+    const entries = [planEntry(D2, 'complete')]
+    // Gap on yesterday means streak = 1 (only TODAY's mobility date qualifies).
+    expect(computePlanStreak('plan-1', entries, [], TODAY, mobility)).toBe(1)
+  })
 })
 
 // ── computeRotationPlanRemaining ──────────────────────────────────────────────
