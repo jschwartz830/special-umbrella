@@ -1,5 +1,42 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-11 (seventy-sixth pass) — branch `claude/dreamy-mccarthy-k4qtko`
+
+---
+
+### Executive summary
+
+1. **What changed**: `computeCurrentStreakDates` API fixed to match `computePlanStreak` signature (+1 optional parameter); 4 new tests covering the `additionalDates` parameter on both streak functions. 2 commits, 2 files modified.
+2. **Test delta**: +4 tests (1056 → 1060). TypeScript errors: 0 → 0.
+3. **Highest confidence**: Both changes are test-only or additive API extension (optional param, no behavior change to existing callers). Lowest-risk class of improvement.
+4. **What to review first**: Commit 1 is the only code change — one new optional parameter and a JSDoc update in `historyStats.ts`. Commit 2 is tests only.
+
+---
+
+### Issues found and fixed
+
+| Priority | Issue | File | Disposition |
+|---|---|---|---|
+| Low | `computeCurrentStreakDates` lacked `additionalDates?: Set<string>` parameter that `computePlanStreak` has — future calendar streak-highlight feature would silently disagree with TodayPage streak count | `historyStats.ts` | **Fixed** — parameter added and passed through to `getStreakDatesSet` |
+| Low | `computePlanStreak`'s `additionalDates` parameter (production path: TodayPage + `mobilityDateSet`) had zero test coverage | `historyStats.test.ts` | **Fixed** — 2 tests added |
+
+### Issues confirmed as non-issues this pass
+
+| Item | Verdict |
+|---|---|
+| BUG-2: `CalendarPage.tsx` `handleOutcomeConfirm` date collision | **Non-issue** — `removeEntry(planId, completedDate)` is called before `updateEntryDate`, and `updateEntryDate` also guards collision internally. Double-protected. |
+| BUG-4: `storeSync.ts` 1500ms debounce data loss window | Acknowledged architectural tradeoff — debounce correctly coalesces rapid writes; tail-loss risk on hard close acceptable for a PWA |
+| BUG-6: `clearPlanHistory` stale `startDate` on re-import | Low-priority edge case only reachable via CSV export → plan delete → re-import from same CSV. Normal YAML import creates fresh plan IDs. |
+
+### Issues documented only (carry-forward, lower priority than what was fixed)
+
+| Priority | Code | File | Description |
+|---|---|---|---|
+| Low | BUG-6 | `planStore.ts` | `importPlans` (CSV) merges by plan ID — a re-imported plan after deletion retains its old `startDate`, making `countTotalUnloggedDays` count all the days since the old start as unlogged |
+| Low | BUG-4 | `storeSync.ts` | 1500ms debounce: app close mid-debounce loses last write |
+
+---
+
 ## 2026-07-09 (seventy-fifth pass) — branch `claude/dreamy-mccarthy-vpg2n1`
 
 ---

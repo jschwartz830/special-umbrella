@@ -1,5 +1,52 @@
 # Test Results
 
+## 2026-07-11 (seventy-sixth pass) — branch `claude/dreamy-mccarthy-k4qtko`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  30 passed (30)
+     Tests  1056 passed (1056)
+  Duration  ~3.1s
+```
+
+### After commit 1 (computeCurrentStreakDates additionalDates fix + 2 new tests)
+
+```
+Test Files  30 passed (30)
+     Tests  1058 passed (1058)
+  Duration  ~3.1s
+```
+
+### After commit 2 (computePlanStreak additionalDates tests + 2 new tests)
+
+```
+Test Files  30 passed (30)
+     Tests  1060 passed (1060)
+  Duration  ~3.1s
+```
+
+### Final state
+
+```
+Test Files  30 passed (30)
+     Tests  1060 passed (1060)
+  Duration  ~3.1s
+TypeScript: 0 errors (tsc --noEmit)
+```
+
+**Delta**: +4 tests (1056 → 1060). All 30 test files pass. No regressions.
+
+**New tests added**:
+- `computeCurrentStreakDates` — additionalDates extends the streak dates (matches computePlanStreak behavior)
+- `computeCurrentStreakDates` — additionalDates fills a gap so the streak count matches computePlanStreak
+- `computePlanStreak` — additionalDates (e.g. mobility completions) count toward the streak
+- `computePlanStreak` — additionalDates does not cross a gap day
+
+---
+
 ## 2026-07-09 (seventy-fifth pass) — branch `claude/dreamy-mccarthy-vpg2n1`
 
 ---

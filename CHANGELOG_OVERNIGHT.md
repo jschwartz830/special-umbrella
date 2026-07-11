@@ -1,3 +1,42 @@
+# Overnight Changelog — Pass 76 (2026-07-11)
+
+## Branch: `claude/dreamy-mccarthy-k4qtko`
+
+### Commit 1 — `797ebe5`
+
+**fix: add additionalDates param to computeCurrentStreakDates**
+
+- **Modified** `src/lib/historyStats.ts`: Added `additionalDates?: Set<string>` as a fifth parameter to `computeCurrentStreakDates`. The parameter is passed through to the internal `getStreakDatesSet` call, which already supports it. Updated the JSDoc comment to describe the new parameter and explain it matches `computePlanStreak`'s API so both functions count the same streak.
+- **Modified** `src/lib/__tests__/historyStats.test.ts`: Added 2 tests to the `computeCurrentStreakDates` describe block:
+  1. `additionalDates extends the streak dates (matches computePlanStreak behavior)` — verifies that passing a Set of mobility dates with no rotation entries or extras produces a streak count matching those dates.
+  2. `additionalDates fills a gap so the streak count matches computePlanStreak` — verifies that a mobility-only intermediate day bridges a gap and that `computeCurrentStreakDates` size equals the `computePlanStreak` count for the same inputs.
+- **Why**: `computePlanStreak` (used by TodayPage to include mobility completion dates in the plan streak) accepted `additionalDates` but `computeCurrentStreakDates` (the function that would be used to highlight streak dates in a calendar view) did not. The mismatch meant a future CalendarPage streak-highlight would silently disagree with the TodayPage streak count whenever the user only completed a mobility session on a given day.
+- **Risk**: None. The parameter is optional with no default effect; existing call sites pass nothing and are unaffected. The function body only adds one new argument pass-through.
+
+---
+
+### Commit 2 — `42df2f7`
+
+**test: add coverage for computePlanStreak additionalDates parameter**
+
+- **Modified** `src/lib/__tests__/historyStats.test.ts`: Added 2 tests to the `computePlanStreak` describe block:
+  1. `additionalDates (e.g. mobility completions) count toward the streak` — verifies that a Set with TODAY and YESTERDAY (no rotation entries) produces a streak of 2.
+  2. `additionalDates does not cross a gap day` — verifies that when yesterday has no qualifying entry and the additionalDates set only includes TODAY, the streak is 1 (gap day stops the walk).
+- **Why**: `computePlanStreak`'s `additionalDates` parameter is called in production by TodayPage (`computePlanStreak(plan.id, planEntries, planExtras, today, mobilityDateSet)`) but had zero test coverage. These tests ensure the parameter is exercised in the test suite and would catch a regression if the pass-through to `getStreakDatesSet` were accidentally removed.
+- **Risk**: None. Test-only change.
+
+---
+
+## Summary
+
+| Metric | Before | After |
+|---|---|---|
+| Tests | 1056 | 1060 (+4) |
+| TypeScript errors | 0 | 0 |
+| Test files | 30 | 30 |
+
+---
+
 # Overnight Changelog — Pass 75 (2026-07-09)
 
 ## Branch: `claude/dreamy-mccarthy-vpg2n1`

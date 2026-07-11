@@ -1,5 +1,46 @@
 # Implementation Plan
 
+## Pass 76 — 2026-07-11 (branch `claude/dreamy-mccarthy-k4qtko`)
+
+### Baseline
+
+- Branch started from `main` after PR #185 merge.
+- **1056 tests passing** across 30 test files at start of pass (confirmed via `npx vitest run`).
+- **1060 tests passing** at end of pass (+4 new tests across 2 commits).
+- TypeScript: `tsc --noEmit` produced 0 errors.
+
+### Architecture Summary
+
+No new dependencies. All changes are in `src/lib/historyStats.ts` and `src/lib/__tests__/historyStats.test.ts`. No runtime-behavior changes; all changes are an API extension + test coverage.
+
+### What is Strong (reaffirmed)
+
+- BUG-2 (`CalendarPage.tsx` `updateEntryDate` collision): Confirmed non-issue. `handleOutcomeConfirm` at line 210 calls `removeEntry(outcomeTarget.planId, completedDate)` before `updateEntryDate(entry.id, completedDate)`, and `updateEntryDate` itself handles collision at historyStore.ts lines 261–265. Double-protected.
+- BUG-4 (`storeSync.ts` 1500ms debounce data loss): Acknowledged architectural tradeoff. The debounce window correctly coalesces rapid changes; the tail-loss risk on hard page close is acceptable given PWA conventions.
+- BUG-6 (`clearPlanHistory` stale `startDate`): Low-priority CSV re-import edge case. Only triggered when user exports plans, deletes the plan, and re-imports from the same CSV. Normal YAML import path creates new plans with fresh IDs.
+- All carry-forward BUG-1/3/5/8/9/10/11 non-issues from pass 75 remain confirmed.
+
+### Key Issues Found
+
+#### API Inconsistency
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Low | `historyStats.ts` | `computeCurrentStreakDates` lacked the `additionalDates?: Set<string>` parameter that `computePlanStreak` has, making the two functions inconsistent. A calendar streak-highlight feature would silently undercount vs. the TodayPage streak badge. | **Fixed** |
+
+#### Test Coverage Gap
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Low | `historyStats.test.ts` | `computePlanStreak`'s `additionalDates` parameter (used in production by TodayPage with `mobilityDateSet`) had zero test coverage. | **Fixed — 2 tests added** |
+
+### Changes Implemented
+
+1. `797ebe5` — `fix: add additionalDates param to computeCurrentStreakDates`
+2. `42df2f7` — `test: add coverage for computePlanStreak additionalDates parameter`
+
+---
+
 ## Pass 75 — 2026-07-09 (branch `claude/dreamy-mccarthy-vpg2n1`)
 
 ### Baseline
