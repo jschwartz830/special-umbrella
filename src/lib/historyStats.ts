@@ -722,6 +722,9 @@ export function computePlanStreak(
  *
  * The same plan-scoping rules as `getStreakDatesSet` / `computePlanStreak`
  * apply: pass `planId` to scope to one plan, or omit for the global streak.
+ * Pass `additionalDates` (e.g. mobility completion dates) to include dates
+ * that qualify even without a history or extra entry — matching the parameter
+ * on `computePlanStreak` so both functions count the same streak.
  *
  * Returns an empty set when today has no qualifying activity.
  */
@@ -730,8 +733,9 @@ export function computeCurrentStreakDates(
   extras: ExtraWorkoutEntry[],
   today: string,
   planId?: string | null,
+  additionalDates?: Set<string>,
 ): Set<string> {
-  const streakable = getStreakDatesSet(entries, extras, planId)
+  const streakable = getStreakDatesSet(entries, extras, planId, additionalDates)
   const result = new Set<string>()
   let cursor = today
   while (streakable.has(cursor)) {

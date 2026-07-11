@@ -2272,6 +2272,34 @@ describe('computeCurrentStreakDates', () => {
     expect(result.size).toBe(1)
     expect(result.has(TODAY)).toBe(true)
   })
+
+  it('additionalDates extends the streak dates (matches computePlanStreak behavior)', () => {
+    // No history or extra entries, but mobility was done on TODAY and yesterday.
+    const YESTERDAY = '2026-06-14'
+    const mobility = new Set([TODAY, YESTERDAY])
+    const result = computeCurrentStreakDates([], [], TODAY, null, mobility)
+    expect(result.has(TODAY)).toBe(true)
+    expect(result.has(YESTERDAY)).toBe(true)
+    expect(result.size).toBe(2)
+  })
+
+  it('additionalDates fills a gap so the streak count matches computePlanStreak', () => {
+    // Entry on TODAY and two days ago, with a mobility-only day bridging yesterday.
+    const D2 = '2026-06-13' // two days ago
+    const D1 = '2026-06-14' // yesterday (mobility only)
+    const mobility = new Set([D1])
+    const entries = [cse(D2, 'complete'), cse(TODAY, 'complete')]
+
+    const streakDates = computeCurrentStreakDates(entries, [], TODAY, null, mobility)
+    expect(streakDates.has(TODAY)).toBe(true)
+    expect(streakDates.has(D1)).toBe(true)
+    expect(streakDates.has(D2)).toBe(true)
+    expect(streakDates.size).toBe(3)
+
+    // Streak count via computePlanStreak must match size of streak dates set.
+    const count = computePlanStreak('plan-1', entries, [], TODAY, mobility)
+    expect(count).toBe(streakDates.size)
+  })
 })
 
 // ── computeWorkoutTypeBreakdown — multi-slot day (documented limitation) ──────
