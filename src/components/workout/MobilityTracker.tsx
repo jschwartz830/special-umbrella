@@ -52,6 +52,12 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
   const [totalSec, setTotalSec] = useState(cp?.totalElapsedSec ?? 0)
   const [exSec, setExSec] = useState(cp?.exElapsedSec ?? 0)
 
+  // Per-exercise duration adjustments (seconds added/removed), keyed by exercise id.
+  // Lets the user scroll/drag the countdown to run an exercise longer or shorter.
+  const [durationOverrides, setDurationOverrides] = useState<Record<string, number>>({})
+  const overridesR = useRef<Record<string, number>>({})
+  useEffect(() => { overridesR.current = durationOverrides }, [durationOverrides])
+
   // Wall-clock refs — never go stale in closures
   const totalR = useRef({ acc: cp?.totalElapsedSec ?? 0, at: Date.now() as number | null })
   const exR = useRef({ acc: cp?.exElapsedSec ?? 0, at: null as number | null })
@@ -71,6 +77,15 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
   useEffect(() => { idxR.current = currentIdx }, [currentIdx])
   useEffect(() => { doneR.current = completedIds }, [completedIds])
   useEffect(() => { soundOnR.current = soundEnabled }, [soundEnabled])
+
+  // Lock background scroll while the full-screen session view is open — prevents
+  // the page behind it from scrolling/rubber-banding during timer drag gestures.
+  useEffect(() => {
+    if (minimized) return
+    const original = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = original }
+  }, [minimized])
 
   // ── Mount: init store session + start total timer ───────────────────────
   useEffect(() => {
@@ -119,19 +134,20 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
       if (phaseR.current === 'exercising') {
         const cur = routine[idxR.current]
         if (cur) {
+          const effDur = Math.max(5, cur.durationSec + (overridesR.current[cur.id] ?? 0))
           // Halfway cue for bilateral exercises — time to switch sides.
           if (
             !switchFiredR.current &&
             isBilateralExercise(cur) &&
-            e >= cur.durationSec / 2 &&
-            e < cur.durationSec
+            e >= effDur / 2 &&
+            e < effDur
           ) {
             switchFiredR.current = true
             if (soundOnR.current) playSwitchSidesSound()
             flashSwitchCue()
           }
           // Auto-complete when exercise countdown hits zero.
-          if (!autoFiredR.current && e >= cur.durationSec) {
+          if (!autoFiredR.current && e >= effDur) {
             autoFiredR.current = true
             _markDone({ fromTimer: true })
           }
@@ -203,7 +219,8 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
     autoFiredR.current = false
     // If resuming past the halfway point, don't fire a late switch cue.
     const cur = routine[idxR.current]
-    switchFiredR.current = !!cur && (!isBilateralExercise(cur) || exR.current.acc >= cur.durationSec / 2)
+    const curEffDur = cur ? Math.max(5, cur.durationSec + (overridesR.current[cur.id] ?? 0)) : 0
+    switchFiredR.current = !!cur && (!isBilateralExercise(cur) || exR.current.acc >= curEffDur / 2)
     phaseR.current = 'exercising'
     setPhase('exercising')
   }
@@ -270,11 +287,62 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
   // ── Derived values ───────────────────────────────────────────────────────
 
   const currentExercise = routine[currentIdx]
-  const exRemaining = currentExercise ? Math.max(0, currentExercise.durationSec - exSec) : 0
+  const currentEffDuration = currentExercise
+    ? Math.max(5, currentExercise.durationSec + (durationOverrides[currentExercise.id] ?? 0))
+    : 0
+  const exRemaining = currentExercise ? Math.max(0, currentEffDuration - exSec) : 0
   const currentLibInfo = currentExercise
     ? MOBILITY_LIBRARY.find(e => e.id === currentExercise.id)
     : undefined
   const currentBilateral = currentExercise ? isBilateralExercise(currentExercise) : false
+
+  // ── Timer scroll/drag adjustment ────────────────────────────────────────
+  const TIMER_ADJUST_STEP_SEC = 5
+  const TIMER_MIN_SEC = 5
+  const TIMER_MAX_SEC = 1800
+  const timerDragR = useRef<{ startY: number; startOverride: number } | null>(null)
+
+  function adjustCurrentDuration(deltaSec: number) {
+    const cur = routine[idxR.current]
+    if (!cur) return
+    setDurationOverrides(prev => {
+      const base = cur.durationSec + (prev[cur.id] ?? 0)
+      const newTotal = Math.max(TIMER_MIN_SEC, Math.min(TIMER_MAX_SEC, base + deltaSec))
+      return { ...prev, [cur.id]: newTotal - cur.durationSec }
+    })
+  }
+
+  function handleTimerWheel(e: React.WheelEvent) {
+    if (!currentExercise) return
+    e.preventDefault()
+    e.stopPropagation()
+    const dir = e.deltaY < 0 ? 1 : -1 // scroll up → add time, scroll down → subtract time
+    adjustCurrentDuration(dir * TIMER_ADJUST_STEP_SEC)
+  }
+
+  function handleTimerTouchStart(e: React.TouchEvent) {
+    if (!currentExercise) return
+    e.stopPropagation()
+    timerDragR.current = { startY: e.touches[0].clientY, startOverride: overridesR.current[currentExercise.id] ?? 0 }
+  }
+
+  function handleTimerTouchMove(e: React.TouchEvent) {
+    const drag = timerDragR.current
+    const cur = routine[idxR.current]
+    if (!drag || !cur) return
+    e.stopPropagation()
+    e.preventDefault()
+    const PX_PER_SEC = 6
+    const dy = drag.startY - e.touches[0].clientY // drag finger up → add time
+    const deltaSec = Math.round(dy / PX_PER_SEC)
+    const newTotal = Math.max(TIMER_MIN_SEC, Math.min(TIMER_MAX_SEC, cur.durationSec + drag.startOverride + deltaSec))
+    setDurationOverrides(prev => ({ ...prev, [cur.id]: newTotal - cur.durationSec }))
+  }
+
+  function handleTimerTouchEnd(e: React.TouchEvent) {
+    e.stopPropagation()
+    timerDragR.current = null
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -437,13 +505,23 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
                   <span className="text-lg font-bold uppercase tracking-wide">Switch sides!</span>
                 </div>
               )}
-              <p className={`text-7xl font-mono font-bold tabular-nums leading-none transition-colors ${
-                phase === 'exercising'
-                  ? showSwitchCue ? 'text-fuchsia-400' : exRemaining <= 10 ? 'text-amber-400' : 'text-sky-400'
-                  : 'text-slate-500'
-              }`}>
+              <p
+                onWheel={handleTimerWheel}
+                onTouchStart={handleTimerTouchStart}
+                onTouchMove={handleTimerTouchMove}
+                onTouchEnd={handleTimerTouchEnd}
+                style={{ touchAction: 'none' }}
+                className={`text-7xl font-mono font-bold tabular-nums leading-none transition-colors select-none cursor-ns-resize ${
+                  phase === 'exercising'
+                    ? showSwitchCue ? 'text-fuchsia-400' : exRemaining <= 10 ? 'text-amber-400' : 'text-sky-400'
+                    : 'text-slate-500'
+                }`}
+              >
                 {fmtTime(exRemaining)}
               </p>
+              {currentExercise && (
+                <p className="text-[10px] text-slate-600">Scroll to adjust time</p>
+              )}
 
               {/* Progress bar — only visible while exercising */}
               <div className="h-1 rounded-full bg-slate-800 overflow-hidden">
@@ -453,7 +531,7 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
                   }`}
                   style={{
                     width: currentExercise
-                      ? `${Math.min(100, (exSec / currentExercise.durationSec) * 100)}%`
+                      ? `${Math.min(100, (exSec / currentEffDuration) * 100)}%`
                       : '0%',
                   }}
                 />

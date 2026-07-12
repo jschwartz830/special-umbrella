@@ -472,6 +472,15 @@ export function getLibraryExerciseById(id: string): MobilityLibraryExercise | un
   return MOBILITY_LIBRARY.find(e => e.id === id)
 }
 
+// Resolve a completed exercise id to a display name. Prefers the current routine
+// (in case it was renamed or is a hand-added custom exercise) and falls back to
+// the library, then the raw id if the exercise no longer exists anywhere.
+export function mobilityExerciseName(id: string, routine: { id: string; name: string }[]): string {
+  return routine.find(e => e.id === id)?.name
+    ?? getLibraryExerciseById(id)?.name
+    ?? id
+}
+
 // Whether a routine exercise is done one side at a time (so a "switch sides" cue
 // makes sense at its halfway point). Library exercises carry an explicit flag;
 // the built-in default routine and hand-added exercises use their own ids, so we

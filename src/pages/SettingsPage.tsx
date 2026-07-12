@@ -89,7 +89,7 @@ const DELAY_OPTIONS = [
 export function SettingsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
-  const { startDelaySeconds, setStartDelay } = useSettingsStore()
+  const { startDelaySeconds, setStartDelay, autoAdvanceSegments, setAutoAdvanceSegments } = useSettingsStore()
   const { user, signOut } = useAuthStore()
 
   const latestCommitDate =
@@ -162,6 +162,27 @@ export function SettingsPage() {
               {opt.label}
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-medium">Auto-advance run segments</h2>
+            <p className="text-sm text-slate-400 mt-1">
+              When a timed segment ends, automatically chime, announce the next segment's pace and duration, and move on.
+            </p>
+          </div>
+          <div
+            role="switch"
+            aria-checked={autoAdvanceSegments}
+            tabIndex={0}
+            onClick={() => setAutoAdvanceSegments(!autoAdvanceSegments)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAutoAdvanceSegments(!autoAdvanceSegments) } }}
+            className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer flex-shrink-0 mt-0.5 ${autoAdvanceSegments ? 'bg-sky-500' : 'bg-slate-600'}`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${autoAdvanceSegments ? 'left-[22px]' : 'left-0.5'}`} />
+          </div>
         </div>
       </section>
 

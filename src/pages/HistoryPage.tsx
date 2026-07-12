@@ -12,10 +12,14 @@ import {
   Trophy,
   ChevronDown,
   ChevronUp,
+  Zap,
+  Clock,
 } from 'lucide-react'
 import { useHistoryStore } from '../store/historyStore'
 import { usePlanStore } from '../store/planStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
+import { useMobilityStore, type MobilityCompletion } from '../store/mobilityStore'
+import { mobilityExerciseName } from '../lib/mobilityLibrary'
 import { Modal } from '../components/shared/Modal'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { OutcomeMetrics } from '../components/workout/OutcomeMetrics'
@@ -49,8 +53,10 @@ const TYPE_MIX_LABEL: Partial<Record<WorkoutType, string>> = {
 type FlatItem =
   | { kind: 'rotation'; date: string; sortKey: string; entry: HistoryEntry }
   | { kind: 'extra'; date: string; sortKey: string; extra: ExtraWorkoutEntry }
+  | { kind: 'mobility'; date: string; sortKey: string; completion: MobilityCompletion }
 
 const SESSION_FILTER_KEY = 'wpt_history_filterPlanId'
+const KIND_ORDER: Record<FlatItem['kind'], number> = { rotation: 0, extra: 1, mobility: 2 }
 
 export function HistoryPage() {
   const today = useToday()
@@ -75,6 +81,9 @@ export function HistoryPage() {
   const updateEntryDate = useHistoryStore(s => s.updateEntryDate)
   const updateExtraEntryDate = useHistoryStore(s => s.updateExtraEntryDate)
   const updateExtraEntry = useHistoryStore(s => s.updateExtraEntry)
+  const mobilityCompletions = useMobilityStore(s => s.completions)
+  const mobilityRoutine = useMobilityStore(s => s.routine)
+  const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
 
   // Reverse-index progressionStates by the workout instance that triggered each state.
   // Allows O(1) lookup per history item without scanning the full progressionStates object.
@@ -92,6 +101,7 @@ export function HistoryPage() {
   const [notesText, setNotesText] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [confirmDeleteExtraId, setConfirmDeleteExtraId] = useState<string | null>(null)
+  const [confirmDeleteMobilityDate, setConfirmDeleteMobilityDate] = useState<string | null>(null)
 
   const [outcomeTarget, setOutcomeTarget] = useState<{
     planId: string
@@ -136,7 +146,18 @@ export function HistoryPage() {
     [extraEntries, filterPlanId],
   )
 
-  // Build a unified flat list sorted newest-date-first; within a date: rotation before extras
+  // Mobility isn't plan-scoped (no planId on completions), so it's shown regardless of the plan filter.
+  const mobilityItems = useMemo(
+    () => Object.entries(mobilityCompletions).map(([date, completion]) => ({
+      kind: 'mobility' as const,
+      date,
+      sortKey: completion.completedAt,
+      completion,
+    })),
+    [mobilityCompletions],
+  )
+
+  // Build a unified flat list sorted newest-date-first; within a date: rotation, then extras, then mobility
   const flatItems: FlatItem[] = useMemo(() => [
     ...filteredEntries.map(e => ({
       kind: 'rotation' as const,
@@ -150,11 +171,12 @@ export function HistoryPage() {
       sortKey: e.createdAt,
       extra: e,
     })),
+    ...mobilityItems,
   ].sort((a, b) => {
     if (b.date !== a.date) return b.date.localeCompare(a.date)
-    if (a.kind !== b.kind) return a.kind === 'rotation' ? -1 : 1
+    if (a.kind !== b.kind) return KIND_ORDER[a.kind] - KIND_ORDER[b.kind]
     return b.sortKey.localeCompare(a.sortKey)
-  }), [filteredEntries, filteredExtras])
+  }), [filteredEntries, filteredExtras, mobilityItems])
 
   const stats = computeHistoryStats(filteredEntries, filteredExtras, today)
 
@@ -186,7 +208,7 @@ export function HistoryPage() {
       let type: WorkoutType | undefined
       if (item.kind === 'extra') {
         type = item.extra.workoutType
-      } else if (item.entry.action === 'complete') {
+      } else if (item.kind === 'rotation' && item.entry.action === 'complete') {
         const p = plans[item.entry.planId]
         type = p?.days[item.entry.planDayIndex ?? -1]?.slots[0]?.type
       }
@@ -632,6 +654,72 @@ export function HistoryPage() {
                     <Plus size={11} /> Add workout for this day
                   </button>
                 ) : null}
+              </div>
+            )
+          }
+
+          if (item.kind === 'mobility') {
+            const { completion, date } = item
+            return (
+              <div
+                key={`mobility_${date}`}
+                className="bg-slate-800/60 rounded-xl border border-teal-500/20 overflow-hidden"
+              >
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-500 font-medium mb-1">
+                        {format(parseISO(date), 'EEE, MMM d, yyyy')}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white bg-teal-500">
+                          <Zap size={10} />
+                          Mobility
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-slate-500">
+                          <Clock size={11} />
+                          {completion.durationMin} min
+                        </span>
+                      </div>
+                      {completion.completedExerciseIds.length > 0 && (
+                        <ul className="mt-2 space-y-0.5">
+                          {completion.completedExerciseIds.map((id, i) => (
+                            <li key={`${id}_${i}`} className="text-sm text-slate-300 flex items-center gap-1.5">
+                              <span className="w-1 h-1 rounded-full bg-teal-400 flex-shrink-0" />
+                              {mobilityExerciseName(id, mobilityRoutine)}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0 mt-0.5" onClick={e => e.stopPropagation()}>
+                      {confirmDeleteMobilityDate === date ? (
+                        <>
+                          <button
+                            onClick={() => { removeMobilityCompletion(date); setConfirmDeleteMobilityDate(null) }}
+                            className="px-2 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[10px] font-medium transition-colors"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteMobilityDate(null)}
+                            className="px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-[10px] font-medium transition-colors"
+                          >
+                            <X size={10} />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteMobilityDate(date)}
+                          className="p-1.5 rounded-lg bg-slate-700 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )
           }
