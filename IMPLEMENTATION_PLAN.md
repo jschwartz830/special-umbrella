@@ -1,5 +1,43 @@
 # Implementation Plan
 
+## Pass 76 — 2026-07-12 (branch `claude/dreamy-mccarthy-2h1jip`)
+
+### Baseline
+
+- Branch started from `main` after PR #183 merge (or at `2b4fd7a`).
+- **1056 tests passing** across 30 test files at start of pass (confirmed via `npx vitest run`).
+- **1068 tests passing** at end of pass (+12 new tests).
+- TypeScript: `tsc --noEmit` clean (0 errors).
+
+### Architecture Summary
+
+No new dependencies. All changes are in `src/lib/__tests__/historyStats.test.ts`.
+
+### What is Strong (reaffirmed)
+
+- `getStreakDatesSet` and `computePlanStreak` both correctly accept and apply `additionalDates` (mobility dates) — the implementation was already correct; only test coverage was missing.
+- `TodayPage.tsx` line 338 calls `computePlanStreak(plan.id, planEntries, planExtras, today, mobilityDateSet)` — the mobility-streak integration is used in production and is now covered by tests.
+
+### Key Issues Found
+
+#### Bugs / Correctness
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| None found | — | No new bugs discovered this pass | — |
+
+#### Test Coverage Gap Fixed
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Medium | `historyStats.ts` + `historyStats.test.ts` | `additionalDates` parameter of `getStreakDatesSet` and `computePlanStreak` had zero test coverage despite active production use | **Fixed** — 12 new tests added |
+
+### Commits
+
+1. `test: cover additionalDates parameter in getStreakDatesSet and computePlanStreak (12 tests)`
+
+---
+
 ## Pass 75 — 2026-07-09 (branch `claude/dreamy-mccarthy-vpg2n1`)
 
 ### Baseline

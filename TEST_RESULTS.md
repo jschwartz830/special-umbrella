@@ -1,5 +1,27 @@
 # Test Results
 
+## 2026-07-12 (seventy-sixth pass) — branch `claude/dreamy-mccarthy-2h1jip`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  30 passed (30)
+     Tests  1056 passed (1056)
+  Duration  ~2.7s
+```
+
+### After commit 1 (12 new additionalDates tests)
+
+```
+Test Files  30 passed (30)
+     Tests  1068 passed (1068)
+  Duration  ~2.7s
+```
+
+---
+
 ## 2026-07-09 (seventy-fifth pass) — branch `claude/dreamy-mccarthy-vpg2n1`
 
 ---

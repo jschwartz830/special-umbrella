@@ -1,3 +1,31 @@
+# Overnight Changelog — Pass 76 (2026-07-12)
+
+## Branch: `claude/dreamy-mccarthy-2h1jip`
+
+### Commit 1
+
+**test: cover additionalDates parameter in getStreakDatesSet and computePlanStreak (12 tests)**
+
+#### What changed
+
+- **Modified** `src/lib/__tests__/historyStats.test.ts`: Added 12 new tests covering the `additionalDates?: Set<string>` parameter of `getStreakDatesSet` and `computePlanStreak`.
+
+#### Why
+
+The `additionalDates` parameter was introduced to allow mobility-session dates (from `mobilityCompletions`) to count toward the plan streak displayed on `TodayPage`. `TodayPage.tsx` line 338 actively uses:
+
+```typescript
+computePlanStreak(plan.id, planEntries, planExtras, today, mobilityDateSet)
+```
+
+Despite this production usage, neither `getStreakDatesSet` nor `computePlanStreak` had any test that passed a non-empty `additionalDates` argument. The 7 `additionalDates` tests added to `computePlanStreak` cover: today-only date, consecutive dates, bridging a rotation gap, not bridging without the date, unconditional application (not filtered by planId), empty-set parity, and future dates not extending the streak. The 5 `additionalDates` tests in `getStreakDatesSet` cover: single date, multiple dates, union with entries, unconditional (not planId-filtered), and empty-set parity.
+
+#### Risk
+
+None — pure test additions. No production code was modified. All 1068 tests pass.
+
+---
+
 # Overnight Changelog — Pass 75 (2026-07-09)
 
 ## Branch: `claude/dreamy-mccarthy-vpg2n1`
