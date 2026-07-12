@@ -1,5 +1,38 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-12 (seventy-sixth pass) — branch `claude/dreamy-mccarthy-2h1jip`
+
+---
+
+### Executive summary
+
+1. **What changed**: 12 new tests covering the `additionalDates` parameter in `getStreakDatesSet` and `computePlanStreak`. No production code changed.
+2. **Test delta**: +12 tests (1056 → 1068). TypeScript errors: 0.
+3. **Highest confidence**: The added tests directly exercise the mobility-streak integration path that `TodayPage.tsx` uses in production. The implementation was already correct; the gap was test coverage only.
+4. **What to review first**: The single commit is a pure test addition — no production logic changed.
+
+---
+
+### Issues found and fixed
+
+| Priority | Issue | File | Disposition |
+|---|---|---|---|
+| Medium | `additionalDates` parameter of `getStreakDatesSet` and `computePlanStreak` had zero test coverage despite active production use | `historyStats.test.ts` | **Fixed** — 12 tests added |
+
+### Open bugs carried forward
+
+| Priority | Code | File | Description | Status |
+|---|---|---|---|---|
+| Low | BUG-2 | `CalendarPage.tsx` | `handleMoveWorkout` → `updateEntryDate` can silently collide on destination date | Confirmed non-issue this pass: both `removeEntry` and `updateEntryDate` each handle the collision independently |
+| Low | BUG-4 | `storeSync.ts` | 1500ms debounce: app close mid-debounce loses last write | Acknowledged architectural tradeoff |
+| Low | BUG-6 | `planStore.ts` | `clearPlanHistory` doesn't reset plan's `startDate` — only called during delete, not restart | Confirmed non-issue: `clearPlanHistory` is only called as part of plan deletion (not standalone restart) |
+
+### Non-issues reconfirmed
+
+All non-issues from pass 75 remain valid (BUG-1, BUG-3, BUG-5, BUG-7 via pass 75 fix, BUG-8, BUG-9, BUG-10, BUG-11).
+
+---
+
 ## 2026-07-09 (seventy-fifth pass) — branch `claude/dreamy-mccarthy-vpg2n1`
 
 ---

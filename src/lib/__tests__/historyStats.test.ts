@@ -1373,6 +1373,63 @@ describe('computePlanStreak', () => {
     const extras = [planExtra('2099-01-01')] // far-future extra
     expect(computePlanStreak('plan-1', entries, extras, TODAY)).toBe(1)
   })
+
+  // ── additionalDates ──────────────────────────────────────────────────────────
+
+  it('additionalDates: today-only date starts a streak of 1', () => {
+    const additionalDates = new Set([TODAY])
+    expect(computePlanStreak('plan-1', [], [], TODAY, additionalDates)).toBe(1)
+  })
+
+  it('additionalDates: consecutive dates extend the streak', () => {
+    const additionalDates = new Set(['2026-05-10', '2026-05-11', TODAY])
+    expect(computePlanStreak('plan-1', [], [], TODAY, additionalDates)).toBe(3)
+  })
+
+  it('additionalDates: bridges a gap in rotation entries', () => {
+    // May 11 has no rotation entry; additionalDates fills the gap.
+    const entries = [
+      planEntry('2026-05-10', 'complete'),
+      planEntry(TODAY, 'complete'),
+    ]
+    const additionalDates = new Set(['2026-05-11'])
+    expect(computePlanStreak('plan-1', entries, [], TODAY, additionalDates)).toBe(3)
+  })
+
+  it('additionalDates: gap NOT bridged when date is absent from additionalDates', () => {
+    // Same setup but without the bridge date — streak is still broken.
+    const entries = [
+      planEntry('2026-05-10', 'complete'),
+      planEntry(TODAY, 'complete'),
+    ]
+    expect(computePlanStreak('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('additionalDates: applied unconditionally (not filtered by planId)', () => {
+    // additionalDates are mobility dates — they have no plan affinity.
+    // They should count for any plan, regardless of which plan's entries are present.
+    const entries = [planEntry(TODAY, 'complete', 'plan-2')]
+    const additionalDates = new Set(['2026-05-11'])
+    // plan-1 has no entries; additionalDates give May 11 but not today → streak 0
+    expect(computePlanStreak('plan-1', entries, [], TODAY, additionalDates)).toBe(0)
+    // With today also in additionalDates → streak 2
+    const additionalDatesWithToday = new Set(['2026-05-11', TODAY])
+    expect(computePlanStreak('plan-1', entries, [], TODAY, additionalDatesWithToday)).toBe(2)
+  })
+
+  it('additionalDates: empty set behaves identically to omitting the parameter', () => {
+    const entries = [planEntry(TODAY, 'complete')]
+    const withEmpty = computePlanStreak('plan-1', entries, [], TODAY, new Set())
+    const withOmit = computePlanStreak('plan-1', entries, [], TODAY)
+    expect(withEmpty).toBe(withOmit)
+  })
+
+  it('additionalDates: future dates do not extend the streak', () => {
+    // The backward walk from today can never reach a future date.
+    const entries = [planEntry(TODAY, 'complete')]
+    const additionalDates = new Set(['2099-01-01'])
+    expect(computePlanStreak('plan-1', entries, [], TODAY, additionalDates)).toBe(1)
+  })
 })
 
 // ── computeRotationPlanRemaining ──────────────────────────────────────────────
@@ -2155,6 +2212,52 @@ describe('getStreakDatesSet', () => {
     // And computePlanStreak should walk them correctly → streak of 3
     const streak = computePlanStreak('plan-1', entries, [], TODAY)
     expect(streak).toBe(3)
+  })
+
+  // ── additionalDates ──────────────────────────────────────────────────────────
+
+  it('additionalDates: provided date is present in the returned set', () => {
+    const s = getStreakDatesSet([], [], undefined, new Set(['2026-06-10']))
+    expect(s.has('2026-06-10')).toBe(true)
+    expect(s.size).toBe(1)
+  })
+
+  it('additionalDates: multiple dates all appear in the set', () => {
+    const dates = new Set(['2026-06-10', '2026-06-11', '2026-06-12'])
+    const s = getStreakDatesSet([], [], undefined, dates)
+    expect(s.has('2026-06-10')).toBe(true)
+    expect(s.has('2026-06-11')).toBe(true)
+    expect(s.has('2026-06-12')).toBe(true)
+  })
+
+  it('additionalDates: combined with entries — union of both appears in the set', () => {
+    const s = getStreakDatesSet(
+      [se('2026-06-10', 'complete')],
+      [],
+      'plan-1',
+      new Set(['2026-06-11']),
+    )
+    expect(s.has('2026-06-10')).toBe(true)
+    expect(s.has('2026-06-11')).toBe(true)
+  })
+
+  it('additionalDates: adds a date even when it would be excluded by planId filter', () => {
+    // additionalDates are not filtered by planId — they are unconditional.
+    const s = getStreakDatesSet(
+      [se('2026-06-10', 'complete', 'plan-2')],
+      [],
+      'plan-1',                           // plan-1 filter → plan-2 entry excluded
+      new Set(['2026-06-11']),             // additionalDates are not plan-scoped
+    )
+    expect(s.has('2026-06-10')).toBe(false) // filtered out by planId
+    expect(s.has('2026-06-11')).toBe(true)  // from additionalDates (no planId filter)
+  })
+
+  it('additionalDates: empty set produces the same result as omitting it', () => {
+    const entries = [se('2026-06-10', 'complete')]
+    const withEmpty = getStreakDatesSet(entries, [], undefined, new Set())
+    const withOmit = getStreakDatesSet(entries, [])
+    expect([...withEmpty].sort()).toEqual([...withOmit].sort())
   })
 })
 
