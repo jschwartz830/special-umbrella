@@ -11,13 +11,16 @@ import {
   ClipboardList,
   Play,
   Copy,
+  Zap,
+  Clock,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { useToday } from '../hooks/useToday'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
-import { useMobilityStore } from '../store/mobilityStore'
+import { useMobilityStore, type MobilityCompletion, type MobilityExercise } from '../store/mobilityStore'
+import { mobilityExerciseName } from '../lib/mobilityLibrary'
 import { buildMonthGrid } from '../engine/calendarProjection'
 import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { ActiveWorkoutTracker } from '../components/workout/ActiveWorkoutTracker'
@@ -34,7 +37,7 @@ import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTrac
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { formatWorkoutForClipboard } from '../lib/shareWorkout'
-import { WORKOUT_TYPE_OPTIONS } from '../lib/constants'
+import { WORKOUT_TYPE_OPTIONS, WORKOUT_META } from '../lib/constants'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -78,6 +81,8 @@ export function CalendarPage() {
   const addExtraEntry = useHistoryStore(s => s.addExtraEntry)
   const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
   const mobilityCompletions = useMobilityStore(s => s.completions)
+  const mobilityRoutine = useMobilityStore(s => s.routine)
+  const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
   const outcomes = useOutcomeStore(s => s.outcomes)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
@@ -368,13 +373,18 @@ export function CalendarPage() {
                         {new Date(cell.date + 'T00:00').getDate()}
                       </span>
                       {rd && cell.isCurrentMonth && !isUnlogged && !isDayOff && !hasFutureDayOff && (
-                        <div className="flex gap-0.5 mt-0.5">
-                          {rd.planDay.slots.map(slot => (
-                            <span key={slot.id} className={`w-1 h-1 rounded-full ${isComplete ? 'bg-emerald-400' : isSkip ? 'bg-slate-600' : 'bg-slate-500'}`} />
-                          ))}
-                          {extras.map(e => (
-                            <span key={e.id} className="w-1 h-1 rounded-full bg-sky-400" />
-                          ))}
+                        <div className="flex gap-0.5 mt-0.5 items-center">
+                          {rd.planDay.slots.map(slot => {
+                            if (isComplete) {
+                              const Icon = WORKOUT_META[slot.type].icon
+                              return <Icon key={slot.id} size={8} strokeWidth={2.5} className="text-emerald-400" />
+                            }
+                            return <span key={slot.id} className={`w-1 h-1 rounded-full ${isSkip ? 'bg-slate-600' : 'bg-slate-500'}`} />
+                          })}
+                          {extras.map(e => {
+                            const Icon = WORKOUT_META[e.workoutType].icon
+                            return <Icon key={e.id} size={8} strokeWidth={2.5} className="text-sky-400" />
+                          })}
                         </div>
                       )}
                       {(isDayOff || hasFutureDayOff) && cell.isCurrentMonth && (
@@ -408,6 +418,9 @@ export function CalendarPage() {
           plan={plan}
           extras={getExtrasForDate(selected.calendarDate)}
           outcomes={outcomes}
+          mobilityCompletion={mobilityCompletions[selected.calendarDate] ?? null}
+          mobilityRoutine={mobilityRoutine}
+          onDeleteMobility={() => removeMobilityCompletion(selected.calendarDate)}
           onLog={(action, idx) => logForDate(selected, action, idx)}
           onClear={() => clearDate(selected)}
           onEditOutcome={() => openEditOutcome(selected)}
@@ -500,6 +513,9 @@ function DayDetailModal({
   plan,
   extras,
   outcomes,
+  mobilityCompletion,
+  mobilityRoutine,
+  onDeleteMobility,
   onLog,
   onClear,
   onEditOutcome,
@@ -515,6 +531,9 @@ function DayDetailModal({
   plan: Plan
   extras: ExtraWorkoutEntry[]
   outcomes: Record<string, WorkoutOutcome>
+  mobilityCompletion: MobilityCompletion | null
+  mobilityRoutine: MobilityExercise[]
+  onDeleteMobility: () => void
   onLog: (action: ActionType, selectedPlanDayIdx: number) => void
   onClear: () => void
   onEditOutcome: () => void
@@ -672,6 +691,39 @@ function DayDetailModal({
               </button>
             )
           })}
+
+          {/* Mobility completion */}
+          {mobilityCompletion && (
+            <div className="px-3 py-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white bg-teal-500">
+                  <Zap size={10} />
+                  Mobility
+                </span>
+                <span className="flex items-center gap-1 text-xs text-slate-400">
+                  <Clock size={11} />
+                  {mobilityCompletion.durationMin} min
+                </span>
+                <button
+                  onClick={onDeleteMobility}
+                  className="ml-auto text-slate-500 hover:text-red-400 transition-colors"
+                  aria-label="Delete mobility entry"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+              {mobilityCompletion.completedExerciseIds.length > 0 && (
+                <ul className="space-y-0.5">
+                  {mobilityCompletion.completedExerciseIds.map((id, i) => (
+                    <li key={`${id}_${i}`} className="text-xs text-slate-300 flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-teal-400 flex-shrink-0" />
+                      {mobilityExerciseName(id, mobilityRoutine)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {/* Add workout */}
           {!showAddExtra ? (

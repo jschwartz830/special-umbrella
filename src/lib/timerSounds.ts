@@ -51,6 +51,19 @@ function vibrate(pattern: number | number[]): void {
   }
 }
 
+// Speak a short cue via the Web Speech API (e.g. announcing the next run segment).
+// No-op when speech synthesis is unavailable.
+export function speak(text: string): void {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
+  try {
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 1
+    utterance.volume = 1
+    window.speechSynthesis.speak(utterance)
+  } catch { /* unsupported / blocked */ }
+}
+
 // Rising three-note chime — an exercise timer has run out, advancing to the next.
 export function playExerciseEndSound(): void {
   const ctx = getAudioContext()

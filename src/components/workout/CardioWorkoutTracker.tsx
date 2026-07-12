@@ -5,6 +5,8 @@ import {
 } from 'lucide-react'
 import type { WorkoutSlot } from '../../types'
 import type { RunSegment, RunSegmentType } from '../../types/program'
+import { useSettingsStore } from '../../store/settingsStore'
+import { playExerciseEndSound, speak } from '../../lib/timerSounds'
 
 // ── Pace helpers ──────────────────────────────────────────────────────────────
 
@@ -133,6 +135,9 @@ export function CardioWorkoutTracker({
   const [totalElapsed, setTotalElapsed] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoAdvanceEnabled = useSettingsStore(s => s.autoAdvanceSegments)
+  const setAutoAdvanceEnabled = useSettingsStore(s => s.setAutoAdvanceSegments)
+  const autoAdvanceFiredIdxRef = useRef<number | null>(null)
 
   // Refs that shadow state — readable inside callbacks without stale closures
   const totalElapsedRef = useRef(0)
@@ -197,6 +202,7 @@ export function CardioWorkoutTracker({
       setSegmentIdx(i => i + 1)
       setSeg(0)
       wallSegRef.current = { elapsed: 0, time: Date.now() }
+      autoAdvanceFiredIdxRef.current = null
     } else {
       onComplete(Math.round(totalElapsedRef.current / 60))
     }
@@ -207,12 +213,46 @@ export function CardioWorkoutTracker({
       setSegmentIdx(i => i - 1)
       setSeg(0)
       wallSegRef.current = { elapsed: 0, time: Date.now() }
+      autoAdvanceFiredIdxRef.current = null
     }
   }, [segmentIdx])
 
   const finish = useCallback(() => {
     onComplete(Math.round(totalElapsedRef.current / 60))
   }, [onComplete])
+
+  // Auto-advance: when a timed segment finishes, chime + announce the next
+  // segment's name/pace/duration, then move on automatically. Never auto-
+  // finishes the workout on the last segment — that still requires a tap.
+  useEffect(() => {
+    if (!autoAdvanceEnabled) return
+    if (isPaused) return
+    if (segDurSec === null) return
+    if (segmentElapsed < segDurSec) return
+    if (autoAdvanceFiredIdxRef.current === segmentIdx) return
+    autoAdvanceFiredIdxRef.current = segmentIdx
+
+    playExerciseEndSound()
+
+    if (isLast) {
+      speak('Final segment complete.')
+      return
+    }
+
+    const next = effectiveSegments[segmentIdx + 1]
+    const nextCfg = segmentCfg(next?.type)
+    const nextPace = parsePaceInfo(next?.pace)
+    const nextDurSec = parseDurationToSeconds(next?.duration)
+    const nextDist = resolveDistanceExpr(next?.distance, programVars)
+    const parts = [`Next: ${nextCfg.label}.`]
+    if (nextDist) parts.push(`${nextDist}.`)
+    else if (nextDurSec !== null) parts.push(`${formatSeconds(nextDurSec)}.`)
+    if (nextPace.mphRange) parts.push(`${nextPace.mphRange[0]} to ${nextPace.mphRange[1]} miles per hour.`)
+    speak(parts.join(' '))
+
+    const t = setTimeout(() => goNext(), 1500)
+    return () => clearTimeout(t)
+  }, [autoAdvanceEnabled, isPaused, segDurSec, segmentElapsed, segmentIdx, isLast, effectiveSegments, programVars, goNext])
 
   // ── Minimized banner ────────────────────────────────────────────────────────
   if (minimized) {
@@ -250,13 +290,28 @@ export function CardioWorkoutTracker({
           <span className="text-sm">Minimize</span>
         </button>
         <p className="text-sm font-semibold text-slate-200 truncate mx-4 flex-1 text-center">{slot.name}</p>
-        <button
-          onClick={onCancel}
-          className="text-slate-400 hover:text-red-400 transition-colors p-1"
-          aria-label="End cardio"
-        >
-          <X size={20} />
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setAutoAdvanceEnabled(!autoAdvanceEnabled)}
+            aria-label={autoAdvanceEnabled ? 'Disable auto-advance' : 'Enable auto-advance'}
+            aria-pressed={autoAdvanceEnabled}
+            title={autoAdvanceEnabled ? 'Auto-advance: on' : 'Auto-advance: off'}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold uppercase tracking-wide transition-colors ${
+              autoAdvanceEnabled
+                ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
+                : 'bg-slate-800 border-slate-700 text-slate-500'
+            }`}
+          >
+            Auto
+          </button>
+          <button
+            onClick={onCancel}
+            className="text-slate-400 hover:text-red-400 transition-colors p-1"
+            aria-label="End cardio"
+          >
+            <X size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Segment progress pills */}
@@ -267,7 +322,7 @@ export function CardioWorkoutTracker({
             return (
               <button
                 key={i}
-                onClick={() => { setSegmentIdx(i); setSegmentElapsed(0) }}
+                onClick={() => { setSegmentIdx(i); setSegmentElapsed(0); autoAdvanceFiredIdxRef.current = null }}
                 className={`transition-all rounded-full ${
                   i === segmentIdx
                     ? `h-2.5 w-6 ${c.dotColor}`

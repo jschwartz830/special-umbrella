@@ -4,6 +4,8 @@ import { persist } from 'zustand/middleware'
 interface SettingsState {
   startDelaySeconds: number
   setStartDelay: (s: number) => void
+  autoAdvanceSegments: boolean
+  setAutoAdvanceSegments: (enabled: boolean) => void
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -11,6 +13,8 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       startDelaySeconds: 0,
       setStartDelay: (s) => set({ startDelaySeconds: s }),
+      autoAdvanceSegments: true,
+      setAutoAdvanceSegments: (enabled) => set({ autoAdvanceSegments: enabled }),
     }),
     { name: 'wpt_settings' },
   ),
