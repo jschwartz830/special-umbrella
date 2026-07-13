@@ -38,6 +38,7 @@ import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 import { WORKOUT_TYPE_OPTIONS, WORKOUT_META } from '../lib/constants'
+import { parseExtraWorkoutInstanceId } from '../lib/workoutInstanceId'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -200,7 +201,8 @@ export function CalendarPage() {
 
     if (completedDate !== originalDate) {
       if (isExtra) {
-        const extraId = outcomeTarget.instanceId.split('_extra_')[1]
+        const parsed = parseExtraWorkoutInstanceId(outcomeTarget.instanceId)
+        const extraId = parsed?.extraId
         if (extraId) {
           updateExtraEntryDate(extraId, completedDate)
           const nextId = makeExtraWorkoutInstanceId(outcomeTarget.planId, completedDate, extraId)
