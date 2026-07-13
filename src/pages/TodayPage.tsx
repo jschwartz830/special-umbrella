@@ -165,6 +165,11 @@ function SwipeToDelete({ children, onDelete }: { children: React.ReactNode; onDe
           directionRef.current = null
           setOffset(prev => (prev <= -(REVEAL / 2) ? -REVEAL : 0))
         }}
+        onTouchCancel={() => {
+          swipingRef.current = false
+          directionRef.current = null
+          setOffset(0)
+        }}
       >
         {children}
       </div>
