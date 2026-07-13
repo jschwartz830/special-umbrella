@@ -38,6 +38,7 @@ import type { RunProgressionState } from '../modules/run-adaptation/types'
 import { COMPLETION_STATE_LABELS } from '../modules/workout-outcomes/types'
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { WORKOUT_TYPE_OPTIONS } from '../lib/constants'
+import { parseExtraWorkoutInstanceId } from '../lib/workoutInstanceId'
 
 const WORKOUT_TYPES = WORKOUT_TYPE_OPTIONS
 
@@ -340,7 +341,8 @@ export function HistoryPage() {
 
     if (completedDate !== originalDate) {
       if (isExtra) {
-        const extraId = outcomeTarget.instanceId.split('_extra_')[1]
+        const parsed = parseExtraWorkoutInstanceId(outcomeTarget.instanceId)
+        const extraId = parsed?.extraId
         if (extraId) {
           updateExtraEntryDate(extraId, completedDate)
           const nextId = makeExtraWorkoutInstanceId(outcomeTarget.planId, completedDate, extraId)
