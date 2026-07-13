@@ -3,6 +3,7 @@ import {
   makeWorkoutInstanceId,
   makeExtraWorkoutInstanceId,
   parseWorkoutInstanceId,
+  parseExtraWorkoutInstanceId,
 } from '../workoutInstanceId'
 
 // ── makeWorkoutInstanceId ─────────────────────────────────────────────────────
@@ -86,5 +87,57 @@ describe('parseWorkoutInstanceId', () => {
     const instanceId = `${planId}_2026-03-10`
     const result = parseWorkoutInstanceId(instanceId)
     expect(result).toEqual({ planId, calendarDate: '2026-03-10' })
+  })
+})
+
+// ── parseExtraWorkoutInstanceId ───────────────────────────────────────────────
+
+describe('parseExtraWorkoutInstanceId', () => {
+  it('parses a standard extra instanceId', () => {
+    const id = makeExtraWorkoutInstanceId('plan1', '2026-06-01', 'ex99')
+    expect(parseExtraWorkoutInstanceId(id)).toEqual({
+      planId: 'plan1',
+      calendarDate: '2026-06-01',
+      extraId: 'ex99',
+    })
+  })
+
+  it('handles planId with underscores', () => {
+    const id = makeExtraWorkoutInstanceId('pl_an_id', '2026-01-15', 'abc123')
+    expect(parseExtraWorkoutInstanceId(id)).toEqual({
+      planId: 'pl_an_id',
+      calendarDate: '2026-01-15',
+      extraId: 'abc123',
+    })
+  })
+
+  it('handles extraId with underscores', () => {
+    const id = makeExtraWorkoutInstanceId('plan1', '2026-06-01', 'ex_id_99')
+    expect(parseExtraWorkoutInstanceId(id)).toEqual({
+      planId: 'plan1',
+      calendarDate: '2026-06-01',
+      extraId: 'ex_id_99',
+    })
+  })
+
+  it('returns null for a regular (non-extra) instanceId', () => {
+    const id = makeWorkoutInstanceId('plan1', '2026-06-01')
+    expect(parseExtraWorkoutInstanceId(id)).toBeNull()
+  })
+
+  it('returns null for a string without a date', () => {
+    expect(parseExtraWorkoutInstanceId('nodateinhere')).toBeNull()
+  })
+
+  it('returns null for an empty string', () => {
+    expect(parseExtraWorkoutInstanceId('')).toBeNull()
+  })
+
+  it('round-trips: make then parse returns the original values', () => {
+    const planId = 'V1StGXR8_Z5jdHi6B-myT'
+    const calendarDate = '2026-03-10'
+    const extraId = 'xk2q9n'
+    const id = makeExtraWorkoutInstanceId(planId, calendarDate, extraId)
+    expect(parseExtraWorkoutInstanceId(id)).toEqual({ planId, calendarDate, extraId })
   })
 })
