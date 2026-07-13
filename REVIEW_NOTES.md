@@ -1,5 +1,126 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-13 (seventy-seventh pass) — branch `claude/dreamy-mccarthy-kvu0c5`
+
+---
+
+### Executive Summary
+
+This pass was a focused bug-fix run. A full deep audit found 3 high-severity data correctness bugs, 4 medium-severity behavioral issues, and several low-severity code quality items. All 3 high-severity and 2 low-severity issues were fixed. The 4 medium-severity items are documented here with clear descriptions of the risk and recommended next steps. No feature work was attempted — the high-severity bug density indicated the codebase needed stabilization first.
+
+**What changed:** 7 commits — 1 new utility function, 3 bug fixes (data correctness), 2 code quality fixes, 7 new tests.
+
+**Highest confidence:** `handleSkip` planDayIndex fix — the bug was clear-cut and the one-line fix is exactly symmetrical to the already-correct `complete` path.
+
+**Risky items:** The `changeAction` bug in HistoryPage (day_off → complete drops planDayIndex) needs product input before fixing, as it requires either a plan-day picker UI or an opinionated default.
+
+**Review first:** Change 4 (`handleSkip` fix) and the documented but unfixed `usePlanActions` stale date (item 4 below).
+
+---
+
+### Biggest Issues Found
+
+#### 1. `handleSkip` logs skip against wrong plan day after double-day advance [HIGH — FIXED]
+
+After a user does a double-day advance (logs workout + advances rotation), `todayResolved.planDayIndex` reflects the next day. `handleSkip` was using this post-advance value, logging the skip against tomorrow's plan day instead of today's. The `complete` path already used `primaryPlanDayIndex` correctly.
+
+**Likely observed:** User who does a double-day then skips sees their skip count on the wrong workout type in stats.
+
+**Fix:** Changed `actions.skip(todayResolved.planDayIndex)` → `actions.skip(primaryPlanDayIndex)`.
+
+#### 2. `_extra_` string split could fail on future planId formats [HIGH — FIXED]
+
+`instanceId.split('_extra_')[1]` in CalendarPage and HistoryPage was the fragile mechanism for extracting the extraId when moving an outcome to a different date. A new `parseExtraWorkoutInstanceId` utility was added following the same pattern as the existing `parseWorkoutInstanceId` (regex date detection, prefix derivation).
+
+**Current risk level:** Low in practice (nanoid IDs don't contain `_extra_`). Fixed anyway because the correct approach exists and the cost is minimal.
+
+#### 3. `changeAction` in HistoryPage drops `planDayIndex` when converting day_off → complete [HIGH — NOT FIXED]
+
+When a user edits a history entry and changes its action from `day_off` to `complete`, `updateEntryAction` is called without `planDayIndex`. Day-off entries don't store `planDayIndex`, so after conversion the entry is `action: 'complete'` but `planDayIndex: undefined` — it won't be attributed to any workout type in stats.
+
+**Recommended fix options:**
+- (A) Show a plan-day picker in the edit modal when changing from `day_off`.
+- (B) Use the rotation engine to infer what day that would have been (risky — may be wrong if history was manually adjusted).
+- (C) Prevent changing day_off entries to complete in the UI (safest, least flexible).
+
+This requires product judgment. Documenting, not fixing.
+
+#### 4. `usePlanActions` captures `today` non-reactively — skip/dayOff log to wrong date across midnight [MEDIUM — NOT FIXED]
+
+`usePlanActions(plan.id)` computes `today = format(new Date(), 'yyyy-MM-dd')` at hook initialization. If the page stays open past midnight, `actions.skip()` and `actions.dayOff()` will log to the previous calendar day even though `useToday()` has already advanced. The `complete` path works around this by computing the date from `completedAt` inside the modal.
+
+**Recommended fix:** In `usePlanActions`, change `skip` and `dayOff` to capture the date at call time rather than hook initialization:
+```ts
+skip: (planDayIndex) => {
+  const date = format(new Date(), 'yyyy-MM-dd')
+  logAction(planId, date, planDayIndex, 'skip')
+}
+```
+
+#### 5. `getUpcomingDays` ignores `plan.startDate` [MEDIUM — NOT FIXED]
+
+If today is before `plan.startDate`, the engine still projects upcoming days starting from index 0. A user who creates a future-start plan would see incorrect upcoming days until the plan start date is reached.
+
+**Recommended fix:** In `rotationEngine.ts`, add a guard in `getUpcomingDays`: if `today < plan.startDate`, return empty array (or project from startDate).
+
+---
+
+### Improvements Completed
+
+| # | Change | Confidence |
+|---|---|---|
+| 1 | `parseExtraWorkoutInstanceId` utility + 7 tests | High |
+| 2 | Fix `_extra_` split in CalendarPage | High |
+| 3 | Fix `_extra_` split in HistoryPage | High |
+| 4 | Fix `handleSkip` planDayIndex | High |
+| 5 | Fix TodayPage header date to use date-fns | High |
+| 6 | Fix SwipeToDelete onTouchCancel | High |
+
+---
+
+### Recommendations Only (not implemented)
+
+1. **`changeAction` day_off→complete drops planDayIndex** — product decision needed; see above.
+2. **`usePlanActions` stale date** — targeted fix is small but touches the hook API.
+3. **`getUpcomingDays` + `plan.startDate`** — two-line guard in rotationEngine.
+4. **Expression eval error surfacing** — `expressionEval.ts` silently returns 0 for bad tokens and division by zero. Consider adding an optional error callback or warn-only log.
+5. **`canDayOff` always true in CalendarPage** — rename or inline `true` to remove the misleading guard appearance.
+6. **`getFutureProjection` dead code in `calendarProjection.ts`** — safe to delete.
+7. **No-op `migrate` casts in persist stores** — document that future schema changes need real migrations; consider adding a schema version bump to the next structural change in any store.
+8. **`@/*` path alias unused in tsconfig** — either start using it or remove it to avoid misleading contributors.
+
+---
+
+### Definitely Keep
+
+All 7 commits. Each is small, reversible, and correct.
+
+### Probably Keep But Tweak
+
+None — all fixes are clean.
+
+### Do Not Keep
+
+Nothing to recommend reverting.
+
+### Open Questions For You
+
+1. **`changeAction` day_off→complete** — what should happen to `planDayIndex`? Picker, infer, or disallow?
+2. **`usePlanActions` stale date** — is "page open across midnight" a realistic scenario worth fixing? If so, should we fix it in the hook or in each call site?
+3. **Expression eval silent errors** — should progression expression errors surface to the user (toast? console.error?), or stay silent?
+
+### Known Issues / Incomplete Work
+
+- The `changeAction` bug (item 3 above) is unfixed; any user who changes a day_off entry to complete via HistoryPage edit will have a malformed entry.
+- `getUpcomingDays` + `plan.startDate` is not fixed; future-start plans show incorrect upcoming days.
+- No new component/integration tests added — Vitest is running in node environment with no jsdom; all tests remain pure logic tests.
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-07-12 (seventy-sixth pass) — branch `claude/dreamy-mccarthy-2h1jip`
 
 ---

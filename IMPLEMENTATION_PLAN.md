@@ -1,5 +1,55 @@
 # Implementation Plan
 
+## Pass 77 — 2026-07-13 (branch `claude/dreamy-mccarthy-kvu0c5`)
+
+### Baseline
+
+- Branch started from `main` after PR #189 merge (commit `69a098c`).
+- **1068 tests passing** across 30 test files at start of pass (confirmed via `npx vitest run`).
+- **1075 tests passing** at end of pass (+7 new tests for `parseExtraWorkoutInstanceId`).
+
+### Architecture Summary
+
+React 18 + TypeScript (strict) + Zustand 4.5 PWA, deployed to GitHub Pages via GitHub Actions. No new dependencies added this pass.
+
+Key modules audited: `rotationEngine.ts`, `historyStore.ts`, `outcomeStore.ts`, `planStore.ts`, `TodayPage.tsx`, `CalendarPage.tsx`, `HistoryPage.tsx`, `historyStats.ts`, `expressionEval.ts`, `workoutInstanceId.ts`, `calendarProjection.ts`, all test files.
+
+### What is Strong (reaffirmed)
+
+- Rotation engine is a clean pure function with comprehensive test coverage.
+- `workoutInstanceId.ts` uses regex-based date detection rather than naive `split('_')` — the approach is correct and extensible. This pass adds `parseExtraWorkoutInstanceId` following the same pattern.
+- Zustand stores have migration guards on all stores.
+- Test suite is at 1075 tests across 30 files after this pass.
+
+### Key Issues Found
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| High | `TodayPage.tsx:554` | `handleSkip` used `todayResolved.planDayIndex` (post-advance) instead of `primaryPlanDayIndex` — logged skip against wrong plan day after double-day advance | **FIXED** |
+| High | `CalendarPage.tsx:203` | `instanceId.split('_extra_')[1]` fragile extraId extraction | **FIXED** |
+| High | `HistoryPage.tsx:343` | Same `_extra_` split fragility | **FIXED** |
+| Medium | `TodayPage.tsx` | `usePlanActions` captures date non-reactively; skip/dayOff log to wrong date if page open across midnight | **DOCUMENTED** |
+| Medium | `rotationEngine.ts` | `getUpcomingDays` ignores `plan.startDate` for future-start plans | **DOCUMENTED** |
+| Medium | `expressionEval.ts` | Bad tokens and division-by-zero silently return 0 | **DOCUMENTED** |
+| Medium | `HistoryPage.tsx:298` | `changeAction` from day_off → complete drops planDayIndex | **DOCUMENTED** |
+| Low | `TodayPage.tsx:633` | Header used `Date.toLocaleDateString` instead of date-fns `format` | **FIXED** |
+| Low | `TodayPage.tsx` | SwipeToDelete touch cancel left `swipingRef` stuck | **FIXED** |
+| Low | `CalendarPage.tsx:559` | `canDayOff` always true; name implies a guard that doesn't exist | **DOCUMENTED** |
+| Low | `calendarProjection.ts` | `getFutureProjection` is dead code, explicitly marked unused | **DOCUMENTED** |
+| Low | All stores except mobilityStore | `migrate` is a no-op cast | **DOCUMENTED** |
+
+### Commits
+
+1. `bc75a63` — `feat: add parseExtraWorkoutInstanceId utility`
+2. `5846184` — `fix: use parseExtraWorkoutInstanceId in CalendarPage`
+3. `4ce7dc9` — `fix: use parseExtraWorkoutInstanceId in HistoryPage`
+4. `56f9957` — `fix: handleSkip uses primaryPlanDayIndex not todayResolved.planDayIndex`
+5. `4880c80` — `fix: use date-fns format for TodayPage header date display`
+6. `41babff` — `fix: handle touch cancel in SwipeToDelete`
+7. `646fa3a` — `test: add tests for parseExtraWorkoutInstanceId`
+
+---
+
 ## Pass 76 — 2026-07-12 (branch `claude/dreamy-mccarthy-2h1jip`)
 
 ### Baseline

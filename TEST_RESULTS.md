@@ -1,5 +1,47 @@
 # Test Results
 
+## 2026-07-13 (seventy-seventh pass) — branch `claude/dreamy-mccarthy-kvu0c5`
+
+---
+
+### Baseline
+
+- **1068 tests** passing across 30 test files at start of pass.
+- **1075 tests** passing at end of pass (+7 new tests).
+- All tests run via `npx vitest run` (node environment, no jsdom).
+
+### Tests Added
+
+| File | Tests Added | What's Covered |
+|---|---|---|
+| `src/lib/__tests__/workoutInstanceId.test.ts` | 7 | `parseExtraWorkoutInstanceId`: standard ID, planId with underscores, extraId with underscores, non-extra returns null, empty string, no-date string, full round-trip |
+
+### Tests Reviewed
+
+All 30 test files reviewed for relevance to this pass's changes. Key areas:
+
+- `historyStore.test.ts` — confirmed the `skip` action stores `planDayIndex` correctly; the `handleSkip` fix is covered indirectly.
+- `workoutInstanceId.test.ts` — added 7 tests for the new utility.
+- `rotationEngine.test.ts` — existing coverage is comprehensive; no gaps related to this pass's changes.
+- `historyStats.test.ts` — no changes needed; existing tests unaffected.
+
+### Results
+
+```
+Test Files  30 passed (30)
+     Tests  1075 passed (1075)
+  Start at  07:20:50
+  Duration  3.34s
+```
+
+### Important Areas Still Untested
+
+- **`TodayPage.tsx` component logic** — `handleSkip`, `handleOutcomeConfirm`, `SwipeToDelete` are not covered by unit tests. Vitest runs in `environment: 'node'`; testing React components would require jsdom/happy-dom and `@testing-library/react`.
+- **`CalendarPage.tsx` + `HistoryPage.tsx` extraId extraction** — the fixed code paths in both pages are not directly tested; covered only by the new `parseExtraWorkoutInstanceId` utility tests.
+- **Cross-midnight behavior of `usePlanActions`** — would require time-mocking in a component environment.
+
+---
+
 ## 2026-07-12 (seventy-sixth pass) — branch `claude/dreamy-mccarthy-2h1jip`
 
 ---

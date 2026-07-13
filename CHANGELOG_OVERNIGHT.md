@@ -1,3 +1,103 @@
+# Overnight Changelog — Pass 77 (2026-07-13)
+
+## Branch: `claude/dreamy-mccarthy-kvu0c5`
+
+---
+
+### Change 1 — `parseExtraWorkoutInstanceId` utility
+
+**Summary:** Added a new export to `src/lib/workoutInstanceId.ts` that robustly extracts `planId`, `calendarDate`, and `extraId` from an extra-workout instance ID. Uses the same regex-based date detection as `parseWorkoutInstanceId` to avoid fragile string splits.
+
+**Why it matters:** The pattern `${planId}_${calendarDate}_extra_${extraId}` was being parsed in two places via `instanceId.split('_extra_')[1]`. If a planId or date ever contained the literal substring `_extra_`, the split would return the wrong segment and silently fail to find the extra entry. The new utility is the correct way to extract the extraId.
+
+**Files changed:** `src/lib/workoutInstanceId.ts`
+
+**Risk:** Additive only — no existing code paths changed, no behavior modified.
+
+**Rollback:** Revert the new function (no callers yet in this commit).
+
+---
+
+### Change 2 — Fix `_extra_` extraId extraction in CalendarPage
+
+**Summary:** Replaced `outcomeTarget.instanceId.split('_extra_')[1]` with `parseExtraWorkoutInstanceId(outcomeTarget.instanceId)?.extraId` in `CalendarPage.tsx`.
+
+**Why it matters:** The old split was fragile. If date-moving an extra workout's outcome failed to find the extraId, `updateExtraEntryDate` would silently no-op and the extra entry would remain on the old date while the outcome record moved to the new one — a data inconsistency.
+
+**Files changed:** `src/pages/CalendarPage.tsx`
+
+**Risk:** Behaviour-equivalent for all valid inputs. The `?.extraId` optional chaining preserves the existing null-guard.
+
+**Rollback:** `git revert 5846184`
+
+---
+
+### Change 3 — Fix `_extra_` extraId extraction in HistoryPage
+
+**Summary:** Same fix as Change 2, applied to the identical fragile split in `HistoryPage.tsx`.
+
+**Files changed:** `src/pages/HistoryPage.tsx`
+
+**Risk:** Same as Change 2.
+
+**Rollback:** `git revert 4ce7dc9`
+
+---
+
+### Change 4 — Fix `handleSkip` uses wrong `planDayIndex` after double-day advance
+
+**Summary:** `handleSkip()` in `TodayPage.tsx` was calling `actions.skip(todayResolved.planDayIndex)`. After a double-day advance override, `todayResolved.planDayIndex` reflects the already-advanced next day. The skip was being attributed to the wrong plan day. Changed to `actions.skip(primaryPlanDayIndex)` to match the `complete` path.
+
+**Why it matters:** A user who skips today after doing a double-day workout (advance) would have the skip logged against tomorrow's plan day index instead of today's. This corrupts workout-type stats and session counts for that plan day.
+
+**Files changed:** `src/pages/TodayPage.tsx`
+
+**Risk:** Low. One-line change in a simple function. The `primaryPlanDayIndex` variable is already computed correctly at line 314 and used correctly by `handleOutcomeConfirm`.
+
+**Rollback:** `git revert 56f9957`
+
+---
+
+### Change 5 — Fix date display in TodayPage header
+
+**Summary:** Replaced `new Date().toLocaleDateString('en-US', {...})` with `format(parseISO(today), 'EEEE, MMMM d')` in the TodayPage header. The header was the only place in the app not using date-fns.
+
+**Why it matters:** `new Date()` reads the system clock at render time — if the page was open across midnight, the header date would be correct but not reactive to the `today` variable that drives all other date-dependent logic. Using `format(parseISO(today))` ensures the header always agrees with `useToday()`.
+
+**Files changed:** `src/pages/TodayPage.tsx`
+
+**Risk:** Very low. Visual output is equivalent. `parseISO` and `format` are already imported.
+
+**Rollback:** `git revert 4880c80`
+
+---
+
+### Change 6 — Fix SwipeToDelete touch cancel leak
+
+**Summary:** Added an `onTouchCancel` handler to the inner `<div>` of `SwipeToDelete` in `TodayPage.tsx`. Previously, a cancelled touch (incoming call, iOS home gesture, browser interruption) left `swipingRef.current = true` permanently.
+
+**Why it matters:** With `swipingRef` stuck at `true`, the element's `transition` style would be set to `'none'` on all subsequent renders, preventing the snap-back animation after any swipe. In rare cases this could also suppress tap events on other interactive areas.
+
+**Files changed:** `src/pages/TodayPage.tsx`
+
+**Risk:** Very low. Additive event handler. Cancel resets to the same clean state as `onTouchEnd` with `offset(0)`.
+
+**Rollback:** `git revert 41babff`
+
+---
+
+### Change 7 — Tests for `parseExtraWorkoutInstanceId`
+
+**Summary:** Added 7 tests to `src/lib/__tests__/workoutInstanceId.test.ts` covering: standard ID, planId with underscores, extraId with underscores, non-extra ID (returns null), empty input, string without date (returns null), and a full round-trip.
+
+**Files changed:** `src/lib/__tests__/workoutInstanceId.test.ts`
+
+**Risk:** Test-only. No production code changed.
+
+**Rollback:** `git revert 646fa3a`
+
+---
+
 # Overnight Changelog — Pass 76 (2026-07-12)
 
 ## Branch: `claude/dreamy-mccarthy-2h1jip`
