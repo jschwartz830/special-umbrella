@@ -551,7 +551,7 @@ export function TodayPage() {
 
   function handleSkip() {
     if (!todayResolved) return
-    actions.skip(todayResolved.planDayIndex)
+    actions.skip(primaryPlanDayIndex)
   }
 
   function handleCopyWorkout() {
