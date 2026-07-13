@@ -39,3 +39,22 @@ export function parseWorkoutInstanceId(
   if (sep === -1) return null
   return { planId: instanceId.slice(0, sep), calendarDate }
 }
+
+/**
+ * Parse planId, calendarDate, and extraId from an extra workout instanceId.
+ * Format: `${planId}_${calendarDate}_extra_${extraId}`
+ *
+ * Returns null if the instanceId is not an extra workout instance (i.e. does
+ * not contain `_extra_` after the date segment).
+ */
+export function parseExtraWorkoutInstanceId(
+  instanceId: string,
+): { planId: string; calendarDate: string; extraId: string } | null {
+  const base = parseWorkoutInstanceId(instanceId)
+  if (!base) return null
+  const extraMarker = `${base.planId}_${base.calendarDate}_extra_`
+  if (!instanceId.startsWith(extraMarker)) return null
+  const extraId = instanceId.slice(extraMarker.length)
+  if (!extraId) return null
+  return { ...base, extraId }
+}
