@@ -1,5 +1,66 @@
 # Feature Proposals
 
+## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
+
+---
+
+### Proposal: Streak Milestone Celebration Banner
+
+**Status**: Implemented in this pass.
+
+#### Feature selected
+
+A dismissable celebration banner on TodayPage that appears when the user's plan streak reaches a milestone (7, 14, 21, 30, 60, 90, 180, or 365 days). Each milestone is independently dismissable per plan.
+
+#### Why selected
+
+The TodayPage already computes and displays the current streak (`🔥 N streak`) and celebrates plan completion (`Plan complete!`). But crossing a meaningful streak threshold — particularly early milestones like 7 or 30 days — produces no feedback. Adding a one-time celebration is low-risk, clearly adjacent to existing functionality, and a standard pattern in fitness/habit apps. It required no new stores, no schema changes, and no new dependencies.
+
+The codebase is in excellent shape with no high-priority bugs remaining. A small motivational UX improvement was the most valuable thing to add this pass without touching risky areas.
+
+#### Expected user value
+
+Users who consistently log workouts see a brief acknowledgment when they hit a streak threshold. The banner disappears immediately after the user dismisses it and never re-appears for the same milestone. Reaching the next threshold triggers a fresh banner.
+
+#### Implementation scope
+
+- New hook: `useStreakMilestoneDismiss(planId, streak)` — milestone detection + localStorage persistence.
+- New helper: `getActiveStreakMilestone(streak): number | null` — pure function, fully unit-tested.
+- TodayPage: `earlyPlanStreak` `useMemo` for Rules-of-Hooks compliance; amber banner below consecutive-skips nudge.
+- 13 unit tests for the pure helper function.
+
+#### Assumptions
+
+- Milestone banners apply to `planStreak` (plan-specific streak), not the global streak, since plan context is already available on TodayPage.
+- Mobility-only streak days are excluded from `earlyPlanStreak` (see open question in REVIEW_NOTES).
+- The amber color is acceptable alongside the existing amber consecutive-skips nudge; the two banners are mutually exclusive in practice.
+
+#### Open product / UX decisions
+
+1. Should there be a different celebration tone for the very first milestone (7 days) vs. later ones?
+2. Should the 30-day message be "A full month!" or "30 days of consistency!" (month ≠ 30 days exactly)?
+3. Is the fire emoji 🔥 the right icon, or should celebrations use a distinct emoji (e.g. ⭐, 🏆)?
+
+#### Architecture / schema impact
+
+None — hook uses localStorage only, no Zustand store changes.
+
+#### Risks
+
+Low. The banner is additive. The hook reads from localStorage on every render (synchronous, O(1)); a localStorage failure degrades to `isDismissed = false` (try/catch).
+
+#### Rollback strategy
+
+`git revert 930d1c8` removes all three file changes atomically. Alternatively, comment out the banner JSX block in TodayPage.
+
+#### What is intentionally not built yet
+
+- Banner animation (slide-in, fade-out)
+- Social sharing ("I hit a 30-day streak!")
+- Streak freeze or repair flow
+
+---
+
 ## Pass 72 — 2026-07-05 (branch `claude/dreamy-mccarthy-80hikp`)
 
 ---

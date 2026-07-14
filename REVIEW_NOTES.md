@@ -116,6 +116,75 @@ Nothing to recommend reverting.
 - No new component/integration tests added — Vitest is running in node environment with no jsdom; all tests remain pure logic tests.
 
 ### Dependencies Added
+## 2026-07-14 (seventy-seventh pass) — branch `claude/dreamy-mccarthy-aeym9p`
+
+---
+
+### Executive summary
+
+1. **What changed**: 2 commits, 4 files. (1) `nanoid()` upgraded from `Math.random` (~46-bit) to `crypto.getRandomValues` (128-bit). (2) Streak milestone celebration banner added to TodayPage, backed by a new dismissable hook and 13 unit tests.
+2. **Test delta**: +13 tests (1068 → 1081). TypeScript errors: 0.
+3. **Highest confidence**: The `nanoid` fix is a pure quality improvement — same opaque-string semantics, strictly more entropy, no consumer changes needed. The milestone hook's `getActiveStreakMilestone` is fully unit-tested across all 8 thresholds and boundary values.
+4. **What to review first**: The streak banner in TodayPage (lines ~762–785 in the updated file). Verify the amber styling fits alongside the existing amber consecutive-skips nudge, and confirm `earlyPlanStreak` (without mobility dates) is an acceptable approximation for milestone detection.
+
+---
+
+### Issues found and fixed
+
+| Priority | Issue | File | Disposition |
+|---|---|---|---|
+| Low | `nanoid()` used `Math.random()` (~46-bit entropy); acceptable for personal-tracker scale but not best-practice | `src/lib/utils.ts` | **Fixed** — `crypto.getRandomValues` (128-bit) |
+
+### Feature added
+
+| Feature | Files | Notes |
+|---|---|---|
+| Streak milestone celebration banner | `src/hooks/useStreakMilestoneDismiss.ts` (new), `src/hooks/__tests__/useStreakMilestoneDismiss.test.ts` (new), `src/pages/TodayPage.tsx` | Shows once per milestone per plan (7/14/21/30/60/90/180/365 days). Dismissed per-milestone independently. |
+
+### Open bugs carried forward
+
+| Priority | Code | File | Description | Status |
+|---|---|---|---|---|
+| Low | BUG-2 | `CalendarPage.tsx` | `handleMoveWorkout` → `updateEntryDate` can silently collide on destination date | Confirmed non-issue in pass 75: both `removeEntry` and `updateEntryDate` handle the collision independently |
+| Low | BUG-4 | `storeSync.ts` | 1500ms debounce: app close mid-debounce loses last write | Acknowledged architectural tradeoff |
+| Low | BUG-6 | `planStore.ts` | `clearPlanHistory` doesn't reset plan's `startDate` — only called during delete, not restart | Confirmed non-issue in pass 76 |
+| Low | BUG-12 | `HistoryPage.tsx` | Extra entry edit modal has no notes field despite `ExtraWorkoutEntry.notes` existing on the type | Documented only — low-impact gap; `WorkoutOutcome.notes` covers the main notes flow |
+
+### Non-issues confirmed this pass
+
+| Item | Verdict |
+|---|---|
+| `nanoid` ID format change (9-char base-36 → 32-char hex) | Safe — all consumers treat the value as an opaque string; `parseWorkoutInstanceId` regex matches a date substring, not the ID format |
+| `earlyPlanStreak` omitting mobility dates | Acceptable — one-day imprecision for a celebration banner is not material |
+| Streak banner vs. consecutive-skips nudge (both amber) | Mutually exclusive in practice: a skip streak means the plan streak is 0 |
+
+### Definitely keep
+- `nanoid` fix — strictly better, no risk
+- Streak milestone banner — clear user value, additive, rollback is trivial
+
+### Probably keep but tweak
+- Banner copy for mid-range milestones could be more varied (30 says "A full month!" which is fine; 60/90 reuse "Three months strong" — could be expanded)
+
+### Do not keep
+- Nothing to reject
+
+### Recommendations only (not implemented)
+
+1. **Extra entry notes field**: Add `editingExtraNotes` state and a textarea to the extra-entry edit modal in `HistoryPage`. The `ExtraWorkoutEntry.notes` type field already exists; the UI just doesn't expose it for editing.
+2. **TodayPage decomposition**: The 1700-line TodayPage would benefit from extracting sub-components (e.g., `<TodayWorkoutCard>`, `<TodayBanners>`) to reduce cognitive load when making future changes. This is a medium-complexity refactor with non-trivial regression risk.
+3. **storeSync merge on login**: If the app ever targets multi-device sync more seriously, replacing the "cloud wins" strategy with a per-store last-write-wins merge (comparing `updated_at` timestamps) would prevent the current data-loss scenario where local offline edits are silently dropped on first login.
+
+### Open questions for me
+
+1. Is the amber color for the streak milestone banner distinct enough from the consecutive-skips nudge? Both are amber. A different hue (e.g. gold/yellow for celebration vs. amber/orange for warning) could improve clarity.
+2. Should mobility-only streaks show milestone banners? The `earlyPlanStreak` excludes mobility dates. If a user does 7 consecutive days of only mobility (no plan workouts), they won't see a banner. Is that the right behavior?
+3. The banner message at 30 days is "A full month of consistency!" — technically 30 days isn't always a month. Should it say "30 days of consistency!" instead?
+
+### Known issues or incomplete work
+
+None.
+
+### Dependencies added
 
 None.
 
