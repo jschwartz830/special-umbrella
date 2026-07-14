@@ -1,5 +1,57 @@
 # Feature Reviews
 
+## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
+
+### Feature: Streak Milestone Celebration Banner
+
+---
+
+#### What was actually built
+
+A dismissable amber banner in `TodayPage.tsx` that celebrates streak milestones (7, 14, 21, 30, 60, 90, 180, 365 days). Three new artifacts:
+
+1. **`src/hooks/useStreakMilestoneDismiss.ts`** — pure hook: computes the active milestone from a raw streak count, reads dismissal state fresh from localStorage on each render, and forces a re-render on `dismiss()`. Exports `getActiveStreakMilestone()` helper and `STREAK_MILESTONES` constant.
+
+2. **`src/hooks/__tests__/useStreakMilestoneDismiss.test.ts`** — 13 unit tests covering null below threshold, each milestone exactly, mid-range values, above-max, STREAK_MILESTONES parity.
+
+3. **`src/pages/TodayPage.tsx`** — `earlyPlanStreak` useMemo (computed without mobility dates, before the early-return guard), hook call, and banner JSX rendered between the consecutive-skips nudge and the run adaptation note.
+
+---
+
+#### What was NOT built
+
+- **No server-side persistence of dismissal**: The dismissed state lives in localStorage only. If a user clears localStorage, the banner reappears. This is acceptable — it's a motivational banner, not critical state, and consistent with the plan-complete banner's behavior.
+- **No per-day "just hit" detection**: The banner appears as long as streak ≥ milestone AND not dismissed. It does not track the exact day the milestone was crossed. If a user hits 30 days, dismisses the banner, then their streak drops and recovers to 30 days later, no new banner appears (the dismissal persists). This is a deliberate choice — re-showing a congratulation for a re-hit milestone would feel confusing.
+- **No animation**: The banner appears and disappears without CSS animation. Consistent with the rest of the codebase's minimal-animation approach.
+
+---
+
+#### What assumptions were encoded
+
+- **`earlyPlanStreak` vs `planStreak`**: The banner uses `earlyPlanStreak` (computed without mobility dates) due to the Rules of Hooks constraint. `planStreak` (line ~344) is defined after the early-return guard; hooks must be called before. The one-day difference is acceptable for a celebration banner.
+- **Amber color chosen to distinguish from purple plan-completion banner**: The two can't appear simultaneously in practice (high skip count → streak ≈ 0), but the color difference is correct anyway.
+- **Milestone = highest threshold crossed**: A streak of 25 shows the "21-day" banner, not "14-day". The user has cleared all milestones up to 21.
+- **`planExpired` guard**: The banner is suppressed if the plan is expired. A completed plan showing streak celebrations would be confusing.
+
+---
+
+#### What worked well
+
+- **No new dependencies**: `crypto.getRandomValues` is universally available; the hook uses only `useState`/`useCallback`.
+- **Zero store coupling**: The hook reads from localStorage; it cannot corrupt Zustand state.
+- **Independent dismissal per milestone**: Dismissing the 21-day banner doesn't prevent the 30-day banner from showing later. Each uses a unique localStorage key: `wpt_streak_ms_v1_${planId}_${milestone}`.
+- **Rules of Hooks solution**: The `earlyPlanStreak` pattern (compute without full deps, before early-return) is clean and reusable if similar hooks are needed in the future.
+
+---
+
+#### Potential follow-up
+
+- **Re-hit milestone detection**: If a user's streak drops and then recovers to a threshold they already dismissed, should the banner re-appear? Currently it does not. A versioned key (e.g., `_v2_${...}_${hitCount}`) could track re-hits — low priority.
+- **Milestone animation**: A brief fade-in or confetti burst on first render. Low priority, consistent with codebase style.
+- **Share streak**: A "Share" button next to dismiss for social sharing (Instagram story format). Out of scope for an overnight pass but a natural next feature.
+
+---
+
 ## Pass 72 — 2026-07-05 (branch `claude/dreamy-mccarthy-80hikp`)
 
 ### Feature: Rotation Cycle Progress Chip
