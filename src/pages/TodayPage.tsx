@@ -29,6 +29,7 @@ import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
 import { useExpiryDismiss } from '../hooks/useExpiryDismiss'
 import { useStallNudgeDismiss } from '../hooks/useStallNudgeDismiss'
+import { useStreakMilestoneDismiss } from '../hooks/useStreakMilestoneDismiss'
 import { useToday } from '../hooks/useToday'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
@@ -275,6 +276,16 @@ export function TodayPage() {
   const mobilityRoutine = useMobilityStore(s => s.routine)
   const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
   const [mobilityState, setMobilityState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
+
+  // Compute streak early (without mobility dates, which aren't yet available here)
+  // so the milestone hook — a Rules-of-Hooks requirement — can be called before
+  // the early return guard below. The one-day difference is negligible for a banner.
+  const earlyPlanStreak = useMemo(
+    () => (plan ? computePlanStreak(plan.id, planEntries, planExtras, today) : 0),
+    [plan, planEntries, planExtras, today],
+  )
+  const { isDismissed: streakMilestoneDismissed, dismiss: dismissStreakMilestone, milestone: streakMilestone } =
+    useStreakMilestoneDismiss(plan?.id ?? null, earlyPlanStreak)
 
   if (!plan || !todayResolved) {
     return (
@@ -744,6 +755,32 @@ export function TodayPage() {
             className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
           >
             Calendar →
+          </button>
+        </div>
+      )}
+
+      {/* Streak milestone celebration — shown once per milestone per plan */}
+      {!planExpired && streakMilestone !== null && !streakMilestoneDismissed && (
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <span className="text-sm flex-shrink-0" role="img" aria-label="fire">🔥</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-amber-300 font-medium">{streakMilestone}-day streak!</p>
+            <p className="text-xs text-amber-400/70">
+              {streakMilestone >= 365
+                ? 'One full year of consistency — incredible.'
+                : streakMilestone >= 90
+                ? 'Three months strong. Keep it up!'
+                : streakMilestone >= 30
+                ? 'A full month of consistency!'
+                : 'Keep the momentum going!'}
+            </p>
+          </div>
+          <button
+            onClick={dismissStreakMilestone}
+            className="text-amber-400/60 hover:text-amber-200 flex-shrink-0 transition-colors"
+            aria-label="Dismiss streak milestone"
+          >
+            <X size={13} />
           </button>
         </div>
       )}

@@ -1,5 +1,56 @@
 # Implementation Plan
 
+## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
+
+### Baseline
+
+- Branch started from `main` at `69a098c` (after PR #189 merge).
+- **1068 tests passing** across 30 test files at start of pass (confirmed via `npm test`).
+- **1081 tests passing** at end of pass (+13 new tests).
+- TypeScript: `tsc --noEmit` clean (0 errors).
+
+### Architecture Summary (pass 77 scope)
+
+Two independent changes, 4 files modified:
+
+1. **`src/lib/utils.ts`** — `nanoid()` implementation replaced with `crypto.getRandomValues`.
+2. **`src/hooks/useStreakMilestoneDismiss.ts`** (new) — per-plan, per-milestone localStorage dismissal hook.
+3. **`src/hooks/__tests__/useStreakMilestoneDismiss.test.ts`** (new) — 13 unit tests for `getActiveStreakMilestone`.
+4. **`src/pages/TodayPage.tsx`** — streak milestone banner added; uses new hook and pre-computes `earlyPlanStreak` for Rules-of-Hooks compliance.
+
+### What is Strong (reaffirmed this pass)
+
+- Rotation engine is still fully pure and well-tested.
+- The hook ordering constraint in TodayPage is correctly addressed by computing `earlyPlanStreak` without mobility dates; the slight imprecision (may be off by one day) is acceptable for a celebration banner.
+- `useStreakMilestoneDismiss` reads `isDismissed` fresh from localStorage on every render — avoids stale-closure issues when the milestone key changes within the same mounted component.
+
+### Key Issues Found
+
+#### Bugs / Correctness
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Fixed | `src/lib/utils.ts` | `nanoid()` used `Math.random()` (~46-bit entropy); collision probability negligible for personal use but not best-practice | Fixed — now uses `crypto.getRandomValues` for 128-bit entropy |
+
+#### Quality / Technical Debt
+
+| Severity | File | Issue | Status |
+|---|---|---|---|
+| Noted | `src/pages/TodayPage.tsx` | File is 1700+ lines with 25+ top-level state variables — long-term maintainability risk | Document only; refactor is too risky for this pass |
+| Noted | `src/lib/storeSync.ts` | "Cloud wins" on login can silently discard local-only offline edits | Document only; no merge semantics needed for single-user app |
+| Noted | `src/pages/HistoryPage.tsx` | Extra entry edit modal does not expose a notes field despite `ExtraWorkoutEntry.notes` existing on the type | Document only; low-impact gap |
+
+### Prioritized Plan
+
+| Priority | Item | Implemented? |
+|---|---|---|
+| 1 | Fix `nanoid` entropy (correctness improvement, zero risk) | ✅ Done |
+| 2 | Streak milestone celebration banner (new UX feature, narrow scope) | ✅ Done |
+| 3 | Extra entry notes field in edit modal | No — documented only |
+| 4 | TodayPage decomposition into sub-components | No — too risky for overnight run |
+
+---
+
 ## Pass 76 — 2026-07-12 (branch `claude/dreamy-mccarthy-2h1jip`)
 
 ### Baseline

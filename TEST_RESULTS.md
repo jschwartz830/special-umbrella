@@ -1,5 +1,67 @@
 # Test Results
 
+## 2026-07-14 (seventy-seventh pass) — branch `claude/dreamy-mccarthy-aeym9p`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  30 passed (30)
+     Tests  1068 passed (1068)
+  Duration  ~2.8s
+```
+
+### After commit 1 (nanoid fix — no new tests)
+
+```
+Test Files  30 passed (30)
+     Tests  1068 passed (1068)  (unchanged)
+  Duration  ~2.8s
+```
+
+No test changes in commit 1. The `nanoid()` function is used only to generate opaque IDs; the existing test suite exercises the ID consumers (stores, rotation engine, etc.) but does not directly test the entropy source. The fix is verified by inspection and by the fact that all 1068 pre-existing tests still pass.
+
+### After commit 2 (streak milestone feature — 13 new tests)
+
+```
+Test Files  31 passed (31)
+     Tests  1081 passed (1081)  (+13)
+  Duration  ~2.9s
+```
+
+New file: `src/hooks/__tests__/useStreakMilestoneDismiss.test.ts`
+
+| Test | Description |
+|---|---|
+| `getActiveStreakMilestone` — returns null below 7 | Streak 0, 1, 6 all return null |
+| `getActiveStreakMilestone` — returns 7 at exactly 7 | Boundary: streak=7 → milestone=7 |
+| `getActiveStreakMilestone` — returns 7 for 8–13 | Midpoint checks |
+| `getActiveStreakMilestone` — returns 14 at exactly 14 | Boundary |
+| `getActiveStreakMilestone` — returns 21 at exactly 21 | Boundary |
+| `getActiveStreakMilestone` — returns 30 at exactly 30 | Boundary |
+| `getActiveStreakMilestone` — returns 60 at exactly 60 | Boundary |
+| `getActiveStreakMilestone` — returns 90 at exactly 90 | Boundary |
+| `getActiveStreakMilestone` — returns 180 at exactly 180 | Boundary |
+| `getActiveStreakMilestone` — returns 365 at exactly 365 | Boundary |
+| `getActiveStreakMilestone` — returns 365 above 365 | Clamps at maximum |
+| `getActiveStreakMilestone` — highest-hit milestone, not next | streak=25→21, streak=91→90 |
+| `getActiveStreakMilestone` — covers all STREAK_MILESTONES | Parity test against the exported constant |
+
+### TypeScript
+
+```
+tsc --noEmit  →  0 errors  (before and after both commits)
+```
+
+### Areas still untested
+
+- `useStreakMilestoneDismiss` hook behavior (localStorage read/write, force re-render) — no component test harness is available. The `getActiveStreakMilestone` pure function is fully covered; the hook's localStorage I/O degrades gracefully on failure (wrapped in try/catch).
+- `nanoid()` entropy source — no test asserts `crypto.getRandomValues` is used; this is verified by code inspection only.
+- TodayPage streak banner render path — no component tests exist in this codebase (no `@testing-library/react`).
+
+---
+
 ## 2026-07-12 (seventy-sixth pass) — branch `claude/dreamy-mccarthy-2h1jip`
 
 ---
