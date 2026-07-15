@@ -19,6 +19,7 @@ import { useActivePlan } from '../hooks/useActivePlan'
 import { useToday } from '../hooks/useToday'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
+import { extractExtraId } from '../lib/workoutInstanceId'
 import { useMobilityStore, type MobilityCompletion, type MobilityExercise } from '../store/mobilityStore'
 import { mobilityExerciseName } from '../lib/mobilityLibrary'
 import { buildMonthGrid } from '../engine/calendarProjection'
@@ -200,7 +201,7 @@ export function CalendarPage() {
 
     if (completedDate !== originalDate) {
       if (isExtra) {
-        const extraId = outcomeTarget.instanceId.split('_extra_')[1]
+        const extraId = extractExtraId(outcomeTarget.instanceId)
         if (extraId) {
           updateExtraEntryDate(extraId, completedDate)
           const nextId = makeExtraWorkoutInstanceId(outcomeTarget.planId, completedDate, extraId)
@@ -212,8 +213,15 @@ export function CalendarPage() {
           e => e.planId === outcomeTarget.planId && e.calendarDate === originalDate,
         )
         if (entry) {
-          removeEntry(outcomeTarget.planId, completedDate)
-          updateEntryDate(entry.id, completedDate)
+          const destEntry = entries.find(
+            e => e.planId === outcomeTarget.planId && e.calendarDate === completedDate,
+          )
+          // Only clear the destination slot when it is free; otherwise leave the
+          // existing independently-logged entry intact to prevent silent data loss.
+          if (!destEntry) {
+            removeEntry(outcomeTarget.planId, completedDate)
+            updateEntryDate(entry.id, completedDate)
+          }
         }
         const nextId = makeWorkoutInstanceId(outcomeTarget.planId, completedDate)
         // Remove any existing outcome at the target date so its exercise history
