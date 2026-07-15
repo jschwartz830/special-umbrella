@@ -1,5 +1,54 @@
 # Test Results
 
+## 2026-07-15 (seventy-eighth pass) — branch `claude/dreamy-mccarthy-cr3jyk`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  31 passed (31)
+     Tests  1081 passed (1081)
+  Duration  ~4.6s
+```
+
+### After all commits (commits 1–7 — no new tests until commit 8)
+
+All 1081 pre-existing tests continue to pass through commits 1–7. No test regressions.
+
+### After commit 8 (extractExtraId tests — +7 tests)
+
+```
+Test Files  31 passed (31)
+     Tests  1088 passed (1088)  (+7)
+  Duration  ~4.7s
+```
+
+New describe block in `src/lib/__tests__/workoutInstanceId.test.ts`:
+
+| Test | Description |
+|---|---|
+| `extractExtraId` — standard extra instanceId | `plan123_2026-05-21_extra_abc` → `'abc'` |
+| `extractExtraId` — planId with underscores | `my_plan_2026-01-15_extra_xyz` → `'xyz'` |
+| `extractExtraId` — extraId containing `_extra_` | Returns full extraId including the substring |
+| `extractExtraId` — non-extra instanceId | Returns `null` |
+| `extractExtraId` — no date present | Returns `null` |
+| `extractExtraId` — empty string | Returns `null` |
+| `extractExtraId` — round-trip with makeExtraWorkoutInstanceId | Full round-trip confirms correctness |
+
+### Important areas still untested
+
+| Area | Risk | Notes |
+|---|---|---|
+| `storeSync.ts` entire module | High | Cloud sync logic, "cloud wins" policy, debounce, beforeunload flush — all untested |
+| `useToday.ts` midnight advance timer | Medium | `setTimeout` off-by-one or timer leak on unmount possible |
+| `ActiveWorkoutTracker.tsx` (1872 lines) | High | Draft persistence/hydration, rest timer, superset grouping — all untested |
+| `CardioWorkoutTracker.tsx` auto-advance | Medium | Timer firing, `autoAdvanceFiredIdxRef` guard, manual-nav cancellation |
+| `MobilityTracker.tsx` bilateral detection | Medium | `playSwitchSidesSound`, `autoFiredR`, checkpoint restore |
+| `useStreakMilestoneDismiss` localStorage I/O | Low | Pure function `getActiveStreakMilestone` IS tested; the hook's localStorage read/write is not |
+
+---
+
 ## 2026-07-14 (seventy-seventh pass) — branch `claude/dreamy-mccarthy-aeym9p`
 
 ---

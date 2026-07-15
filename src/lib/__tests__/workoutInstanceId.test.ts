@@ -3,6 +3,7 @@ import {
   makeWorkoutInstanceId,
   makeExtraWorkoutInstanceId,
   parseWorkoutInstanceId,
+  extractExtraId,
 } from '../workoutInstanceId'
 
 // ── makeWorkoutInstanceId ─────────────────────────────────────────────────────
@@ -86,5 +87,40 @@ describe('parseWorkoutInstanceId', () => {
     const instanceId = `${planId}_2026-03-10`
     const result = parseWorkoutInstanceId(instanceId)
     expect(result).toEqual({ planId, calendarDate: '2026-03-10' })
+  })
+})
+
+// ── extractExtraId ────────────────────────────────────────────────────────────
+
+describe('extractExtraId', () => {
+  it('returns the extraId from a standard extra instanceId', () => {
+    expect(extractExtraId('plan123_2026-05-21_extra_abc')).toBe('abc')
+  })
+
+  it('returns the extraId when planId contains underscores', () => {
+    expect(extractExtraId('my_plan_2026-01-15_extra_xyz')).toBe('xyz')
+  })
+
+  it('returns the full extraId even when extraId contains _extra_', () => {
+    // Defensive: current hex ids cannot contain this, but the helper stays correct
+    expect(extractExtraId('plan_2026-06-01_extra_foo_extra_bar')).toBe('foo_extra_bar')
+  })
+
+  it('returns null for a standard (non-extra) instanceId', () => {
+    expect(extractExtraId('plan123_2026-05-21')).toBeNull()
+  })
+
+  it('returns null when no date is present', () => {
+    expect(extractExtraId('nodateinhere')).toBeNull()
+  })
+
+  it('returns null for an empty string', () => {
+    expect(extractExtraId('')).toBeNull()
+  })
+
+  it('round-trips with makeExtraWorkoutInstanceId', () => {
+    const extraId = 'e7f3a'
+    const instanceId = makeExtraWorkoutInstanceId('planX', '2026-09-30', extraId)
+    expect(extractExtraId(instanceId)).toBe(extraId)
   })
 })

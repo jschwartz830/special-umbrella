@@ -138,6 +138,7 @@ export function CardioWorkoutTracker({
   const autoAdvanceEnabled = useSettingsStore(s => s.autoAdvanceSegments)
   const setAutoAdvanceEnabled = useSettingsStore(s => s.setAutoAdvanceSegments)
   const autoAdvanceFiredIdxRef = useRef<number | null>(null)
+  const autoAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Refs that shadow state — readable inside callbacks without stale closures
   const totalElapsedRef = useRef(0)
@@ -197,8 +198,16 @@ export function CardioWorkoutTracker({
   const paceInfo = parsePaceInfo(seg?.pace)
   const isLast = segmentIdx === effectiveSegments.length - 1
 
+  function cancelAutoAdvance() {
+    if (autoAdvanceTimeoutRef.current !== null) {
+      clearTimeout(autoAdvanceTimeoutRef.current)
+      autoAdvanceTimeoutRef.current = null
+    }
+  }
+
   const goNext = useCallback(() => {
     if (!isLast) {
+      cancelAutoAdvance()
       setSegmentIdx(i => i + 1)
       setSeg(0)
       wallSegRef.current = { elapsed: 0, time: Date.now() }
@@ -210,6 +219,7 @@ export function CardioWorkoutTracker({
 
   const goPrev = useCallback(() => {
     if (segmentIdx > 0) {
+      cancelAutoAdvance()
       setSegmentIdx(i => i - 1)
       setSeg(0)
       wallSegRef.current = { elapsed: 0, time: Date.now() }
@@ -250,8 +260,12 @@ export function CardioWorkoutTracker({
     if (nextPace.mphRange) parts.push(`${nextPace.mphRange[0]} to ${nextPace.mphRange[1]} miles per hour.`)
     speak(parts.join(' '))
 
-    const t = setTimeout(() => goNext(), 1500)
-    return () => clearTimeout(t)
+    const t = setTimeout(() => {
+      autoAdvanceTimeoutRef.current = null
+      goNext()
+    }, 1500)
+    autoAdvanceTimeoutRef.current = t
+    return () => { clearTimeout(t); autoAdvanceTimeoutRef.current = null }
   }, [autoAdvanceEnabled, isPaused, segDurSec, segmentElapsed, segmentIdx, isLast, effectiveSegments, programVars, goNext])
 
   // ── Minimized banner ────────────────────────────────────────────────────────
@@ -322,7 +336,7 @@ export function CardioWorkoutTracker({
             return (
               <button
                 key={i}
-                onClick={() => { setSegmentIdx(i); setSegmentElapsed(0); autoAdvanceFiredIdxRef.current = null }}
+                onClick={() => { cancelAutoAdvance(); setSegmentIdx(i); setSegmentElapsed(0); autoAdvanceFiredIdxRef.current = null }}
                 className={`transition-all rounded-full ${
                   i === segmentIdx
                     ? `h-2.5 w-6 ${c.dotColor}`

@@ -18,6 +18,7 @@ import {
 import { useHistoryStore } from '../store/historyStore'
 import { usePlanStore } from '../store/planStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
+import { extractExtraId } from '../lib/workoutInstanceId'
 import { useMobilityStore, type MobilityCompletion } from '../store/mobilityStore'
 import { mobilityExerciseName } from '../lib/mobilityLibrary'
 import { Modal } from '../components/shared/Modal'
@@ -340,7 +341,7 @@ export function HistoryPage() {
 
     if (completedDate !== originalDate) {
       if (isExtra) {
-        const extraId = outcomeTarget.instanceId.split('_extra_')[1]
+        const extraId = extractExtraId(outcomeTarget.instanceId)
         if (extraId) {
           updateExtraEntryDate(extraId, completedDate)
           const nextId = makeExtraWorkoutInstanceId(outcomeTarget.planId, completedDate, extraId)
@@ -352,8 +353,15 @@ export function HistoryPage() {
           e => e.planId === outcomeTarget.planId && e.calendarDate === originalDate,
         )
         if (entryToMove) {
-          removeEntry(outcomeTarget.planId, completedDate)
-          updateEntryDate(entryToMove.id, completedDate)
+          const destEntry = entries.find(
+            e => e.planId === outcomeTarget.planId && e.calendarDate === completedDate,
+          )
+          // Only clear the destination slot when it is free; otherwise leave the
+          // existing independently-logged entry intact to prevent silent data loss.
+          if (!destEntry) {
+            removeEntry(outcomeTarget.planId, completedDate)
+            updateEntryDate(entryToMove.id, completedDate)
+          }
         }
         const nextId = makeWorkoutInstanceId(outcomeTarget.planId, completedDate)
         // Remove any existing outcome at the destination so its exercise history
