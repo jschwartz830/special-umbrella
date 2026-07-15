@@ -79,8 +79,8 @@ export function AuthGate({ children }: Props) {
   return (
     <>
       {children}
-      {/* Sign out available via settings — exposed here as a fallback dev trigger */}
-      <div className="hidden" id="__auth-signout" onClick={signOut} />
+      {/* Sign out available via settings — dev-only fallback trigger */}
+      {import.meta.env.DEV && <div className="hidden" id="__auth-signout" onClick={signOut} />}
     </>
   )
 }
