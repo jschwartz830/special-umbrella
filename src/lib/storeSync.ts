@@ -85,19 +85,43 @@ export async function syncOnLogin(): Promise<void> {
 /** Subscribe to all stores and debounce-push changes to Supabase. */
 export function subscribeStores(): () => void {
   const unsubscribers: (() => void)[] = []
+  // Track pending debounced timeouts so we can flush them on page unload.
+  const pendingByStore = new Map<string, ReturnType<typeof setTimeout>>()
 
   for (const { name, store } of STORES) {
-    const timeouts = { id: undefined as ReturnType<typeof setTimeout> | undefined }
-
     const unsub = store.subscribe((state) => {
-      clearTimeout(timeouts.id)
-      timeouts.id = setTimeout(() => {
-        pushStore(name, serializeState(state))
-      }, 1500)
+      const prev = pendingByStore.get(name)
+      if (prev !== undefined) clearTimeout(prev)
+      pendingByStore.set(
+        name,
+        setTimeout(() => {
+          pendingByStore.delete(name)
+          pushStore(name, serializeState(state))
+        }, 1500),
+      )
     })
 
     unsubscribers.push(unsub)
   }
 
-  return () => unsubscribers.forEach(u => u())
+  // Flush any pending debounced writes immediately before the page is torn
+  // down. Without this, a tab closed within 1.5s of a change loses that
+  // write entirely — the debounced setTimeout never fires.
+  function handleBeforeUnload() {
+    for (const [timeoutStoreName, timeoutId] of pendingByStore.entries()) {
+      clearTimeout(timeoutId)
+      const entry = STORES.find(s => s.name === timeoutStoreName)
+      if (entry) pushStore(timeoutStoreName, serializeState(entry.store.getState()))
+    }
+    pendingByStore.clear()
+  }
+
+  window.addEventListener('beforeunload', handleBeforeUnload)
+
+  return () => {
+    unsubscribers.forEach(u => u())
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+    pendingByStore.forEach(id => clearTimeout(id))
+    pendingByStore.clear()
+  }
 }
