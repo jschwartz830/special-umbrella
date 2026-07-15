@@ -479,12 +479,19 @@ export function TodayPage() {
     logAction(plan!.id, today, primaryPlanDayIndex, action, outcome.notes ?? undefined)
 
     if (completedDate !== today) {
-      const todayEntry = useHistoryStore.getState().entries.find(
-        e => e.planId === plan!.id && e.calendarDate === today,
-      )
+      const storeEntries = useHistoryStore.getState().entries
+      const todayEntry = storeEntries.find(e => e.planId === plan!.id && e.calendarDate === today)
       if (todayEntry) {
-        removeEntry(plan!.id, completedDate)
-        updateEntryDate(todayEntry.id, completedDate)
+        const destEntry = storeEntries.find(
+          e => e.planId === plan!.id && e.calendarDate === completedDate,
+        )
+        // Only move the entry when the destination date is free. If something
+        // is already logged there, leave both entries in place to avoid silently
+        // deleting a previously-logged workout, skip, or day-off.
+        if (!destEntry) {
+          removeEntry(plan!.id, completedDate)
+          updateEntryDate(todayEntry.id, completedDate)
+        }
       }
       removeOutcome(makeWorkoutInstanceId(plan!.id, completedDate))
       outcome = { ...outcome, workoutInstanceId: makeWorkoutInstanceId(plan!.id, completedDate) }
