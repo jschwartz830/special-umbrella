@@ -1,5 +1,89 @@
 # Implementation Plan
 
+## Pass 78 — 2026-07-15 (branch `claude/dreamy-mccarthy-cr3jyk`)
+
+### Baseline
+
+- Branch started from `main` after PR from pass 77 merged.
+- **1081 tests passing** across 31 test files at start of pass.
+- **1088 tests passing** at end of pass (+7 new tests for `extractExtraId`).
+- TypeScript: `tsc --noEmit` clean (0 errors).
+
+### Architecture Summary (pass 78 scope)
+
+Codebase: React 18 + TypeScript + Vite PWA. 7 Zustand stores with localStorage + Supabase cloud sync. Core rotation engine, expression evaluator, YAML program import. ~31 test files, 1081 tests at pass start.
+
+This pass was a pure stabilisation pass — no new features. A thorough audit (using an Explore subagent) surfaced 11 confirmed bugs, 5 architecture concerns, and 6 test-coverage gaps. The 7 highest-confidence, lowest-risk bugs were fixed across 8 commits with no architectural changes. Feature work was deliberately skipped because the audit findings warranted stabilisation first.
+
+### Bugs Fixed This Pass
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-1 | `usePlanActions.ts` | `today` was computed once at hook initialisation via `format(new Date(), …)`. If the app stayed open past midnight, all logAction / advance / goBack calls wrote entries with the wrong (yesterday's) calendarDate. Fixed by replacing with `useToday()`, which resets at midnight. |
+| BUG-2 | `CalendarPage.tsx` | `.split('_extra_')[1]` to extract extraId is fragile — correct today because hex nanoid can't contain `_extra_`, but brittle if the ID alphabet ever changes. Fixed by using the new `extractExtraId()` helper. |
+| BUG-3 | `TodayPage.tsx` | `handleOutcomeConfirm` called `removeEntry(planId, completedDate)` unconditionally before moving today's entry to the new date. Any independently-logged entry at the destination (skip, day-off, or prior workout) was silently destroyed. Fixed with a destination-entry guard. |
+| BUG-5 | `storeSync.ts` | The 1.5s debounce means a tab closed within that window never pushes its final change to Supabase. Fixed by tracking pending timeouts in a Map and flushing them on `window.beforeunload`. |
+| BUG-6 | `CardioWorkoutTracker.tsx` | The auto-advance `setTimeout` was only cancelled via React's effect cleanup. Storing the handle in a ref and calling `cancelAutoAdvance()` in `goNext`, `goPrev`, and the dot-click handler makes cancellation explicit and immediate. |
+| MINOR-1 | `HistoryPage.tsx` | Same `.split('_extra_')` fragility as BUG-2. Fixed with `extractExtraId()`. |
+| MINOR-3 | `AuthGate.tsx` | `<div id="__auth-signout">` dev-helper div rendered in production DOM. Gated behind `import.meta.env.DEV`. |
+
+Also fixed: stale comment in `workoutInstanceId.ts` (nanoid is hex, not base-36) and added `extractExtraId()` helper to centralise extraId parsing.
+
+### Bugs Found But Not Fixed (documented only)
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-4 | `storeSync.ts` | Cloud-hydration via `setState` bypasses Zustand's `migrate` function. Old schema data from Supabase won't be migrated. Requires careful planning around migration pipeline before fixing. |
+| BUG-8 | `outcomeSortKey.ts` | Empty-string fallback when both `completedAt` and `workoutInstanceId` date are absent produces non-deterministic sort order for prior-session lookup. Low probability; low impact. |
+| BUG-9 | `workoutInstanceId.ts` | (Fixed this pass — was a doc-only comment bug.) |
+| BUG-10 | `exerciseLibrary.ts` | `synergist` arrays contain corrupted data (exercise names instead of muscle groups). No current feature queries synergist data. |
+| BUG-11 | `csv.ts` | CSV import restores the original plan ID, silently overwriting an existing plan on reimport. |
+
+### Key Architecture Concerns (documented only)
+
+| ID | Concern |
+|---|---|
+| ARCH-1 | `TodayPage.tsx` is 1700+ lines with 25+ top-level state variables — long-term maintainability risk |
+| ARCH-2 | "Cloud wins" sync strategy can lose offline edits made on a second device before login |
+| ARCH-3 | Jump override `appliedAt` uses local-time ISO string with no timezone suffix — could misattribute on timezone change |
+| ARCH-4 | Active-workout draft has no schema version; stale drafts from older app versions would partially hydrate |
+| ARCH-5 | Extra-entry edit modal in HistoryPage doesn't expose the `notes` field despite the type having one |
+
+### Test Coverage Gaps (documented only)
+
+| Gap | Scope |
+|---|---|
+| TEST-1 | `storeSync.ts` — entire cloud sync module has no tests |
+| TEST-2 | `useToday.ts` — midnight-advance timer has no tests |
+| TEST-3 | `ActiveWorkoutTracker.tsx` (1872 lines) — fully untested |
+| TEST-4 | `MobilityTracker.tsx` bilateral detection + checkpoint restore — untested |
+| TEST-5 | `useStreakMilestoneDismiss` localStorage I/O — untested (pure function IS tested) |
+| TEST-6 | `CardioWorkoutTracker.tsx` auto-advance timer path — untested |
+
+### What is Strong (reaffirmed)
+
+- Rotation engine: pure, fully tested, handles all edge cases.
+- `expressionEval.ts`: comprehensive coverage, robust NaN/Infinity guards.
+- `historyStats.ts` test suite: exemplary behavior-level tests across all exports.
+- `outcomeStore.ts` progression error guard: correctly catches failures without blocking the outcome save.
+- Service worker cache-bust flow: robust with correct timeout handling.
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Add tests for `storeSync.ts` |
+| P1 | Fix BUG-4: cloud hydration bypassing Zustand migrate |
+| P2 | Fix BUG-8: `outcomeSortKey` non-deterministic empty fallback |
+| P2 | Fix BUG-11: CSV import plan-ID collision |
+| P3 | Begin TodayPage decomposition (extract `<TodayBanners>` first) |
+| P3 | Add `draftVersion` to active-workout draft |
+| P3 | Add `localDate` to `OverrideEntry` for timezone-safe jump overrides |
+| P4 | Tests for `useToday`, `useStreakMilestoneDismiss` localStorage I/O |
+| P4 | Expose `notes` in extra-entry edit modal |
+
+---
+
 ## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
 
 ### Baseline

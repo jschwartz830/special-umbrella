@@ -1,5 +1,101 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-15 (seventy-eighth pass) — branch `claude/dreamy-mccarthy-cr3jyk`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 8 commits, 7 source files + 1 test file. Pure stabilisation pass — no new features. Seven bugs fixed, one `extractExtraId` helper added, 7 new tests.
+2. **Test delta**: +7 tests (1081 → 1088). All 1081 pre-existing tests still pass. TypeScript: 0 errors.
+3. **Highest confidence**: All 7 fixes are small, additive guards that remove failure paths without changing the happy-path logic. The `usePlanActions` midnight bug is the highest-impact fix — it affects every logAction, advance, and goBack call made after midnight.
+4. **What is risky**: None of the 7 fixes are risky; the `storeSync` beforeunload flush is the most new-logic-heavy, but it's a simple flush of pending writes. The two "destination guard" fixes (TodayPage + CalendarPage/HistoryPage) subtly change behaviour on date-collision — instead of overwriting, the move is skipped. This is safer than before, but different behaviour.
+5. **What to review first**: The three "destination guard" fixes (commits 4 and 5). Verify that silently skipping the history-entry move when the destination is occupied is the correct UX vs. warning the user.
+
+---
+
+### Biggest Issues Found
+
+| ID | Severity | File | Summary |
+|---|---|---|---|
+| BUG-1 | Medium | `usePlanActions.ts` | Stale `today` after midnight — all writes go to wrong date |
+| BUG-3 | Medium | `TodayPage.tsx` + Calendar/History | Date-change in outcome modal silently deletes an existing entry at the destination |
+| BUG-4 | Medium | `storeSync.ts` | Cloud hydration bypasses Zustand migrate — old schema data is applied without migration |
+| BUG-6 | Low | `CardioWorkoutTracker.tsx` | Stale auto-advance timeout could fire after manual segment change |
+| BUG-5 | Low | `storeSync.ts` | Final write lost when tab closed within 1.5s debounce window |
+| ARCH-1 | Debt | `TodayPage.tsx` | 1700+ lines, 25+ state variables — long-term maintainability risk |
+| TEST-1 | Gap | `storeSync.ts` | No tests for cloud sync; highest-risk untested module in the codebase |
+| TEST-3 | Gap | `ActiveWorkoutTracker.tsx` | 1872 lines, 0 tests |
+
+---
+
+### Improvements Completed
+
+| # | What | Commit |
+|---|---|---|
+| 1 | `extractExtraId()` helper + corrected nanoid comment in `workoutInstanceId.ts` | `38d2f06` |
+| 2 | `usePlanActions` midnight bug — `useToday()` replaces stale `format(new Date(), …)` | `4cbaed8` |
+| 3 | `AuthGate` dev div gated to `import.meta.env.DEV` | `6d26ab2` |
+| 4 | `CalendarPage` + `HistoryPage`: `extractExtraId` + destination guard | `960b699` |
+| 5 | `TodayPage`: destination guard in `handleOutcomeConfirm` | `770bf3f` |
+| 6 | `CardioWorkoutTracker`: explicit timeout ref + `cancelAutoAdvance()` | `21a9d81` |
+| 7 | `storeSync`: beforeunload flush for pending debounced writes | `64ed8f0` |
+| 8 | Tests for `extractExtraId` (7 new) | `cefdacf` |
+
+---
+
+### Verdict by Item
+
+#### Definitely keep
+
+- **Commit 2** (`usePlanActions` midnight fix): Clear bug, zero risk, uses an existing hook correctly.
+- **Commit 3** (AuthGate dev div): Obvious housekeeping, no behaviour change in production.
+- **Commit 1** (extractExtraId + comment fix): Additive, safe, well-tested.
+- **Commit 8** (tests): Always keep tests.
+
+#### Probably keep but verify behaviour
+
+- **Commits 4 and 5** (destination guard in CalendarPage, HistoryPage, TodayPage): The new behaviour silently leaves the history entry at the original date if the destination is occupied. This prevents data loss, but the user gets no feedback that the date move was skipped. Confirm this is acceptable vs. showing a warning. The outcome still moves to the requested date; only the history/scheduling entry is affected.
+
+#### Keep — low risk, worth having
+
+- **Commit 6** (CardioWorkoutTracker explicit cancellation): Defensively correct even if the React cleanup should also cancel it.
+- **Commit 7** (storeSync beforeunload): Meaningful improvement for multi-device users; clean implementation.
+
+---
+
+### Recommendations Only (not implemented)
+
+| Priority | Item |
+|---|---|
+| P1 | Add unit tests for `storeSync.ts` — mock Supabase, test debounce + flush + beforeunload |
+| P1 | Fix BUG-4: apply Zustand `migrate` after cloud hydration in `syncOnLogin` |
+| P2 | Fix BUG-8: `outcomeSortKey` non-deterministic fallback — use `workoutInstanceId` date as tie-breaker |
+| P2 | Fix BUG-11: CSV re-import collision warning — detect existing plan ID and offer "replace or create new" |
+| P3 | Begin TodayPage decomposition — extract `<TodayBanners>` as a first step |
+| P3 | Add `draftVersion` to active-workout draft for safe stale-draft detection |
+| P3 | Add `localDate: string` field to `OverrideEntry` for timezone-safe jump overrides |
+| P4 | Add tests for `useToday` midnight advance |
+| P4 | Add tests for `useStreakMilestoneDismiss` localStorage I/O |
+| P4 | Expose `notes` field in extra-entry edit modal (HistoryPage) |
+
+---
+
+### Open Questions
+
+1. **Destination-guard UX**: Should the date move silently fail when the destination is occupied, or should the app surface a warning ("That date already has a logged workout — move anyway?")? The current fix is silent-skip.
+2. **BUG-4 priority**: How common is multi-device use? If most users are single-device, the cloud-hydration migration bypass is low urgency. If multi-device is a design goal, it's P1.
+3. **storeSync tests**: The Supabase client is hard to mock in Vitest without additional setup. A lightweight abstraction (`type StorePusher = (name, data) => Promise<void>`) injected via a parameter would make `subscribeStores` testable. Worth the refactor?
+
+---
+
+### Known Issues / Incomplete Work
+
+- The destination-guard fix in TodayPage (commit 5) only guards the `if (todayEntry)` branch. The `removeOutcome` and `outcome = {...}` lines immediately after still run even when the entry move was skipped. This means the outcome is always recorded at the requested `completedDate`, but the history entry may stay at `today`. This is intentional — outcome data (weights, metrics) belongs at the date the user intended, even if the scheduling entry can't be moved — but it may be surprising.
+- No new dependencies added this pass.
+
+---
+
 ## 2026-07-14 (seventy-seventh pass) — branch `claude/dreamy-mccarthy-aeym9p`
 
 ---

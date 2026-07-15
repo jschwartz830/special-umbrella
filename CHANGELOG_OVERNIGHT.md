@@ -1,4 +1,126 @@
-# Overnight Changelog — Pass 77 (2026-07-14)
+# Overnight Changelog
+
+---
+
+## Pass 78 — 2026-07-15 (branch `claude/dreamy-mccarthy-cr3jyk`)
+
+### Commit 1 — `38d2f06`
+
+**fix(workoutInstanceId): fix stale comment and add extractExtraId helper**
+
+| | |
+|---|---|
+| **Files** | `src/lib/workoutInstanceId.ts` |
+| **Risk** | Very low — additive; no existing callers changed |
+| **Rollback** | `git revert 38d2f06` |
+
+The comment said nanoid uses "base-36 (0-9, a-z)"; the actual implementation (since pass 77) uses 32-char hex. Updated the comment. Added `extractExtraId(instanceId)` which anchors on the YYYY-MM-DD date pattern rather than naively splitting on `'_extra_'`. Any caller using the naive split would produce a wrong extraId if a planId or extraId ever contained `'_extra_'` as a substring.
+
+---
+
+### Commit 2 — `4cbaed8`
+
+**fix(usePlanActions): replace stale today with useToday()**
+
+| | |
+|---|---|
+| **Files** | `src/hooks/usePlanActions.ts` |
+| **Risk** | Low — drops one import, adds one hook call; `useToday()` is already used in TodayPage |
+| **Rollback** | `git revert 4cbaed8` |
+
+`format(new Date(), 'yyyy-MM-dd')` is evaluated once when the hook initialises. If the app stays open past midnight without a full re-render of the consumer, every subsequent `complete()`, `skip()`, `dayOff()`, `advance()`, and `goBack()` call would write history entries with yesterday's date. `useToday()` uses a `setTimeout` to reset to the new date at midnight.
+
+---
+
+### Commit 3 — `6d26ab2`
+
+**fix(AuthGate): gate dev signout div to import.meta.env.DEV**
+
+| | |
+|---|---|
+| **Files** | `src/components/auth/AuthGate.tsx` |
+| **Risk** | Very low — Vite dead-code-eliminates the false branch; no production behaviour change |
+| **Rollback** | `git revert 6d26ab2` |
+
+The `<div id="__auth-signout">` dev convenience helper rendered in every production bundle. Wrapping it in `import.meta.env.DEV` removes it from production builds entirely.
+
+---
+
+### Commit 4 — `960b699`
+
+**fix(CalendarPage,HistoryPage): safer extraId extraction and destination guard**
+
+| | |
+|---|---|
+| **Files** | `src/pages/CalendarPage.tsx`, `src/pages/HistoryPage.tsx` |
+| **Risk** | Low — guards are additive; removes a silent data-loss path |
+| **Rollback** | `git revert 960b699` |
+
+Two fixes:
+
+1. **extraId extraction**: replaced `.split('_extra_')[1]` with `extractExtraId()` in both files. Safe under all current IDs (hex can't contain `_extra_`), but future-proof.
+
+2. **Destination guard**: in the non-extra date-move path, `removeEntry(planId, completedDate)` was called unconditionally before moving the history entry to the new date. If an independently-logged entry existed at the destination, it was silently deleted. Added a check: only proceed with the move if `completedDate` has no existing entry. The outcome still moves; only the history-entry relocation is skipped on collision.
+
+---
+
+### Commit 5 — `770bf3f`
+
+**fix(TodayPage): guard date-change in handleOutcomeConfirm against data loss**
+
+| | |
+|---|---|
+| **Files** | `src/pages/TodayPage.tsx` |
+| **Risk** | Low — guard is additive; prevents a silent data-loss path |
+| **Rollback** | `git revert 770bf3f` |
+
+Same issue as commit 4, but in TodayPage's `handleOutcomeConfirm`. After `logAction` creates an entry for `today`, if the user changes the date in the outcome modal, the handler called `removeEntry(planId, completedDate)` and then `updateEntryDate(...)` — silently destroying any entry already at the destination. Added a `destEntry` check so the move only fires when the destination date is free.
+
+---
+
+### Commit 6 — `21a9d81`
+
+**fix(CardioWorkoutTracker): explicitly cancel auto-advance timeout on manual nav**
+
+| | |
+|---|---|
+| **Files** | `src/components/workout/CardioWorkoutTracker.tsx` |
+| **Risk** | Low — stores a ref and calls `clearTimeout` earlier; no semantic change when navigation is not manual |
+| **Rollback** | `git revert 21a9d81` |
+
+The 1500ms auto-advance `setTimeout` was only cancelled through React's effect cleanup (which fires on re-render when `segmentIdx` changes). While this technically works, adding `cancelAutoAdvance()` explicitly in `goNext`, `goPrev`, and the segment-dot click handler makes the cancellation immediate and unconditional, removing any risk of a stale timeout firing after the user manually changes segment.
+
+---
+
+### Commit 7 — `64ed8f0`
+
+**fix(storeSync): flush pending debounced writes on beforeunload**
+
+| | |
+|---|---|
+| **Files** | `src/lib/storeSync.ts` |
+| **Risk** | Low — purely additive; adds a `beforeunload` event listener that's properly cleaned up |
+| **Rollback** | `git revert 64ed8f0` |
+
+The 1.5s debounce means any state change made within 1.5s of closing the browser tab was never pushed to Supabase. On a single-device workflow, localStorage retains the data. On multi-device or after a browser data clear, those changes were permanently lost from cloud sync. The fix tracks pending timeouts in a `Map`, cancels them on `beforeunload`, and immediately calls `pushStore` for any store with a pending write. The `beforeunload` listener is registered when `subscribeStores()` is called and removed when the returned cleanup runs.
+
+---
+
+### Commit 8 — `cefdacf`
+
+**test(workoutInstanceId): add coverage for extractExtraId helper**
+
+| | |
+|---|---|
+| **Files** | `src/lib/__tests__/workoutInstanceId.test.ts` |
+| **Risk** | Zero — tests only |
+| **Rollback** | `git revert cefdacf` |
+
+7 new tests: standard id, planId-with-underscores, extraId-containing-`_extra_` (the fragile-split scenario), non-extra id, missing date, empty string, and round-trip with `makeExtraWorkoutInstanceId`.
+
+---
+
+## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
 
 ## Branch: `claude/dreamy-mccarthy-aeym9p`
 
