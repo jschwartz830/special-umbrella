@@ -2,9 +2,9 @@
  * workoutInstanceId format: `${planId}_${calendarDate}[_extra_${extraId}]`
  * where calendarDate is always YYYY-MM-DD.
  *
- * The custom nanoid in lib/utils uses base-36 (0-9, a-z) so current IDs
- * never include '_', but all helpers here are written defensively so the
- * format remains correct even if the ID alphabet changes in the future.
+ * The custom nanoid in lib/utils generates hex (0-9, a-f), 32 chars, so
+ * current IDs never include '_'. All helpers here are written defensively
+ * so the format remains correct even if the ID alphabet changes in the future.
  */
 
 /** Build the workoutInstanceId for a rotation-day workout */
@@ -38,4 +38,16 @@ export function parseWorkoutInstanceId(
   const sep = instanceId.indexOf(`_${calendarDate}`)
   if (sep === -1) return null
   return { planId: instanceId.slice(0, sep), calendarDate }
+}
+
+/**
+ * Extract the extraId from an extra-workout instanceId
+ * (`planId_YYYY-MM-DD_extra_<extraId>`).
+ *
+ * Anchors on the date pattern to stay correct even if planId or extraId
+ * contain the substring "_extra_".
+ */
+export function extractExtraId(instanceId: string): string | null {
+  const match = instanceId.match(/_\d{4}-\d{2}-\d{2}_extra_(.+)$/)
+  return match?.[1] ?? null
 }
