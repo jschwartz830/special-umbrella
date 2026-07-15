@@ -1,11 +1,11 @@
-import { format } from 'date-fns'
 import { useHistoryStore } from '../store/historyStore'
+import { useToday } from './useToday'
 import type { WorkoutType } from '../types'
 
 export function usePlanActions(planId: string | null) {
   const logAction = useHistoryStore(s => s.logAction)
   const logOverride = useHistoryStore(s => s.logOverride)
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = useToday()
 
   function complete(planDayIndex: number, notes?: string) {
     if (!planId) return
