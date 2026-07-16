@@ -32,9 +32,12 @@ describe('outcomeSortKey', () => {
     expect(outcomeSortKey(outcome)).toBe('2026-03-22')
   })
 
-  it('returns empty string when instanceId does not contain a recognisable date', () => {
+  it('returns a stable prefix-based key when instanceId does not contain a recognisable date', () => {
     const outcome = makeOutcome('no-date-here', null)
-    expect(outcomeSortKey(outcome)).toBe('')
+    // Should sort before any valid YYYY-MM-DD date ('' was non-deterministic when two such outcomes compared equal)
+    const key = outcomeSortKey(outcome)
+    expect(key).toBe('0000-00-00_no-date-here')
+    expect(key < '2000-01-01').toBe(true)
   })
 
   it('completedAt sorts later than calendarDate for the same date', () => {
