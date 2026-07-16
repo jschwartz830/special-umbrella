@@ -135,8 +135,10 @@ export function CardioWorkoutTracker({
   const [totalElapsed, setTotalElapsed] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const autoAdvanceEnabled = useSettingsStore(s => s.autoAdvanceSegments)
-  const setAutoAdvanceEnabled = useSettingsStore(s => s.setAutoAdvanceSegments)
+  // Initialized from the global default but kept session-local: toggling during
+  // a run doesn't permanently change the setting for future sessions.
+  const autoAdvanceDefault = useSettingsStore(s => s.autoAdvanceSegments)
+  const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(autoAdvanceDefault)
   const autoAdvanceFiredIdxRef = useRef<number | null>(null)
   const autoAdvanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -309,7 +311,7 @@ export function CardioWorkoutTracker({
             onClick={() => setAutoAdvanceEnabled(!autoAdvanceEnabled)}
             aria-label={autoAdvanceEnabled ? 'Disable auto-advance' : 'Enable auto-advance'}
             aria-pressed={autoAdvanceEnabled}
-            title={autoAdvanceEnabled ? 'Auto-advance: on' : 'Auto-advance: off'}
+            title={autoAdvanceEnabled ? 'Auto-advance on (this session only)' : 'Auto-advance off (this session only)'}
             className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-semibold uppercase tracking-wide transition-colors ${
               autoAdvanceEnabled
                 ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
