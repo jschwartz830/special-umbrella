@@ -1,5 +1,74 @@
 # Implementation Plan
 
+## Pass 79 — 2026-07-16 (branch `claude/dreamy-mccarthy-1jxqcb`)
+
+### Baseline
+
+- Branch started from `main` after PR from pass 78 merged.
+- **1088 tests passing** across 31 test files at start of pass.
+- **1088 tests passing** at end of pass (BUG-8 test updated to match new stable key format; no net change in test count).
+- TypeScript: pre-existing `import.meta.env` type error in `AuthGate.tsx` (Vite-specific, not a regression). No new errors introduced.
+
+### Architecture Summary (pass 79 scope)
+
+This pass was a focused bug-fix + small-feature pass. Five bugs/architecture concerns were fixed; one medium-complexity feature (notes on extra workouts) was implemented across both the creation form and the edit modal, completing the notes workflow for ad-hoc workouts.
+
+### Bugs Fixed This Pass
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-8 | `outcomeSortKey.ts` | Empty-string fallback for malformed outcomes produced non-deterministic sort. Replaced with `0000-00-00_${instanceId}` prefix for stable ordering. |
+| DOUBLE-SUBTYPE | `WorkoutSlotDetails.tsx` | YAML-imported run slots rendered `subtype` twice (once via `slot.runConfig.subtype`, once via `slot.subtype`). Added equality guard. |
+| ARCH-4 | `ActiveWorkoutTracker.tsx` | Active-workout draft had no schema version. Added `DRAFT_VERSION = 1` check that discards stale drafts rather than partially hydrating them. |
+| AUTOADV-GLOBAL | `CardioWorkoutTracker.tsx` | Auto-advance toggle was writing to the global persistent `settingsStore`, permanently changing the default for all future sessions. Now session-local. |
+| settingsStore-version | `settingsStore.ts` | No `version` field meant `migrate()` would never be called on future schema changes. Added `version: 1` baseline. |
+
+### Features Added This Pass
+
+| Feature | Files | Description |
+|---|---|---|
+| Notes on extra workouts | `src/pages/HistoryPage.tsx` | Notes textarea added to the inline "Add workout" creation form and the "Edit Workout" modal. Completes the notes workflow for ad-hoc workouts. |
+
+### Bugs Found But Not Fixed (documented only)
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-4 | `storeSync.ts` | Cloud-hydration via `setState` bypasses Zustand's `migrate` function. Old schema data from Supabase won't be migrated. Requires careful planning. |
+| BUG-11 | `csv.ts` | CSV import restores the original plan ID, silently overwriting an existing plan on reimport. |
+| DESTINATION-SILENT | `TodayPage.tsx` + `CalendarPage.tsx` + `HistoryPage.tsx` | Pass 78 destination-guard fix silently skips the history entry move when occupied, but still moves the outcome. Outcome and entry can end up on different dates with no user feedback. |
+
+### Remaining Architecture Concerns
+
+| ID | Concern |
+|---|---|
+| ARCH-1 | `TodayPage.tsx` is 1700+ lines with 25+ top-level state variables |
+| ARCH-2 | "Cloud wins" sync strategy can lose offline edits from a second device |
+| ARCH-3 | Jump override `appliedAt` uses local-time ISO string with no timezone suffix |
+
+### Remaining Test Coverage Gaps
+
+| Gap | Scope |
+|---|---|
+| TEST-1 | `storeSync.ts` — entire cloud sync module has no tests |
+| TEST-2 | `useToday.ts` — midnight-advance timer has no tests |
+| TEST-3 | `ActiveWorkoutTracker.tsx` (1872 lines) — fully untested |
+| TEST-4 | `MobilityTracker.tsx` bilateral detection + checkpoint restore — untested |
+| TEST-5 | `useStreakMilestoneDismiss` localStorage I/O — untested |
+| TEST-6 | `CardioWorkoutTracker.tsx` auto-advance timer path — untested |
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Add tests for `storeSync.ts` |
+| P1 | Fix BUG-4: cloud hydration bypassing Zustand migrate |
+| P2 | Fix BUG-11: CSV import plan-ID collision (add warning/confirmation) |
+| P2 | Fix DESTINATION-SILENT: show user feedback when date-move is skipped due to conflict |
+| P3 | Begin TodayPage decomposition (extract `<TodayBanners>` first) |
+| P4 | Add `localDate` field to `OverrideEntry` (ARCH-3 fix) |
+
+---
+
 ## Pass 78 — 2026-07-15 (branch `claude/dreamy-mccarthy-cr3jyk`)
 
 ### Baseline

@@ -1,5 +1,54 @@
 # Feature Reviews
 
+## Pass 79 — 2026-07-16 (branch `claude/dreamy-mccarthy-1jxqcb`)
+
+### Feature: Extra-Workout Notes Workflow
+
+#### What was actually built
+
+Two UI additions to `HistoryPage.tsx`:
+
+1. **"Add workout" inline form** — Added `extraNotes` state and a `<textarea rows={2}>` below the Name input. `submitAddExtra` passes `notes: extraNotes.trim() || undefined` to `addExtraEntry`. Cancel and reset also clear `extraNotes`. Applied to both form instances (under rotation-entry dates and under extra-entry dates).
+
+2. **"Edit Workout" modal** — Added `editingExtraNotes` state, initialized from `extra.notes ?? ''` in `openExtraEdit`. `saveAndCloseExtra` passes `notes: editingExtraNotes || undefined` to `updateExtraEntry`. Save is a no-op when type, name, AND notes are all unchanged.
+
+#### What assumptions were encoded
+
+- Empty string on save → `undefined` (removes the field). Cannot explicitly store empty string — consistent with other nullable string fields.
+- `rows={2}` used in both contexts. Compact but acceptable for short notes.
+- Notes are not validated or length-limited.
+
+#### What worked well
+
+- Zero store or schema changes needed — `notes` was already first-class everywhere.
+- Entirely additive and isolated to one file.
+- Consistent behaviour between the add form and edit modal.
+
+#### What feels risky or incomplete
+
+- Inline form adds ~40px height per open instance. On small phones with virtual keyboard open, Add/Cancel buttons may be off-screen. **Test on 375px viewport.**
+- `rows={2}` may feel cramped for longer notes.
+- Notes typed in add form are lost on cancel/navigate (consistent with Name/Type fields — not a regression).
+
+#### What to evaluate
+
+1. Mobile layout with virtual keyboard open.
+2. Notes pre-populated in edit modal from stored value.
+3. Clearing a note and saving removes it from display.
+4. Cancel resets textarea to empty.
+
+#### Recommended next steps
+
+- Consider a character limit (200–500 chars).
+- Show notes in CalendarPage day detail for extra entries.
+- Check if CalendarPage has its own add-extra path that also needs notes.
+
+#### Keep / Revise / Prototype only / Reject
+
+**Keep** — Self-contained, zero risk, completes a half-built workflow. Only open question is mobile layout.
+
+---
+
 ## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
 
 ### Feature: Streak Milestone Celebration Banner
