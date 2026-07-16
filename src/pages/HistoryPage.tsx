@@ -123,6 +123,7 @@ export function HistoryPage() {
   const [editingExtraDate, setEditingExtraDate] = useState('')
   const [editingExtraType, setEditingExtraType] = useState<WorkoutType>('yoga')
   const [editingExtraName, setEditingExtraName] = useState('')
+  const [editingExtraNotes, setEditingExtraNotes] = useState('')
 
   const plansWithHistory = getPlansWithHistory(plans, entries, extraEntries)
   const showPlanFilter = plansWithHistory.length > 1
@@ -391,6 +392,7 @@ export function HistoryPage() {
     setEditingExtraDate(extra.calendarDate)
     setEditingExtraType(extra.workoutType)
     setEditingExtraName(extra.workoutName)
+    setEditingExtraNotes(extra.notes ?? '')
   }
 
   function saveAndCloseExtra() {
@@ -405,8 +407,10 @@ export function HistoryPage() {
       )
       updateExtraEntryDate(editingExtra.id, newDate)
     }
-    if (editingExtraType !== editingExtra.workoutType || editingExtraName !== editingExtra.workoutName) {
-      updateExtraEntry(editingExtra.id, { workoutType: editingExtraType, workoutName: editingExtraName })
+    const typeOrNameChanged = editingExtraType !== editingExtra.workoutType || editingExtraName !== editingExtra.workoutName
+    const notesChanged = editingExtraNotes !== (editingExtra.notes ?? '')
+    if (typeOrNameChanged || notesChanged) {
+      updateExtraEntry(editingExtra.id, { workoutType: editingExtraType, workoutName: editingExtraName, notes: editingExtraNotes || undefined })
     }
     setEditingExtra(null)
   }
@@ -983,6 +987,16 @@ export function HistoryPage() {
                 onChange={e => setEditingExtraName(e.target.value)}
                 placeholder="Workout name"
                 className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Notes</p>
+              <textarea
+                value={editingExtraNotes}
+                onChange={e => setEditingExtraNotes(e.target.value)}
+                placeholder="Optional notes…"
+                rows={2}
+                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
               />
             </div>
             <button
