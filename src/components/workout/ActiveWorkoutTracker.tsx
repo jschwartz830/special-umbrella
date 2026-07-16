@@ -9,6 +9,9 @@ import { EXERCISE_LIBRARY } from '../../lib/exerciseLibrary'
 import { usePlanStore } from '../../store/planStore'
 import { useSettingsStore } from '../../store/settingsStore'
 
+// Increment when the draft schema changes to discard stale drafts from older versions.
+const DRAFT_VERSION = 1
+
 interface SetTrackState {
   setElapsedSeconds: number
   completed: boolean
@@ -588,6 +591,7 @@ export function ActiveWorkoutTracker({
     }
     try {
       const draft = JSON.parse(raw) as {
+        draftVersion?: number
         workoutStart?: string
         pausePeriods?: { start: string; end?: string }[]
         workoutElapsed?: number
@@ -601,6 +605,10 @@ export function ActiveWorkoutTracker({
         restOwner?: { exIdx: number; setIdx: number } | null
         activeSetTimer?: { exIdx: number; setIdx: number } | null
         exercises?: ExerciseTrackState[]
+      }
+      if (draft.draftVersion !== DRAFT_VERSION) {
+        window.localStorage.removeItem(draftStorageKey)
+        return
       }
       if (draft.workoutStart) workoutStartRef.current = draft.workoutStart
       if (draft.pausePeriods) pausePeriodsRef.current = draft.pausePeriods
@@ -656,6 +664,7 @@ export function ActiveWorkoutTracker({
 
   useEffect(() => {
     const draft = {
+      draftVersion: DRAFT_VERSION,
       workoutStart: workoutStartRef.current,
       pausePeriods: pausePeriodsRef.current,
       workoutElapsed,
