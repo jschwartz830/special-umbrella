@@ -172,7 +172,7 @@ export function WorkoutSlotDetails({ slot, planId, className, collapsed }: Props
         <p className="text-xs text-slate-500 mt-1 italic">{resolved.structureText}</p>
       )}
 
-      {slot.subtype && (
+      {slot.subtype && slot.subtype !== slot.runConfig?.subtype && (
         <p className="text-[10px] text-slate-500 capitalize mt-1">{slot.subtype.replace(/_/g, ' ')}</p>
       )}
 
