@@ -115,6 +115,7 @@ export function HistoryPage() {
   const [addingExtraDate, setAddingExtraDate] = useState<string | null>(null)
   const [extraType, setExtraType] = useState<WorkoutType>('yoga')
   const [extraName, setExtraName] = useState('')
+  const [extraNotes, setExtraNotes] = useState('')
 
   const [editingEntryDate, setEditingEntryDate] = useState('')
   const [dateConflict, setDateConflict] = useState(false)
@@ -417,9 +418,11 @@ export function HistoryPage() {
 
   function submitAddExtra(planId: string, calendarDate: string) {
     const name = extraName.trim() || WORKOUT_TYPES.find(w => w.type === extraType)?.label || extraType
-    addExtraEntry({ planId, calendarDate, workoutType: extraType, workoutName: name, source: 'history' })
+    const notes = extraNotes.trim() || undefined
+    addExtraEntry({ planId, calendarDate, workoutType: extraType, workoutName: name, notes, source: 'history' })
     setAddingExtraDate(null)
     setExtraName('')
+    setExtraNotes('')
     setExtraType('yoga')
   }
 
@@ -653,14 +656,21 @@ export function HistoryPage() {
                       placeholder="Name (optional)"
                       className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                     />
+                    <textarea
+                      value={extraNotes}
+                      onChange={e => setExtraNotes(e.target.value)}
+                      placeholder="Notes (optional)"
+                      rows={2}
+                      className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 resize-none"
+                    />
                     <div className="flex gap-2">
                       <button onClick={() => submitAddExtra(entry.planId, entry.calendarDate)} className="flex-1 py-1.5 text-xs rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-medium transition-colors">Add</button>
-                      <button onClick={() => { setAddingExtraDate(null); setExtraName('') }} className="flex-1 py-1.5 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">Cancel</button>
+                      <button onClick={() => { setAddingExtraDate(null); setExtraName(''); setExtraNotes('') }} className="flex-1 py-1.5 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">Cancel</button>
                     </div>
                   </div>
                 ) : isLastForDate && addingExtraDate !== entry.calendarDate ? (
                   <button
-                    onClick={() => { setAddingExtraDate(entry.calendarDate); setExtraType('yoga'); setExtraName('') }}
+                    onClick={() => { setAddingExtraDate(entry.calendarDate); setExtraType('yoga'); setExtraName(''); setExtraNotes('') }}
                     className="mt-1 flex items-center gap-1 text-xs text-slate-600 hover:text-sky-400 transition-colors px-1"
                   >
                     <Plus size={11} /> Add workout for this day
@@ -833,14 +843,21 @@ export function HistoryPage() {
                     placeholder="Name (optional)"
                     className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                   />
+                  <textarea
+                    value={extraNotes}
+                    onChange={e => setExtraNotes(e.target.value)}
+                    placeholder="Notes (optional)"
+                    rows={2}
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 resize-none"
+                  />
                   <div className="flex gap-2">
                     <button onClick={() => submitAddExtra(extra.planId, extra.calendarDate)} className="flex-1 py-1.5 text-xs rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-medium transition-colors">Add</button>
-                    <button onClick={() => { setAddingExtraDate(null); setExtraName('') }} className="flex-1 py-1.5 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">Cancel</button>
+                    <button onClick={() => { setAddingExtraDate(null); setExtraName(''); setExtraNotes('') }} className="flex-1 py-1.5 text-xs rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">Cancel</button>
                   </div>
                 </div>
               ) : isLastForDate ? (
                 <button
-                  onClick={() => { setAddingExtraDate(extra.calendarDate); setExtraType('yoga'); setExtraName('') }}
+                  onClick={() => { setAddingExtraDate(extra.calendarDate); setExtraType('yoga'); setExtraName(''); setExtraNotes('') }}
                   className="mt-1 flex items-center gap-1 text-xs text-slate-600 hover:text-sky-400 transition-colors px-1"
                 >
                   <Plus size={11} /> Add workout for this day
