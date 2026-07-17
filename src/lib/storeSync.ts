@@ -1,10 +1,10 @@
 import { supabase } from './supabase'
-import { useHistoryStore } from '../store/historyStore'
+import { useHistoryStore, migrateHistoryState } from '../store/historyStore'
 import { useOutcomeStore } from '../store/outcomeStore'
-import { usePlanStore } from '../store/planStore'
+import { usePlanStore, migratePlanState } from '../store/planStore'
 import { useProgramStore } from '../store/programStore'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
-import { useMobilityStore } from '../store/mobilityStore'
+import { useMobilityStore, migrateMobilityState } from '../store/mobilityStore'
 import { useSettingsStore } from '../store/settingsStore'
 
 type AnyStore = {
@@ -13,13 +13,28 @@ type AnyStore = {
   subscribe: (listener: (state: Record<string, unknown>) => void) => () => void
 }
 
-const STORES: { name: string; store: AnyStore }[] = [
-  { name: 'wpt_history', store: useHistoryStore as unknown as AnyStore },
+const STORES: { name: string; store: AnyStore; migrateFromCloud?: (data: unknown) => unknown }[] = [
+  {
+    name: 'wpt_history',
+    store: useHistoryStore as unknown as AnyStore,
+    // Apply all history migrations: adds `source: 'history'` to extras that pre-date the field.
+    migrateFromCloud: (data) => migrateHistoryState(data, 0),
+  },
   { name: 'wpt_outcomes', store: useOutcomeStore as unknown as AnyStore },
-  { name: 'wpt_plans', store: usePlanStore as unknown as AnyStore },
+  {
+    name: 'wpt_plans',
+    store: usePlanStore as unknown as AnyStore,
+    // Apply all plan migrations: normalises legacy slot types (weightlifting→weights, etc.).
+    migrateFromCloud: migratePlanState,
+  },
   { name: 'wpt_program_vars', store: useProgramStore as unknown as AnyStore },
   { name: 'wpt_exercise_history', store: useExerciseHistoryStore as unknown as AnyStore },
-  { name: 'wpt_mobility', store: useMobilityStore as unknown as AnyStore },
+  {
+    name: 'wpt_mobility',
+    store: useMobilityStore as unknown as AnyStore,
+    // Adds `activeSession: null` when missing (v1→v2 upgrade) without clobbering live sessions.
+    migrateFromCloud: migrateMobilityState,
+  },
   { name: 'wpt_settings', store: useSettingsStore as unknown as AnyStore },
 ]
 
@@ -73,11 +88,16 @@ export async function syncOnLogin(): Promise<void> {
     return
   }
 
-  // Hydrate stores from Supabase (cloud wins over localStorage)
+  // Hydrate stores from Supabase (cloud wins over localStorage).
+  // Apply each store's migration before setState so cloud data at an older
+  // schema version is upgraded before it lands in the in-memory state.
   for (const row of rows) {
     const entry = STORES.find(s => s.name === row.store_name)
     if (entry && row.data && typeof row.data === 'object') {
-      entry.store.setState(row.data as Record<string, unknown>)
+      const migratedData = entry.migrateFromCloud
+        ? entry.migrateFromCloud(row.data)
+        : row.data
+      entry.store.setState(migratedData as Record<string, unknown>)
     }
   }
 }

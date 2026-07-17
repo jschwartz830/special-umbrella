@@ -54,6 +54,18 @@ interface MobilityState {
   clearSession: () => void
 }
 
+/**
+ * Migrate mobility state coming from cloud sync (no version metadata available).
+ * Adds `activeSession: null` when missing — handles data from any version below
+ * v2 without clobbering an in-progress session stored in v2+ cloud data.
+ * @internal Exported only for cloud-sync hydration and unit testing.
+ */
+export function migrateMobilityState(data: unknown): unknown {
+  if (!data || typeof data !== 'object') return data
+  const d = data as Record<string, unknown>
+  return 'activeSession' in d ? d : { ...d, activeSession: null }
+}
+
 export const useMobilityStore = create<MobilityState>()(
   persist(
     (set) => ({
