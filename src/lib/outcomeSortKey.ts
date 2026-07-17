@@ -7,8 +7,9 @@ import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
  * so that outcomes without completedAt are still sorted by workout date.
  * Using '' as the fallback would make all non-completedAt outcomes compare
  * as equal, returning whichever Object.values() iteration order happened to
- * be first.
+ * be first. The final fallback to workoutInstanceId itself ensures a
+ * deterministic (if arbitrary) ordering even for malformed instance IDs.
  */
 export function outcomeSortKey(outcome: WorkoutOutcome): string {
-  return outcome.completedAt ?? parseWorkoutInstanceId(outcome.workoutInstanceId)?.calendarDate ?? ''
+  return outcome.completedAt ?? parseWorkoutInstanceId(outcome.workoutInstanceId)?.calendarDate ?? outcome.workoutInstanceId
 }
