@@ -189,11 +189,13 @@ export function PlansPage() {
 
   async function handleImport(file: File): Promise<ImportResult> {
     const text = await file.text()
-    const { plans: newPlans, warnings } = plansFromCsv(text)
+    const existingIds = new Set(Object.keys(plans))
+    const { plans: newPlans, warnings, collisions } = plansFromCsv(text, existingIds)
     importPlans(newPlans)
+    const collisionWarnings = collisions.map(name => `"${name}" overwrote an existing plan with the same ID.`)
     return {
       summary: `Imported ${newPlans.length} plan${newPlans.length === 1 ? '' : 's'}.`,
-      warnings,
+      warnings: [...warnings, ...collisionWarnings],
     }
   }
 

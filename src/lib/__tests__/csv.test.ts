@@ -263,6 +263,37 @@ describe('plansToCsv + plansFromCsv', () => {
     expect(plans).toHaveLength(1)
     expect(warnings.some(w => w.includes('missing planId'))).toBe(true)
   })
+
+  it('returns empty collisions array when no existingPlanIds provided', () => {
+    const csv = plansToCsv([makePlan()])
+    const { collisions } = plansFromCsv(csv)
+    expect(collisions).toEqual([])
+  })
+
+  it('returns empty collisions array when imported plan IDs are all new', () => {
+    const csv = plansToCsv([makePlan()])
+    const { collisions } = plansFromCsv(csv, new Set(['other-plan-id']))
+    expect(collisions).toEqual([])
+  })
+
+  it('reports collision when imported plan ID already exists in existingPlanIds', () => {
+    const csv = plansToCsv([makePlan()])
+    const { plans, collisions } = plansFromCsv(csv, new Set(['plan-1']))
+    // Plan is still imported (ID preserved for history linkage)
+    expect(plans).toHaveLength(1)
+    expect(plans[0].id).toBe('plan-1')
+    // Collision is reported by plan name
+    expect(collisions).toContain('Upper/Lower')
+  })
+
+  it('reports collisions for multiple overlapping plan IDs', () => {
+    const planA = { ...makePlan(), id: 'p-a', name: 'Plan A' }
+    const planB = { ...makePlan(), id: 'p-b', name: 'Plan B' }
+    const csv = plansToCsv([planA, planB])
+    const { collisions } = plansFromCsv(csv, new Set(['p-a', 'p-b']))
+    expect(collisions).toContain('Plan A')
+    expect(collisions).toContain('Plan B')
+  })
 })
 
 // ── History round-trip ────────────────────────────────────────────────────────

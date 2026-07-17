@@ -264,16 +264,25 @@ const VALID_RUN_SUBTYPES: RunWorkoutSubtype[] = [
 export interface PlansImportResult {
   plans: Plan[]
   warnings: string[]
+  /** planIds whose import will overwrite an existing plan with the same ID. */
+  collisions: string[]
 }
 
 /**
  * Parse CSV text into Plan[] objects. Generates new IDs for all entities.
  * Plans without slots are skipped. Malformed rows are collected in `warnings`.
+ *
+ * Pass `existingPlanIds` to detect plan-ID collisions; the result `collisions`
+ * array lists the names of plans that will silently overwrite an existing plan
+ * on import. (The original ID is preserved intentionally so previously-exported
+ * history CSVs stay linkable; the caller is responsible for surfacing the
+ * collision warning to the user.)
  */
-export function plansFromCsv(text: string): PlansImportResult {
+export function plansFromCsv(text: string, existingPlanIds?: Set<string>): PlansImportResult {
   const records = parseCsvToRecords(text)
   const warnings: string[] = []
-  if (records.length === 0) return { plans: [], warnings: ['CSV is empty.'] }
+  const collisions: string[] = []
+  if (records.length === 0) return { plans: [], warnings: ['CSV is empty.'], collisions: [] }
 
   // Group rows by original planId to preserve grouping.
   const byPlan = new Map<string, Record<string, string>[]>()
@@ -295,6 +304,9 @@ export function plansFromCsv(text: string): PlansImportResult {
     const first = rows[0]
     // Preserve the original planId so exported history CSVs continue to match.
     const newPlanId = pid
+    if (existingPlanIds?.has(pid)) {
+      collisions.push(first.planName || pid)
+    }
 
     const status = VALID_STATUSES.includes(first.planStatus as PlanStatus)
       ? (first.planStatus as PlanStatus)
@@ -358,7 +370,7 @@ export function plansFromCsv(text: string): PlansImportResult {
     })
   }
 
-  return { plans, warnings }
+  return { plans, warnings, collisions }
 }
 
 function rowToSlot(row: Record<string, string>, type: WorkoutType): WorkoutSlot {
