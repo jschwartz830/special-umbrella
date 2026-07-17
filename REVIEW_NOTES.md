@@ -1,5 +1,68 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-17 (seventy-ninth pass) — branch `claude/dreamy-mccarthy-19hbsd`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 5 commits, 8 source files + 2 test files (1 new). Mixed pass: 4 bugs fixed, 1 pre-existing TS error resolved, 1 UX feature added (notes field in extra-entry modal), 19 new tests.
+2. **Test delta**: +19 tests (1088 → 1107). All 1088 pre-existing tests still pass. TypeScript: 0 errors (was 1).
+3. **Risk level**: Low across all changes. No store schemas altered, no data migrations run destructively, all new fields are additive.
+
+---
+
+### Changes Reviewed
+
+#### `src/vite-env.d.ts` (new file) — LOW RISK
+
+Standard Vite + TypeScript boilerplate. No logic. Fixes `import.meta.env` TypeScript resolution in `AuthGate.tsx`.
+
+#### `src/lib/outcomeSortKey.ts` — LOW RISK
+
+One-line change: `''` → `outcome.workoutInstanceId`. The function returns a string used exclusively for `Array.sort` comparison. The new fallback is at least as stable as the old one and strictly more deterministic when multiple non-standard IDs exist.
+
+Verified: `parseWorkoutInstanceId` returns `null` only for IDs that don't match the `{planId}_{date}` format. The fallback only fires in that case. No regression risk.
+
+#### `src/lib/csv.ts` + `src/pages/PlansPage.tsx` — LOW RISK
+
+`plansFromCsv` signature change is backwards-compatible (new parameter is optional). The import flow is unchanged — same overwrite behaviour, just with user-visible warnings added. The `collisions` array is computed in the same loop that already iterates over `byPlan` entries, so no additional passes over the data.
+
+The choice to keep the overwrite was deliberate: the primary use case for re-importing a plans CSV is to restore history linkage, which requires the original plan ID to be preserved.
+
+#### `src/lib/storeSync.ts` — MEDIUM RISK (mitigated)
+
+This is the highest-risk change: it modifies how cloud data lands in live stores. Risk factors considered:
+
+- `migratePlanState` is the same function already tested in `planStore.test.ts`. No new migration logic was introduced.
+- `migrateHistoryState(data, 0)` passes `fromVersion = 0`, which triggers the `source: 'history'` backfill. This is correct: cloud data has no version metadata, so treating it as v0 is the safe assumption.
+- `migrateMobilityState` is conditional: it only sets `activeSession: null` when the key is absent. If cloud data already contains `activeSession` (from a v2+ push), it is preserved unchanged. This is critical — a naïve `{ ...d, activeSession: null }` would destroy a live session.
+- If `migrateFromCloud` throws (shouldn't happen with defensive implementations), the error propagates up through `syncOnLogin`'s try/catch. No silent data loss.
+
+Confirmed: the 15 storeSync tests cover the migration paths for all three stores with migrations.
+
+#### `src/pages/HistoryPage.tsx` — LOW RISK
+
+Additive modal field. `updateExtraEntry` already accepted `notes` in its patch argument — this change just passes a value for it from the UI. State initialisation (`editingExtraNotes = extra.notes ?? ''`) and save logic (`trim() || undefined`) follow the same pattern used for `editingExtraName`.
+
+---
+
+### Issues Observed (not fixed this pass)
+
+These are carry-forward from previous passes with no new observations:
+
+- `computeWorkoutPRFlags` O(n²) inner loop (`historyStats.ts`): unchanged, flagged in prior passes.
+- `removeLastOverrideByType` unused `type` param: unchanged.
+- `@testing-library/react` not in devDeps: component-level tests still not possible.
+- Run progression state (`RunProgressionState.lastResult`) not surfaced in UI.
+
+### New items observed this pass (deferred)
+
+- `storeSync.ts` `subscribeStores` has no retry on push failure. If the Supabase upsert fails (transient network error), the data is silently lost until the next store change triggers another push. A future pass could add a simple retry with exponential backoff or queue the failed store name for re-push.
+- `migrateHistoryState` always receives `fromVersion = 0` in the cloud path. If a future schema version is added to `historyStore`, a more sophisticated version-detection pass over the raw cloud object would be needed. Currently not an issue.
+
+---
+
 ## 2026-07-15 (seventy-eighth pass) — branch `claude/dreamy-mccarthy-cr3jyk`
 
 ---

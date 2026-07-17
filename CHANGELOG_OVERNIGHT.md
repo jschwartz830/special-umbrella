@@ -2,6 +2,77 @@
 
 ---
 
+## Pass 79 — 2026-07-17 (branch `claude/dreamy-mccarthy-19hbsd`)
+
+### Commit 1 — `b9a2adc`
+
+**fix(ts): add vite-env.d.ts so import.meta.env resolves without TS errors**
+
+- **Added** `src/vite-env.d.ts`: single-line file with `/// <reference types="vite/client" />`.
+- **Why**: `AuthGate.tsx` referenced `import.meta.env.VITE_SUPABASE_URL` but the Vite client type declarations were never added to the repo. TypeScript reported `Property 'env' does not exist on type 'ImportMeta'`. This is the standard fix required for any Vite + TypeScript project.
+- **Risk**: None — purely additive declaration file.
+
+---
+
+### Commit 2 — `bac155e`
+
+**fix(outcomeSortKey): use workoutInstanceId as final fallback instead of ''**
+
+- **Modified** `src/lib/outcomeSortKey.ts`: changed the final fallback in `outcomeSortKey` from `''` (empty string) to `outcome.workoutInstanceId`.
+- **Why**: When a `workoutInstanceId` doesn't contain a recognisable date (e.g., a malformed or manually-created ID), the function previously returned `''` for all such outcomes. This made their sort order non-deterministic — they all compared as equal, so `Array.sort` could place them in any order. Using the `workoutInstanceId` itself as the fallback guarantees a stable, unique sort key.
+- **Modified** `src/lib/__tests__/outcomeSortKey.test.ts`: updated the test that previously asserted `toBe('')` to instead assert `toBe('no-date-here')`.
+- **Risk**: Very low — only affects outcomes with non-standard IDs, and the new sort is strictly more deterministic.
+
+---
+
+### Commit 3 — `1f88c04`
+
+**fix(csv): detect plan ID collision on CSV import and surface warning**
+
+- **Modified** `src/lib/csv.ts`:
+  - `PlansImportResult` gains a `collisions: string[]` field.
+  - `plansFromCsv` now accepts an optional second argument `existingPlanIds?: Set<string>`.
+  - When an imported plan's ID is found in `existingPlanIds`, its plan name (or raw ID) is pushed to `collisions`.
+  - The empty/error return paths also include `collisions: []`.
+- **Modified** `src/pages/PlansPage.tsx`:
+  - `handleImport` passes `new Set(Object.keys(plans))` as the second argument to `plansFromCsv`.
+  - Collision names are mapped to human-readable warnings (`"${name}" overwrote an existing plan with the same ID.`) and appended to the `warnings` array returned to the import summary modal.
+- **Modified** `src/lib/__tests__/csv.test.ts`: 4 new tests for the collision detection behaviour.
+- **Why**: CSV plan import preserved original plan IDs (by design, so exported history CSVs remain linkable). But this meant importing a plan that was already in the store would silently overwrite it with no feedback to the user. The fix keeps the overwrite behaviour (needed for re-import workflows) but now informs the user.
+- **Risk**: Low — existing import flow unchanged; `collisions` is additive.
+
+---
+
+### Commit 4 — `a22b139`
+
+**fix(storeSync): apply store migrations when hydrating from Supabase cloud data**
+
+- **Modified** `src/store/planStore.ts`: added `export` to `migratePlanState`.
+- **Modified** `src/store/mobilityStore.ts`: added and exported `migrateMobilityState` — a conditional migration that adds `activeSession: null` only when the key is absent (safe for v2+ cloud data that already carries a live session).
+- **Modified** `src/lib/storeSync.ts`:
+  - Each entry in the `STORES` array gains an optional `migrateFromCloud?: (data: unknown) => unknown` field.
+  - `wpt_history`, `wpt_plans`, and `wpt_mobility` entries now carry their respective migration callbacks.
+  - The `syncOnLogin` hydration loop applies `migrateFromCloud(row.data)` before calling `store.setState`.
+- **Added** `src/lib/__tests__/storeSync.test.ts`: 15 new tests covering the full `syncOnLogin` and `subscribeStores` surface (previously at 0% coverage).
+- **Why**: Cloud-fetched store data was applied verbatim via `setState`, bypassing the `migrate` callbacks registered in each store's `persist` config. Old slot types (`weightlifting`, `long_run`, etc.), missing `source` fields on history entries, and absent `activeSession` on mobility state could all land in live stores without normalisation.
+- **Risk**: Low — the migration functions are the same ones already tested in their respective store test files.
+
+---
+
+### Commit 5 — `50bbf1f`
+
+**feat(HistoryPage): expose notes field in extra-entry edit modal**
+
+- **Modified** `src/pages/HistoryPage.tsx`:
+  - Added `editingExtraNotes` state (string, default `''`).
+  - `openExtraEdit` now sets `editingExtraNotes(extra.notes ?? '')` when opening the modal.
+  - `saveAndCloseExtra` computes `notesTrimmed` and includes `notes: notesTrimmed` in the `updateExtraEntry` call when notes changed.
+  - Modal renders a labelled `<textarea>` between the Name input and the Delete button.
+- **Why**: The extra-entry edit modal only exposed workout type and name. Editing notes on a logged extra entry required deleting and re-adding the entry. This completes the modal's field coverage.
+- **Risk**: Low — additive UI change; underlying `updateExtraEntry` already accepted a `notes` field.
+
+---
+
 ## Pass 78 — 2026-07-15 (branch `claude/dreamy-mccarthy-cr3jyk`)
 
 ### Commit 1 — `38d2f06`

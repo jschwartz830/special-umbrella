@@ -1,5 +1,103 @@
 # Implementation Plan
 
+## Pass 79 — 2026-07-17 (branch `claude/dreamy-mccarthy-19hbsd`)
+
+### Baseline
+
+- **Test count**: 1088 (from merge base of branch) → **1107** (+19)
+- **TypeScript errors**: 1 pre-existing → **0** (fixed)
+- **Test files**: 32 (net +1: `storeSync.test.ts`)
+
+### Bugs Fixed
+
+**BUG-4 — Cloud hydration bypasses Zustand migration pipeline**
+
+`src/lib/storeSync.ts`: `syncOnLogin` called `store.setState(row.data)` directly, bypassing the `migrate` callbacks registered in each store's `persist` config. This meant data fetched from Supabase was applied verbatim — old field names (`weightlifting`, `long_run`, `recovery_run`, `rest` slot types) and missing fields (`source` on history entries, `activeSession` on mobility state) could land in the live store without being normalized.
+
+Fix: exported `migrateHistoryState` from `historyStore.ts`, `migratePlanState` from `planStore.ts`, and added a new `migrateMobilityState` from `mobilityStore.ts`. Each store entry in the `STORES` array now carries an optional `migrateFromCloud` callback. In the hydration loop, `row.data` is passed through `migrateFromCloud` before `setState`. The mobility migration is conditional (`'activeSession' in d ? d : { ...d, activeSession: null }`) to avoid clobbering a live mobility session stored in v2+ cloud data.
+
+**BUG-8 — `outcomeSortKey` returns empty string for unrecognisable instanceIds**
+
+`src/lib/outcomeSortKey.ts`: The final fallback was `''` (empty string), making outcomes with non-standard `workoutInstanceId` formats sort identically — a non-deterministic tie. Fixed: fallback is now `outcome.workoutInstanceId` itself, which is a stable string unique per outcome. Sort is now fully deterministic.
+
+**BUG-11 — CSV plan import silently overwrites existing plan when IDs collide**
+
+`src/lib/csv.ts` + `src/pages/PlansPage.tsx`: `plansFromCsv` accepted any CSV row with a matching `planId` and passed it straight to `importPlans`, which called `setState` overwriting the existing plan. No warning was surfaced. Fix: `plansFromCsv` now accepts an optional `existingPlanIds: Set<string>` parameter; when a collision is detected, the plan name is recorded in a new `collisions: string[]` field on the return value. `PlansPage.handleImport` passes the current plan ID set and converts each collision to a human-readable warning shown in the import summary modal.
+
+**ARCH-5 — Extra-entry edit modal missing notes field**
+
+`src/pages/HistoryPage.tsx`: the modal for editing an extra workout entry (type + name) had no notes field, making it impossible to edit notes on a logged extra entry without deleting and re-adding it. Added `editingExtraNotes` state, wired `openExtraEdit` to populate it, updated `saveAndCloseExtra` to include `notes` in the `updateExtraEntry` call, and added a `<textarea>` between the Name input and the Delete button in the modal.
+
+**Pre-existing TS — `import.meta.env` unresolved**
+
+`src/vite-env.d.ts` was missing from the repository. `AuthGate.tsx` referenced `import.meta.env.VITE_SUPABASE_URL` which TypeScript could not resolve, producing `Property 'env' does not exist on type 'ImportMeta'`. Added the standard Vite triple-slash reference file.
+
+### Tests Added
+
+**`src/lib/__tests__/storeSync.test.ts`** — 15 new tests (new file)
+
+Covers the previously-untested `storeSync.ts` module:
+- `syncOnLogin`: unauthenticated no-op, first-login push (all 7 stores), cloud hydration, no push on hydration, skip unknown store names
+- Migration integration: plan migration (weightlifting→weights, long_run→run), history migration (source backfill), mobility migration (adds `activeSession: null`, preserves live session)
+- `subscribeStores`: unsubscribe function, 1.5 s debounce, coalescing, `beforeunload` flush, unsubscribe guard
+
+**`src/lib/__tests__/csv.test.ts`** — 4 new collision tests
+
+- Empty `collisions` array when no `existingPlanIds` provided
+- Empty `collisions` when all imported plan IDs are new
+- Single collision reported when one imported ID already exists
+- Multiple collisions reported for overlapping IDs
+
+**`src/lib/__tests__/outcomeSortKey.test.ts`** — 1 updated test
+
+- Renamed: "returns empty string when instanceId does not contain a recognisable date" → "returns the workoutInstanceId itself when no date can be extracted (deterministic fallback)"
+- Assertion updated from `toBe('')` → `toBe('no-date-here')`
+
+### Work Completed
+
+#### 1. Fix: vite-env.d.ts for import.meta.env TypeScript resolution
+
+`src/vite-env.d.ts` — new file with `/// <reference types="vite/client" />`. Resolves pre-existing TS error in `AuthGate.tsx`.
+
+#### 2. Fix: deterministic outcomeSortKey fallback
+
+`src/lib/outcomeSortKey.ts` — final fallback changed from `''` to `outcome.workoutInstanceId`. One-line change.
+
+#### 3. Fix: CSV import collision detection and warning
+
+`src/lib/csv.ts` — `PlansImportResult` gains `collisions: string[]`; `plansFromCsv` accepts optional `existingPlanIds` and populates `collisions` for matching IDs.
+
+`src/pages/PlansPage.tsx` — `handleImport` passes current plan IDs and appends collision warnings to the import result.
+
+`src/lib/__tests__/csv.test.ts` — 4 new collision tests.
+
+#### 4. Fix: cloud hydration respects store migration pipelines
+
+`src/store/planStore.ts` — exported `migratePlanState`.
+
+`src/store/mobilityStore.ts` — added and exported `migrateMobilityState`.
+
+`src/lib/storeSync.ts` — `STORES` array gains optional `migrateFromCloud` callbacks; hydration loop applies them.
+
+`src/lib/__tests__/storeSync.test.ts` — 15 new tests (new file).
+
+#### 5. Feature: notes field in extra-entry edit modal
+
+`src/pages/HistoryPage.tsx` — `editingExtraNotes` state, populated on modal open, saved on close, rendered as a textarea in the modal.
+
+---
+
+### What was NOT done (and why)
+
+| Considered | Decision |
+|---|---|
+| `computeWorkoutPRFlags` O(n²) loop | Low-priority performance; flagged for future pass |
+| `removeLastOverrideByType` rename | Cosmetic; no callers broken; deferred |
+| Component/integration tests | Requires `@testing-library/react` not in devDeps |
+| Run progression UI surfacing | Medium-scope; deferred |
+
+---
+
 ## Pass 78 — 2026-07-15 (branch `claude/dreamy-mccarthy-cr3jyk`)
 
 ### Baseline

@@ -1,5 +1,89 @@
 # Test Results
 
+## 2026-07-17 (seventy-ninth pass) — branch `claude/dreamy-mccarthy-19hbsd`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  31 passed (31)
+     Tests  1088 passed (1088)
+  Start at  (pass-78 result, restored from branch base)
+  Duration  ~3.5s
+```
+
+### Final results (after all 5 commits)
+
+```
+Test Files  32 passed (32)
+     Tests  1107 passed (1107)
+  Start at  (overnight run)
+  Duration  ~4s (transform ~1.7s, setup 0ms, import ~3.7s, tests ~700ms)
+```
+
+Net: **+19 tests**, **+1 test file**, **0 failures**.
+
+---
+
+### New test file: `src/lib/__tests__/storeSync.test.ts`
+
+**15 tests added** covering the previously-untested `storeSync` module:
+
+**`syncOnLogin` tests:**
+| Test | Coverage |
+|---|---|
+| no-op when user is not authenticated | unauthenticated guard |
+| pushes all 7 stores on first login (empty cloud) | initial push path |
+| hydrates stores from existing cloud rows | setState hydration |
+| does not push after hydrating | no-push-on-hydrate guard |
+| skips rows for unknown store names | defensive unknown-store skip |
+| applies plan migration when hydrating (weightlifting→weights, long_run→run) | `migratePlanState` integration |
+| applies history migration when hydrating (adds source field) | `migrateHistoryState` integration |
+| applies mobility migration when hydrating (adds activeSession) | `migrateMobilityState` integration (absent key) |
+| preserves live activeSession when hydrating mobility from v2+ cloud data | `migrateMobilityState` integration (key present) |
+
+**`subscribeStores` tests:**
+| Test | Coverage |
+|---|---|
+| returns an unsubscribe function | return type |
+| debounces pushes (1500 ms) | debounce delay |
+| coalesces multiple store changes within the debounce window | coalescing |
+| flushes pending push synchronously on beforeunload | `beforeunload` handler |
+| does not push after unsubscribe | cleanup guard |
+| calling unsubscribe twice does not error | idempotent cleanup |
+
+---
+
+### Updated test: `src/lib/__tests__/outcomeSortKey.test.ts`
+
+1 test assertion updated (not a new test):
+- `expect(outcomeSortKey(outcome)).toBe('')` → `expect(outcomeSortKey(outcome)).toBe('no-date-here')`
+- Test renamed to reflect the new, deterministic fallback behaviour.
+
+---
+
+### New tests: `src/lib/__tests__/csv.test.ts` (4 added)
+
+| Test | Coverage |
+|---|---|
+| returns empty collisions array when no existingPlanIds provided | backwards-compatible no-arg call |
+| returns empty collisions array when imported plan IDs are all new | no-collision path |
+| reports collision when imported plan ID already exists | single collision detection |
+| reports collisions for multiple overlapping plan IDs | multi-collision detection |
+
+---
+
+### Coverage notes
+
+| Module | New Tests | What's covered |
+|---|---|---|
+| `storeSync.ts` | 15 | Full `syncOnLogin` and `subscribeStores` surface |
+| `csv.ts` (collision path) | 4 | `plansFromCsv` collision detection |
+| `outcomeSortKey.ts` | 0 (1 updated) | Fallback now tested for determinism |
+
+---
+
 ## 2026-07-15 (seventy-eighth pass) — branch `claude/dreamy-mccarthy-cr3jyk`
 
 ---
