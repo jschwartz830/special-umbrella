@@ -32,9 +32,15 @@ describe('outcomeSortKey', () => {
     expect(outcomeSortKey(outcome)).toBe('2026-03-22')
   })
 
-  it('returns empty string when instanceId does not contain a recognisable date', () => {
+  it('returns workoutInstanceId itself when neither completedAt nor a parseable date is available', () => {
     const outcome = makeOutcome('no-date-here', null)
-    expect(outcomeSortKey(outcome)).toBe('')
+    expect(outcomeSortKey(outcome)).toBe('no-date-here')
+  })
+
+  it('two unparseable instanceIds produce deterministic (stable) sort order', () => {
+    const a = makeOutcome('aaa-no-date', null)
+    const b = makeOutcome('zzz-no-date', null)
+    expect(outcomeSortKey(a) < outcomeSortKey(b)).toBe(true)
   })
 
   it('completedAt sorts later than calendarDate for the same date', () => {

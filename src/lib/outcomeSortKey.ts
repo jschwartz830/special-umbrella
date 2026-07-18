@@ -10,5 +10,5 @@ import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
  * be first.
  */
 export function outcomeSortKey(outcome: WorkoutOutcome): string {
-  return outcome.completedAt ?? parseWorkoutInstanceId(outcome.workoutInstanceId)?.calendarDate ?? ''
+  return outcome.completedAt ?? parseWorkoutInstanceId(outcome.workoutInstanceId)?.calendarDate ?? outcome.workoutInstanceId
 }
