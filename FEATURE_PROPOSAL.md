@@ -1,5 +1,72 @@
 # Feature Proposals
 
+## Pass 79 — 2026-07-18 (branch `claude/dreamy-mccarthy-8y5o0o`)
+
+---
+
+### Proposal: Run Progression Badge in TodayPage Resolved State
+
+**Status**: Implemented in this pass.
+
+#### Feature selected
+
+After completing a progression-eligible run, TodayPage shows a small inline badge below the resolved workout card: "↑ Progressed — next: N mi" (emerald) for a progress result, or "↓ Adjusted down — next: N mi" (amber) for a regress result.
+
+#### Why selected
+
+The run adaptation system has stored progression results in `outcomeStore.progressionStates` since pass ~55-58. HistoryPage has shown these results on historical workouts since pass 67. But at the moment of completion — when the user is most interested — TodayPage shows nothing. This is the highest-recommended feature across passes 63–69; it closes the last gap in the run progression feedback loop.
+
+#### Expected user value
+
+Users with progression-eligible runs (YAML plans with `runConfig.progressionGroupId`) see the progression result immediately after logging, without navigating to History. "You progressed to 5.5 mi next run" is actionable and motivating at completion time.
+
+#### Implementation scope
+
+Narrowest viable slice:
+- No new state, no new hooks, no new components
+- `todayProgressionState` is already computed from the store (line ~330 in TodayPage)
+- `instanceId` (today's workout instance ID) is already computed
+- Show badge when: `isResolved && todayProgressionState?.lastCompletedWorkoutInstanceId === instanceId && lastResult is 'progress' or 'regress'`
+- Position: between the resolved `WorkoutDayCard` and the resolved action buttons
+
+#### Assumptions
+
+- Badge only shows for 'progress' and 'regress' — 'hold' is deliberately silent (no change = no news)
+- Badge auto-dismisses when the workout is undone (`isResolved` becomes false) or when tomorrow's date changes the `instanceId`
+- No separate dismiss button needed — the badge is transient by nature
+
+#### Open product / UX decisions
+
+1. Should 'hold' also show a message ("→ Same distance next run")? Current: no — hold is the most common outcome and showing it every time would desensitize.
+2. Should the badge appear for runs without a `progressionGroupId` (non-progression runs)? Current: no — only when `todayProgressionState` exists.
+3. Should "next: N mi" use more words ("next run target: N mi")?
+
+#### Architecture / schema impact
+
+None — purely additive JSX conditional. No store changes, no localStorage keys.
+
+#### Risks
+
+Very low. The conditional is tight: `isResolved && todayProgressionState?.lastCompletedWorkoutInstanceId === instanceId`. This requires:
+1. Today is logged
+2. The plan slot has `runConfig.progressionGroupId`
+3. The progression state's `lastCompletedWorkoutInstanceId` matches today's exact instance ID
+
+Any user without progression-eligible runs sees zero change.
+
+#### Rollback strategy
+
+Revert the single TodayPage commit. No data migration. No side effects.
+
+#### What is intentionally not built yet
+
+- 'Hold' message
+- Distance-unit localization (currently always miles, matching the rest of the app)
+- Progression badge in CalendarPage
+- Progression badge in the active workout tracker completion screen
+
+---
+
 ## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
 
 ---

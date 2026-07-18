@@ -1019,6 +1019,24 @@ export function TodayPage() {
         </div>
       )}
 
+      {/* Run progression result — shown after logging a progression-eligible run */}
+      {isResolved
+        && todayProgressionState?.lastCompletedWorkoutInstanceId === instanceId
+        && todayProgressionState.currentTargetDistanceMiles != null
+        && (todayProgressionState.lastResult === 'progress' || todayProgressionState.lastResult === 'regress')
+        && (
+          <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-medium ${
+            todayProgressionState.lastResult === 'progress'
+              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+              : 'bg-amber-500/10 border-amber-500/25 text-amber-400'
+          }`}>
+            <TrendingUp size={13} className="flex-shrink-0" />
+            {todayProgressionState.lastResult === 'progress'
+              ? `↑ Progressed — next: ${todayProgressionState.currentTargetDistanceMiles} mi`
+              : `↓ Adjusted down — next: ${todayProgressionState.currentTargetDistanceMiles} mi`}
+          </div>
+        )}
+
       {/* Resolved actions */}
       {isResolved && (
         <div className="flex gap-2">
