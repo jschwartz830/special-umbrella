@@ -1,5 +1,59 @@
 # Feature Reviews
 
+## Pass 79 — 2026-07-18 (branch `claude/dreamy-mccarthy-8y5o0o`)
+
+### Feature: Run Progression Result Badge in TodayPage Resolved State
+
+---
+
+#### What was actually built
+
+A small inline badge rendered inside `TodayPage.tsx`'s resolved-state section. It appears only when:
+1. Today's workout is fully resolved (logged or completed)
+2. Today's `workoutInstanceId` matches `todayProgressionState.lastCompletedWorkoutInstanceId` — confirming this run was the triggering event
+3. `todayProgressionState.currentTargetDistanceMiles` is non-null — the plan uses distance progression
+4. `todayProgressionState.lastResult` is `'progress'` or `'regress'` — a decision was made (hold is intentionally silent)
+
+When shown, the badge uses a `TrendingUp` icon (already imported) with emerald styling for progress and amber for regression, displaying the new target distance in miles.
+
+No new components, no new imports, no new state, no new tests (pure JSX branch using existing computed variables).
+
+---
+
+#### What was NOT built
+
+- **`hold` state badge**: `lastResult === 'hold'` is intentionally silent. A hold means the user ran but didn't quite hit the threshold for progression — showing a badge like "— Held — next: 3.0 mi" adds noise for the majority case. Only directional changes (up or down) are surfaced.
+- **HistoryPage retroactive badge**: `RunProgressionState.lastResult` is already shown in HistoryPage's progression card (added in pass 67). This badge is purely a "right now, today" feedback loop.
+- **Exact distance run**: The badge shows the *next* target, not the distance just logged. This is intentional — the user already saw their logged distance in the outcome modal.
+- **Percentage badge**: Some progression systems show "+5%" or "−10%". Not implemented; the absolute target is clearer for run distance.
+
+---
+
+#### What assumptions were encoded
+
+- **`lastCompletedWorkoutInstanceId === instanceId` as the trigger guard**: Progression state is updated globally (across all plans). Without this guard, any other run-eligible plan that was recently completed would also show the badge. The guard is tight: it fires only when today's exact instance was the last one processed.
+- **`currentTargetDistanceMiles != null` as the distance guard**: Plans without distance-based progression have `currentTargetDistanceMiles === null`. Without this guard, the badge would render empty for non-distance plans.
+- **`isResolved` as the outer guard**: Matches the existing pattern in the file — the resolved-state section only renders when `isResolved` is true. No guard needed inside the badge's own condition.
+- **Existing `todayProgressionState` variable**: Computed at ~line 330, well before the badge JSX. No new hook calls needed.
+
+---
+
+#### What worked well
+
+- **Zero new state, zero new imports**: `TrendingUp` was already imported from `lucide-react`. `todayProgressionState`, `instanceId`, `isResolved` were all already computed in scope.
+- **Three-state model (progress/hold/regress) maps cleanly to badge logic**: `hold` silences itself; the two visible states have distinct color semantics.
+- **Self-contained guard chain**: All four conditions are independent and short-circuit correctly. A pass-78 user who hasn't run a progression-eligible workout today sees nothing.
+
+---
+
+#### Potential follow-up
+
+- **Show the distance actually run alongside the next target**: e.g., "↑ You ran 3.2 mi — next: 3.5 mi". Requires reading `completedAt` / `outcomeStore` for the logged distance.
+- **Surface `hold` with softer copy**: "Same distance tomorrow — keep it up" might be motivating for holds, without the anxiety of "you didn't progress". Low priority.
+- **Tap-to-see-details**: Badge could expand to show the full progression history inline. Ties into the broader HistoryPage → TodayPage feedback loop. Not scoped here.
+
+---
+
 ## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
 
 ### Feature: Streak Milestone Celebration Banner

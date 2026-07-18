@@ -1,5 +1,80 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-18 (seventy-ninth pass) — branch `claude/dreamy-mccarthy-8y5o0o`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 4 commits, 4 source files + 1 test file. Two bug fixes (TypeScript env reference, outcomeSortKey fallback), one UI enhancement (notes in extra-entry edit modal), one small feature (run progression badge in TodayPage).
+2. **Test delta**: +1 test (1088 → 1089). All 1088 pre-existing tests still pass. TypeScript: 0 errors.
+3. **Highest confidence**: The `import.meta.env` TypeScript fix is pure additive and correct. The `outcomeSortKey` fallback is a strict improvement — deterministic replaces non-deterministic with no behaviour change for the happy path.
+4. **What is risky**: The run progression badge is the only change with user-facing impact. It has four strict guard conditions and renders only in a very specific post-log state, which limits blast radius. The notes textarea in HistoryPage writes to an existing optional field; clearing it correctly stores `undefined`.
+5. **What to review first**: Commit 3 (HistoryPage notes field) — verify that `editingExtraNotes || undefined` correctly handles the empty-string-to-undefined conversion and that `updateExtraEntry` accepts partial updates (it should, based on the type).
+
+---
+
+### Biggest Issues Found
+
+| ID | Severity | File | Summary |
+|---|---|---|---|
+| TS-ERR-1 | Build error | `raw-modules.d.ts` | `import.meta.env.DEV` from pass 78 had no `vite/client` reference directive; `tsc --noEmit` failed |
+| BUG-8 | Low | `outcomeSortKey.ts` | Empty-string fallback made unparseable-id outcomes sort non-deterministically |
+| ARCH-5 | UX gap | `HistoryPage.tsx` | `notes` field in extra-entry edit was never exposed despite existing in the type |
+
+---
+
+### Improvements Completed
+
+| # | What | Commit |
+|---|---|---|
+| 1 | `vite/client` reference directive — fixes `import.meta.env` TypeScript error | `4a3a459` |
+| 2 | `outcomeSortKey` deterministic fallback + 1 new test | `16ae968` |
+| 3 | Notes textarea in extra-entry edit modal | `833b7aa` |
+| 4 | Run progression result badge in TodayPage resolved state | `6516ec1` |
+
+---
+
+### Verdict by Item
+
+#### Definitely keep
+
+- **Commit 1** (vite/client reference): Fixes a real TypeScript error introduced by pass 78. Zero risk.
+- **Commit 2** (outcomeSortKey fallback): Strictly better — deterministic replaces non-deterministic. The change only affects edge-case outcomes that have no `completedAt` and no parseable date in their instanceId.
+
+#### Probably keep but verify behaviour
+
+- **Commit 3** (HistoryPage notes): Adds a textarea to an existing modal. The `editingExtraNotes || undefined` pattern is correct for converting empty strings to `undefined`; verify `updateExtraEntry` handles partial updates as expected.
+
+#### Keep — low risk, worth having
+
+- **Commit 4** (TodayPage progression badge): Clean four-guard conditional. Uses only existing computed values. `hold` is intentionally silent, which is the right UX call.
+
+---
+
+### Recommendations Only (not implemented)
+
+| Priority | Item |
+|---|---|
+| P1 | Add unit tests for `storeSync.ts` — mock Supabase, test debounce + flush + beforeunload |
+| P1 | Fix BUG-4: apply Zustand `migrate` after cloud hydration in `syncOnLogin` |
+| P2 | Fix BUG-11: CSV re-import collision warning — detect existing plan ID and offer "replace or create new" |
+| P3 | Begin TodayPage decomposition — extract `<TodayBanners>` as a first step |
+| P3 | Add `draftVersion` to active-workout draft for safe stale-draft detection |
+| P3 | Add `localDate: string` field to `OverrideEntry` for timezone-safe jump overrides |
+| P4 | Add tests for `useToday` midnight advance |
+| P4 | Add tests for `useStreakMilestoneDismiss` localStorage I/O |
+
+---
+
+### Open Questions
+
+1. **Run progression badge — hold state**: Should `hold` ever get a badge ("Same distance tomorrow")? Currently silent. Low priority, but a "keep going" nudge might be motivating.
+2. **Notes field — multi-line UX**: The textarea uses `rows={2}`. Should it auto-grow to fit content? Currently consistent with the rest of the form's fixed-height fields.
+3. **BUG-4 priority**: How common is multi-device use? If most users are single-device, the cloud-hydration migration bypass is low urgency. If multi-device is a design goal, it's P1.
+
+---
+
 ## 2026-07-15 (seventy-eighth pass) — branch `claude/dreamy-mccarthy-cr3jyk`
 
 ---

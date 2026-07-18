@@ -1,5 +1,87 @@
 # Implementation Plan
 
+## Pass 79 — 2026-07-18 (branch `claude/dreamy-mccarthy-8y5o0o`)
+
+### Baseline
+
+- Branch started from `main` after PR from pass 78 merged.
+- **1088 tests passing** across 31 test files at start of pass.
+- **1089 tests passing** at end of pass (+1 new test for `outcomeSortKey` deterministic fallback).
+- TypeScript: `tsc --noEmit` clean (0 errors).
+
+### Architecture Summary (pass 79 scope)
+
+Codebase: React 18 + TypeScript + Vite PWA. 7 Zustand stores with localStorage + Supabase cloud sync. Core rotation engine, expression evaluator, YAML program import. ~31 test files, 1088 tests at pass start.
+
+Mixed pass: two bug fixes, one UI enhancement (notes field in extra-entry edit modal), one small feature (run progression badge in TodayPage). Zero new dependencies. Zero architectural changes.
+
+### Bugs Fixed This Pass
+
+| ID | File | Summary |
+|---|---|---|
+| TS-ERR-1 | `src/types/raw-modules.d.ts` | `import.meta.env.DEV` caused `TS2339: Property 'env' does not exist on type 'ImportMeta'`. Root cause: no `/// <reference types="vite/client" />` in any `.d.ts` file. Fixed by adding the reference to the existing `raw-modules.d.ts` file. |
+| BUG-8 | `src/lib/outcomeSortKey.ts` | Empty-string fallback when both `completedAt` and `workoutInstanceId` date are absent produced non-deterministic sort order (all unparseable outcomes compared as equal). Fixed by using `outcome.workoutInstanceId` itself as the final fallback — always present, always a deterministic string. |
+
+### UI Enhancement This Pass
+
+| ID | File | Summary |
+|---|---|---|
+| ARCH-5 | `src/pages/HistoryPage.tsx` | Extra-entry edit modal exposed `workoutType` and `workoutName` but never `notes`, despite `ExtraWorkoutEntry.notes` existing in the type since it was designed. Added a `textarea` field and wired `editingExtraNotes` state through open/save/close handlers. Clearing the field saves `undefined` (not `''`). |
+
+### Feature This Pass
+
+Run progression result badge in TodayPage resolved state. After a user logs a progression-eligible run, the resolved view now shows whether the engine progressed, held, or regressed their target distance — with the new target displayed. `hold` is silenced (no badge). Uses existing `todayProgressionState`, `instanceId`, and `isResolved` computed values; zero new state or imports.
+
+### Bugs Found But Not Fixed (documented only, carried forward)
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-4 | `storeSync.ts` | Cloud hydration via `setState` bypasses Zustand's `migrate` function. Old schema data from Supabase won't be migrated. Requires careful planning around migration pipeline before fixing. |
+| BUG-10 | `exerciseLibrary.ts` | `synergist` arrays contain corrupted data (exercise names instead of muscle groups). No current feature queries synergist data. |
+| BUG-11 | `csv.ts` | CSV import restores the original plan ID, silently overwriting an existing plan on reimport. |
+
+### Key Architecture Concerns (documented only, carried forward)
+
+| ID | Concern |
+|---|---|
+| ARCH-1 | `TodayPage.tsx` is 1700+ lines with 25+ top-level state variables — long-term maintainability risk |
+| ARCH-2 | "Cloud wins" sync strategy can lose offline edits made on a second device before login |
+| ARCH-3 | Jump override `appliedAt` uses local-time ISO string with no timezone suffix — could misattribute on timezone change |
+| ARCH-4 | Active-workout draft has no schema version; stale drafts from older app versions would partially hydrate |
+
+### Test Coverage Gaps (documented only, carried forward)
+
+| Gap | Scope |
+|---|---|
+| TEST-1 | `storeSync.ts` — entire cloud sync module has no tests |
+| TEST-2 | `useToday.ts` — midnight-advance timer has no tests |
+| TEST-3 | `ActiveWorkoutTracker.tsx` (1872 lines) — fully untested |
+| TEST-4 | `MobilityTracker.tsx` bilateral detection + checkpoint restore — untested |
+| TEST-5 | `useStreakMilestoneDismiss` localStorage I/O — untested (pure function IS tested) |
+| TEST-6 | `CardioWorkoutTracker.tsx` auto-advance timer path — untested |
+
+### What is Strong (reaffirmed)
+
+- Rotation engine: pure, fully tested, handles all edge cases.
+- `expressionEval.ts`: comprehensive coverage, robust NaN/Infinity guards.
+- `historyStats.ts` test suite: exemplary behavior-level tests across all exports.
+- `outcomeStore.ts` progression error guard: correctly catches failures without blocking the outcome save.
+- Service worker cache-bust flow: robust with correct timeout handling.
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Add tests for `storeSync.ts` |
+| P1 | Fix BUG-4: cloud hydration bypassing Zustand migrate |
+| P2 | Fix BUG-11: CSV import plan-ID collision |
+| P3 | Begin TodayPage decomposition (extract `<TodayBanners>` first) |
+| P3 | Add `draftVersion` to active-workout draft |
+| P3 | Add `localDate` to `OverrideEntry` for timezone-safe jump overrides |
+| P4 | Tests for `useToday`, `useStreakMilestoneDismiss` localStorage I/O |
+
+---
+
 ## Pass 78 — 2026-07-15 (branch `claude/dreamy-mccarthy-cr3jyk`)
 
 ### Baseline

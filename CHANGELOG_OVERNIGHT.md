@@ -2,6 +2,64 @@
 
 ---
 
+## Pass 79 — 2026-07-18 (branch `claude/dreamy-mccarthy-8y5o0o`)
+
+### Commit 1 — `4a3a459`
+
+**fix(types): add vite/client reference to resolve import.meta.env TypeScript error**
+
+| | |
+|---|---|
+| **Files** | `src/types/raw-modules.d.ts` |
+| **Risk** | Zero — adds a reference directive that was always implicitly needed; no runtime effect |
+| **Rollback** | `git revert 4a3a459` |
+
+`import.meta.env.DEV` (introduced in `AuthGate.tsx` in pass 78) caused `TS2339: Property 'env' does not exist on type 'ImportMeta'` because no `.d.ts` file in the project included `/// <reference types="vite/client" />`. Added the reference to the existing `raw-modules.d.ts` ambient declaration file. `tsc --noEmit` now exits clean.
+
+---
+
+### Commit 2 — `16ae968`
+
+**fix(outcomeSortKey): use workoutInstanceId as deterministic fallback instead of empty string**
+
+| | |
+|---|---|
+| **Files** | `src/lib/outcomeSortKey.ts`, `src/lib/__tests__/outcomeSortKey.test.ts` |
+| **Risk** | Very low — changes sort order only for outcomes with no `completedAt` and no parseable date in their instanceId (rare edge case) |
+| **Rollback** | `git revert 16ae968` |
+
+The previous fallback was `''` (empty string). When multiple outcomes had unparseable instanceIds (e.g. data-import edge cases), all compared as equal and their order depended on `Object.values()` iteration — non-deterministic across JS engines and Zustand re-renders. Replacing `''` with `outcome.workoutInstanceId` (always present, always a non-empty string) makes the sort stable. Added 1 new test: "two unparseable instanceIds produce deterministic (stable) sort order". Updated the "returns empty string" test description to match the new behaviour.
+
+---
+
+### Commit 3 — `833b7aa`
+
+**feat(HistoryPage): expose notes field in extra-entry edit modal**
+
+| | |
+|---|---|
+| **Files** | `src/pages/HistoryPage.tsx` |
+| **Risk** | Low — additive UI; reads/writes only `ExtraWorkoutEntry.notes`, a field that existed since the type was designed |
+| **Rollback** | `git revert 833b7aa` |
+
+`ExtraWorkoutEntry.notes` has always existed in the type and was displayed read-only in history list items, but the edit modal only exposed `workoutType` and `workoutName`. Added `editingExtraNotes` state, wired it through `openExtraEdit` (loads existing notes or `''`) and `saveAndCloseExtra` (saves `undefined` when the field is cleared, preserving the optional-field contract). Added a `<textarea>` in the modal between the Name field and the type picker. Clearing the notes field saves `undefined` rather than an empty string.
+
+---
+
+### Commit 4 — `6516ec1`
+
+**feat(TodayPage): show run progression result badge after logging a progression-eligible run**
+
+| | |
+|---|---|
+| **Files** | `src/pages/TodayPage.tsx` |
+| **Risk** | Very low — purely additive JSX; all four guard conditions must be true simultaneously before the badge renders |
+| **Rollback** | `git revert 6516ec1` |
+
+After logging a run on a plan with distance-based progression, the resolved view now shows whether the engine moved the target up or down, and displays the new target distance. `hold` is intentionally silent. Guards: `isResolved && todayProgressionState?.lastCompletedWorkoutInstanceId === instanceId && todayProgressionState.currentTargetDistanceMiles != null && (lastResult === 'progress' || lastResult === 'regress')`. Uses existing `TrendingUp` import, `todayProgressionState` computation, and `instanceId` — zero new state, zero new imports.
+
+---
+
 ## Pass 78 — 2026-07-15 (branch `claude/dreamy-mccarthy-cr3jyk`)
 
 ### Commit 1 — `38d2f06`

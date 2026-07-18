@@ -1,5 +1,54 @@
 # Test Results
 
+## 2026-07-18 (seventy-ninth pass) — branch `claude/dreamy-mccarthy-8y5o0o`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  31 passed (31)
+     Tests  1088 passed (1088)
+  Duration  ~4.7s
+```
+
+### After commits 1, 3, 4 (no new tests)
+
+All 1088 pre-existing tests continue to pass. No test regressions.
+
+### After commit 2 (outcomeSortKey fallback + 1 new test)
+
+```
+Test Files  31 passed (31)
+     Tests  1089 passed (1089)  (+1)
+  Duration  ~4.7s
+```
+
+New test in `src/lib/__tests__/outcomeSortKey.test.ts`:
+
+| Test | Description |
+|---|---|
+| `two unparseable instanceIds produce deterministic (stable) sort order` | `makeOutcome('aaa-no-date')` vs `makeOutcome('zzz-no-date')` — confirms `sortKey(a) < sortKey(b)` lexicographically |
+
+Updated test (description only):
+
+| Old description | New description |
+|---|---|
+| `returns empty string when neither completedAt nor a parseable date is available` | `returns workoutInstanceId itself when neither completedAt nor a parseable date is available` |
+
+### Important areas still untested
+
+| Area | Risk | Notes |
+|---|---|---|
+| `storeSync.ts` entire module | High | Cloud sync logic, "cloud wins" policy, debounce, beforeunload flush — all untested |
+| `useToday.ts` midnight advance timer | Medium | `setTimeout` off-by-one or timer leak on unmount possible |
+| `ActiveWorkoutTracker.tsx` (1872 lines) | High | Draft persistence/hydration, rest timer, superset grouping — all untested |
+| `CardioWorkoutTracker.tsx` auto-advance | Medium | Timer firing, `autoAdvanceFiredIdxRef` guard, manual-nav cancellation |
+| `MobilityTracker.tsx` bilateral detection | Medium | `playSwitchSidesSound`, `autoFiredR`, checkpoint restore |
+| `useStreakMilestoneDismiss` localStorage I/O | Low | Pure function `getActiveStreakMilestone` IS tested; the hook's localStorage read/write is not |
+
+---
+
 ## 2026-07-15 (seventy-eighth pass) — branch `claude/dreamy-mccarthy-cr3jyk`
 
 ---
