@@ -39,6 +39,7 @@ import { extraToPlanDay } from '../lib/planDayUtils'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 import { WORKOUT_TYPE_OPTIONS, WORKOUT_META } from '../lib/constants'
+import { computeCurrentStreakDates } from '../lib/historyStats'
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -99,6 +100,12 @@ export function CalendarPage() {
     () => buildMonthGrid(year, month, plan, entries, overrides, today),
     [year, month, plan, entries, overrides, today],
   )
+
+  const streakDatesSet = useMemo(() => {
+    if (!plan) return new Set<string>()
+    const mobilityDates = new Set(Object.keys(mobilityCompletions))
+    return computeCurrentStreakDates(entries, extraEntries, todayStr, plan.id, mobilityDates)
+  }, [plan, entries, extraEntries, todayStr, mobilityCompletions])
 
   function prevMonth() {
     if (month === 0) { setYear(y => y - 1); setMonth(11) }
@@ -354,6 +361,7 @@ export function CalendarPage() {
                   const hasFutureDayOff = rd?.status === 'future' && rd.historyEntry?.action === 'day_off'
                   const extras = rd ? getExtrasForDate(rd.calendarDate) : []
                   const hasMobility = cell.isCurrentMonth && !!mobilityCompletions[cell.date]
+                  const isOnStreak = cell.isCurrentMonth && streakDatesSet.has(cell.date)
 
                   const bgClass = cell.isToday
                     ? 'bg-sky-500 text-white'
@@ -398,6 +406,9 @@ export function CalendarPage() {
                       {(isDayOff || hasFutureDayOff) && cell.isCurrentMonth && (
                         <Coffee size={8} className="mt-0.5 opacity-70" />
                       )}
+                      {isOnStreak && (
+                        <span className="w-1 h-1 rounded-full bg-amber-400 mt-0.5 flex-shrink-0" />
+                      )}
                     </button>
                   )
                 })}
@@ -414,6 +425,7 @@ export function CalendarPage() {
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500/10 inline-block" />Day Off</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-slate-800 inline-block" />Skipped</span>
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm ring-1 ring-emerald-400 inline-block" />Mobility</span>
+            <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />Streak</span>
           </div>
         </>
       )}

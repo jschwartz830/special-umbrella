@@ -730,8 +730,9 @@ export function computeCurrentStreakDates(
   extras: ExtraWorkoutEntry[],
   today: string,
   planId?: string | null,
+  additionalDates?: Set<string>,
 ): Set<string> {
-  const streakable = getStreakDatesSet(entries, extras, planId)
+  const streakable = getStreakDatesSet(entries, extras, planId, additionalDates)
   const result = new Set<string>()
   let cursor = today
   while (streakable.has(cursor)) {
