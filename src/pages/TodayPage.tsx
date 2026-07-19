@@ -648,7 +648,7 @@ export function TodayPage() {
       {/* Header — date + plan name */}
       <div className="pt-6 pb-1">
         <p className="text-xs text-slate-500 uppercase tracking-widest font-medium">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          {new Date(today + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
         <h1 className="text-xl font-bold text-white mt-0.5 leading-snug">{plan.name}</h1>
       </div>
