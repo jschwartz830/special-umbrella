@@ -249,7 +249,7 @@ export function HistoryPage() {
 
   const weeklyBreakdown = useMemo<WeeklyBreakdown[]>(() => {
     if (filterPlanId === 'all') return []
-    const from = format(addDays(new Date(), -55), 'yyyy-MM-dd')
+    const from = format(addDays(parseISO(today), -55), 'yyyy-MM-dd')
     const active = computeWeeklyBreakdown(filterPlanId, filteredEntries, filteredExtras, from, today)
     // Fill gap weeks so training breaks are visible rather than silently skipped.
     return padWeekGaps(active).reverse()
