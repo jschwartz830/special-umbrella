@@ -1,5 +1,21 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-19 (seventy-ninth pass) — branch `claude/dreamy-mccarthy-0r25in`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 4 commits, 5 source files + 1 test file. Three bug fixes and one feature (calendar streak highlighting). No new dependencies; no store schema changes.
+2. **Test delta**: +1 test (1088 → 1089). All pre-existing tests still pass.
+3. **Root cause pattern (bugs)**: Three pages (`TodayPage`, `HistoryPage`, `PlansPage`) all used bare `new Date()` for rendered state that should track the current calendar date. The fix is consistent across all three: use `useToday()` (which fires a midnight timer) instead. One-time action calls (CSV export filenames, modal initial dates) are left as-is because they are not rendered state.
+4. **API consistency fix**: `computeCurrentStreakDates` now accepts `additionalDates` (matching `computePlanStreak`). The fix is a 1-line change. Without it, any calendar streak highlighting would silently exclude mobility-only days, while the streak badge would include them.
+5. **Feature (calendar streak dot)**: An amber dot is added to each streak day in the calendar grid. The computation is in a `useMemo`, scoped to the active plan, and includes mobility completions. The dot is 4px — small enough not to interfere with the existing slot-type icon row.
+6. **What to review**: The streak dot visual — it appears at the bottom of each streak cell's flex column, after the slot-icon row and the coffee icon (for day-off cells). Verify it looks right on both active streak days and day-off streak cells. On day-off cells there will be both a coffee icon and an amber dot — check that isn't confusing.
+7. **Low-risk assessment**: All 4 commits are additive or single-call-site replacements. No store mutations, no new async paths, no schema changes.
+
+---
+
 ## 2026-07-15 (seventy-eighth pass) — branch `claude/dreamy-mccarthy-cr3jyk`
 
 ---

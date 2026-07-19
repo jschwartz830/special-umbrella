@@ -1,5 +1,44 @@
 # Feature Proposals
 
+## Pass 79 — 2026-07-19 (branch `claude/dreamy-mccarthy-0r25in`)
+
+---
+
+### Proposal: Calendar Streak Day Highlighting
+
+**Status**: Implemented in this pass.
+
+#### Problem
+
+The Today page shows a streak count badge ("🔥 N day streak"), but the Calendar page gives no indication of which days are part of the current streak. A user who looks at their calendar has no way to visually identify the run of consecutive workout days without manually counting.
+
+#### Solution
+
+Add a small amber dot (4px, rounded-full) at the bottom of each calendar cell that falls within the current consecutive streak. The streak is:
+- Scoped to the active plan (same logic as the Today streak badge)
+- Computed with mobility completions as `additionalDates` (so a mobility-only day keeps the streak alive in the calendar, matching the badge)
+
+#### Why amber
+
+- Emerald: done cells and mobility ring
+- Sky: today
+- Yellow: pending
+- Amber: day-off cells (coffee icon)
+
+Amber was chosen because it's warm (connoting consistency / achievement), is already used in the app (day-off color), and doesn't conflict with the status colors above.
+
+#### Scope
+
+Narrow, additive, zero store changes. The computation is a single `useMemo` that calls `computeCurrentStreakDates` (already tested and well-specified). The indicator is 4 lines of JSX and 1 legend entry.
+
+#### What it does NOT do
+
+- It does not show future streak projections
+- It does not highlight "best historical streak" — only the current active streak
+- It is not shown when there is no active plan
+
+---
+
 ## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
 
 ---

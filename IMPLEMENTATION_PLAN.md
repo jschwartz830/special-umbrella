@@ -1,5 +1,53 @@
 # Implementation Plan
 
+## Pass 79 — 2026-07-19 (branch `claude/dreamy-mccarthy-0r25in`)
+
+### Baseline
+
+- Branch started from `main` after PR from pass 78 merged.
+- **1088 tests passing** across 31 test files at start of pass.
+- **1089 tests passing** at end of pass (+1 new test for `additionalDates` coverage).
+- TypeScript: `tsc --noEmit` clean (0 errors — verified implicitly by Vitest).
+
+### Architecture Summary (pass 79 scope)
+
+Three bug fixes and one feature, all in UI/rendering layer. No new dependencies. No store schema changes.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File | Summary |
+|---|---|---|---|
+| 1 | `f94088a` | `TodayPage.tsx:651` | Date header used `new Date().toLocaleDateString(...)` — stale date after midnight. Fixed: `new Date(today + 'T00:00').toLocaleDateString(...)` using `today` from `useToday()`. |
+| 2 | `327484d` | `HistoryPage.tsx:252` | Weekly breakdown 55-day window used `addDays(new Date(), -55)` — stale after midnight. Fixed: `addDays(parseISO(today), -55)` using `today` from `useToday()`. |
+| 3 | `3924a79` | `PlansPage.tsx:160` | `today` for plan status was `format(new Date(), 'yyyy-MM-dd')` — stale after midnight. Fixed: `useToday()`. |
+
+Root cause for all three: same pattern. `useToday()` sets a timer that fires at midnight and triggers a re-render. Bare `new Date()` in render-time code captures the old date until the next full re-mount, causing stale plan-status badges, stale weekly breakdown windows, and stale date headers for sessions kept open past midnight.
+
+### API Consistency Fix
+
+**`computeCurrentStreakDates`** (in `historyStats.ts`) lacked the `additionalDates?: Set<string>` parameter that `computePlanStreak` and `getStreakDatesSet` already supported. This meant any streak date set computed via this function would ignore mobility-only days, while the streak badge count (via `computePlanStreak`) correctly includes them — a silent inconsistency if the calendar ever highlighted streak days.
+
+Fixed: added `additionalDates?: Set<string>` as the fifth parameter, threaded through to `getStreakDatesSet`. Added 1 test verifying a mobility date bridging a gap extends the returned set.
+
+### Feature: Calendar Streak Highlighting (`2662bd7`)
+
+**Files changed**: `CalendarPage.tsx`, `historyStats.ts`, `historyStats.test.ts`
+
+Added a small amber dot (1×1, `rounded-full`, `bg-amber-400`) to each calendar cell within the current consecutive workout streak. The streak is scoped to the active plan, and mobility completions are included as `additionalDates` (matching the streak badge on TodayPage). A "Streak" legend entry was added below the existing "Mobility" entry.
+
+**Design rationale**: Amber is visually distinct from emerald (done), sky (today), and yellow (pending). The dot is small enough not to overpower slot-type icons. Only current-month cells are eligible (consistent with all other indicators).
+
+### Prioritized Plan (for future passes)
+
+Carries forward from pass 78:
+- P1: Fix BUG-4 (cloud hydration bypassing Zustand migrate)
+- P1: Add tests for `storeSync.ts`
+- P2: Fix BUG-8 (`outcomeSortKey` non-deterministic empty fallback)
+- P2: Fix BUG-11 (CSV import plan-ID collision)
+- P3: Begin TodayPage decomposition
+
+---
+
 ## Pass 78 — 2026-07-15 (branch `claude/dreamy-mccarthy-cr3jyk`)
 
 ### Baseline

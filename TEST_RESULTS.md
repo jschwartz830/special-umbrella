@@ -1,5 +1,43 @@
 # Test Results
 
+## 2026-07-19 (seventy-ninth pass) — branch `claude/dreamy-mccarthy-0r25in`
+
+---
+
+### Baseline (before changes)
+
+```
+Test Files  31 passed (31)
+     Tests  1088 passed (1088)
+  Duration  ~4.6s
+```
+
+### After commits 1–3 (three bug fixes — no new tests)
+
+All 1088 pre-existing tests continue to pass. No test regressions.
+
+### After commit 4 (streak feature + additionalDates fix — +1 test)
+
+```
+Test Files  31 passed (31)
+     Tests  1089 passed (1089)
+   Duration  2.88s
+```
+
+**New test**: `computeCurrentStreakDates > additionalDates extends streak dates (e.g. mobility completions)` — verifies that a mobility date bridging a gap causes the streak set to include all three dates (before gap, gap-bridge, today), while without `additionalDates` the set contains only today.
+
+### New test coverage added
+
+| Test | Assertion |
+|---|---|
+| `additionalDates extends streak dates` | With a `Set(['2026-06-14'])` as `additionalDates`, a gap between `2026-06-13` and `2026-06-15` is bridged and all 3 dates appear in the streak set |
+
+### Why only 1 new test
+
+The bug fixes (commits 1–3) are UI render-time bugs in React components — they replace `new Date()` with `useToday()` in component code. There is no pure function to test; the correct vehicle for covering this would be component tests with `@testing-library/react`, which is not in the project's devDependencies. Adding the dependency just for these three tests is out of scope for an overnight pass.
+
+---
+
 ## 2026-07-15 (seventy-eighth pass) — branch `claude/dreamy-mccarthy-cr3jyk`
 
 ---
