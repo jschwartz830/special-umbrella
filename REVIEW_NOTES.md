@@ -1083,3 +1083,83 @@ Test suite on entry: **935 tests passing** across 24 test files.
 2. **`computeWorkoutPRFlags` performance** — Pre-index `maxLoad` by exercise name to reduce from O(n²) to O(n). Only matters at large record counts.
 3. **`removeLastOverrideByType` clarity** — Rename to `removeLastOverride` and update JSDoc. Zero behavior change.
 4. **Run progression UI** — `RunProgressionState.lastResult` is stored but never surfaced. A "Progressed ↑" chip on HistoryPage would close the feedback loop for runners.
+
+---
+
+## 2026-07-20 (seventy-ninth pass) — branch `claude/dreamy-mccarthy-ccykny`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 3 commits, 5 source files + 1 test file. Pure stabilisation pass — no new features. Three bugs fixed, 2 new tests, 5 tests updated.
+2. **Test delta**: +2 tests (1088 → 1090). All 1088 pre-existing tests still pass. TypeScript: 0 errors.
+3. **Highest confidence**: The CI gate (commit 1) is zero-risk and immediately valuable. The outcomeSortKey fix (commit 2) is self-contained with clear test coverage. The cloud migration fix (commit 3) is idempotent and safe.
+4. **What is risky**: None of the three fixes are risky. The `migratePlanState` export is the most "visible" change — it exposes a previously-internal function. The annotation `@internal` makes intent clear.
+5. **What to review first**: Commit 3 (storeSync). Verify the migration call order and idempotency assumptions match your understanding of the store version history.
+
+---
+
+### Biggest Issues Found
+
+| ID | Severity | File | Summary |
+|----|----------|------|---------|
+| CI gap | Medium | `.github/workflows/deploy.yml` | Tests not run in CI — broken builds could ship |
+| BUG-8 | Low | `outcomeSortKey.ts` | Non-deterministic sort for same-second outcomes |
+| BUG-4 | Medium | `storeSync.ts` | Cloud hydration bypassed Zustand migrate |
+
+---
+
+### Improvements Completed
+
+| # | What | Commit |
+|---|------|--------|
+| 1 | Add `npm test` step to GitHub Actions deploy pipeline | `f47f2f8` |
+| 2 | Fix `outcomeSortKey` non-determinism — append `\x00instanceId` as tiebreaker | `d4dccc6` |
+| 3 | Fix cloud hydration: apply historyStore, planStore, mobilityStore migrations in `syncOnLogin` | `0cebeb2` |
+
+---
+
+### Verdict by Item
+
+#### Definitely keep
+
+- **Commit 1** (CI gate): No downside; future broken commits will now be caught before shipping.
+- **Commit 2** (outcomeSortKey fix): Clear, tested, zero risk. The `\x00` null-byte separator is the right choice — it sorts before all printable characters, so the secondary key only matters when the primary keys are equal.
+- **Commit 3** (cloud migrations): All three migration functions are idempotent. The historyStore migration in particular is important for users who created extras before the `source` field was introduced — without this fix, their Undo handler would silently delete those entries after a cloud sync.
+
+---
+
+### Recommendations Only (not implemented)
+
+| Priority | Item |
+|----------|------|
+| P1 | Add unit tests for `storeSync.ts` — mock Supabase with `vi.mock`, test: first-login push, hydrate-with-migration, debounce, beforeunload flush |
+| P1 | Fix BUG-11: CSV re-import collision when `extraId` absent in pre-2026-04-26 exports |
+| P2 | Extract `<TodayBanners>` from TodayPage.tsx as first step of ARCH-1 decomposition |
+| P2 | Add `draftVersion` field to active-workout draft key for stale-draft detection on resume |
+| P3 | Add `localDate: string` to OverrideEntry for timezone-safe override storage |
+| P3 | Expose `notes` field in extra-entry edit modal (HistoryPage) |
+| P4 | Add `@testing-library/react` to devDeps to unblock RTL hook/component tests |
+
+---
+
+### Open Questions for Owner
+
+1. **BUG-11 preferred fix**: when a legacy CSV import (no `extraId` column) collides with an existing extra, should the UI warn and offer "replace or create new", or silently re-key the imported extra?
+2. **storeSync migration version tracking**: should we store `{ state, version }` in the Supabase `data` column going forward so future migrations can be version-gated (rather than always run idempotently)? This would require a migration of existing Supabase rows but allows more precise control over which migrations fire.
+3. **TodayPage decomposition**: is there appetite for a multi-pass decomposition of TodayPage (ARCH-1)? Suggest starting with `<TodayBanners>` extraction (~150 lines, zero logic change).
+
+---
+
+### Known Issues / Incomplete Work
+
+- `storeSync.ts` has zero unit tests (TEST-1). The migrations added in this pass are verified only by TypeScript types and manual reasoning.
+- `ActiveWorkoutTracker.tsx` has zero tests (TEST-3). RTL infrastructure would be needed.
+- BUG-11 (CSV extraId collision) documented but not fixed.
+
+---
+
+### Dependencies Added
+
+None.
