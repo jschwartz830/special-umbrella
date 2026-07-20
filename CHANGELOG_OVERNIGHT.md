@@ -2,6 +2,44 @@
 
 ---
 
+## Pass 79 — 2026-07-19 (branch `claude/dreamy-mccarthy-0r25in`)
+
+### Commit 1 — `f94088a`
+
+**fix(TodayPage): use today string for date header to prevent stale display past midnight**
+
+- `src/pages/TodayPage.tsx:651`: Changed `new Date().toLocaleDateString(...)` → `new Date(today + 'T00:00').toLocaleDateString(...)`, where `today` comes from `useToday()`.
+- Without this fix, a session kept open past midnight would display yesterday's date in the header until the page was re-mounted.
+
+### Commit 2 — `327484d`
+
+**fix(HistoryPage): use parseISO(today) for weekly breakdown window to prevent stale date past midnight**
+
+- `src/pages/HistoryPage.tsx:252`: Changed `addDays(new Date(), -55)` → `addDays(parseISO(today), -55)`, where `today` comes from `useToday()`.
+- Without this fix, the weekly workout breakdown chart would anchor its 55-day window to yesterday's date after midnight, showing one day too far back.
+
+### Commit 3 — `3924a79`
+
+**fix(PlansPage): replace stale format(new Date()) with useToday() for correct midnight reset**
+
+- `src/pages/PlansPage.tsx`: Removed `format(new Date(), 'yyyy-MM-dd')` local variable; replaced with `useToday()` hook.
+- Added `import { useToday } from '../hooks/useToday'`.
+- Without this fix, `isPlanExpired` and `computePlanProgress` in `PlanCard` received a stale date after midnight, potentially showing a completed plan as still "Active" until re-mount.
+
+### Commit 4 — `2662bd7`
+
+**feat(CalendarPage): highlight current streak days with amber dot indicator**
+
+- `src/lib/historyStats.ts`: Added `additionalDates?: Set<string>` parameter to `computeCurrentStreakDates`, threaded through to `getStreakDatesSet`. Fixes API inconsistency with `computePlanStreak`.
+- `src/lib/__tests__/historyStats.test.ts`: Added 1 test for `additionalDates` parameter — verifies a mobility date bridging a gap extends the streak date set.
+- `src/pages/CalendarPage.tsx`:
+  - Imported `computeCurrentStreakDates` from `../lib/historyStats`.
+  - Added `streakDatesSet` `useMemo` scoped to the active plan, with `Object.keys(mobilityCompletions)` as `additionalDates`.
+  - Each calendar cell now computes `isOnStreak` and renders a small amber dot (`w-1 h-1 rounded-full bg-amber-400`) when true.
+  - Added "Streak" entry to the calendar legend with a matching amber dot.
+
+---
+
 ## Pass 78 — 2026-07-15 (branch `claude/dreamy-mccarthy-cr3jyk`)
 
 ### Commit 1 — `38d2f06`

@@ -2375,6 +2375,24 @@ describe('computeCurrentStreakDates', () => {
     expect(result.size).toBe(1)
     expect(result.has(TODAY)).toBe(true)
   })
+
+  it('additionalDates extends streak dates (e.g. mobility completions)', () => {
+    // Base: plan has a gap on Jun 14; additionalDates fills that gap via mobility
+    const entries = [
+      cse('2026-06-13', 'complete'),
+      // Jun 14: no plan entry — gap by default
+      cse(TODAY, 'complete'),
+    ]
+    const withoutAdditional = computeCurrentStreakDates(entries, [], TODAY, 'plan-1')
+    expect(withoutAdditional.size).toBe(1) // only TODAY; gap breaks the streak
+
+    const mobilityDates = new Set(['2026-06-14'])
+    const withAdditional = computeCurrentStreakDates(entries, [], TODAY, 'plan-1', mobilityDates)
+    expect(withAdditional.size).toBe(3) // Jun 13, Jun 14, TODAY
+    expect(withAdditional.has('2026-06-13')).toBe(true)
+    expect(withAdditional.has('2026-06-14')).toBe(true)
+    expect(withAdditional.has(TODAY)).toBe(true)
+  })
 })
 
 // ── computeWorkoutTypeBreakdown — multi-slot day (documented limitation) ──────

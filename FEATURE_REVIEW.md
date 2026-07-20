@@ -1,5 +1,33 @@
 # Feature Reviews
 
+## Pass 79 — 2026-07-19 (branch `claude/dreamy-mccarthy-0r25in`)
+
+### Feature: Calendar Streak Day Highlighting
+
+---
+
+#### What was actually built
+
+A `streakDatesSet` `useMemo` in `CalendarPage` that calls `computeCurrentStreakDates(entries, extraEntries, todayStr, plan.id, mobilityDates)`. Each calendar cell computes `isOnStreak = cell.isCurrentMonth && streakDatesSet.has(cell.date)` and renders `{isOnStreak && <span className="w-1 h-1 rounded-full bg-amber-400 mt-0.5 flex-shrink-0" />}` in the cell's flex column. A legend entry "● Streak" was added after the existing "Mobility" entry.
+
+The `computeCurrentStreakDates` API was simultaneously fixed to accept `additionalDates` (the same parameter already present on `computePlanStreak`), making the calendar streak include mobility-only days.
+
+#### Scope accuracy
+
+Exactly as proposed. No scope creep.
+
+#### What's worth watching
+
+- **Day-off streak cells**: A day-off cell (amber background, coffee icon) will also show the amber streak dot. Both are amber, so the dot blends visually — it's visible but subtle. This is probably fine since the day-off cell already signals "streak-contributing" by being amber, but it's a small redundancy.
+- **`streakDatesSet` recomputes on any history change**: This is the correct behavior (streak changes when you log a workout), but it means every Zustand subscription update to `entries`, `extraEntries`, or `mobilityCompletions` will rerun this memo. The computation is O(n) in entry count, which is fast for personal-scale data (<<10k entries). Not a concern.
+- **No active plan**: When there's no active plan, `streakDatesSet` returns an empty `Set` immediately (early return in the `useMemo`). No dots appear. Correct.
+
+#### Verdict
+
+Shipped as designed. Low risk, high clarity, zero regressions.
+
+---
+
 ## Pass 77 — 2026-07-14 (branch `claude/dreamy-mccarthy-aeym9p`)
 
 ### Feature: Streak Milestone Celebration Banner
