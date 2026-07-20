@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
-import { useHistoryStore } from '../store/historyStore'
+import { useHistoryStore, migrateHistoryState } from '../store/historyStore'
 import { useOutcomeStore } from '../store/outcomeStore'
-import { usePlanStore } from '../store/planStore'
+import { usePlanStore, migratePlanState } from '../store/planStore'
 import { useProgramStore } from '../store/programStore'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { useMobilityStore } from '../store/mobilityStore'
@@ -13,13 +13,41 @@ type AnyStore = {
   subscribe: (listener: (state: Record<string, unknown>) => void) => () => void
 }
 
-const STORES: { name: string; store: AnyStore }[] = [
-  { name: 'wpt_history', store: useHistoryStore as unknown as AnyStore },
+type MigrateFn = (data: unknown) => unknown
+
+const STORES: { name: string; store: AnyStore; migrate?: MigrateFn }[] = [
+  {
+    name: 'wpt_history',
+    store: useHistoryStore as unknown as AnyStore,
+    // Always apply from version 0 — idempotent for already-migrated data.
+    // Extras that already have `source` defined are unchanged; only
+    // undefined-source entries get patched to 'history', preventing the Undo
+    // handler from silently deleting user-added extras.
+    migrate: (data) => migrateHistoryState(data, 0),
+  },
   { name: 'wpt_outcomes', store: useOutcomeStore as unknown as AnyStore },
-  { name: 'wpt_plans', store: usePlanStore as unknown as AnyStore },
+  {
+    name: 'wpt_plans',
+    store: usePlanStore as unknown as AnyStore,
+    // Normalises legacy slot types (weightlifting → weights, long_run → run,
+    // recovery_run → run, rest → other) and derives location / focus from
+    // deprecated `tags` field.
+    migrate: (data) => migratePlanState(data),
+  },
   { name: 'wpt_program_vars', store: useProgramStore as unknown as AnyStore },
   { name: 'wpt_exercise_history', store: useExerciseHistoryStore as unknown as AnyStore },
-  { name: 'wpt_mobility', store: useMobilityStore as unknown as AnyStore },
+  {
+    name: 'wpt_mobility',
+    store: useMobilityStore as unknown as AnyStore,
+    // v1 mobility state is missing `activeSession`; add it as null so the
+    // tracker never receives undefined where null | MobilitySessionCheckpoint
+    // is expected.
+    migrate: (data) => {
+      const s = data as Record<string, unknown>
+      if (s && !('activeSession' in s)) return { ...s, activeSession: null }
+      return data
+    },
+  },
   { name: 'wpt_settings', store: useSettingsStore as unknown as AnyStore },
 ]
 
@@ -73,11 +101,17 @@ export async function syncOnLogin(): Promise<void> {
     return
   }
 
-  // Hydrate stores from Supabase (cloud wins over localStorage)
+  // Hydrate stores from Supabase (cloud wins over localStorage).
+  // Apply store-specific migrations before setState so that cloud data stored
+  // by an older app version is normalised to the current schema — the persist
+  // middleware only runs migrate() on localStorage reads, not direct setState.
   for (const row of rows) {
     const entry = STORES.find(s => s.name === row.store_name)
     if (entry && row.data && typeof row.data === 'object') {
-      entry.store.setState(row.data as Record<string, unknown>)
+      const migratedData = entry.migrate
+        ? entry.migrate(row.data as Record<string, unknown>)
+        : row.data as Record<string, unknown>
+      entry.store.setState(migratedData as Record<string, unknown>)
     }
   }
 }
