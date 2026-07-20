@@ -14,14 +14,14 @@ function makeOutcome(
 }
 
 describe('outcomeSortKey', () => {
-  it('returns completedAt when present', () => {
+  it('primary key is completedAt when present, with instanceId tiebreaker', () => {
     const outcome = makeOutcome('plan-1_2026-01-01', '2026-01-01T14:30:00Z')
-    expect(outcomeSortKey(outcome)).toBe('2026-01-01T14:30:00Z')
+    expect(outcomeSortKey(outcome)).toBe('2026-01-01T14:30:00Z\x00plan-1_2026-01-01')
   })
 
-  it('falls back to calendarDate extracted from workoutInstanceId when completedAt is null', () => {
+  it('falls back to calendarDate when completedAt is null, with instanceId tiebreaker', () => {
     const outcome = makeOutcome('plan-1_2026-06-15', null)
-    expect(outcomeSortKey(outcome)).toBe('2026-06-15')
+    expect(outcomeSortKey(outcome)).toBe('2026-06-15\x00plan-1_2026-06-15')
   })
 
   it('falls back to calendarDate when completedAt is undefined', () => {
@@ -29,12 +29,14 @@ describe('outcomeSortKey', () => {
       workoutInstanceId: 'plan-abc_2026-03-22',
       completionState: 'completed',
     }
-    expect(outcomeSortKey(outcome)).toBe('2026-03-22')
+    expect(outcomeSortKey(outcome)).toBe('2026-03-22\x00plan-abc_2026-03-22')
   })
 
-  it('returns empty string when instanceId does not contain a recognisable date', () => {
-    const outcome = makeOutcome('no-date-here', null)
-    expect(outcomeSortKey(outcome)).toBe('')
+  it('sorts before all dated outcomes when instanceId contains no recognisable date', () => {
+    const undated = makeOutcome('no-date-here', null)
+    const dated = makeOutcome('plan-1_2026-01-01', null)
+    // '\x00...' (no date prefix) sorts before any YYYY-MM-DD-bearing key
+    expect(outcomeSortKey(undated) < outcomeSortKey(dated)).toBe(true)
   })
 
   it('completedAt sorts later than calendarDate for the same date', () => {
@@ -59,12 +61,31 @@ describe('outcomeSortKey', () => {
   it('handles extra-workout instanceId (contains _extra_ segment)', () => {
     // makeExtraWorkoutInstanceId produces: "planId_calendarDate_extra_extraId"
     const outcome = makeOutcome('plan-1_2026-04-10_extra_abc123', null)
-    expect(outcomeSortKey(outcome)).toBe('2026-04-10')
+    expect(outcomeSortKey(outcome)).toBe('2026-04-10\x00plan-1_2026-04-10_extra_abc123')
   })
 
   it('handles planId with underscores without extracting wrong date', () => {
     // planId "my_plan_v2" — the date must still be identified correctly
     const outcome = makeOutcome('my_plan_v2_2026-07-04', null)
-    expect(outcomeSortKey(outcome)).toBe('2026-07-04')
+    expect(outcomeSortKey(outcome)).toBe('2026-07-04\x00my_plan_v2_2026-07-04')
+  })
+
+  it('two outcomes with the same completedAt second sort deterministically by instanceId', () => {
+    const a = makeOutcome('plan-aaa_2026-01-01', '2026-01-01T14:30:00Z')
+    const b = makeOutcome('plan-bbb_2026-01-01', '2026-01-01T14:30:00Z')
+    const keyA = outcomeSortKey(a)
+    const keyB = outcomeSortKey(b)
+    // Keys must be different — no longer a tie
+    expect(keyA).not.toBe(keyB)
+    // And the function is pure — same inputs always produce the same key
+    expect(outcomeSortKey(a)).toBe(keyA)
+    expect(outcomeSortKey(b)).toBe(keyB)
+  })
+
+  it('two outcomes with no completedAt and the same date sort deterministically by instanceId', () => {
+    const a = makeOutcome('plan-alpha_2026-05-01', null)
+    const b = makeOutcome('plan-beta_2026-05-01', null)
+    expect(outcomeSortKey(a)).not.toBe(outcomeSortKey(b))
+    expect(outcomeSortKey(a)).toBe(outcomeSortKey(a))
   })
 })
