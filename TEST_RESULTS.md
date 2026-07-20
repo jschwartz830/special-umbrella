@@ -838,3 +838,46 @@ No test failures. Net +10 tests vs. baseline.
 | Module | New Tests | What's covered |
 |---|---|---|
 | `useDismissableBanner.ts` | 10 | localStorage read/write contract, isolation, null planId, error degradation |
+
+---
+
+## Pass 79 — 2026-07-20 (branch `claude/dreamy-mccarthy-ccykny`)
+
+### Baseline (before changes)
+
+```
+Test Files  31 passed (31)
+     Tests  1088 passed (1088)
+  Start at  (start of pass)
+  Duration  ~3.1s
+```
+
+### Tests added
+
+| Module | New Tests | What's covered |
+|--------|-----------|----------------|
+| `outcomeSortKey.ts` | +2 | Deterministic tie-breaking: same-completedAt and same-calendarDate |
+
+5 existing tests updated to include the `\x00instanceId` tiebreaker suffix in expected values. 1 test updated to check relative ordering (meaningful contract) rather than exact string value (implementation detail).
+
+### Final results
+
+```
+Test Files  31 passed (31)
+     Tests  1090 passed (1090)
+  Start at  07:31:12
+  Duration  3.08s
+```
+
+No failures. Net +2 tests vs. baseline.
+
+### Still untested (significant gaps)
+
+| Module | Gap | Why deferred |
+|--------|-----|--------------|
+| `storeSync.ts` | Cloud sync, migration application, debounce, flush | Requires Supabase client mock (vi.mock) — infrastructure not yet in place |
+| `ActiveWorkoutTracker.tsx` | Draft persistence, rest timer, superset grouping | Requires `@testing-library/react` (not in devDeps) |
+| `CardioWorkoutTracker.tsx` | Auto-advance cancellation (partially tested indirectly) | Same RTL gap |
+| `MobilityTracker.tsx` | Bilateral detection, session checkpoint | Same RTL gap |
+| `useToday.ts` | Midnight advance timer | Hook integration test requires RTL |
+| `authStore.ts` | All paths | Requires Supabase mock |

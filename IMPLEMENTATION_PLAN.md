@@ -1089,3 +1089,50 @@ Test count: 1017 → 1027 (+10).
 | `removeLastOverrideByType` footgun API | No callers pass wrong `type`; rename/docs improvement, low urgency |
 | Component/integration tests | Still requires `@testing-library/react` not in devDeps; out of scope for this pass |
 | Run progression state surfacing in HistoryPage | Medium-scope UI feature; deferred |
+
+---
+
+## Pass 79 — 2026-07-20 (branch `claude/dreamy-mccarthy-ccykny`)
+
+### Baseline
+
+- Branch started from `main` after PR from pass 78 merged.
+- **1088 tests passing** across 31 test files at start of pass.
+- **1090 tests passing** at end of pass (+2 new tests for outcomeSortKey tie-breaking).
+- TypeScript: `tsc --noEmit` clean (0 errors).
+
+### Architecture summary (unchanged from pass 78)
+
+React 18 + TypeScript 5.5 + Zustand 4.5, Vite PWA, GitHub Pages. Local-first with optional Supabase Google OAuth cloud sync. 7 Zustand stores, 31 test files.
+
+### What is strong
+
+- Rotation engine: well-tested, edge cases covered, symmetric modulo correct.
+- Expression evaluator: safe recursive-descent parser, NaN/Infinity guard.
+- CSV I/O: RFC 4180, backward-compatible column additions, idempotent re-import.
+- Store migrations: all idempotent, applying to already-migrated data is a no-op.
+- 78 prior audit passes have eliminated most obvious bugs.
+
+### Key risks / weak points (updated)
+
+| ID | Severity | Area | Status |
+|----|----------|------|--------|
+| CI gap | Medium | deploy.yml | **FIXED pass 79** — test step added |
+| BUG-8 | Low | outcomeSortKey | **FIXED pass 79** — instanceId tiebreaker added |
+| BUG-4 | Medium | storeSync | **FIXED pass 79** — migrations applied on cloud hydration |
+| ARCH-1 | Debt | TodayPage.tsx | Open — 1700+ lines, decomposition deferred |
+| TEST-1 | High | storeSync.ts | Open — requires Supabase mock infrastructure |
+| TEST-3 | High | ActiveWorkoutTracker.tsx | Open — requires RTL/Playwright |
+| BUG-11 | Low | csv.ts | Open — legacy CSV extraId collision |
+
+### Prioritised plan for next pass
+
+| Priority | Item |
+|----------|------|
+| P1 | Add storeSync unit tests (mock Supabase via vi.mock) |
+| P1 | Fix BUG-11: legacy CSV extraId collision — warn or re-key |
+| P2 | Extract `<TodayBanners>` from TodayPage (ARCH-1 first step) |
+| P2 | Add `draftVersion` to active-workout draft for stale-draft detection |
+| P3 | Add `localDate` to OverrideEntry for timezone-safe overrides |
+| P3 | Expose `notes` in extra-entry edit modal (HistoryPage) |
+| P4 | RTL tests for ActiveWorkoutTracker (requires devDep addition) |
