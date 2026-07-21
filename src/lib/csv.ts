@@ -20,7 +20,7 @@ import type {
   PerceivedEffort,
 } from '../types'
 import { nanoid } from './utils'
-import { makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
+import { makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from './workoutInstanceId'
 
 // ── Core encode/decode ────────────────────────────────────────────────────────
 
