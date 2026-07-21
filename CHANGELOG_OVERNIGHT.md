@@ -2,6 +2,78 @@
 
 ---
 
+## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
+
+### [6000a9c] fix(CalendarPage): slot fallback type 'rest' → 'other'
+
+**Summary**: The zero-slots guard in `handleOutcomeConfirm` (line 244) used the deprecated `'rest'` WorkoutType. `planStore` migrations normalise `'rest'` to `'other'`, so using `'rest'` here put the code on a branch that no live plan can reach while also looking up `WORKOUT_META['rest']` (the legacy Moon icon / "Other" label) instead of `WORKOUT_META['other']`.
+
+**Why it matters**: Silent visual corruption and wrong downstream logic for any plan day that has zero slots. The same bug was already fixed in `HistoryPage.tsx` but CalendarPage was missed.
+
+**Files changed**: `src/pages/CalendarPage.tsx`
+
+**Risks**: None — single character change, no logic change.
+
+**Rollback**: `git revert 6000a9c`
+
+---
+
+### [68c2f9f] fix(csv): import workoutInstanceId helpers from lib, not store
+
+**Summary**: `csv.ts` imported `makeWorkoutInstanceId` and `makeExtraWorkoutInstanceId` from `../store/outcomeStore` instead of their canonical home `../lib/workoutInstanceId.ts`. These functions are defined in `workoutInstanceId.ts` and only re-exported by `outcomeStore`.
+
+**Why it matters**: A lib module importing from a store violates dependency direction (`lib → store` instead of `store → lib`). While it doesn't currently cause a circular import, if `outcomeStore` ever imported from `csv.ts`, a cycle would form and bundling would fail.
+
+**Files changed**: `src/lib/csv.ts`
+
+**Risks**: None — the functions are identical; only the import path changes. Tests confirm identical behaviour.
+
+**Rollback**: `git revert 68c2f9f`
+
+---
+
+### [5f96761] fix(stores): add version + migrate to settingsStore and programStore
+
+**Summary**: `settingsStore` (`wpt_settings`) and `programStore` (`wpt_program_vars`) both used `persist()` without `version` or `migrate`. All other five stores already have `version: 1`. Without a version, any future schema change would silently leave existing localStorage data without migration.
+
+**Why it matters**: Forward-compatibility safety net. No data migration needed today; establishes the baseline so future schema changes can run correctly.
+
+**Files changed**: `src/store/settingsStore.ts`, `src/store/programStore.ts`
+
+**Risks**: On first load, Zustand sees `version: undefined` vs `version: 1` and calls the identity migrate — returns the existing data unchanged. Safe and correct.
+
+**Rollback**: `git revert 5f96761`
+
+---
+
+### [13dd36d] fix(expressionEval): tokenizer stops at first decimal point in a number
+
+**Summary**: The number scanner consumed any `[\d.]` sequence and relied on `parseFloat` to discard extra decimals. Replaced with an explicit `seenDot` flag that stops consuming at the second decimal point. Adds one test documenting the expected tokenizer behaviour.
+
+**Why it matters**: Principled tokenization — the scanner no longer relies on `parseFloat`'s implicit truncation. No observable behaviour change for valid YAML-authored expressions.
+
+**Files changed**: `src/lib/expressionEval.ts`, `src/lib/__tests__/expressionEval.test.ts`
+
+**Risks**: None for valid inputs. Malformed multi-dot numbers already produced the correct result via `parseFloat`'s truncation.
+
+**Rollback**: `git revert 13dd36d`
+
+---
+
+### [6463ed0] test(historyStore): document BUG-2 — day_off→complete without planDayIndex
+
+**Summary**: Test that captures the current (buggy) behaviour of `updateEntryAction` when no `planDayIndex` is supplied while changing from `day_off` to `complete`. The resulting entry has `planDayIndex: undefined`, silently dropped by stats functions.
+
+**Why it matters**: Regression anchor for the future fix. Documents the expected fix path in the test comment.
+
+**Files changed**: `src/store/__tests__/historyStore.test.ts`
+
+**Risks**: None — test-only change.
+
+**Rollback**: `git revert 6463ed0`
+
+---
+
 ## Pass 79 — 2026-07-19 (branch `claude/dreamy-mccarthy-0r25in`)
 
 ### Commit 1 — `f94088a`

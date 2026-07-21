@@ -1,5 +1,59 @@
 # Implementation Plan
 
+## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
+
+### Baseline
+
+- Branch started from `main` after PR from pass 79 merged.
+- **1091 tests passing** across 31 test files at start of pass.
+- **1093 tests passing** at end of pass (+2 new tests).
+- TypeScript: `tsc --noEmit` clean (0 errors — verified implicitly by Vitest).
+
+### Architecture Summary (pass 80 scope)
+
+Stabilisation pass. Four confirmed bugs fixed, two store schema-safety gaps patched, one tokenizer correctness improvement, one dependency-direction fix. No new dependencies. No store schema data changes (version bump is safe/forward-compatible). Feature work deliberately skipped; see Prioritized Plan.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File | Summary |
+|---|---|---|---|
+| BUG-1 | `6000a9c` | `CalendarPage.tsx:244` | Slot fallback in `handleOutcomeConfirm` used deprecated `'rest'` WorkoutType instead of `'other'`. Downstream `type === 'other'` checks and `WORKOUT_META` icon lookup would silently follow the wrong path. |
+| ARCH-2 | `68c2f9f` | `csv.ts:23` | `csv.ts` imported `makeWorkoutInstanceId` and `makeExtraWorkoutInstanceId` from `outcomeStore` instead of their source module `workoutInstanceId.ts`. A lib module importing from a store violates dependency direction and risks a circular import. Fixed by importing directly from `lib/workoutInstanceId.ts`. |
+| RISK-1/RISK-2 | `5f96761` | `settingsStore.ts`, `programStore.ts` | Both stores lacked a `version` and `migrate` in the `persist` config. Future schema changes would silently fail to run migrations for existing users. Added `version: 1` with identity migrations to match the pattern in all other stores. |
+| EDGE-1 | `13dd36d` | `expressionEval.ts:40` | Number tokenizer consumed all digits-and-dots then relied on `parseFloat` to discard extra decimal portions (e.g. `parseFloat("1.2.3") = 1.2`). Replaced with an explicit `seenDot` flag that stops scanning at the first decimal point. Principled tokenization, no observable behavior change for valid input. |
+
+### Test Added This Pass
+
+| Commit | File | Summary |
+|---|---|---|
+| `6463ed0` | `historyStore.test.ts` | Documents BUG-2: `updateEntryAction` called without `planDayIndex` when changing `day_off → complete` leaves `planDayIndex: undefined`. Stats functions silently drop such entries. Test anchors the current behaviour for the future fix. |
+
+### Bugs Found But Not Fixed (newly documented)
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-2 | `CalendarPage.tsx`, `historyStore.ts:179` | `openEditOutcome` → `handleOutcomeConfirm` path: if the existing entry is `day_off`, `entry.planDayIndex` is `undefined`, so `updateEntryAction` is called without a valid index. The resulting `complete` entry has `planDayIndex: undefined`, causing it to be silently dropped from stats. Fix: add `planDayIndex` to the `outcomeTarget` state shape in CalendarPage and use it as a fallback. |
+| BUG-CSV | `csv.ts:653` | Pre-2026-04-26 CSV exports lack an `extraId` column. Each re-import generates fresh `nanoid()` IDs, creating duplicate extra workout entries. Fix: derive a stable synthetic ID from `planId + calendarDate + workoutType + workoutName` for rows missing `extraId`. |
+| EDGE-5 | `sessionSummary.ts:92` | A `runActual` object with neither `actualDistanceMiles` nor `actualDurationMin` but with a stored `averagePaceSecondsPerMile` would produce a pace-only summary line. Partially-complete outcomes that have only a stored pace (no distance/duration) would correctly show the pace. Outcomes with `runActual` but no distance, duration, or pace would silently return `null`. Low probability, but worth testing. |
+
+### Prioritized Plan (for future passes)
+
+Carries forward from pass 79, updated priority:
+
+| Priority | Item |
+|---|---|
+| P1 | Fix BUG-2: `openEditOutcome` → `day_off → complete` leaves `planDayIndex: undefined` |
+| P1 | Add tests for `storeSync.ts` cloud sync branching logic (TEST-1) |
+| P1 | Fix BUG-4: cloud hydration bypassing Zustand migrate (complex — requires migration pipeline) |
+| P2 | Fix BUG-CSV: deterministic `extraId` for pre-2026-04-26 CSV re-imports |
+| P2 | Fix BUG-8: `outcomeSortKey` non-deterministic empty fallback |
+| P2 | Fix BUG-11: CSV import plan-ID collision (separate from BUG-CSV above) |
+| P3 | Begin TodayPage decomposition — extract `<TodayBanners>` first |
+| P3 | Add `draftVersion` to active-workout draft |
+| P4 | EDGE-5: add pace-only run/swim outcome summary test |
+
+---
+
 ## Pass 79 — 2026-07-19 (branch `claude/dreamy-mccarthy-0r25in`)
 
 ### Baseline
