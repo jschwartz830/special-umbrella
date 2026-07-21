@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2 } from 'lucide-react'
+import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
 import type { ExerciseSpec, WarmupRampSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
@@ -20,6 +20,8 @@ interface SetTrackState {
   actualRestSeconds: number | null
   resolvedLoadLbs: number | null
   isWarmup?: boolean
+  /** True when the set is measured in seconds (duration-based) rather than reps. */
+  isTimed?: boolean
 }
 
 interface ExerciseTrackState {
@@ -374,7 +376,7 @@ export function ActiveWorkoutTracker({
   onComplete,
 }: Props) {
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
-  const { startDelaySeconds } = useSettingsStore()
+  const { startDelaySeconds, focusMode, setFocusMode } = useSettingsStore()
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [exercisePicker, setExercisePicker] = useState<ExercisePickerMode | null>(null)
   const workoutStartRef = useRef(new Date().toISOString())
@@ -493,24 +495,28 @@ export function ActiveWorkoutTracker({
         : deriveProgressionMode(ex.progressionType, ex.progress != null)
       const isDouble = progressionMode === 'double'
 
-      function buildSet(load?: string | null, reps?: number | string | null, rest?: string | null, workSetIndex?: number): SetTrackState {
+      function buildSet(load?: string | null, reps?: number | string | null, rest?: string | null, workSetIndex?: number, duration?: string | null): SetTrackState {
         const resolvedLoadLbs = hasVars
           ? (resolveLoad(load ?? undefined, evalCtx) ?? parseNumericLoad(load))
           : parseNumericLoad(load)
         const validLoad = resolvedLoadLbs != null && resolvedLoadLbs > 0 ? resolvedLoadLbs : null
+        // Timed set: no reps target, measured in seconds via `duration` ("45s", "1m").
+        const timedSecs = reps == null && duration != null ? parseRestSecs(duration) : null
+        const isTimed = timedSecs != null
         // For double progression, resolve a specific rep target from previous performance
         const prevReps = workSetIndex != null ? prevEx?.[workSetIndex + (warmupSets?.length ?? 0)]?.actualReps : undefined
         const effectiveReps = isDouble ? resolveDoubleProgressionTarget(reps, prevReps) : reps
         return {
           setElapsedSeconds: 0,
           completed: false,
-          actualReps: typeof effectiveReps === 'number' ? effectiveReps : null,
+          actualReps: isTimed ? timedSecs : (typeof effectiveReps === 'number' ? effectiveReps : null),
           actualLoad: validLoad,
-          targetReps: effectiveReps ?? null,
+          targetReps: isTimed ? timedSecs : (effectiveReps ?? null),
           targetLoad: load ?? null,
           restSeconds: parseRestSecs(rest),
           actualRestSeconds: null,
           resolvedLoadLbs: validLoad,
+          isTimed,
         }
       }
 
@@ -526,7 +532,7 @@ export function ActiveWorkoutTracker({
       let sets: SetTrackState[]
       if (Array.isArray(ex.sets) && ex.sets.length > 0) {
         const workSets = ex.sets.map((s, i) => {
-          const base = buildSet(s.load ?? ex.load, s.reps ?? ex.reps, s.rest ?? ex.rest, i)
+          const base = buildSet(s.load ?? ex.load, s.reps ?? ex.reps, s.rest ?? ex.rest, i, s.duration ?? ex.duration)
           const prev = prevEx?.[i + warmupSets.length]
           return {
             ...base,
@@ -538,7 +544,7 @@ export function ActiveWorkoutTracker({
       } else {
         const n = typeof ex.sets === 'number' ? ex.sets : 3
         const workSets = Array.from({ length: n }, (_, i) => {
-          const base = buildSet(ex.load, ex.reps, ex.rest, i)
+          const base = buildSet(ex.load, ex.reps, ex.rest, i, ex.duration)
           const prev = prevEx?.[i + warmupSets.length]
           return {
             ...base,
@@ -1407,6 +1413,47 @@ export function ActiveWorkoutTracker({
     return `${previous.actualReps} x ${previous.actualLoad}lb`
   }
 
+  // ── Focus mode ────────────────────────────────────────────────────────────
+  // A single-set view driven by the same timer/logging handlers as the list.
+
+  /** First set anywhere in the workout that hasn't been completed yet. */
+  function findCurrentSet(): { exIdx: number; setIdx: number } | null {
+    for (let ei = 0; ei < exercises.length; ei++) {
+      for (let si = 0; si < exercises[ei].sets.length; si++) {
+        if (!exercises[ei].sets[si].completed) return { exIdx: ei, setIdx: si }
+      }
+    }
+    return null
+  }
+
+  // +15 / −15 in the focus-view corners bump rest time: the live target while
+  // resting, otherwise the planned rest of the set you're about to perform.
+  function focusAdjustRest(delta: number, cur: { exIdx: number; setIdx: number } | null) {
+    if (restTargetRef.current != null) {
+      const next = Math.max(15, restTargetRef.current + delta)
+      restTargetRef.current = next
+      setRestTarget(next)
+      if (restRunRef.current) {
+        const ctx = getAudioContext()
+        if (ctx) scheduleRestAudio(ctx, next, restElapsedRef.current ?? 0)
+      }
+      recordRestElapsed()
+      return
+    }
+    if (!cur) return
+    const s = exercises[cur.exIdx]?.sets[cur.setIdx]
+    if (!s) return
+    updateSet(cur.exIdx, cur.setIdx, { restSeconds: Math.max(15, (s.restSeconds ?? 90) + delta) })
+  }
+
+  function targetLabel(s: SetTrackState): string {
+    const reps = s.targetReps
+    const load = s.resolvedLoadLbs != null && s.resolvedLoadLbs > 0 ? s.resolvedLoadLbs : parseNumericLoad(s.targetLoad)
+    const repsPart = reps != null ? `${reps}${s.isTimed ? 's' : ''}` : (s.isTimed ? '—s' : '—')
+    const loadPart = load != null ? ` × ${load} lb` : ''
+    return `${repsPart}${loadPart}`
+  }
+
   function handleDone() {
     const endTime = new Date().toISOString()
     const periods = pausePeriodsRef.current
@@ -1470,6 +1517,220 @@ export function ActiveWorkoutTracker({
     )
   }
 
+  if (focusMode && exercises.length > 0) {
+    const cur = findCurrentSet()
+    const curEx = cur ? exercises[cur.exIdx] : null
+    const curSet = cur ? curEx!.sets[cur.setIdx] : null
+
+    const isCountingDown = cur != null && setTimerCountdown?.exIdx === cur.exIdx && setTimerCountdown?.setIdx === cur.setIdx
+    const setRunning = cur != null && activeSetTimer?.exIdx === cur.exIdx && activeSetTimer?.setIdx === cur.setIdx
+    const performing = isCountingDown || setRunning
+    const resting = !performing && restElapsed != null
+
+    const curWorkNumber = cur && curSet && !curSet.isWarmup
+      ? curEx!.sets.slice(0, cur.setIdx + 1).filter(s => !s.isWarmup).length
+      : null
+    const totalWork = curEx ? curEx.sets.filter(s => !s.isWarmup).length : 0
+    const repStep = curSet?.isTimed ? 5 : 1
+    const unitLabel = curSet?.isTimed ? 'Secs' : 'Reps'
+
+    const buttonLabel = !cur
+      ? 'Log Workout'
+      : performing ? 'Log Set'
+      : resting ? 'Start Next Set'
+      : 'Start Set'
+
+    const onButton = () => {
+      if (!cur) { handleDone(); return }
+      if (performing) handleSetComplete(cur.exIdx, cur.setIdx)
+      else handleSetTimerToggle(cur.exIdx, cur.setIdx)
+    }
+
+    const restOver = restTarget != null && restElapsed != null && restElapsed >= restTarget
+
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
+        {/* Header */}
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 border-b border-slate-800" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
+          <button
+            onClick={onMinimize}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title="Minimize workout"
+          >
+            <X size={18} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm font-bold text-white truncate">{planDay.label}</h1>
+            <p className="text-xs text-slate-500 truncate">{slot.name}</p>
+          </div>
+          <button
+            onClick={() => setFocusMode(false)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-slate-800 transition-colors"
+            title="Exit focus mode"
+          >
+            <List size={16} />
+          </button>
+          <button
+            onClick={() => toggleWorkout()}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
+              workoutRunning
+                ? 'border-sky-500/50 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20'
+                : 'border-orange-500/50 bg-orange-500/10 text-orange-300 hover:bg-orange-500/20'
+            }`}
+          >
+            {workoutRunning ? <Pause size={12} /> : <Play size={12} />}
+            <span className="font-mono">{fmt(workoutElapsed)}</span>
+          </button>
+        </div>
+
+        {!cur || !curSet || !curEx ? (
+          /* All sets logged */
+          <div className="flex-1 flex flex-col items-center justify-center px-6 gap-6">
+            <div className="text-center space-y-1">
+              <Check size={40} className="text-emerald-400 mx-auto" />
+              <p className="text-lg font-semibold text-white">All sets logged</p>
+              <p className="text-sm text-slate-500">Nice work — log the workout to finish.</p>
+            </div>
+            <button
+              onClick={handleDone}
+              className="w-full max-w-sm py-4 bg-sky-500 hover:bg-sky-600 text-white rounded-2xl font-semibold text-base transition-colors active:scale-[0.98]"
+            >
+              Log Workout
+            </button>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col px-5 pt-4 pb-6 overflow-y-auto">
+            {/* Exercise + set position */}
+            <div className="text-center">
+              <p className="text-xl font-bold text-white leading-tight">{curEx.exercise}</p>
+              <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-medium">
+                {curSet.isWarmup
+                  ? 'Warmup set'
+                  : `Set ${curWorkNumber} of ${totalWork}`}
+              </p>
+            </div>
+
+            {/* Last / Target */}
+            <div className="grid grid-cols-2 gap-3 mt-5">
+              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-center">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Last</p>
+                <p className="text-sm text-slate-200 font-medium mt-1">{previousSetDisplay(curEx, cur.setIdx)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-center">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Target</p>
+                <p className="text-sm text-sky-200 font-medium mt-1">{targetLabel(curSet)}</p>
+              </div>
+            </div>
+
+            {/* Data entry for current set */}
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-3">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold text-center mb-2">{unitLabel}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualReps: Math.max(0, (curSet.actualReps ?? 0) - repStep) })}
+                    className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
+                  >−</button>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={curSet.actualReps ?? ''}
+                    onChange={e => updateSet(cur.exIdx, cur.setIdx, { actualReps: parseInputNumber(e.target.value) })}
+                    onFocus={e => e.target.select()}
+                    placeholder={String(curSet.targetReps ?? (curSet.isTimed ? 'secs' : 'reps'))}
+                    className="flex-1 min-w-0 bg-transparent text-2xl font-bold text-white text-center focus:outline-none"
+                  />
+                  <button
+                    onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualReps: (curSet.actualReps ?? 0) + repStep })}
+                    className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
+                  >+</button>
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-3">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold text-center mb-2">Lbs</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualLoad: Math.max(0, (curSet.actualLoad ?? 0) - 5) })}
+                    className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
+                  >−</button>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={curSet.actualLoad ?? ''}
+                    onChange={e => updateSet(cur.exIdx, cur.setIdx, { actualLoad: parseInputNumber(e.target.value) })}
+                    onFocus={e => e.target.select()}
+                    placeholder={
+                      curSet.resolvedLoadLbs != null && curSet.resolvedLoadLbs > 0
+                        ? String(curSet.resolvedLoadLbs)
+                        : (curSet.targetLoad ?? 'lbs')
+                    }
+                    className="flex-1 min-w-0 bg-transparent text-2xl font-bold text-white text-center focus:outline-none"
+                  />
+                  <button
+                    onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualLoad: (curSet.actualLoad ?? 0) + 5 })}
+                    className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
+                  >+</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Big center action button */}
+            <div className="flex-1 flex flex-col items-center justify-center py-6">
+              <button
+                onClick={onButton}
+                disabled={!workoutRunning}
+                className={`w-full max-w-xs aspect-square max-h-[300px] rounded-full flex flex-col items-center justify-center gap-2 font-bold shadow-xl transition-transform active:scale-[0.97] disabled:opacity-40 ${
+                  performing
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                    : 'bg-sky-500 hover:bg-sky-600 text-white'
+                }`}
+              >
+                <span className="text-2xl">{buttonLabel}</span>
+                {isCountingDown ? (
+                  <span className="text-4xl font-mono font-bold text-sky-100">{setTimerCountdown!.remaining}</span>
+                ) : setRunning ? (
+                  <span className="text-4xl font-mono font-bold text-amber-200">{fmt(curSet.setElapsedSeconds)}</span>
+                ) : resting ? (
+                  <span className={`text-4xl font-mono font-bold ${restOver ? 'text-red-200' : 'text-emerald-100'}`}>{fmt(restElapsed!)}</span>
+                ) : null}
+              </button>
+
+              {/* Rest timer + target below the button */}
+              {resting && (
+                <div className="mt-5 text-center">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Rest</p>
+                  <p className={`text-2xl font-mono font-bold leading-none mt-1 ${restOver ? 'text-red-400' : 'text-emerald-300'}`}>{fmt(restElapsed!)}</p>
+                  <p className="text-xs text-slate-500 mt-1">Target {restTarget != null ? fmt(restTarget) : '—'}</p>
+                </div>
+              )}
+              {!workoutRunning && (
+                <p className="mt-5 text-xs text-orange-300">Workout paused — tap the timer to resume</p>
+              )}
+            </div>
+
+            {/* Corner rest adjusters */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => focusAdjustRest(-15, cur)}
+                className="flex flex-col items-center px-5 py-2.5 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 active:bg-slate-700 transition-colors"
+              >
+                <span className="text-lg font-bold leading-none">−15</span>
+                <span className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">Rest</span>
+              </button>
+              <button
+                onClick={() => focusAdjustRest(15, cur)}
+                className="flex flex-col items-center px-5 py-2.5 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 active:bg-slate-700 transition-colors"
+              >
+                <span className="text-lg font-bold leading-none">+15</span>
+                <span className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">Rest</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <>
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
@@ -1485,6 +1746,15 @@ export function ActiveWorkoutTracker({
           <h1 className="text-sm font-bold text-white truncate">{planDay.label}</h1>
           <p className="text-xs text-slate-500 truncate">{slot.name}</p>
         </div>
+        {exercises.length > 0 && (
+          <button
+            onClick={() => setFocusMode(true)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-slate-800 transition-colors"
+            title="Focus mode"
+          >
+            <Maximize2 size={16} />
+          </button>
+        )}
         <button
           onClick={() => setShowCancelConfirm(true)}
           className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
@@ -1559,6 +1829,7 @@ export function ActiveWorkoutTracker({
           exercises.map((ex, exIdx) => {
             const ssInfo = ex.supersetGroupId ? supersetGroups.get(ex.supersetGroupId) : undefined
             const ssColors = ssInfo ? getColorClasses(ssInfo.color) : null
+            const isTimedExercise = ex.sets.some(s => s.isTimed)
             return (
             <div key={ex.exercise + exIdx} className={`bg-slate-800/60 rounded-xl p-3 space-y-2 border ${ssColors ? ssColors.border : 'border-transparent'}`}>
               {ssInfo && (
@@ -1624,7 +1895,7 @@ export function ActiveWorkoutTracker({
               <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
                 <span className="col-span-1 text-center">#</span>
                 <span className="col-span-3 text-center">Prev</span>
-                <span className="col-span-3 text-center">Reps</span>
+                <span className="col-span-3 text-center">{isTimedExercise ? 'Secs' : 'Reps'}</span>
                 <span className="col-span-3 text-center">Lbs</span>
                 <span className="col-span-2 text-center">Time</span>
                 <span className="col-span-1 text-center">✓</span>
@@ -1679,7 +1950,7 @@ export function ActiveWorkoutTracker({
                       })}
                       onFocus={e => { handleFieldFocus(exIdx, setIdx, 'reps'); e.target.select() }}
                       onBlur={handleFieldBlur}
-                      placeholder={String(s.targetReps ?? 'reps')}
+                      placeholder={String(s.targetReps ?? (s.isTimed ? 'secs' : 'reps'))}
                       className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
                     />
                     <input
