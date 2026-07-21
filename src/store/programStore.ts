@@ -88,6 +88,10 @@ export const useProgramStore = create<ProgramState>()(
         }
       },
     }),
-    { name: 'wpt_program_vars' },
+    {
+      name: 'wpt_program_vars',
+      version: 1,
+      migrate: (persisted) => persisted as ProgramState,
+    },
   ),
 )

@@ -37,6 +37,15 @@ describe('evaluateExpression', () => {
     it('evaluates a negative number via unary minus', () => {
       expect(evaluateExpression('-5', ctx())).toBe(-5)
     })
+
+    it('malformed multi-dot number: tokenizer stops at first decimal point', () => {
+      // "1.2.3" is an authoring error. The tokenizer stops at the first decimal
+      // and produces [1.2, 0.3]; the parser returns 1.2 from the first primary
+      // token (trailing 0.3 is unreachable without an operator). The fix ensures
+      // the tokenizer is principled — it no longer relies on parseFloat to silently
+      // discard the ".3" suffix.
+      expect(evaluateExpression('1.2.3', ctx())).toBeCloseTo(1.2)
+    })
   })
 
   describe('variable resolution', () => {

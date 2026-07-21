@@ -1,5 +1,38 @@
 # Test Results
 
+## 2026-07-21 (eightieth pass) — branch `claude/dreamy-mccarthy-h2vbby`
+
+---
+
+### Baseline (before changes)
+
+- **31 test files, 1091 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+
+### Tests Added This Pass
+
+| File | Test | Purpose |
+|---|---|---|
+| `src/lib/__tests__/expressionEval.test.ts` | `'malformed multi-dot number: tokenizer stops at first decimal point'` | Documents that `1.2.3` tokenizes to `[1.2, 0.3]` after the `seenDot` fix; parser takes `1.2` from the first primary token |
+| `src/store/__tests__/historyStore.test.ts` | `'day_off → complete without planDayIndex leaves planDayIndex undefined (BUG-2)'` | Regression anchor for BUG-2; asserts current (buggy) behaviour and documents the expected fix path in comment |
+
+### Final Results
+
+- **31 test files, 1093 tests — all passing** (+2 tests)
+- No regressions
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `storeSync.ts` — cloud sync module | P1 | Zero tests. Highest-risk untested path: first-login branch, migration ordering, debounce, `beforeunload` flush. |
+| `ActiveWorkoutTracker.tsx` — 1872-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues, bilateral cues — all manual-only |
+| `CardioWorkoutTracker.tsx` auto-advance timer | P3 | The `setTimeout` → auto-advance flow is tested by manual QA only |
+| `MobilityTracker.tsx` bilateral detection | P3 | Checkpoint restore and bilateral cue logic untested |
+| `useToday.ts` midnight-advance timer | P4 | The timer setup is straightforward but untested |
+
+---
+
 ## 2026-07-19 (seventy-ninth pass) — branch `claude/dreamy-mccarthy-0r25in`
 
 ---

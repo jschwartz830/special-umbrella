@@ -16,6 +16,10 @@ export const useSettingsStore = create<SettingsState>()(
       autoAdvanceSegments: true,
       setAutoAdvanceSegments: (enabled) => set({ autoAdvanceSegments: enabled }),
     }),
-    { name: 'wpt_settings' },
+    {
+      name: 'wpt_settings',
+      version: 1,
+      migrate: (persisted) => persisted as SettingsState,
+    },
   ),
 )

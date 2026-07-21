@@ -37,7 +37,17 @@ function tokenize(src: string): Tok[] {
 
     if (/\d/.test(c) || (c === '.' && /\d/.test(src[i + 1] ?? ''))) {
       let n = ''
-      while (i < src.length && /[\d.]/.test(src[i])) n += src[i++]
+      let seenDot = false
+      while (i < src.length) {
+        if (/\d/.test(src[i])) {
+          n += src[i++]
+        } else if (src[i] === '.' && !seenDot) {
+          seenDot = true
+          n += src[i++]
+        } else {
+          break
+        }
+      }
       toks.push({ type: 'num', value: parseFloat(n) })
       continue
     }

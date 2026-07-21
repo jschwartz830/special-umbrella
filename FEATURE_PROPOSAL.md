@@ -1,5 +1,40 @@
 # Feature Proposals
 
+## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
+
+### Proposal: Extra Workout Notes in HistoryPage Edit Modal
+
+**Status**: Proposed only — not implemented this pass (stabilisation pass, feature work deferred).
+
+**Feature selected**: Expose the `notes` field on `ExtraWorkoutEntry` in the HistoryPage extra-entry edit modal.
+
+**Why selected**: The type already has `notes?: string` and the notes field is persisted; it's just not shown in the UI. This is the narrowest possible useful slice — purely additive, zero schema change, no new state, directly adjacent to existing code. ARCH-5 in the IMPLEMENTATION_PLAN documents it as a known gap.
+
+**Expected user value**: Users can annotate ad-hoc workouts (e.g. "felt strong", "short on time, did half") the same way they can annotate plan workouts. The feature surfaces data that already exists in the store.
+
+**Implementation scope for this run**:
+1. In `HistoryPage.tsx`, add a `<textarea>` or `<input>` for `extraNotes` to the inline extra-entry edit form (similar to the existing `notesText` state for rotation entries).
+2. In `historyStore.ts`, confirm `updateExtraEntry` already accepts `notes` (it likely does given the type). If not, add it.
+3. Display the notes in the history list item, matching the existing notes display for rotation entries.
+
+**Assumptions**:
+- `historyStore.updateExtraEntry` already persists `notes` (type allows it; confirm before implementing).
+- The HistoryPage's "edit extra" flow is a simple inline form — no separate modal required.
+
+**Open product / UX decisions**:
+- Should notes be multi-line (textarea) or single-line (input)? Match whatever rotation entries use.
+- Should existing notes be shown read-only in the list item even if they were imported via CSV (i.e. pre-existing data)?
+
+**Architecture / schema impact**: None. `ExtraWorkoutEntry.notes?: string` already exists. No migration required.
+
+**Risks**: Low. The HistoryPage edit form already has a notes field for rotation entries — the extra-entry form just needs the same field wired up.
+
+**Rollback strategy**: `git revert <commit>` — purely additive UI change with no schema impact.
+
+**What is intentionally not being built**: Full rich-text notes, notes on CalendarPage extra entries (different flow), notes history or versioning.
+
+---
+
 ## Pass 79 — 2026-07-19 (branch `claude/dreamy-mccarthy-0r25in`)
 
 ---

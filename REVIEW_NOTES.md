@@ -1,5 +1,105 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-21 (eightieth pass) — branch `claude/dreamy-mccarthy-h2vbby`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 5 commits, 6 source files + 2 test files. Four bug fixes, one dependency-direction fix, one store schema-safety patch, one tokenizer correctness improvement, and one regression-anchor test. No new dependencies. No production store data changes.
+2. **Test delta**: +2 tests (1091 → 1093). All pre-existing tests still pass.
+3. **Highest confidence items**: `CalendarPage.tsx` `'rest'`→`'other'` fix, csv.ts import path fix, and the persist `version`/`migrate` additions — all zero-risk, clearly correct.
+4. **Risky items**: None in this pass. All changes are local, additive, or one-liners.
+5. **Review first**: The `settingsStore` / `programStore` version bump (first load triggers an identity migrate) and the BUG-2 regression-anchor test (test documents a bug, not a fix — the comment explains the expected future fix path).
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | Description |
+|---|---|---|
+| Medium | BUG-2 | `CalendarPage.openEditOutcome → handleOutcomeConfirm`: changing a `day_off` entry to `complete` without a `planDayIndex` leaves the entry's `planDayIndex: undefined`. Stats functions silently drop it. Documented with a test; fix requires plumbing `planDayIndex` through `outcomeTarget`. |
+| Medium | BUG-1 | `CalendarPage.tsx:244` slot fallback used deprecated `'rest'` WorkoutType — **fixed this pass**. |
+| Medium | BUG-CSV | Pre-2026-04-26 CSV re-imports create duplicate `ExtraWorkoutEntry` records because each import assigns a fresh `nanoid()`. Fix needs a stable synthetic ID derived from available fields. Deferred. |
+| Low | ARCH-2 | `csv.ts` imported from `outcomeStore` instead of `workoutInstanceId.ts` — **fixed this pass**. |
+| Low | RISK-1/RISK-2 | `settingsStore` and `programStore` had no `version`/`migrate` — **fixed this pass**. |
+| Low | EDGE-1 | `expressionEval.ts` number tokenizer relied on `parseFloat` to silently discard multi-dot input — **fixed this pass** (principled, no behaviour change). |
+| Low | TEST-1 | `storeSync.ts` — entire cloud-sync module has zero unit tests. Carries forward from prior passes. |
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `6000a9c` | `CalendarPage.tsx`: slot fallback `'rest'` → `'other'` |
+| `68c2f9f` | `csv.ts`: import ID helpers from `lib/workoutInstanceId.ts` not from `store/outcomeStore` |
+| `5f96761` | `settingsStore.ts`, `programStore.ts`: add `version: 1` + identity migrate to persist config |
+| `13dd36d` | `expressionEval.ts`: explicit `seenDot` flag replaces `parseFloat`-truncation reliance |
+| `6463ed0` | `historyStore.test.ts`: BUG-2 regression-anchor test |
+
+---
+
+### Small Features Added
+
+None this pass. Feature work was deliberately skipped — audit found enough stabilisation work to warrant full-stabilisation mode.
+
+---
+
+### Medium-Complexity Feature Explored
+
+None attempted. See FEATURE_PROPOSAL.md for the best candidate for the next pass.
+
+---
+
+### Definitely Keep
+
+- `6000a9c` — `'rest'` → `'other'` fix. Zero risk, clearly correct.
+- `68c2f9f` — Import direction fix. Zero risk.
+- `5f96761` — `version`/`migrate` additions. Safe by design; identity migrate never loses data.
+
+### Probably Keep But Tweak
+
+- `13dd36d` — expressionEval tokenizer fix. Principled and safe, but has no observable behaviour change for any real input. The test documents the new behaviour clearly. If you prefer to revert because it adds complexity for zero user-visible benefit, that's reasonable.
+
+### Definitely Keep (test)
+
+- `6463ed0` — BUG-2 regression-anchor test. Even though it documents a bug rather than fixing it, the test comment explains exactly what the fix should look like, making this a useful anchor.
+
+### Recommendations Only (not implemented)
+
+1. **BUG-2 fix** (P1): Add `planDayIndex?: number` to the `outcomeTarget` state shape in CalendarPage. In `openEditOutcome`, set it from `rd.historyEntry?.planDayIndex ?? rd.planDayIndex`. In `handleOutcomeConfirm`, use `entry.planDayIndex ?? outcomeTarget.planDayIndex` when calling `updateEntryAction`. Low-complexity, medium-confidence fix.
+
+2. **BUG-CSV fix** (P2): In `historyFromCsv`, when `row.extraId` is absent, derive a stable ID: `const legacyId = \`${planId}_${calendarDate}_${workoutType}_${(row.workoutName?.trim() ?? '')}\`` and use it instead of `nanoid()`. This makes re-importing pre-2026-04-26 CSVs idempotent for the common case (unique type+name per day). Collision risk is low but non-zero; add a comment acknowledging it.
+
+3. **storeSync.ts tests** (P1): Add unit tests for the "rows.length === 0 → upload all" vs "rows exist → hydrate from cloud" branching logic. This is the highest-risk untested module.
+
+---
+
+### Open Questions
+
+1. For BUG-2: should `openEditOutcome` be reachable for a `day_off` entry at all? If the calendar UI never shows an "Edit Outcome" button for day_off entries, the bug is unreachable in practice. Worth auditing the UI guard.
+
+2. For BUG-CSV: is idempotent re-import of old CSVs actually needed, or do users import once and discard the file? If it's rarely used, the fix complexity may not be worth it.
+
+3. `storeSync.ts` `beforeunload` push is fire-and-forget (acknowledged in CHANGELOG). Is there a plan to use `sendBeacon` or another approach to improve reliability on tab close?
+
+---
+
+### Known Issues / Incomplete Work
+
+- BUG-2 is documented but not fixed. The test at `historyStore.test.ts:195` (BUG-2 test) will continue to pass while documenting the bug — it asserts the buggy current behaviour.
+- `storeSync.ts` has zero tests (TEST-1, carried forward from passes 78–79).
+- `TodayPage.tsx` remains at ~1735 lines (ARCH-1, long-term debt).
+
+---
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-07-19 (seventy-ninth pass) — branch `claude/dreamy-mccarthy-0r25in`
 
 ---
