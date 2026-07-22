@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Settings2, ChevronLeft, ChevronUp, Trash2, Check, Volume2, VolumeX, ArrowLeftRight } from 'lucide-react'
+import { X, Settings2, ChevronLeft, Trash2, Check, Volume2, VolumeX, ArrowLeftRight } from 'lucide-react'
 import { useMobilityStore } from '../../store/mobilityStore'
 import type { MobilitySessionCheckpoint } from '../../store/mobilityStore'
 import { MOBILITY_LIBRARY, isBilateralExercise } from '../../lib/mobilityLibrary'
@@ -16,14 +16,11 @@ const SWIPE_MIN_DX = 50
 
 interface Props {
   today: string
-  minimized: boolean
-  onMinimize: () => void
-  onResume: () => void
   onClose: () => void
   onManageRoutine: () => void
 }
 
-export function MobilityTracker({ today, minimized, onMinimize, onResume, onClose, onManageRoutine }: Props) {
+export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
   const routine = useMobilityStore(s => s.routine)
   const logCompletion = useMobilityStore(s => s.logCompletion)
   const activeSession = useMobilityStore(s => s.activeSession)
@@ -81,11 +78,32 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
   // Lock background scroll while the full-screen session view is open — prevents
   // the page behind it from scrolling/rubber-banding during timer drag gestures.
   useEffect(() => {
-    if (minimized) return
     const original = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = original }
-  }, [minimized])
+  }, [])
+
+  // Snapshot the current wall-clock timers + progress into a resumable checkpoint.
+  // Shared by the unmount cleanup and the explicit "close" action so a user can
+  // step away mid-routine — even mid-exercise — and pick up later without losing
+  // completed exercises or accumulated time.
+  function _computeCheckpoint(): MobilitySessionCheckpoint {
+    const now = Date.now()
+    const te = totalR.current.at != null
+      ? totalR.current.acc + (now - totalR.current.at) / 1000
+      : totalR.current.acc
+    const ee = exR.current.at != null
+      ? exR.current.acc + (now - exR.current.at) / 1000
+      : exR.current.acc
+    return {
+      date: today,
+      exerciseIds: routine.map(e => e.id),
+      currentIdx: idxR.current,
+      completedIds: doneR.current,
+      totalElapsedSec: Math.max(0, te),
+      exElapsedSec: Math.max(0, ee),
+    }
+  }
 
   // ── Mount: init store session + start total timer ───────────────────────
   useEffect(() => {
@@ -94,23 +112,10 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
 
     return () => {
       if (switchCueTimerR.current) clearTimeout(switchCueTimerR.current)
-      // Unmount without finalizing → save checkpoint so user can resume
-      if (phaseR.current === 'finished' || finalizedR.current) return
-      const now = Date.now()
-      const te = totalR.current.at != null
-        ? totalR.current.acc + (now - totalR.current.at) / 1000
-        : totalR.current.acc
-      const ee = exR.current.at != null
-        ? exR.current.acc + (now - exR.current.at) / 1000
-        : exR.current.acc
-      saveCheckpoint({
-        date: today,
-        exerciseIds: routine.map(e => e.id),
-        currentIdx: idxR.current,
-        completedIds: doneR.current,
-        totalElapsedSec: Math.max(0, te),
-        exElapsedSec: Math.max(0, ee),
-      })
+      // Unmount without an explicit close/log/discard → save a checkpoint so
+      // the user can resume later, whether or not the last exercise finished.
+      if (finalizedR.current) return
+      saveCheckpoint(_computeCheckpoint())
     }
   }, []) // intentionally empty — refs handle stale values
 
@@ -265,6 +270,15 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
     onClose()
   }
 
+  // Close without finishing or discarding — saves a checkpoint so exercises
+  // already done (and time already spent) aren't lost. Lets the user knock
+  // out the routine bit by bit throughout the day instead of all at once.
+  function handleClose() {
+    finalizedR.current = true
+    saveCheckpoint(_computeCheckpoint())
+    onClose()
+  }
+
   // ── Swipe navigation (out-of-order exercise browsing) ───────────────────
 
   function handleTouchStart(e: React.TouchEvent) {
@@ -346,27 +360,6 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
 
   // ── Render ───────────────────────────────────────────────────────────────
 
-  if (minimized) {
-    return (
-      <div className="fixed bottom-[72px] inset-x-0 z-50 px-4 pb-2">
-        <button
-          onClick={onResume}
-          className="w-full flex items-center gap-3 px-4 py-3 bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl active:scale-[0.98] transition-transform"
-        >
-          <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse flex-shrink-0" />
-          <div className="flex-1 min-w-0 text-left">
-            <p className="text-sm font-semibold text-white truncate">Daily Mobility</p>
-            <p className="text-xs text-slate-400">
-              {completedIds.length}/{routine.length} done — tap to resume
-            </p>
-          </div>
-          <span className="font-mono text-teal-300 text-sm flex-shrink-0">{fmtTime(totalSec)}</span>
-          <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />
-        </button>
-      </div>
-    )
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-900">
 
@@ -400,9 +393,10 @@ export function MobilityTracker({ today, minimized, onMinimize, onResume, onClos
             <Trash2 size={16} />
           </button>
           <button
-            onClick={onMinimize}
+            onClick={handleClose}
             className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
-            aria-label="Minimize"
+            aria-label="Close — progress is saved, resume anytime"
+            title="Close (progress saved)"
           >
             <X size={18} />
           </button>

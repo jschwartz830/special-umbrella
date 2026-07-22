@@ -68,29 +68,34 @@ function CompletedWorkoutsRing({
   count,
   percent,
   accessibilityLabel,
+  size = 40,
 }: {
   count: number
   percent: number
   accessibilityLabel?: string
+  size?: number
 }) {
-  const r = 14
+  const r = size * 0.35
+  const center = size / 2
+  const strokeWidth = size * 0.0625
   const circ = 2 * Math.PI * r
   const offset = circ - (Math.min(100, Math.max(0, percent)) / 100) * circ
   return (
     <div
-      className="relative flex items-center justify-center w-10 h-10 flex-shrink-0"
+      className="relative flex items-center justify-center flex-shrink-0"
+      style={{ width: size, height: size }}
       aria-label={accessibilityLabel ?? `${count} workouts completed, ${percent}% of plan`}
       role="img"
     >
-      <svg className="absolute inset-0 -rotate-90" width="40" height="40" viewBox="0 0 40 40">
-        <circle cx="20" cy="20" r={r} fill="none" stroke="#1e293b" strokeWidth="2.5" />
+      <svg className="absolute inset-0 -rotate-90" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={center} cy={center} r={r} fill="none" stroke="#1e293b" strokeWidth={strokeWidth} />
         <circle
-          cx="20" cy="20" r={r} fill="none" stroke="#0ea5e9" strokeWidth="2.5"
+          cx={center} cy={center} r={r} fill="none" stroke="#0ea5e9" strokeWidth={strokeWidth}
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
           className="transition-all duration-500"
         />
       </svg>
-      <span className="text-sm font-bold text-white relative z-10">{count}</span>
+      <span className={`font-bold text-white relative z-10 ${size >= 80 ? 'text-2xl' : 'text-sm'}`}>{count}</span>
     </div>
   )
 }
@@ -275,7 +280,21 @@ export function TodayPage() {
   const mobilityCompletion = mobilityCompletions[today] ?? null
   const mobilityRoutine = useMobilityStore(s => s.routine)
   const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
-  const [mobilityState, setMobilityState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
+  const mobilityActiveSession = useMobilityStore(s => s.activeSession)
+  const [mobilityState, setMobilityState] = useState<'hidden' | 'open'>('hidden')
+  // A checkpoint left behind by closing the tracker mid-routine (see
+  // MobilityTracker's handleClose) — lets today's card offer "Continue"
+  // instead of starting the whole routine over.
+  const mobilityInProgress = !!(
+    !mobilityCompletion &&
+    mobilityActiveSession &&
+    mobilityActiveSession.date === today &&
+    mobilityActiveSession.exerciseIds.join(',') === mobilityRoutine.map(e => e.id).join(',') &&
+    (mobilityActiveSession.completedIds.length > 0 || mobilityActiveSession.totalElapsedSec >= 3)
+  )
+
+  // Progress ring detail modal
+  const [showPlanProgressModal, setShowPlanProgressModal] = useState(false)
 
   // Compute streak early (without mobility dates, which aren't yet available here)
   // so the milestone hook — a Rules-of-Hooks requirement — can be called before
@@ -677,14 +696,17 @@ export function TodayPage() {
             </div>
           )
         )}
-        <div className="ml-auto flex items-center gap-1.5">
+        <button
+          onClick={() => setShowPlanProgressModal(true)}
+          className="ml-auto flex items-center gap-1.5 active:scale-95 transition-transform"
+          aria-label={`View plan progress details — ${stats.totalCompleted} workouts completed, ${planCompletionPercent}% of plan`}
+        >
           <CompletedWorkoutsRing
             count={stats.totalCompleted}
             percent={planCompletionPercent}
-            accessibilityLabel={`${stats.totalCompleted} workouts completed · ${planCompletionPercent}% of plan`}
           />
           <span className="text-xs text-slate-500">plan</span>
-        </div>
+        </button>
       </div>
 
       {/* Plan completion / expiry banner */}
@@ -1091,6 +1113,22 @@ export function TodayPage() {
               <RotateCcw size={13} />
             </button>
           </div>
+        ) : mobilityInProgress ? (
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-sky-500/12 border border-sky-500/30">
+            <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-sky-200 font-medium">Mobility in progress</p>
+              <p className="text-xs text-sky-300/60 mt-0.5">
+                {mobilityActiveSession!.completedIds.length}/{mobilityRoutine.length} exercises done — pick up anytime
+              </p>
+            </div>
+            <button
+              onClick={() => setMobilityState('open')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold text-xs transition-colors active:scale-[0.98] flex-shrink-0"
+            >
+              <Play size={13} /> Continue
+            </button>
+          </div>
         ) : (
           <button
             onClick={() => setMobilityState('open')}
@@ -1409,19 +1447,78 @@ export function TodayPage() {
         </Modal>
       )}
 
-      {/* Mobility tracker — kept mounted while open or minimized so timers keep running */}
+      {/* Mobility tracker — closing saves a checkpoint so the routine can be
+          finished bit by bit throughout the day instead of all at once */}
       {mobilityState !== 'hidden' && (
         <MobilityTracker
           today={today}
-          minimized={mobilityState === 'minimized'}
-          onMinimize={() => setMobilityState('minimized')}
-          onResume={() => setMobilityState('open')}
           onClose={() => setMobilityState('hidden')}
           onManageRoutine={() => {
             setMobilityState('hidden')
             navigate('/mobility')
           }}
         />
+      )}
+
+      {/* Plan progress detail — opened by tapping the ring in the habit summary row */}
+      {showPlanProgressModal && (
+        <Modal title="Plan Progress" onClose={() => setShowPlanProgressModal(false)}>
+          <div className="space-y-5">
+            <div className="flex flex-col items-center gap-2 py-2">
+              <CompletedWorkoutsRing count={stats.totalCompleted} percent={planCompletionPercent} size={88} />
+              <p className="text-xs text-slate-500">{planCompletionPercent}% of plan complete</p>
+            </div>
+
+            <div className="rounded-xl bg-slate-800/80 border border-slate-700/60 divide-y divide-slate-700/60">
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm text-slate-400">Workouts completed</span>
+                <span className="text-sm font-semibold text-white">{stats.totalCompleted}</span>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm text-slate-400">Current streak</span>
+                <span className="text-sm font-semibold text-white">
+                  🔥 {planStreak} day{planStreak === 1 ? '' : 's'}
+                </span>
+              </div>
+              {weekProgress && (
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-slate-400">Weeks elapsed</span>
+                  <span className="text-sm font-semibold text-white">{weekProgress.completed} / {weekProgress.total}</span>
+                </div>
+              )}
+              {cycleProgress && (
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-slate-400">Current cycle</span>
+                  <span className="text-sm font-semibold text-white">
+                    {cycleProgress.justCompletedRotation
+                      ? 'Just completed'
+                      : `${cycleProgress.doneInCycle} / ${cycleProgress.rotationLength} days`}
+                  </span>
+                </div>
+              )}
+              {plan.duration.type === 'rotations' && (
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-slate-400">Plan length</span>
+                  <span className="text-sm font-semibold text-white">
+                    {plan.duration.value} rotation{plan.duration.value === 1 ? '' : 's'}
+                  </span>
+                </div>
+              )}
+              {loggedRate !== null && (
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-slate-400">Logged rate</span>
+                  <span className="text-sm font-semibold text-white">{loggedRate}%</span>
+                </div>
+              )}
+              {consecutiveSkips > 0 && (
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm text-slate-400">Consecutive skips</span>
+                  <span className="text-sm font-semibold text-amber-400">{consecutiveSkips}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Edit outcome for a completed extra workout */}
