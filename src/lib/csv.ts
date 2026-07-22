@@ -442,6 +442,26 @@ function defaultNameForType(type: WorkoutType): string {
   }
 }
 
+/**
+ * Derives a stable synthetic extra-workout ID for rows that predate the
+ * 2026-04-26 export schema (which added the `extraId` column). Without this,
+ * every reimport of an old CSV creates new nanoid() values, producing
+ * duplicate extra entries in the history store.
+ *
+ * FNV-1a 32-bit over the composite key gives a deterministic 8-char hex
+ * suffix that is collision-resistant for realistic usage (one plan, one date,
+ * one workout type, one name).
+ */
+function stableExtraId(planId: string, date: string, type: string, name: string): string {
+  const key = `${planId}|${date}|${type}|${name}`
+  let h = 2166136261
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i)
+    h = Math.imul(h, 16777619) >>> 0
+  }
+  return `legacy-${h.toString(16).padStart(8, '0')}`
+}
+
 // ── History CSV ───────────────────────────────────────────────────────────────
 
 const HISTORY_HEADERS = [
@@ -647,10 +667,12 @@ export function historyFromCsv(
         warnings.push(`Row ${lineNum}: invalid workoutType "${row.workoutType}" for extra — skipped.`)
         return
       }
+      const workoutName = row.workoutName?.trim() || defaultNameForType(workoutType)
       // Prefer the stable extraId from the CSV when present (2026-04-26+ exports)
-      // so that re-importing the same file is idempotent. Fall back to a fresh
-      // nanoid() for older exports that don't include this column.
-      const extraId = row.extraId?.trim() || nanoid()
+      // so that re-importing the same file is idempotent. For older exports that
+      // lack this column, derive a deterministic ID from the composite key so
+      // repeated reimports of the same file don't create duplicate entries.
+      const extraId = row.extraId?.trim() || stableExtraId(planId, calendarDate, workoutType, workoutName)
       // Restore source field so Undo on TodayPage keeps the correct
       // 'history' vs 'double_day' classification after a re-import.
       // Absent in pre-2026-04-27 exports — undefined matches old record shape.
@@ -663,7 +685,7 @@ export function historyFromCsv(
         planId,
         calendarDate,
         workoutType,
-        workoutName: row.workoutName?.trim() || defaultNameForType(workoutType),
+        workoutName,
         notes: row.notes || undefined,
         source,
         createdAt: row.createdAt || now,
