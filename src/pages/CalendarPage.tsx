@@ -58,6 +58,11 @@ export function CalendarPage() {
     calendarDate: string
     planDay: PlanDay
     instanceId: string
+    /** Carried through from the source ResolvedDay or log action so that
+     *  handleOutcomeConfirm can pass a valid planDayIndex to updateEntryAction
+     *  even when the existing history entry is a day_off (which stores
+     *  planDayIndex: undefined). */
+    planDayIndex?: number
   } | null>(null)
   const [activeWorkoutState, setActiveWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
   const [activeWorkoutTarget, setActiveWorkoutTarget] = useState<{
@@ -164,6 +169,7 @@ export function CalendarPage() {
           calendarDate: rd.calendarDate,
           planDay,
           instanceId: makeWorkoutInstanceId(plan.id, rd.calendarDate),
+          planDayIndex: selectedPlanDayIdx,
         })
         return
       }
@@ -183,6 +189,7 @@ export function CalendarPage() {
       calendarDate: rd.calendarDate,
       planDay,
       instanceId: makeWorkoutInstanceId(plan.id, rd.calendarDate),
+      planDayIndex: planDayIdx,
     })
   }
 
@@ -254,7 +261,7 @@ export function CalendarPage() {
     if (entry) {
       const action = completionStateToAction(outcome.completionState)
       if (entry.action !== action) {
-        updateEntryAction(entry.planId, entry.calendarDate, action, entry.planDayIndex)
+        updateEntryAction(entry.planId, entry.calendarDate, action, entry.planDayIndex ?? outcomeTarget.planDayIndex)
       }
     }
     setOutcomeTarget(null)
