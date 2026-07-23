@@ -1,5 +1,94 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-23 (eighty-first pass) — branch `claude/dreamy-mccarthy-nj7qfw`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 3 commits, 2 source files + 1 new test file. One bug fix (BUG-2, the P1 issue from Pass 80), one small feature (extra workout notes editing, proposed in Pass 80), and 10 new tests for `useStallNudgeDismiss`. No new dependencies. No store schema changes.
+2. **Test delta**: +10 tests from this pass (+18 vs. Pass 80 baseline of 1093, reflecting inter-pass human-authored commits). Final: 32 test files, 1111 tests passing.
+3. **Highest confidence items**: BUG-2 fix (clearly correct, traces through the full call chain with no side effects) and the notes textarea (zero schema impact, purely additive).
+4. **Risky items**: None. All three commits are additive or targeted point fixes.
+5. **Review first**: The BUG-2 fix threads `planDayIndex` through four call sites in `CalendarPage.tsx` — worth reading the diff to confirm no site was missed.
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | Description |
+|---|---|---|
+| Medium | BUG-2 | `CalendarPage`: historical resume flow dropped `planDayIndex`, leaving resumed-and-completed history entries with `planDayIndex: undefined`. **Fixed this pass** (`159c96d`). |
+| Medium | BUG-CSV | Pre-2026-04-26 CSV re-imports create duplicate `ExtraWorkoutEntry` records — `stableExtraId` was implemented in a prior pass, so this may already be resolved. Needs verification. |
+| Low | TEST-1 | `storeSync.ts` — zero unit tests (cloud sync, first-login branch, debounce). Carried forward from passes 78–80. |
+| Low | EDGE-5 | `sessionSummary.ts:92` — pace-only run outcome with no distance/duration returns `null`. Low probability, untested. |
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `159c96d` | `CalendarPage.tsx`: thread `planDayIndex` through `startHistoricalResume` → `activeWorkoutTarget` → `outcomeTarget` (BUG-2 fix) |
+| `94eca5e` | `HistoryPage.tsx`: add Notes textarea to extra workout edit modal |
+| `f4bbb52` | `useStallNudgeDismiss.test.ts` (new): 10 localStorage contract tests |
+
+---
+
+### Small Features Added
+
+The extra workout notes textarea is small but closes a real UI gap: `ExtraWorkoutEntry.notes` was always in the type and displayed read-only, but had no edit surface. The feature is entirely additive with zero schema impact.
+
+---
+
+### Medium-Complexity Feature Explored
+
+Extra workout notes in HistoryPage (proposed in Pass 80's FEATURE_PROPOSAL.md). Implemented as planned — see FEATURE_REVIEW.md for the post-implementation review.
+
+---
+
+### Definitely Keep
+
+- `159c96d` — BUG-2 fix. Clearly correct; previously missing value threaded through a well-understood call chain. No logic changes.
+- `94eca5e` — Notes textarea. Zero-risk additive feature; surfacing data already persisted in the store.
+- `f4bbb52` — useStallNudgeDismiss tests. No-risk test-only addition; closes a documentation gap for the stall-nudge hook.
+
+### Probably Keep But Tweak
+
+Nothing this pass. All changes are straightforward.
+
+### Recommendations Only (not implemented)
+
+1. **TEST-1** (P1): Add unit tests for `storeSync.ts` branching logic — "no rows in DB → upload all" vs. "rows exist → hydrate from cloud". This has been P1 for 3+ passes and remains the highest-risk untested path.
+
+2. **BUG-CSV verification** (P2): Confirm `stableExtraId` in `csv.ts` fully resolves the duplicate-extra-entry problem on re-import of pre-2026-04-26 CSVs. If resolved, update status in IMPLEMENTATION_PLAN.md and close the issue.
+
+3. **TodayPage decomposition** (P3): Extract `<TodayBanners>` component to reduce the 1735-line file. First split is low-risk and improves readability.
+
+---
+
+### Open Questions
+
+1. **BUG-2 via `openEditOutcome`**: The BUG-2 fix targets the `startHistoricalResume` path. There is a second path to `handleOutcomeConfirm`: `openEditOutcome`, which opens the OutcomeModal directly for an existing entry. Does that path also need `planDayIndex` threaded through `outcomeTarget`? Worth auditing whether the Edit Outcome button is ever reachable for a `day_off` entry in `openEditOutcome`.
+
+2. **Notes persistence on CloudSync**: `ExtraWorkoutEntry.notes` is already part of the store shape persisted to Supabase. No change needed, but worth confirming that the cloud sync diff check includes `notes` and doesn't strip it during hydration.
+
+---
+
+### Known Issues / Incomplete Work
+
+- TEST-1 (`storeSync.ts`) remains at zero tests.
+- `TodayPage.tsx` remains at ~1735 lines (ARCH-1, long-term debt).
+- BUG-CSV resolution status unverified.
+
+---
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-07-21 (eightieth pass) — branch `claude/dreamy-mccarthy-h2vbby`
 
 ---

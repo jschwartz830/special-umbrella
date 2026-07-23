@@ -1,10 +1,41 @@
 # Feature Proposals
 
+## Pass 81 — 2026-07-23 (branch `claude/dreamy-mccarthy-nj7qfw`)
+
+### Proposal: Workout Notes Export in CSV
+
+**Status**: Proposed — not implemented this pass (proposed for Pass 82).
+
+**Feature selected**: Include `notes` in the CSV export for both plan workout history entries and extra workout entries, so the data round-trips cleanly.
+
+**Why selected**: Pass 81 made notes on extra workouts editable, making the export gap more visible. The HistoryPage CSV export currently writes `notes` for plan-based entries but the extra-entry row omits it. This is a one-liner addition to `plansToCsv` / `historyToCsv` — the narrowest useful slice, zero schema change, and directly adjacent to existing code.
+
+**Expected user value**: Users who annotate extra workouts (e.g. "felt great", "cut short") can now export those annotations and see them in their CSV backup, making the export truly complete.
+
+**Implementation scope for next pass**:
+1. In `src/lib/csv.ts`, confirm whether the extra-entry CSV row emits a `notes` column. If not, add it alongside the existing `workoutType` and `workoutName` columns.
+2. In `historyFromCsv`, parse the `notes` column back into `ExtraWorkoutEntry.notes` on import.
+3. Add a round-trip test: create an extra entry with notes, export to CSV, import, verify notes survive.
+
+**Assumptions**:
+- The existing CSV test infra in `src/lib/__tests__/csv.test.ts` is sufficient; no new test tooling needed.
+- The `notes` field for plan-based history entries is already handled by the existing CSV logic (verify before implementing).
+
+**Architecture / schema impact**: None. Column addition to an optional part of the CSV format; old CSVs without the column are already handled by the existing `?` pattern.
+
+**Risks**: Very low. Purely additive to the CSV format; backward-compatible by design (missing column = `undefined` on import).
+
+**Rollback strategy**: `git revert <commit>` — zero store impact.
+
+**What is intentionally not being built**: Rich-text formatting in notes, notes length limits, notes-based search/filter.
+
+---
+
 ## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
 
 ### Proposal: Extra Workout Notes in HistoryPage Edit Modal
 
-**Status**: Proposed only — not implemented this pass (stabilisation pass, feature work deferred).
+**Status**: **Implemented in Pass 81** (`94eca5e`). See FEATURE_REVIEW.md for the post-implementation review.
 
 **Feature selected**: Expose the `notes` field on `ExtraWorkoutEntry` in the HistoryPage extra-entry edit modal.
 

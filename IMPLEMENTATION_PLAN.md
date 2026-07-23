@@ -1,5 +1,58 @@
 # Implementation Plan
 
+## Pass 81 — 2026-07-23 (branch `claude/dreamy-mccarthy-nj7qfw`)
+
+### Baseline
+
+- Branch started from `main` after PR from pass 80 merged.
+- **1093 tests passing** across 31 test files at start of pass (Pass 80 baseline; human-authored commits between passes may have raised this).
+- **1111 tests passing** across 32 test files at end of pass (+10 tests from new file; delta vs. Pass 80 baseline is +18, reflecting both this pass and any inter-pass human-authored commits).
+- TypeScript: `tsc --noEmit` clean (0 errors).
+
+### Architecture Summary (pass 81 scope)
+
+One bug fix (BUG-2), one feature (extra workout notes in HistoryPage edit modal, proposed in Pass 80's FEATURE_PROPOSAL.md), and one new test file (useStallNudgeDismiss localStorage contract). No new dependencies. No store schema changes.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File | Summary |
+|---|---|---|---|
+| BUG-2 | `159c96d` | `CalendarPage.tsx` | `planDayIndex` was not threaded through the historical workout resume flow. When the user resumed a logged workout and completed it from the CalendarPage DayDetailModal, `handleHistoricalActiveComplete` opened the OutcomeModal with `planDayIndex: undefined`. As a result, `updateEntryAction` was called without a `planDayIndex`, leaving the history entry with `planDayIndex: undefined` — silently dropped by stats functions. Fix: added `planDayIndex` to `activeWorkoutTarget` state, threaded it through `startHistoricalResume`, and forwarded it into `setOutcomeTarget`. |
+
+### Feature Added This Pass
+
+| Commit | File | Summary |
+|---|---|---|
+| `94eca5e` | `HistoryPage.tsx` | Added a Notes textarea to the extra workout edit modal. `ExtraWorkoutEntry.notes?: string` already existed in the type and was displayed read-only in the list, but could not be edited. `openExtraEdit` now populates `editingExtraNotes`; `saveAndCloseExtra` includes `notes` in the update diff check and write. |
+
+### Tests Added This Pass
+
+| Commit | File | Tests | Summary |
+|---|---|---|---|
+| `f4bbb52` | `src/hooks/__tests__/useStallNudgeDismiss.test.ts` | 10 | localStorage contract for the stall-rotation nudge dismissal hook: absent-key default, write/read/clear, plan isolation, null planId no-op, prefix uniqueness vs. expiry and streak-milestone banners, read/write failure degradation. |
+
+### Bugs Found But Not Fixed (still open)
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-CSV | `csv.ts:653` | Pre-2026-04-26 CSV exports lack an `extraId` column. Each re-import generates fresh `nanoid()` IDs, creating duplicate extra workout entries. **Note**: `stableExtraId` (FNV-1a hash) was already implemented in a prior pass — this may be fully resolved; worth a final verification against live data. |
+| EDGE-5 | `sessionSummary.ts:92` | A `runActual` with only a stored `averagePaceSecondsPerMile` and no distance/duration would silently return `null`. Low probability but untested. |
+| TEST-1 | `storeSync.ts` | Zero unit tests for the cloud sync module (first-login branch, migration ordering, debounce, `beforeunload` flush). Highest-risk untested path. |
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Add tests for `storeSync.ts` cloud sync branching logic (TEST-1) — carried forward 3+ passes |
+| P1 | Fix BUG-4: cloud hydration bypassing Zustand migrate (complex — requires migration pipeline) |
+| P2 | Verify BUG-CSV status against a real pre-2026-04-26 CSV re-import (may already be resolved) |
+| P2 | Fix BUG-11: CSV import plan-ID collision |
+| P3 | Begin TodayPage decomposition — extract `<TodayBanners>` first (1735-line component) |
+| P3 | Add `draftVersion` to active-workout draft |
+| P4 | EDGE-5: add pace-only run/swim outcome summary test |
+
+---
+
 ## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
 
 ### Baseline

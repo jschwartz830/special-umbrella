@@ -1,5 +1,43 @@
 # Test Results
 
+## 2026-07-23 (eighty-first pass) — branch `claude/dreamy-mccarthy-nj7qfw`
+
+---
+
+### Baseline (before changes)
+
+- **1093 tests (Pass 80 baseline)** — human-authored commits between passes may have raised this to ~1101 before our changes ran.
+- Runner: Vitest 4.1.4, node environment
+
+### Tests Added This Pass
+
+| File | Tests | Purpose |
+|---|---|---|
+| `src/hooks/__tests__/useStallNudgeDismiss.test.ts` (new) | 10 | localStorage contract for `useStallNudgeDismiss`: absent-key default, write/read/clear, plan isolation, null planId no-op, prefix uniqueness vs. expiry and streak-milestone banners, read failure degrades to false, write failure does not throw |
+
+### Final Results
+
+```
+Test Files  32 passed (32)
+     Tests  1111 passed (1111)
+  Duration  ~3.1s
+```
+
+- **32 test files, 1111 tests — all passing** (+10 tests from this pass, +18 vs. Pass 80 1093 baseline)
+- No regressions
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `storeSync.ts` — cloud sync module | P1 | Zero tests. Highest-risk untested path: first-login branch, migration ordering, debounce, `beforeunload` flush. Carried forward from passes 78–81. |
+| `ActiveWorkoutTracker.tsx` — 1872-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues, bilateral cues — all manual-only |
+| `CardioWorkoutTracker.tsx` auto-advance timer | P3 | The `setTimeout` → auto-advance flow is tested by manual QA only |
+| `MobilityTracker.tsx` bilateral detection | P3 | Checkpoint restore and bilateral cue logic untested |
+| `useToday.ts` midnight-advance timer | P4 | Timer setup is straightforward but untested |
+
+---
+
 ## 2026-07-21 (eightieth pass) — branch `claude/dreamy-mccarthy-h2vbby`
 
 ---

@@ -2,6 +2,66 @@
 
 ---
 
+## Pass 81 — 2026-07-23 (branch `claude/dreamy-mccarthy-nj7qfw`)
+
+### [159c96d] fix(CalendarPage): thread planDayIndex through historical resume flow
+
+**Summary**: When a user opened a logged workout via the CalendarPage DayDetailModal and tapped "Resume workout", the `planDayIndex` of the existing history entry was never passed into `startHistoricalResume`. The value was available locally (as `loggedIdx`), but the `onResumeRotation` callback only accepted `(planDay, calendarDate)`. As a result, when the resumed workout was completed, `handleHistoricalActiveComplete` constructed an `outcomeTarget` with no `planDayIndex`, and `updateEntryAction` was called without one. The resulting history entry had `planDayIndex: undefined`, silently excluded from stats.
+
+**Fix**:
+1. Added `planDayIndex?: number` to the `activeWorkoutTarget` state type.
+2. Extended `startHistoricalResume` signature to accept and store `planDayIndex`.
+3. Updated `DayDetailModal`'s `onResumeRotation` prop type to pass `planDayIndex`.
+4. The Level 2 "Resume workout" button now passes `loggedIdx` as the third argument.
+5. `handleHistoricalActiveComplete` forwards `planDayIndex` into `setOutcomeTarget`.
+
+**Why it matters**: Any logged workout resumed via the CalendarPage DayDetailModal and then completed would lose its `planDayIndex`, causing it to be silently excluded from rotation stats, completion counts, and progress tracking.
+
+**Files changed**: `src/pages/CalendarPage.tsx`
+
+**Risks**: None — the fix only adds a previously-missing value to a data path; it does not alter any logic.
+
+**Rollback**: `git revert 159c96d`
+
+---
+
+### [94eca5e] feat(HistoryPage): add notes field to extra workout edit modal
+
+**Summary**: `ExtraWorkoutEntry.notes?: string` has always existed in the store type and was already displayed read-only in the history list (`"{extra.notes}"`), but the edit modal had no textarea, making it impossible to add or change notes on an extra workout entry.
+
+**Fix**: Added `editingExtraNotes` state, populated in `openExtraEdit` and included in the diff-check and write in `saveAndCloseExtra`. Added a resizable Notes textarea to the edit modal between the Name field and the Delete button, styled to match the existing note fields in the rotation-entry edit flow.
+
+**Why it matters**: Users who add extra workouts (e.g. ad-hoc gym sessions, walks) had no way to annotate them. The data model already supported notes; the UI was simply missing the input.
+
+**Files changed**: `src/pages/HistoryPage.tsx`
+
+**Risks**: None — purely additive UI change, zero store schema impact.
+
+**Rollback**: `git revert 94eca5e`
+
+---
+
+### [f4bbb52] test: add useStallNudgeDismiss localStorage contract tests
+
+**Summary**: `useStallNudgeDismiss` had zero tests despite being the per-plan localStorage-backed dismissal hook for the stall-rotation nudge banner. Added a 10-test file that validates the hook's localStorage contract directly (same pattern as `useDismissableBanner.test.ts` — no `@testing-library/react` required, no jsdom).
+
+**Tests cover**:
+- Default state: absent key returns false
+- Write sets key to `"1"`; read returns true after write; remove restores false
+- Plan isolation: dismissing plan-1 does not affect plan-2
+- Null planId: produces no localStorage write
+- Prefix uniqueness: `wpt_stall_nudge_dismissed_v1_` is distinct from the expiry banner prefix (`wpt_expiry_dismissed_v1_`) and the streak-milestone prefix (`wpt_streak_ms_v1_`)
+- localStorage read failure: degrades to false (no throw)
+- localStorage write failure: does not throw
+
+**Files changed**: `src/hooks/__tests__/useStallNudgeDismiss.test.ts` (new file)
+
+**Risks**: None — test-only addition.
+
+**Rollback**: `git revert f4bbb52`
+
+---
+
 ## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
 
 ### [6000a9c] fix(CalendarPage): slot fallback type 'rest' → 'other'

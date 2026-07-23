@@ -1,5 +1,54 @@
 # Feature Reviews
 
+## Pass 81 — 2026-07-23 (branch `claude/dreamy-mccarthy-nj7qfw`)
+
+### Feature: Extra Workout Notes in HistoryPage Edit Modal
+
+---
+
+#### What was actually built
+
+A Notes `<textarea>` in the HistoryPage extra workout edit modal. Three surgical additions to `HistoryPage.tsx`:
+
+1. **`editingExtraNotes` state** — `const [editingExtraNotes, setEditingExtraNotes] = useState('')`, parallel to the existing `editingExtraType` / `editingExtraName` state.
+
+2. **`openExtraEdit` population** — `setEditingExtraNotes(extra.notes ?? '')` alongside the existing date/type/name setters.
+
+3. **`saveAndCloseExtra` diff-check** — `notesValue !== editingExtra.notes` added to the change-detection condition so the store is only written when something actually changed. `updateExtraEntry` now receives `{ workoutType, workoutName, notes: notesValue }` where `notesValue` is `editingExtraNotes.trim() || undefined` (empty string → `undefined`, matching the type's optional semantics).
+
+4. **Notes section in modal JSX** — Placed between the Name field and the Delete button, matching the pattern used by the rotation-entry notes field. A `resize-none` 3-row `<textarea>` with the same `bg-slate-700 border-slate-600 rounded-xl` styling as the rest of the modal.
+
+#### Scope accuracy
+
+Exactly as proposed in Pass 80's FEATURE_PROPOSAL.md. No scope creep. The read-only display of notes that was already present in the list item (`{extra.notes && <p ...>"{extra.notes}"</p>}`) was intentionally left unchanged.
+
+#### What's worth watching
+
+- **Empty string → `undefined`**: `editingExtraNotes.trim() || undefined` converts empty/whitespace-only notes to `undefined` before writing. This is the right semantic (the field is optional), but it means a user who deliberately saves a blank notes field will have their previous non-empty notes cleared. This is the expected behavior — "cleared" = "removed".
+
+- **No notes in the CSV export yet**: The feature makes notes editable but the CSV export of extra entries does not yet include the `notes` column. If a user edits notes and then exports/re-imports via CSV, notes are lost on re-import. This is documented as the Pass 82 proposal in FEATURE_PROPOSAL.md.
+
+- **Notes display**: Notes are displayed read-only in the list item whenever non-empty. There is no separate "edit notes only" flow; notes are only editable inside the full edit modal. This is consistent with how the codebase handles notes elsewhere.
+
+#### What was NOT built
+
+- Notes on CalendarPage extra entries (different flow, different modal, out of scope)
+- Notes search or filter in HistoryPage
+- Notes character limit or validation
+- Markdown or rich-text formatting
+
+#### What worked well
+
+- Zero store schema change: `ExtraWorkoutEntry.notes?: string` already existed.
+- Zero new dependencies.
+- The diff-check pattern (`notesValue !== editingExtra.notes`) prevents spurious store writes and Supabase debounce triggers when the user opens and closes the modal without changing the notes.
+
+#### Verdict
+
+Shipped as designed. Closes a real UI gap with minimal surface area. Low risk, zero regressions.
+
+---
+
 ## Pass 79 — 2026-07-19 (branch `claude/dreamy-mccarthy-0r25in`)
 
 ### Feature: Calendar Streak Day Highlighting
