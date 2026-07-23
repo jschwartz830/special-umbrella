@@ -70,6 +70,7 @@ export function CalendarPage() {
     planDay: PlanDay
     slotId: string
     workoutInstanceId: string
+    planDayIndex?: number
   } | null>(null)
   const [activeTrackedExercises, setActiveTrackedExercises] = useState<LoggedExerciseActual[] | null>(null)
   const [activeTrackedDurationMin, setActiveTrackedDurationMin] = useState<number | null>(null)
@@ -277,7 +278,7 @@ export function CalendarPage() {
     setSelected(null)
   }
 
-  function startHistoricalResume(planDay: PlanDay, calendarDate: string, instanceId: string, slotId?: string) {
+  function startHistoricalResume(planDay: PlanDay, calendarDate: string, instanceId: string, slotId?: string, planDayIndex?: number) {
     const slot = slotId ? planDay.slots.find(s => s.id === slotId) : planDay.slots[0]
     if (!slot) return
     setSelected(null)
@@ -289,6 +290,7 @@ export function CalendarPage() {
       planDay,
       slotId: slot.id,
       workoutInstanceId: instanceId,
+      planDayIndex,
     })
     setActiveWorkoutState('open')
   }
@@ -303,6 +305,7 @@ export function CalendarPage() {
       calendarDate: activeWorkoutTarget.calendarDate,
       planDay: activeWorkoutTarget.planDay,
       instanceId: activeWorkoutTarget.workoutInstanceId,
+      planDayIndex: activeWorkoutTarget.planDayIndex,
     })
   }
 
@@ -452,11 +455,12 @@ export function CalendarPage() {
           onClear={() => clearDate(selected)}
           onEditOutcome={() => openEditOutcome(selected)}
           onEditExtraOutcome={(extra) => openExtraOutcome(extra)}
-          onResumeRotation={(planDay, calendarDate) => startHistoricalResume(
+          onResumeRotation={(planDay, calendarDate, planDayIndex) => startHistoricalResume(
             planDay,
             calendarDate,
             makeWorkoutInstanceId(plan.id, calendarDate),
             planDay.slots[0]?.id,
+            planDayIndex,
           )}
           onResumeExtra={(extra) => startHistoricalResume(
             extraToPlanDay(extra),
@@ -565,7 +569,7 @@ function DayDetailModal({
   onClear: () => void
   onEditOutcome: () => void
   onEditExtraOutcome: (extra: ExtraWorkoutEntry) => void
-  onResumeRotation: (planDay: PlanDay, calendarDate: string) => void
+  onResumeRotation: (planDay: PlanDay, calendarDate: string, planDayIndex?: number) => void
   onResumeExtra: (extra: ExtraWorkoutEntry) => void
   onAddExtra: (type: WorkoutType, name: string) => void
   onDeleteExtra: (extra: ExtraWorkoutEntry) => void
@@ -681,7 +685,7 @@ function DayDetailModal({
                     onClick={() => {
                       const loggedIdx = resolved.historyEntry?.planDayIndex ?? resolved.planDayIndex
                       const resumeDay = plan.days[loggedIdx] ?? resolved.planDay
-                      onResumeRotation(resumeDay, calendarDate)
+                      onResumeRotation(resumeDay, calendarDate, loggedIdx)
                     }}
                     className="text-[10px] text-sky-500 hover:text-sky-400 transition-colors"
                   >
