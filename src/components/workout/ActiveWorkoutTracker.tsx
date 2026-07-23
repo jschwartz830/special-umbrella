@@ -1695,13 +1695,8 @@ export function ActiveWorkoutTracker({
                 ) : null}
               </button>
 
-              {/* Rest timer + target below the button */}
               {resting && (
-                <div className="mt-5 text-center">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Rest</p>
-                  <p className={`text-2xl font-mono font-bold leading-none mt-1 ${restOver ? 'text-red-400' : 'text-emerald-300'}`}>{fmt(restElapsed!)}</p>
-                  <p className="text-xs text-slate-500 mt-1">Target {restTarget != null ? fmt(restTarget) : '—'}</p>
-                </div>
+                <p className="mt-5 text-xs text-slate-500">Target {restTarget != null ? fmt(restTarget) : '—'}</p>
               )}
               {!workoutRunning && (
                 <p className="mt-5 text-xs text-orange-300">Workout paused — tap the timer to resume</p>
