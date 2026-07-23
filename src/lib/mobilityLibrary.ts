@@ -104,6 +104,44 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     description: 'Lie on side, knees stacked. Rotate top arm open toward ceiling, following with eyes. Opens thoracic spine for shoulder health.',
     bilateral: true,
   },
+  {
+    id: 'lib-shoulder-iso-er',
+    name: 'Shoulder Isometric External Rotation',
+    categories: ['scapula-shoulder'],
+    durationSec: 100,
+    description: 'Elbow tucked at side, bent 90°. Press forearm outward into a wall or immovable hand resistance without moving the arm. Hold 5 sec, 10 reps, 2 sets. Builds rotator cuff (infraspinatus/teres minor) strength pain-free.',
+  },
+  {
+    id: 'lib-shoulder-iso-ir',
+    name: 'Shoulder Isometric Internal Rotation',
+    categories: ['scapula-shoulder'],
+    durationSec: 100,
+    description: 'Elbow tucked at side, bent 90°. Press forearm inward into a wall or immovable hand resistance without moving the arm. Hold 5 sec, 10 reps, 2 sets. Builds rotator cuff (subscapularis) strength pain-free.',
+  },
+  {
+    id: 'lib-shoulder-iso-er-elevated',
+    name: 'Shoulder Isometric External Rotation — Elevated',
+    categories: ['scapula-shoulder'],
+    durationSec: 100,
+    description: 'Arm elevated to about 90° (shoulder height), elbow bent 90°. Press forearm outward into resistance without moving the arm. Hold 5 sec, 10 reps, 2 sets. Same cuff activation as the standard version, trained at a more functional overhead angle.',
+    note: 'Only progress to the elevated angle once the standard version is pain-free.',
+  },
+  {
+    id: 'lib-wall-slides-serratus',
+    name: 'Side Wall Slides (Serratus)',
+    categories: ['scapula-shoulder'],
+    durationSec: 60,
+    description: 'Stand sideways to a wall, arm against it at shoulder height. Slide the arm up and down the wall, driving the shoulder blade around the rib cage. 10 reps, 2 sets. Isolates serratus anterior for scapular control.',
+    bilateral: true,
+  },
+  {
+    id: 'lib-lacrosse-ball-rotator-cuff',
+    name: 'Lacrosse Ball to Rotator Cuff',
+    categories: ['scapula-shoulder'],
+    durationSec: 600,
+    description: 'Pin a lacrosse ball between the back of the shoulder (rotator cuff/posterior capsule) and a wall or the floor. Apply sustained pressure and roll slowly to release tension. 5 minutes per side.',
+    bilateral: true,
+  },
 
   // ── Ankle & Achilles ──────────────────────────────────────────────────
   {
@@ -245,6 +283,14 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     categories: ['posture'],
     durationSec: 45,
     description: 'Tilt ear to shoulder, apply gentle hand pressure. Hold 30 sec per side. Releases chronically tight upper trap from forward head.',
+    bilateral: true,
+  },
+  {
+    id: 'lib-upper-trap-stretch-seated',
+    name: 'Upper Trap Stretch — Seated',
+    categories: ['posture', 'scapula-shoulder'],
+    durationSec: 180,
+    description: 'Seated, hold the seat with one hand for stability. With the other hand, gently bend the head toward the opposite direction until a stretch is felt along the top of the shoulder. Hold 30 sec, 3 sets per side.',
     bilateral: true,
   },
   {
@@ -443,6 +489,21 @@ export const MOBILITY_PRESETS: MobilityPreset[] = [
       { exerciseId: 'lib-short-foot', durationSec: 45 },
       { exerciseId: 'lib-toe-splay', durationSec: 30 },
       { exerciseId: 'lib-single-leg-balance', durationSec: 60 },
+    ],
+  },
+  {
+    id: 'preset-pt-shoulder-rotator-cuff',
+    name: 'PT: Shoulder & Rotator Cuff',
+    description: 'Post-PT rotator cuff isometrics, serratus activation, upper trap release, and soft tissue work.',
+    durationMin: 19,
+    categories: ['scapula-shoulder', 'posture'],
+    exercises: [
+      { exerciseId: 'lib-shoulder-iso-er', durationSec: 100 },
+      { exerciseId: 'lib-shoulder-iso-ir', durationSec: 100 },
+      { exerciseId: 'lib-shoulder-iso-er-elevated', durationSec: 100 },
+      { exerciseId: 'lib-upper-trap-stretch-seated', durationSec: 180 },
+      { exerciseId: 'lib-wall-slides-serratus', durationSec: 60 },
+      { exerciseId: 'lib-lacrosse-ball-rotator-cuff', durationSec: 600 },
     ],
   },
   {
