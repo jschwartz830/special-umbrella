@@ -14,6 +14,36 @@ type Phase = 'idle' | 'exercising' | 'finished'
 
 const SWIPE_MIN_DX = 50
 
+// Reconciles a resumed checkpoint against the live routine so exercises can be
+// added/removed/reordered mid-session without losing progress. Completed ids
+// for exercises that no longer exist are dropped; the "current" exercise is
+// tracked by id and re-mapped to its new index, or advanced to the next
+// not-yet-completed exercise if it was removed.
+export function reconcileCheckpoint(
+  cp: MobilitySessionCheckpoint,
+  liveRoutine: { id: string }[],
+): { currentIdx: number; completedIds: string[]; totalElapsedSec: number; exElapsedSec: number } {
+  const liveIds = liveRoutine.map(e => e.id)
+  const completedIds = cp.completedIds.filter(id => liveIds.includes(id))
+  const priorCurrentId = cp.exerciseIds[cp.currentIdx]
+  const stillCurrent = priorCurrentId != null && liveIds.includes(priorCurrentId)
+
+  let currentIdx: number
+  if (stillCurrent) {
+    currentIdx = liveIds.indexOf(priorCurrentId)
+  } else {
+    const nextIdx = liveIds.findIndex(id => !completedIds.includes(id))
+    currentIdx = nextIdx === -1 ? Math.max(0, liveIds.length - 1) : nextIdx
+  }
+
+  return {
+    currentIdx,
+    completedIds,
+    totalElapsedSec: cp.totalElapsedSec,
+    exElapsedSec: stillCurrent ? cp.exElapsedSec : 0,
+  }
+}
+
 interface Props {
   today: string
   onClose: () => void
@@ -30,24 +60,25 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
   const soundEnabled = useMobilityStore(s => s.soundEnabled)
   const setSoundEnabled = useMobilityStore(s => s.setSoundEnabled)
 
-  // Validate checkpoint: must match today's date and the same routine order
-  const routineKey = routine.map(e => e.id).join(',')
+  // Validate checkpoint: must match today's date. The routine's exercises may
+  // have been added/removed/reordered since the session started (e.g. via
+  // "Manage routine") — reconcile() below re-maps progress onto the live
+  // routine instead of discarding it.
   const cp: MobilitySessionCheckpoint | null =
-    activeSession?.date === today && activeSession.exerciseIds.join(',') === routineKey
-      ? activeSession
-      : null
+    activeSession?.date === today ? activeSession : null
+  const reconciled = cp ? reconcileCheckpoint(cp, routine) : null
 
   // Session state
-  const [currentIdx, setCurrentIdx] = useState(cp?.currentIdx ?? 0)
-  const [completedIds, setCompletedIds] = useState<string[]>(cp?.completedIds ?? [])
+  const [currentIdx, setCurrentIdx] = useState(reconciled?.currentIdx ?? 0)
+  const [completedIds, setCompletedIds] = useState<string[]>(reconciled?.completedIds ?? [])
   const [phase, setPhase] = useState<Phase>('idle')
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [showJumpMenu, setShowJumpMenu] = useState(false)
   const [showSwitchCue, setShowSwitchCue] = useState(false)
 
   // Live display state (driven by 100ms tick)
-  const [totalSec, setTotalSec] = useState(cp?.totalElapsedSec ?? 0)
-  const [exSec, setExSec] = useState(cp?.exElapsedSec ?? 0)
+  const [totalSec, setTotalSec] = useState(reconciled?.totalElapsedSec ?? 0)
+  const [exSec, setExSec] = useState(reconciled?.exElapsedSec ?? 0)
 
   // Per-exercise duration adjustments (seconds added/removed), keyed by exercise id.
   // Lets the user scroll/drag the countdown to run an exercise longer or shorter.
@@ -56,13 +87,13 @@ export function MobilityTracker({ today, onClose, onManageRoutine }: Props) {
   useEffect(() => { overridesR.current = durationOverrides }, [durationOverrides])
 
   // Wall-clock refs — never go stale in closures
-  const totalR = useRef({ acc: cp?.totalElapsedSec ?? 0, at: Date.now() as number | null })
-  const exR = useRef({ acc: cp?.exElapsedSec ?? 0, at: null as number | null })
+  const totalR = useRef({ acc: reconciled?.totalElapsedSec ?? 0, at: Date.now() as number | null })
+  const exR = useRef({ acc: reconciled?.exElapsedSec ?? 0, at: null as number | null })
 
   // Stale-closure-safe mirrors of state for interval + cleanup
   const phaseR = useRef<Phase>('idle')
-  const idxR = useRef(cp?.currentIdx ?? 0)
-  const doneR = useRef<string[]>(cp?.completedIds ?? [])
+  const idxR = useRef(reconciled?.currentIdx ?? 0)
+  const doneR = useRef<string[]>(reconciled?.completedIds ?? [])
   const autoFiredR = useRef(false) // prevent double-fire when exercise timer hits 0
   const switchFiredR = useRef(false) // prevent double-fire of the bilateral switch cue
   const switchCueTimerR = useRef<ReturnType<typeof setTimeout> | null>(null)
