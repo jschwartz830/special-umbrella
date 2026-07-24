@@ -74,7 +74,9 @@ function tokenize(src: string): Tok[] {
     if (c === '(') { toks.push({ type: 'lparen' }); i++; continue }
     if (c === ')') { toks.push({ type: 'rparen' }); i++; continue }
     if (c === ',') { toks.push({ type: 'comma' }); i++; continue }
-    i++ // skip unknown char
+    // Log unrecognized chars so YAML expression authors can debug typos.
+    if (process.env.NODE_ENV !== 'test') console.warn(`[expressionEval] Skipping unknown character: '${c}'`)
+    i++
   }
   toks.push({ type: 'eof' })
   return toks
