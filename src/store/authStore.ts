@@ -17,12 +17,13 @@ export const useAuthStore = create<AuthState>()((set) => ({
   loading: true,
 
   async signInWithGoogle() {
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: window.location.origin + '/special-umbrella/',
       },
     })
+    if (error) console.error('[auth] signInWithGoogle failed:', error.message)
   },
 
   async signOut() {
@@ -31,10 +32,15 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   async initialize() {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      set({ user: session?.user ?? null, session, loading: false })
-    })
-
-    return () => subscription.unsubscribe()
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        set({ user: session?.user ?? null, session, loading: false })
+      })
+      return () => subscription.unsubscribe()
+    } catch (err) {
+      console.error('[auth] Failed to initialize auth listener:', err)
+      set({ loading: false })
+      return () => {}
+    }
   },
 }))
