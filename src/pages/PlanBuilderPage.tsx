@@ -517,13 +517,13 @@ function SlotEditor({
               <p className="text-xs text-slate-400">Add Exercise (Library or Custom)</p>
               <div className="flex gap-2">
                 <input
-                  list="exercise-library"
+                  list={`exercise-library-${slot.id}`}
                   value={exerciseInput}
                   onChange={e => setExerciseInput(e.target.value)}
                   placeholder="Start typing exercise name"
                   className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white"
                 />
-                <datalist id="exercise-library">
+                <datalist id={`exercise-library-${slot.id}`}>
                   {EXERCISE_LIBRARY.map(ex => <option key={ex.name} value={ex.name} />)}
                 </datalist>
                 <button type="button" onClick={addExerciseFromInput} className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs text-white">Add</button>
