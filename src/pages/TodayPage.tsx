@@ -284,12 +284,16 @@ export function TodayPage() {
   const [mobilityState, setMobilityState] = useState<'hidden' | 'open'>('hidden')
   // A checkpoint left behind by closing the tracker mid-routine (see
   // MobilityTracker's handleClose) — lets today's card offer "Continue"
-  // instead of starting the whole routine over.
+  // instead of starting the whole routine over. Deliberately does NOT
+  // require the checkpoint's exerciseIds to exactly match the live routine:
+  // MobilityTracker's reconcileCheckpoint() already re-maps progress onto
+  // an edited routine (add/remove/reorder), so a mismatch here doesn't mean
+  // the checkpoint is stale — it just means "Manage routine" was used
+  // mid-session, which is the case this feature exists to support.
   const mobilityInProgress = !!(
     !mobilityCompletion &&
     mobilityActiveSession &&
     mobilityActiveSession.date === today &&
-    mobilityActiveSession.exerciseIds.join(',') === mobilityRoutine.map(e => e.id).join(',') &&
     (mobilityActiveSession.completedIds.length > 0 || mobilityActiveSession.totalElapsedSec >= 3)
   )
 
