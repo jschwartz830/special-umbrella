@@ -296,12 +296,13 @@ export function TodayPage() {
   // Progress ring detail modal
   const [showPlanProgressModal, setShowPlanProgressModal] = useState(false)
 
-  // Compute streak early (without mobility dates, which aren't yet available here)
-  // so the milestone hook — a Rules-of-Hooks requirement — can be called before
-  // the early return guard below. The one-day difference is negligible for a banner.
+  // Mobility dates count toward streak — completing mobility on a day keeps the streak alive.
+  // Computed here (before the early-return guard below) since the milestone hook — a
+  // Rules-of-Hooks requirement — must be called unconditionally on every render.
+  const mobilityDateSet = useMemo(() => new Set(Object.keys(mobilityCompletions)), [mobilityCompletions])
   const earlyPlanStreak = useMemo(
-    () => (plan ? computePlanStreak(plan.id, planEntries, planExtras, today) : 0),
-    [plan, planEntries, planExtras, today],
+    () => (plan ? computePlanStreak(plan.id, planEntries, planExtras, today, mobilityDateSet) : 0),
+    [plan, planEntries, planExtras, today, mobilityDateSet],
   )
   const { isDismissed: streakMilestoneDismissed, dismiss: dismissStreakMilestone, milestone: streakMilestone } =
     useStreakMilestoneDismiss(plan?.id ?? null, earlyPlanStreak)
@@ -363,9 +364,9 @@ export function TodayPage() {
 
   // Stats for the compact habit row (scoped to the active plan's history)
   const stats = computeHistoryStats(planEntries, planExtras, today)
-  // Mobility dates count toward streak — completing mobility on a day keeps the streak alive
-  const mobilityDateSet = useMemo(() => new Set(Object.keys(mobilityCompletions)), [mobilityCompletions])
-  const planStreak = computePlanStreak(plan.id, planEntries, planExtras, today, mobilityDateSet)
+  // Same computation as earlyPlanStreak above (mobility dates included) — reuse it
+  // rather than recomputing now that both use the same inputs.
+  const planStreak = earlyPlanStreak
   const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
 
   // Collect recent past days with no entry — used to show the stall nudge.
