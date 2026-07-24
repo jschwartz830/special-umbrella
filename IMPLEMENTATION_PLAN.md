@@ -1,5 +1,58 @@
 # Implementation Plan
 
+## Pass 81 — 2026-07-24 (branch `claude/nightly-codebase-audit-yfetx3`)
+
+### Baseline
+
+- Branch started from `main` (5 PRs merged since pass 80: BUG-2, BUG-CSV, `settingsStore` test coverage, rest-timer display, plan-progress modal + resumable mobility sessions, focus mode, PT mobility preset, active-mobility-session preservation).
+- **1107 tests passing** across 32 test files at start of pass.
+- **1121 tests passing** at end of pass (+14 new tests).
+- TypeScript: `tsc --noEmit` clean (0 errors). `npm run build` succeeds.
+
+### Architecture Summary (pass 81 scope)
+
+Stabilisation pass. All P1/P2 items carried forward from pass 80 (BUG-2, BUG-CSV, BUG-8, EDGE-5) were confirmed already fixed by the 5 PRs merged since then — verified by reading the current code and existing tests rather than re-fixing. This pass closed the single longest-standing carried-forward gap (`storeSync.ts` test coverage, flagged P1 since pass 78) and found 3 new bugs via a targeted audit of the least-tested recently-added code (mobility resumable sessions, streak milestone banner, legacy CSV import). All 3 are fixed. No new dependencies. No store schema changes. Feature work was deliberately skipped — see Prioritized Plan.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File | Summary |
+|---|---|---|---|
+| BUG-STREAK | `0050a45` | `TodayPage.tsx:302` | `earlyPlanStreak` (fed to the streak-milestone dismiss hook) was computed without mobility dates, while `planStreak` (shown in the habit row and progress modal) included them. The code comment claiming mobility data "isn't yet available" was stale — the selector is read earlier in the same component. A run of mobility-only days could show e.g. "32 day streak" on screen while the 7/14/21/30-day milestone banner logic evaluated a lower, divergent count, so celebrations silently misfired or never fired. |
+| BUG-MOBILITY-CONTINUE | `d4da65d` | `TodayPage.tsx:288` | `mobilityInProgress` required the paused checkpoint's `exerciseIds` to exactly match the live routine before offering a "Continue" card. That check predates `reconcileCheckpoint()` (pass-80-adjacent commit `911d095`), which exists specifically to survive routine edits mid-session. Editing the routine via "Manage routine" while a session was paused silently reverted the card to a plain "Start Mobility Routine" button — implying data loss that didn't actually occur. |
+| BUG-CSV-COLLISION | `84fe146` | `csv.ts:455` | `stableExtraId()` (the pass-80-recommended, already-shipped fix for idempotent legacy-CSV re-import) derives an id from `(planId, date, workoutType, workoutName)`. Two rows in the *same* legacy import sharing that key (e.g. two same-day, default-named "Yoga" extras) hashed to the same id; `historyStore.importExtraEntries` only dedupes against already-stored entries, not within the incoming batch, so both rows would be inserted under one colliding id. |
+
+### Test Added This Pass
+
+| Commit | File | Summary |
+|---|---|---|
+| `6036bcb` | `src/lib/__tests__/storeSync.test.ts` (new) | 13 tests covering `syncOnLogin`'s push-vs-hydrate branching, per-store migrate wiring, fetch-error short-circuit, unknown-store tolerance, and `subscribeStores`' debounce/beforeunload-flush/unsubscribe behavior. Closes TEST-1, carried forward since pass 78. |
+| `84fe146` | `src/lib/__tests__/csv.test.ts` | Replaced a weak assertion ("id is a non-empty string") with one that verifies the actual guarantee (re-import twice → same id); added a test for the new within-batch collision guard. |
+
+### Carried-Forward Items Verified Already Fixed (no action needed)
+
+| ID | Status |
+|---|---|
+| BUG-2 (`day_off → complete` drops `planDayIndex`) | Fixed in `a317041` (between pass 80 and this pass). |
+| BUG-CSV (legacy re-import duplicates) | Fixed in `2fc7832`. This pass found and fixed a within-batch edge case the original fix didn't cover (see BUG-CSV-COLLISION above). |
+| BUG-8 (`outcomeSortKey` non-deterministic empty fallback) | Already deterministic — secondary sort key on `workoutInstanceId` was already in place. No bug found on re-inspection. |
+| EDGE-5 (`sessionSummary` pace-only run outcome) | Already handled correctly and already covered by `'shows pace alone when only pace is available'` test. |
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Begin `TodayPage.tsx` decomposition (ARCH-1) — now 1832 lines, still the largest untested page component. No dedicated test file exists for it at all. |
+| P2 | Fix BUG-4: cloud hydration bypassing Zustand migrate pipeline for stores not explicitly listed in `storeSync.ts`'s `STORES` array (complex — requires a shared migration entry point). |
+| P2 | Add a render-level test harness for `TodayPage.tsx` (even a minimal smoke test) — the two bugs fixed this pass were both in un-tested conditional JSX and were only caught by manual code reading. |
+| P3 | Add `draftVersion` to active-workout draft. |
+| P4 | `ActiveWorkoutTracker.tsx` (1872 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested (carried forward from pass 78/80). |
+
+### Rationale for Sequencing
+
+`storeSync.ts` tests came first because it was the single longest-standing, highest-severity gap (4+ passes, zero coverage on the only path that can silently lose or corrupt user data across devices) and carried zero implementation risk. The three bug fixes were sequenced by how directly they affect visible, everyday product behavior: the streak/milestone divergence and the mobility "Continue" card are both things an active user would hit on a normal day; the CSV collision only manifests on a rare re-import of a specific old export shape.
+
+---
+
 ## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
 
 ### Baseline

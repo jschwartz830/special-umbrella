@@ -1,5 +1,49 @@
 # Test Results
 
+## 2026-07-24 (eighty-first pass) — branch `claude/nightly-codebase-audit-yfetx3`
+
+---
+
+### Baseline (before changes)
+
+- **32 test files, 1107 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+- `npm run build`: succeeds
+
+### Tests Reviewed
+
+Re-read `src/lib/__tests__/outcomeSortKey.test.ts` and `src/lib/__tests__/sessionSummary.test.ts` to check whether BUG-8 and EDGE-5 (carried forward from pass 80's plan) were actually fixed by the 5 PRs merged since then. Both were confirmed fixed/already-correct with existing test coverage — no action taken.
+
+### Tests Added/Updated This Pass
+
+| File | Test | Purpose |
+|---|---|---|
+| `src/lib/__tests__/storeSync.test.ts` (new, 13 tests) | `syncOnLogin`: no-user no-op, first-login push (all 7 stores), fetch-error short-circuit, cloud-wins hydrate, `wpt_history`/`wpt_mobility` migrate wiring, unknown-store tolerance, non-object-data guard | Closes TEST-1 (zero coverage on the cloud-sync module, carried forward since pass 78) |
+| `src/lib/__tests__/storeSync.test.ts` (same file, 5 tests) | `subscribeStores`: debounce collapses rapid changes, no-push-without-user, `beforeunload` flush (and no double-push), unsubscribe cancels pending write, unsubscribe removes the listener | Same as above |
+| `src/lib/__tests__/csv.test.ts` | `'derives a stable, deterministic ID...'` (rewritten from a weaker existing test) | Verifies the actual idempotency guarantee (re-import twice → same id), not just "id is non-empty" |
+| `src/lib/__tests__/csv.test.ts` | `'assigns distinct synthetic IDs to two legacy rows that share the same composite key in one import'` | Regression test for the new within-batch collision guard (BUG-CSV-COLLISION) |
+
+No test was added directly for the two `TodayPage.tsx` fixes (streak-milestone divergence, mobility-continue-card check) — `TodayPage.tsx` has no dedicated test file today (1832 lines, zero render-level tests), and building a first test harness for it was judged out of scope for a "small, low-risk" pass. Flagged as a P2 recommendation below.
+
+### Final Results
+
+- **33 test files, 1121 tests — all passing** (+14 tests)
+- No regressions
+- `tsc --noEmit`: clean
+- `npm run build`: succeeds
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `TodayPage.tsx` — 1832-line page component | P1 | Zero render-level tests. Both bugs fixed this pass lived in untested conditional JSX and were only caught by manual code reading, not by any test suite. |
+| `ActiveWorkoutTracker.tsx` — 1872-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues, bilateral cues — all manual-only. Carried forward from pass 78/80. |
+| `CardioWorkoutTracker.tsx` auto-advance timer | P3 | The `setTimeout` → auto-advance flow is tested by manual QA only. Carried forward. |
+| `useToday.ts` midnight-advance timer | P4 | The timer setup is straightforward but untested. Carried forward. |
+
+---
+
 ## 2026-07-21 (eightieth pass) — branch `claude/dreamy-mccarthy-h2vbby`
 
 ---
