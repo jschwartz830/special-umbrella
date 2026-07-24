@@ -2,6 +2,120 @@
 
 ---
 
+## Pass 81 — 2026-07-24 (branch `claude/dreamy-mccarthy-bt9dqu`)
+
+### [7cc21eb] fix(historyStore): removeRetroJumpForDate — UTC-safe date comparison
+
+**Summary**: `removeRetroJumpForDate` used `format(new Date(o.appliedAt), 'yyyy-MM-dd')` to extract the date from an ISO string. `format()` interprets the timestamp through the local timezone, which can shift the date by one day for users in UTC-offset timezones when the override was logged near midnight UTC. The function would then fail to find and remove the jump override, leaving stale overrides that corrupt the rotation display.
+
+**Why it matters**: Calendar retroactive edits rely on `removeRetroJumpForDate` to clean up stale jump overrides before writing a new one. A failed removal causes duplicate jump overrides to accumulate, silently shifting the rotation pointer.
+
+**Fix**: Replace `format(new Date(o.appliedAt), 'yyyy-MM-dd')` with `o.appliedAt.slice(0, 10)` — reads the date directly from the ISO string prefix without any timezone conversion.
+
+**Files changed**: `src/store/historyStore.ts` (also removes now-unused `date-fns/format` import)
+
+**Risks**: None — `slice(0, 10)` on a valid ISO string is always safe. The `CalendarPage` stores `appliedAt` as `${date}T12:00:00.000` where `date` is a YYYY-MM-DD local string; `slice(0, 10)` of that is exactly `date`. Behavior is identical to before for any timezone where noon-UTC doesn't cross midnight.
+
+**Rollback**: `git revert 7cc21eb`
+
+---
+
+### [2104df2] fix(authStore): recover from initialize() errors; log signInWithGoogle failures
+
+**Summary**: Two independent auth bugs fixed in one commit.
+
+**Bug 1 — Permanent loading spinner**: `initialize()` called `supabase.auth.onAuthStateChange()` with no try/catch. If the call throws (network failure, bad token, Supabase SDK error), `loading` remains `true` forever. `AuthGate.tsx` renders a spinner while `loading` is true, so the app shows a permanent loading state with no recovery path.
+
+**Bug 2 — Silent OAuth failures**: `signInWithGoogle` called `supabase.auth.signInWithOAuth()` and discarded the returned `{ error }`. If the OAuth redirect fails (popup blocked, Supabase app misconfigured), the user sees nothing — no error, no retry, no feedback.
+
+**Fix**: Wraps `onAuthStateChange` in try/catch; on catch, logs the error and sets `loading: false`. Destructures `{ error }` from `signInWithOAuth` and logs if non-null.
+
+**Files changed**: `src/store/authStore.ts`
+
+**Risks**: Low — only adds error handling to existing paths. The try/catch fallback returns an empty cleanup function `() => {}` which is safe.
+
+**Rollback**: `git revert 2104df2`
+
+---
+
+### [b6b1ef3] fix(PlanBuilderPage): unique datalist IDs per slot
+
+**Summary**: `SlotEditor` rendered `<datalist id="exercise-library">` for every slot it rendered. When a plan day has two or more slots, the browser sees duplicate element IDs — a violation of the HTML specification. Browsers may associate the exercise autocomplete input with the wrong slot's datalist, causing wrong autocomplete suggestions when entering exercise names in multi-slot days.
+
+**Fix**: Changed `list="exercise-library"` and `id="exercise-library"` to `list={exercise-library-${slot.id}}` and `id={exercise-library-${slot.id}}`. Each slot has a unique `slot.id` (nanoid), so all rendered datalist IDs are unique.
+
+**Files changed**: `src/pages/PlanBuilderPage.tsx`
+
+**Risks**: None — purely additive change; the datalist content is the same `EXERCISE_LIBRARY` array in all slots.
+
+**Rollback**: `git revert b6b1ef3`
+
+---
+
+### [7a4023f] feat(SettingsPage): add focusMode toggle
+
+**Summary**: `focusMode` was fully implemented in `settingsStore` (with a `focusMode: boolean` field and `setFocusMode` action) and actively used in `ActiveWorkoutTracker` (lines 379, 1520+) to show a single-set focus view during workouts. However, there was no UI toggle in `SettingsPage`, making the feature completely inaccessible to users.
+
+**Fix**: Added a new settings section with a toggle switch matching the existing `autoAdvanceSegments` toggle pattern (role="switch", aria-checked, keyboard accessible). The section is placed between the auto-advance section and the app refresh section.
+
+**Files changed**: `src/pages/SettingsPage.tsx`
+
+**Risks**: Low — wires existing store action to existing UI pattern. The focusMode logic in `ActiveWorkoutTracker` is already tested indirectly.
+
+**Rollback**: `git revert 7a4023f`
+
+---
+
+### [9b7f36d] fix(expressionEval): warn on unknown characters in tokenizer
+
+**Summary**: The tokenizer's fallthrough branch (`i++` with a comment "skip unknown char") silently discarded characters it couldn't classify. An `@` in a YAML progression rule (`squat += @5`) would be silently skipped, causing the expression to evaluate to `5` instead of the correct `0` (the `@` was an intended `+`, so the author wanted `+= 5` but got `= 0`). No diagnostic was produced.
+
+**Fix**: Added `console.warn('[expressionEval] Skipping unknown character: ...')` before the `i++`. Gated behind `process.env.NODE_ENV !== 'test'` to avoid polluting test output.
+
+**Files changed**: `src/lib/expressionEval.ts`
+
+**Risks**: Very low — purely additive console output in development. Has no effect on the evaluated result or any store state.
+
+**Rollback**: `git revert 9b7f36d`
+
+---
+
+### [fa1fe65] fix(PlansPage): guard duplicatePlan navigation against empty return
+
+**Summary**: `duplicatePlan()` returns `''` (empty string) when the source plan is not found. The call site in `PlansPage` navigated unconditionally: `navigate('/plans/${newId}/edit')`. With `newId = ''`, this routes to `/plans//edit`, which React Router matches to the plan builder for a non-existent plan ID, opening the New Plan form instead of the copy.
+
+**Fix**: Added `if (newId)` guard before `navigate(...)`.
+
+**Files changed**: `src/pages/PlansPage.tsx`
+
+**Risks**: None — the source plan always exists when the user presses Duplicate (the button is only rendered for plans in the store). The guard is purely defensive.
+
+**Rollback**: `git revert fa1fe65`
+
+---
+
+### [2491f1a] test: programParser suite (37 tests) + historyStore UTC edge case
+
+**Summary**: Two test additions.
+
+**1. programParser.test.ts (new file, 37 tests)**: `programParser.ts` had zero test coverage despite being a 317-line pipeline that includes YAML parsing, type coercions, exercise/segment parsing, `structureDescription` building, `programMeta`/vars handling, and validation error accumulation. The new suite covers:
+- Happy path: minimal valid YAML parses without errors, correct plan/day/slot shape
+- Validation: missing name, duration, days; YAML syntax error returns errors array
+- Weights slot: focus, intent, difficulty, exercises, per-set specs, structureDescription
+- Run slot: segments, reps, structureDescription with `→` separator
+- Program vars: numeric vars stored, non-numeric vars produce errors, no vars = no programMeta
+- Type coercions: unknown type → `'other'`, `rest` → `'other'`, invalid focus/difficulty → undefined
+
+**2. historyStore.test.ts (1 new test)**: Added a UTC midnight edge-case test to the `removeRetroJumpForDate` describe block. An override with `appliedAt = '2026-01-15T00:30:00.000Z'` must be matched by `calendarDate = '2026-01-15'`. The old `format()` implementation would have returned `'2026-01-14'` in UTC-1 or later timezones. The new `slice(0,10)` implementation correctly returns `'2026-01-15'`.
+
+**Files changed**: `src/engine/__tests__/programParser.test.ts` (new), `src/store/__tests__/historyStore.test.ts`
+
+**Risks**: None — tests are additive.
+
+**Rollback**: `git revert 2491f1a`
+
+---
+
 ## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
 
 ### [6000a9c] fix(CalendarPage): slot fallback type 'rest' → 'other'

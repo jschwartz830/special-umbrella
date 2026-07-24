@@ -1,5 +1,64 @@
 # Implementation Plan
 
+## Pass 81 — 2026-07-24 (branch `claude/dreamy-mccarthy-bt9dqu`)
+
+### Baseline
+
+- Branch started from `main` after PR from pass 80 merged.
+- **1108 tests passing** across 33 test files at start of pass (after `npm install`).
+- **1145 tests passing** at end of pass (+37 new tests for programParser).
+- TypeScript: `tsc --noEmit` clean (implicitly verified by Vitest; no test failures).
+
+### Architecture Summary (pass 81 scope)
+
+Full codebase audit using an Explore subagent. Seven confirmed bugs fixed across 6 files, 37 new tests added for `programParser.ts` (previously uncovered), and 1 timezone edge-case test added to `historyStore`. No new dependencies. No store schema changes.
+
+### Bugs Fixed This Pass
+
+| ID | Commit | File | Summary |
+|---|---|---|---|
+| B-3 | `7cc21eb` | `historyStore.ts:189` | `removeRetroJumpForDate` used `format(new Date(appliedAt))` which shifts date by 1 day in UTC-offset timezones near midnight. Fixed with `o.appliedAt.slice(0, 10)`. Also removed now-unused `date-fns/format` import. |
+| B-4 | `2104df2` | `authStore.ts:33` | `initialize()` had no try/catch — any error left `loading:true` forever (permanent spinner). Now catches, logs, and sets `loading:false`. |
+| B-5 | `2104df2` | `authStore.ts:19` | `signInWithGoogle` discarded `{ error }` from `signInWithOAuth`. OAuth failures (popup blocked, misconfigured app) were completely silent. Now logs the error message. |
+| B-2 | `b6b1ef3` | `PlanBuilderPage.tsx:526` | `<datalist id="exercise-library">` was duplicated for every slot — violates HTML spec when a day has multiple slots. Fixed with slot-scoped `id={exercise-library-${slot.id}}`. |
+| B-9 | `7a4023f` | `SettingsPage.tsx` | `focusMode` store setting (fully implemented in `ActiveWorkoutTracker`) had no UI toggle — users couldn't enable it. Added a toggle section matching the auto-advance pattern. |
+| B-6 | `9b7f36d` | `expressionEval.ts:77` | Unknown characters silently skipped — YAML expression typos (e.g. `@`) produced wrong 0 values with no diagnostic. Added `console.warn` in non-test environments. |
+| B-1 | `fa1fe65` | `PlansPage.tsx:117` | `duplicatePlan()` returns `''` for missing plan; call site navigated unconditionally to `/plans//edit`. Added `if (newId)` guard. |
+
+### Tests Added This Pass
+
+| Commit | File | Summary |
+|---|---|---|
+| `2491f1a` | `src/engine/__tests__/programParser.test.ts` | 37 new tests covering `parseYamlProgram` and `validateYamlProgram` — happy path, validation errors, weights/run slot parsing, program vars, type coercions. This file had zero prior coverage. |
+| `2491f1a` | `src/store/__tests__/historyStore.test.ts` | 1 new test: UTC midnight edge case for `removeRetroJumpForDate` — pins the `slice(0,10)` fix so regression is immediately detected. |
+
+### Bugs Found But Not Fixed (documented only)
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-2 (ongoing) | `CalendarPage.tsx`, `historyStore.ts:179` | `day_off → complete` without `planDayIndex` leaves `planDayIndex: undefined` — already documented in test |
+| B-10 | `CalendarPage.tsx` | `T12:00:00.000` noon-UTC anchor — safe now that B-3 is fixed |
+| B-12 | `TodayPage.tsx` | Possible Rules of Hooks violation (hook after early return) — needs manual inspection of 1832-line file |
+| B-13 | `expressionEval.ts` | `resolveLoad('bodyweight', ctx)` returns 0, shows "@ 0 lb" — requires product decision |
+
+### Prioritized Plan (for future passes)
+
+Carries forward from pass 80 with updated priorities:
+
+| Priority | Item |
+|---|---|
+| P1 | Fix BUG-2: `day_off → complete` without `planDayIndex` (CalendarPage path) |
+| P1 | Add tests for `storeSync.ts` |
+| P1 | Fix BUG-4 (cloud hydration bypassing Zustand migrate) |
+| P2 | Fix BUG-CSV: deterministic `extraId` for pre-2026-04-26 CSV re-imports |
+| P2 | Atomic plan delete: extract 6-store cascade to a single `deletePlanAndCascade` function |
+| P2 | Manual Rules of Hooks audit in TodayPage around early returns |
+| P3 | Fix B-13: `bodyweight` load expression returns 0 instead of null |
+| P3 | Move Supabase keys to env vars |
+| P4 | ActiveWorkoutTracker decomposition into custom hooks |
+
+---
+
 ## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
 
 ### Baseline

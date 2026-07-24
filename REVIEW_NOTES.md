@@ -1,5 +1,118 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-24 (eighty-first pass) — branch `claude/dreamy-mccarthy-bt9dqu`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 7 commits, 7 source files + 2 test files. Six bug fixes, one feature (focusMode toggle), and one new test file (programParser). No new dependencies. No store schema changes.
+2. **Test delta**: +38 tests (1108 → 1145). All pre-existing tests still pass. One previously uncovered module (programParser.ts) now has 37 tests.
+3. **Highest confidence**: B-3 timezone fix and B-4/B-5 auth error handling — these are real user-facing bugs with clear incorrect behavior and no product decision required.
+4. **Risky items**: None — all changes are targeted, reversible, and additive. The focusMode toggle is the most "product" change; it exposes an existing implemented feature that was simply unreachable.
+5. **Review first**: Timezone fix in historyStore (commit `7cc21eb`) and auth error handling (commit `2104df2`) — these are the highest-impact changes.
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | File | Description |
+|---|---|---|---|
+| High | B-3 | `historyStore.ts:189` | `removeRetroJumpForDate` shifts dates for UTC-offset users near midnight. **Fixed.** |
+| High | B-4 | `authStore.ts:33` | Auth init error leaves permanent loading spinner. **Fixed.** |
+| Medium | B-5 | `authStore.ts:19` | OAuth sign-in failures completely silent. **Fixed.** |
+| Medium | B-2 | `PlanBuilderPage.tsx:526` | Duplicate datalist IDs with multiple slots per day. **Fixed.** |
+| Medium | B-9 | `SettingsPage.tsx` | focusMode setting inaccessible to users (no UI). **Fixed.** |
+| Low | B-1 | `PlansPage.tsx:117` | duplicatePlan returns `''`; call site navigates to bad route. **Fixed.** |
+| Low | B-6 | `expressionEval.ts:77` | YAML expression typos produce wrong 0 values silently. **Fixed (warning added).** |
+
+---
+
+### Improvements Completed
+
+| # | Commit | Summary |
+|---|---|---|
+| 1 | `7cc21eb` | `historyStore.ts` — UTC-safe date comparison in `removeRetroJumpForDate` |
+| 2 | `2104df2` | `authStore.ts` — try/catch in `initialize()`, log OAuth errors |
+| 3 | `b6b1ef3` | `PlanBuilderPage.tsx` — unique datalist IDs per slot |
+| 4 | `7a4023f` | `SettingsPage.tsx` — focusMode toggle added |
+| 5 | `9b7f36d` | `expressionEval.ts` — console.warn on unknown tokenizer characters |
+| 6 | `fa1fe65` | `PlansPage.tsx` — duplicatePlan navigation guard |
+| 7 | `2491f1a` | Tests: 37 tests for `programParser.ts`, 1 UTC edge case for `historyStore` |
+
+---
+
+### Small Features Added
+
+**focusMode toggle in Settings** (`7a4023f`): The `focusMode` setting was fully implemented and tested in `settingsStore` and `ActiveWorkoutTracker` but had no UI entry point. Users had no way to enable it. Adding the toggle is a single-section addition to SettingsPage following the existing `autoAdvanceSegments` toggle pattern. Zero risk.
+
+---
+
+### Medium-Complexity Feature Explored
+
+None this pass. The codebase benefited most from stabilisation (timezone fix, auth hardening, missing UI) and test coverage expansion. No adjacent feature met the bar for low-risk, narrow-slice implementation without displacing the higher-priority bug fixes.
+
+---
+
+### Definitely Keep
+
+All 7 commits are safe to merge:
+
+- `7cc21eb` — correctness fix with zero behavioral change for in-range timezones
+- `2104df2` — defensive error handling with no behavior change on the happy path
+- `b6b1ef3` — HTML spec compliance fix, zero behavioral change
+- `7a4023f` — exposes existing working feature; fully reversible
+- `9b7f36d` — diagnostic improvement only, no state changes
+- `fa1fe65` — defensive guard for an edge case that shouldn't happen in practice
+- `2491f1a` — tests only
+
+---
+
+### Probably Keep but Tweak
+
+None.
+
+---
+
+### Do Not Keep
+
+None.
+
+---
+
+### Recommendations Only (not implemented)
+
+| Item | Rationale |
+|---|---|
+| Atomic `deletePlanAndCascade` | PlansPage manually chains 6 store calls. Extract to a single function to prevent future callers from forgetting one. Medium-scope refactor. |
+| Move Supabase keys to env vars | `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` should be in `.env` to allow key rotation without a code change. |
+| Rules of Hooks audit in TodayPage | Confirm no hook is called after any early `return` in the 1832-line component. Risky to change without thorough read. |
+| Fix B-13 (`bodyweight` → null load) | `resolveLoad('bodyweight', ctx)` returns 0, causing "@ 0 lb" to appear for bodyweight exercises in OutcomeModal. Requires product decision on how to represent no-weight exercises. |
+| ActiveWorkoutTracker decomposition | 2137-line file with no extractable hooks. Creates zero testable units for the entire live workout experience. |
+
+---
+
+### Open Questions
+
+1. **focusMode UX description**: The placeholder description says "Show one set at a time during a workout." Is this accurate, or does it do more? Worth reviewing `ActiveWorkoutTracker.tsx:1520` to confirm.
+2. **B-12 (Rules of Hooks in TodayPage)**: The pass 77 audit flagged this as "must check carefully" — were hooks above the `if (!plan) return null` confirmed? Or is this still an open question?
+3. **B-13 (bodyweight load display)**: Should bodyweight exercises suppress the load field entirely in OutcomeModal, or should they show something like "BW"?
+
+---
+
+### Known Issues / Incomplete Work
+
+- `programParser.ts` now has 37 tests, but the coercion for **invalid segment types** (unknown type → `'easy'`) is tested implicitly through the parseSlot path rather than a dedicated test. Not a gap — behavior is covered — but explicit is better.
+- The `eslint` `import/first` warning on the `historyStore.test.ts` mock pattern is pre-existing and not introduced by this pass.
+
+---
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-07-21 (eightieth pass) — branch `claude/dreamy-mccarthy-h2vbby`
 
 ---

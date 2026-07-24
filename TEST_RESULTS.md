@@ -1,5 +1,49 @@
 # Test Results
 
+## 2026-07-24 (eighty-first pass) — branch `claude/dreamy-mccarthy-bt9dqu`
+
+---
+
+### Baseline (before changes)
+
+- **31 test files, 1108 tests — all passing**
+- Runner: Vitest (Node environment, no jsdom)
+
+### Tests Added This Pass
+
+| File | Tests Added | Purpose |
+|---|---|---|
+| `src/engine/__tests__/programParser.test.ts` | **37** (new file) | Full happy-path and error-path coverage for the YAML program parser — previously zero coverage |
+| `src/store/__tests__/historyStore.test.ts` | **1** (new case) | UTC midnight edge case for `removeRetroJumpForDate`: verifies that `appliedAt = '2026-01-15T00:30:00.000Z'` matches `calendarDate = '2026-01-15'` after the timezone fix |
+
+**New programParser test groups:**
+
+| Group | Count | What it covers |
+|---|---|---|
+| Happy path — minimal valid YAML | 8 | name, duration, days, slots, auto-generated IDs, plan status |
+| Validation errors | 6 | missing name, missing duration, empty days, YAML syntax error, fallback plan on parse error, multiple errors accumulated |
+| Weights slot parsing | 7 | focus area, training intent, difficulty, exercises array, numeric sets, per-set set specs, structureDescription |
+| Run slot parsing | 5 | slot type, segments array length, segment fields, interval reps, structureDescription format |
+| Program vars | 4 | numeric vars into programMeta, programMeta.version=1, non-numeric var error, programMeta undefined when no vars |
+| Type coercions | 4 | unknown type→'other', 'rest'→'other', invalid focus→undefined, invalid difficulty→undefined |
+| validateYamlProgram | 3 | valid YAML returns empty array, invalid YAML returns error strings |
+
+### Final Results
+
+- **31 test files, 1145 tests — all passing** (+37 tests)
+- No regressions
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `src/store/authStore.ts` | P1 | Fixed B-4/B-5 (permanent loading spinner, silent OAuth errors) — but no unit tests possible without a Supabase mock |
+| `src/store/cloudSyncStore.ts` / `storeSync.ts` | P1 | Zero tests. Highest-risk untested path: first-login branch, migration ordering, debounce, `beforeunload` flush |
+| `ActiveWorkoutTracker.tsx` — 1872-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues, bilateral cues — all manual-only |
+| `CardioWorkoutTracker.tsx` auto-advance timer | P3 | The `setTimeout` → auto-advance flow is tested by manual QA only |
+
+---
+
 ## 2026-07-21 (eightieth pass) — branch `claude/dreamy-mccarthy-h2vbby`
 
 ---
