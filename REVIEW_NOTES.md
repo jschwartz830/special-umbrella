@@ -1,5 +1,96 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-24 (eighty-first pass) — branch `claude/nightly-codebase-audit-yfetx3`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 4 commits, 3 source files + 2 test files (1 new). Three bug fixes (all in recently-shipped, under-tested code) and one long-standing test-coverage gap closed. No new dependencies. No store schema changes. No feature work this pass.
+2. **Highest confidence**: `storeSync.test.ts` (pure test addition, zero production-code risk) and the CSV collision fix (additive disambiguation — ids for the non-colliding case are byte-identical to before).
+3. **Risky items**: None rated risky. The two `TodayPage.tsx` fixes change visible UI behavior (when a milestone banner fires, when the "Continue mobility" card appears) but neither has a test harness to lean on — see "Review First" below.
+4. **Review first**: The `mobilityInProgress` fix (`d4da65d`) — I removed an equality check by reasoning about `reconcileCheckpoint`'s intent rather than from a failing test, since `TodayPage.tsx` has no test file. Worth a 30-second manual check: edit a mobility routine mid-session, close and reopen the tracker, confirm "Continue" still appears and resumes correctly.
+5. A **branch/merge policy conflict** is called out at the end of this document — see "Open Questions" before treating this PR as auto-mergeable.
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | Description |
+|---|---|---|
+| Medium | BUG-STREAK | `TodayPage.tsx`: the streak-milestone dismiss hook was fed a streak count computed without mobility dates, diverging from the streak shown everywhere else in the UI — **fixed this pass**. |
+| Medium | BUG-MOBILITY-CONTINUE | `TodayPage.tsx`: "Continue mobility" card silently disappeared after editing the routine mid-session, even though the session was fully resumable — **fixed this pass**. This directly undermines the mobility-session-preservation feature that shipped just before this pass. |
+| Low | BUG-CSV-COLLISION | `csv.ts`: two same-key legacy CSV rows in one import could collide to the same synthetic id — **fixed this pass**. Narrow trigger condition (specific pre-2026-04-26 export shape). |
+| Low | TEST-1 | `storeSync.ts` had zero tests across 4+ passes — **closed this pass** (13 new tests, no production change). |
+| Debt | ARCH-1 | `TodayPage.tsx` is 1832 lines with zero render-level tests. Both bugs found this pass lived here and were only caught by reading the code, not by any test. Carried forward, now P1 (see recommendations). |
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `6036bcb` | `storeSync.test.ts` (new): 13 tests for cloud-sync push/hydrate branching, migrate wiring, debounce/flush |
+| `0050a45` | `TodayPage.tsx`: streak-milestone banner now uses the same (mobility-inclusive) streak as the rest of the UI |
+| `d4da65d` | `TodayPage.tsx`: "Continue mobility" card no longer requires an exact routine match, matching what `reconcileCheckpoint` already tolerates |
+| `84fe146` | `csv.ts` + `csv.test.ts`: legacy extraId collisions within one import are now disambiguated; strengthened a test that had regressed to a weak assertion |
+
+---
+
+### Small Features Added
+
+None this pass.
+
+---
+
+### Medium-Complexity Feature Explored
+
+None attempted. The audit surfaced 3 real, live bugs in code that shipped in the last 5 PRs (all reachable via normal, everyday use — not edge cases), which is a stronger signal for another stabilisation pass than for new feature work. See "Recommendations Only" for the next feature candidate carried over from pass 80's territory (none was proposed there either).
+
+---
+
+### Definitely Keep
+
+- `6036bcb` — `storeSync.ts` tests. Zero risk, closes the highest-priority long-standing gap.
+- `0050a45` — streak/milestone divergence fix. Low risk, corrects a real and reasonably common divergence (any user with mobility-only streak days).
+- `84fe146` — CSV collision fix. Low risk, additive, and the non-colliding case (majority of data) is byte-identical to before.
+
+### Probably Keep But Tweak
+
+- `d4da65d` — mobility "Continue" card fix. Logically sound and consistent with `reconcileCheckpoint`'s design intent, but I couldn't verify it against a running app or a test (see "Review First" above). Recommend a quick manual check before merging; the change is a 4-line diff and trivially revertable if the manual check surfaces something.
+
+### Do Not Keep
+
+None.
+
+### Recommendations Only (not implemented)
+
+1. **`TodayPage.tsx` decomposition and/or a first test harness** (P1, new this pass): the file is 1832 lines with zero render-level tests. Both bugs this pass lived in conditional JSX branches a test suite would have caught immediately. Suggest starting with the smallest, most self-contained slice — e.g. extracting the mobility-card block (`mobilityCompletion` / `mobilityInProgress` / idle states) into its own component with a couple of render tests — rather than a full-file rewrite.
+2. **BUG-4 fix** (P2, carried forward): cloud hydration in `storeSync.ts` bypasses Zustand's `migrate` pipeline for any store not explicitly listed in the `STORES` array constant, or if a store's shape changes in a way the array's per-store `migrate` function doesn't anticipate. No new instance of this found this pass; still unaddressed architecturally.
+3. **`draftVersion` on the active-workout draft** (P3, carried forward from pass 80, untouched).
+
+---
+
+### Open Questions
+
+1. **Branch/merge policy conflict — please resolve before merging.** `CLAUDE.md` in this repo says "Always commit directly to `main` — no feature branches, no pull requests unless explicitly asked," while this run's task instructions require developing on a dedicated branch and explicitly say to auto-merge to `main` at the end (this repo deploys to GitHub Pages from `main` on every push). The task instructions *also* contradict themselves mid-document ("Work ONLY in the current branch. Do not merge to main."). Given `main` auto-deploys to the live app on push, and every one of the last 80 audit passes ended in an open PR for human review (not an unattended merge) — which is also the entire premise of this document's Keep/Tweak/Reject structure — I opened this as a normal PR and did **not** auto-merge it. If you want future passes to auto-merge, that should be a deliberate, explicit instruction (ideally reconciled into `CLAUDE.md` itself) rather than inferred from a self-contradictory prompt.
+2. For BUG-MOBILITY-CONTINUE: is there a scenario where showing "Continue" for a routine-edited session is actively wrong (vs. just previously unreachable)? I couldn't find one — `reconcileCheckpoint` already handles arbitrary add/remove/reorder — but flagging since I reasoned about this without running the app.
+
+---
+
+### Known Issues / Incomplete Work
+
+- `TodayPage.tsx` remains untested at the render level (ARCH-1, now escalated to P1 given this pass's findings).
+- BUG-4 (cloud hydration bypassing migrate for unlisted/unanticipated store shapes) remains unaddressed.
+
+---
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-07-21 (eightieth pass) — branch `claude/dreamy-mccarthy-h2vbby`
 
 ---

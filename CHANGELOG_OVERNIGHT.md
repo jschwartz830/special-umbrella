@@ -2,6 +2,64 @@
 
 ---
 
+## Pass 81 — 2026-07-24 (branch `claude/nightly-codebase-audit-yfetx3`)
+
+### [6036bcb] test(storeSync): add coverage for cloud-sync branching and debounce logic
+
+**Summary**: `storeSync.ts` — the Supabase cloud-sync bridge for all 7 Zustand stores — had zero tests across 4+ audit passes (TEST-1, the longest-standing carried-forward gap, first flagged pass 78). Added 13 tests covering: `syncOnLogin`'s first-login push vs. cloud-hydrate branching, per-store `migrate` wiring (history extras `source` backfill, mobility `activeSession` backfill), the fetch-error short-circuit, tolerance of unknown/renamed store names in cloud rows, and `subscribeStores`' debounce / `beforeunload` flush / unsubscribe-cancels-pending-write behavior.
+
+**Why it matters**: This is the only path that can silently lose or corrupt user data across devices (a debounce or migrate-ordering bug here has no visible symptom until a user logs in on a second device and finds stale or missing history). Test-only change; zero behavior risk.
+
+**Files changed**: `src/lib/__tests__/storeSync.test.ts` (new)
+
+**Risks**: None — no production code touched.
+
+**Rollback**: `git revert 6036bcb`
+
+---
+
+### [0050a45] fix(TodayPage): streak milestone banner used a different streak than the one displayed
+
+**Summary**: `earlyPlanStreak` (fed to `useStreakMilestoneDismiss`) was computed via `computePlanStreak(...)` without a mobility-dates argument, while `planStreak` (shown in the habit row and the plan-progress modal) included mobility dates via `mobilityDateSet`. A comment justified the split by claiming mobility completions "aren't yet available" at that point in the render — untrue, the `mobilityCompletions` selector is read earlier in the same component. Moved the `mobilityDateSet` computation above the early-return guard, threaded it into `earlyPlanStreak`, and made `planStreak` reuse that value instead of recomputing an now-identical result.
+
+**Why it matters**: A run of consecutive mobility-only days could show e.g. "🔥 32 days" everywhere in the UI while the 7/14/21/30-day milestone-banner logic kept evaluating a lower, stale streak count — silently suppressing celebrations or firing them at the wrong threshold.
+
+**Files changed**: `src/pages/TodayPage.tsx`
+
+**Risks**: Low. Pure data-flow correction — no new state, no new hooks, same computation now shared instead of duplicated. `planStreak`'s value is unchanged for any user without mobility-only streak days (the overwhelming majority of existing streaks).
+
+**Rollback**: `git revert 0050a45`
+
+---
+
+### [d4da65d] fix(TodayPage): "Continue mobility" card broke exactly when routines were edited mid-session
+
+**Summary**: `mobilityInProgress` required the paused checkpoint's `exerciseIds` to exactly match the live routine's ids before showing a "Continue" card. That check predates `reconcileCheckpoint()` (an adjacent recent commit, `911d095`), which was built specifically so a mobility session survives routine edits (add/remove/reorder exercises via "Manage routine") made while paused. The stale equality check meant editing the routine mid-session silently reverted the UI to a plain "Start Mobility Routine" button, implying the paused progress was gone — it wasn't; `MobilityTracker` would have transparently reconciled and resumed it.
+
+**Why it matters**: This bug is only reachable by using the exact feature ("preserve mobility session progress across routine edits") that shipped just before this pass, so it's very likely a live UX bug for anyone who has tried that flow.
+
+**Files changed**: `src/pages/TodayPage.tsx`
+
+**Risks**: Low. Removing the equality check widens when the "Continue" card is shown (from "routine unchanged" to "checkpoint exists for today with progress") — strictly more permissive, and the fallback path it now avoids (`reconcileCheckpoint`) was already exercised and tested via `MobilityTracker.test.ts`.
+
+**Rollback**: `git revert d4da65d`
+
+---
+
+### [84fe146] fix(csv): disambiguate legacy extraId collisions within a single import
+
+**Summary**: `stableExtraId()` (the pass-80-recommended, already-shipped BUG-CSV fix) derives a synthetic id from `(planId, date, workoutType, workoutName)` for legacy CSV exports lacking an `extraId` column. Two rows in the *same* import sharing that composite key (e.g. two same-day, default-named "Yoga" extras) hashed to the identical id. `historyStore.importExtraEntries` only dedupes incoming rows against already-stored entries, not against each other in the same batch, so both rows would be inserted under one colliding id — corrupting id-keyed outcome lookups and making by-id edit/delete affect both entries at once. Added an `occurrence` counter, scoped to a single `historyFromCsv()` call, folded into the hash input for the second and later row sharing a key. Occurrence 0 (the common, non-colliding case) keeps the original unsuffixed hash, so existing ids are unaffected.
+
+**Why it matters**: Silent data corruption on a plausible (not exotic) legacy-CSV shape — anyone who used default names for multiple same-day extras before the 2026-04-26 schema change and now re-imports that export.
+
+**Files changed**: `src/lib/csv.ts`, `src/lib/__tests__/csv.test.ts`
+
+**Risks**: Low. Purely additive disambiguation — occurrence-0 ids (the vast majority) are byte-identical to before. Also strengthened a test that had regressed to only checking "id is a non-empty string" instead of the actual idempotency guarantee.
+
+**Rollback**: `git revert 84fe146`
+
+---
+
 ## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
 
 ### [6000a9c] fix(CalendarPage): slot fallback type 'rest' → 'other'

@@ -451,9 +451,19 @@ function defaultNameForType(type: WorkoutType): string {
  * FNV-1a 32-bit over the composite key gives a deterministic 8-char hex
  * suffix that is collision-resistant for realistic usage (one plan, one date,
  * one workout type, one name).
+ *
+ * `occurrence` disambiguates two rows in the same import that share an
+ * identical composite key (e.g. two same-day, same-name "Yoga" extras) —
+ * without it both would derive the same id, and `historyStore.importExtraEntries`
+ * only dedupes against pre-existing entries, not within the incoming batch, so
+ * both would be inserted with a colliding id. Occurrence 0 omits the suffix
+ * entirely so the common (non-colliding) case keeps producing the same id it
+ * always has.
  */
-function stableExtraId(planId: string, date: string, type: string, name: string): string {
-  const key = `${planId}|${date}|${type}|${name}`
+function stableExtraId(planId: string, date: string, type: string, name: string, occurrence = 0): string {
+  const key = occurrence === 0
+    ? `${planId}|${date}|${type}|${name}`
+    : `${planId}|${date}|${type}|${name}|${occurrence}`
   let h = 2166136261
   for (let i = 0; i < key.length; i++) {
     h ^= key.charCodeAt(i)
@@ -637,6 +647,9 @@ export function historyFromCsv(
   const extras: ExtraWorkoutEntry[] = []
   const outcomes: WorkoutOutcome[] = []
   const now = new Date().toISOString()
+  // Tracks how many times each (planId, date, type, name) composite key has
+  // been seen so far in THIS import — see stableExtraId's `occurrence` param.
+  const legacyIdOccurrences = new Map<string, number>()
 
   records.forEach((row, i) => {
     const lineNum = i + 2
@@ -671,8 +684,15 @@ export function historyFromCsv(
       // Prefer the stable extraId from the CSV when present (2026-04-26+ exports)
       // so that re-importing the same file is idempotent. For older exports that
       // lack this column, derive a deterministic ID from the composite key so
-      // repeated reimports of the same file don't create duplicate entries.
-      const extraId = row.extraId?.trim() || stableExtraId(planId, calendarDate, workoutType, workoutName)
+      // repeated reimports of the same file don't create duplicate entries. The
+      // occurrence counter disambiguates same-key rows within this one import.
+      let extraId = row.extraId?.trim()
+      if (!extraId) {
+        const legacyKey = `${planId}|${calendarDate}|${workoutType}|${workoutName}`
+        const occurrence = legacyIdOccurrences.get(legacyKey) ?? 0
+        legacyIdOccurrences.set(legacyKey, occurrence + 1)
+        extraId = stableExtraId(planId, calendarDate, workoutType, workoutName, occurrence)
+      }
       // Restore source field so Undo on TodayPage keeps the correct
       // 'history' vs 'double_day' classification after a re-import.
       // Absent in pre-2026-04-27 exports — undefined matches old record shape.

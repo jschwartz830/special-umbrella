@@ -284,24 +284,29 @@ export function TodayPage() {
   const [mobilityState, setMobilityState] = useState<'hidden' | 'open'>('hidden')
   // A checkpoint left behind by closing the tracker mid-routine (see
   // MobilityTracker's handleClose) — lets today's card offer "Continue"
-  // instead of starting the whole routine over.
+  // instead of starting the whole routine over. Deliberately does NOT
+  // require the checkpoint's exerciseIds to exactly match the live routine:
+  // MobilityTracker's reconcileCheckpoint() already re-maps progress onto
+  // an edited routine (add/remove/reorder), so a mismatch here doesn't mean
+  // the checkpoint is stale — it just means "Manage routine" was used
+  // mid-session, which is the case this feature exists to support.
   const mobilityInProgress = !!(
     !mobilityCompletion &&
     mobilityActiveSession &&
     mobilityActiveSession.date === today &&
-    mobilityActiveSession.exerciseIds.join(',') === mobilityRoutine.map(e => e.id).join(',') &&
     (mobilityActiveSession.completedIds.length > 0 || mobilityActiveSession.totalElapsedSec >= 3)
   )
 
   // Progress ring detail modal
   const [showPlanProgressModal, setShowPlanProgressModal] = useState(false)
 
-  // Compute streak early (without mobility dates, which aren't yet available here)
-  // so the milestone hook — a Rules-of-Hooks requirement — can be called before
-  // the early return guard below. The one-day difference is negligible for a banner.
+  // Mobility dates count toward streak — completing mobility on a day keeps the streak alive.
+  // Computed here (before the early-return guard below) since the milestone hook — a
+  // Rules-of-Hooks requirement — must be called unconditionally on every render.
+  const mobilityDateSet = useMemo(() => new Set(Object.keys(mobilityCompletions)), [mobilityCompletions])
   const earlyPlanStreak = useMemo(
-    () => (plan ? computePlanStreak(plan.id, planEntries, planExtras, today) : 0),
-    [plan, planEntries, planExtras, today],
+    () => (plan ? computePlanStreak(plan.id, planEntries, planExtras, today, mobilityDateSet) : 0),
+    [plan, planEntries, planExtras, today, mobilityDateSet],
   )
   const { isDismissed: streakMilestoneDismissed, dismiss: dismissStreakMilestone, milestone: streakMilestone } =
     useStreakMilestoneDismiss(plan?.id ?? null, earlyPlanStreak)
@@ -363,9 +368,9 @@ export function TodayPage() {
 
   // Stats for the compact habit row (scoped to the active plan's history)
   const stats = computeHistoryStats(planEntries, planExtras, today)
-  // Mobility dates count toward streak — completing mobility on a day keeps the streak alive
-  const mobilityDateSet = useMemo(() => new Set(Object.keys(mobilityCompletions)), [mobilityCompletions])
-  const planStreak = computePlanStreak(plan.id, planEntries, planExtras, today, mobilityDateSet)
+  // Same computation as earlyPlanStreak above (mobility dates included) — reuse it
+  // rather than recomputing now that both use the same inputs.
+  const planStreak = earlyPlanStreak
   const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
 
   // Collect recent past days with no entry — used to show the stall nudge.
