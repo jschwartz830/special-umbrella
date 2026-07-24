@@ -89,7 +89,7 @@ const DELAY_OPTIONS = [
 export function SettingsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
-  const { startDelaySeconds, setStartDelay, autoAdvanceSegments, setAutoAdvanceSegments } = useSettingsStore()
+  const { startDelaySeconds, setStartDelay, autoAdvanceSegments, setAutoAdvanceSegments, focusMode, setFocusMode } = useSettingsStore()
   const { user, signOut } = useAuthStore()
 
   const latestCommitDate =
@@ -182,6 +182,27 @@ export function SettingsPage() {
             className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer flex-shrink-0 mt-0.5 ${autoAdvanceSegments ? 'bg-sky-500' : 'bg-slate-600'}`}
           >
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${autoAdvanceSegments ? 'left-[22px]' : 'left-0.5'}`} />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-medium">Focus mode</h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Show one set at a time during a workout — hides other exercises until the current set is logged.
+            </p>
+          </div>
+          <div
+            role="switch"
+            aria-checked={focusMode}
+            tabIndex={0}
+            onClick={() => setFocusMode(!focusMode)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFocusMode(!focusMode) } }}
+            className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer flex-shrink-0 mt-0.5 ${focusMode ? 'bg-sky-500' : 'bg-slate-600'}`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${focusMode ? 'left-[22px]' : 'left-0.5'}`} />
           </div>
         </div>
       </section>
