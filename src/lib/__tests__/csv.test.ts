@@ -454,16 +454,40 @@ describe('historyToCsv + historyFromCsv', () => {
     expect(parsed[0].id).toBe('original-id')
   })
 
-  it('generates a fresh ID for extras when the extraId column is absent (pre-2026-04-26 exports)', () => {
+  it('derives a stable, deterministic ID for extras when the extraId column is absent (pre-2026-04-26 exports), so re-importing the same file is idempotent', () => {
     // Simulate an older CSV export that has entryKind but no extraId column.
     const legacyExtraCsv =
       `entryKind,planId,calendarDate,planDayIndex,planDayLabel,action,slotNames,workoutType,workoutName,completionState,perceivedEffort,durationActualMin,actualDistanceMiles,actualDurationMin,averagePaceSecondsPerMile,averageHeartRate,completedAsPlanned,completedAt,notes,createdAt\n` +
       `extra,${plan.id},2026-04-11,,,,, yoga,Morning Yoga,,,,,,,,,,,2026-04-11T08:00:00Z`
+    const first = historyFromCsv(legacyExtraCsv, planIds)
+    const second = historyFromCsv(legacyExtraCsv, planIds)
+    expect(first.extras).toHaveLength(1)
+    expect(first.extras[0].id).toMatch(/^legacy-[0-9a-f]{8}$/)
+    // BUG-CSV: the whole point of the synthetic ID is that re-importing the
+    // same legacy file twice produces the same id (so historyStore's
+    // importExtraEntries dedup, keyed by id, treats it as already-imported).
+    expect(second.extras[0].id).toBe(first.extras[0].id)
+  })
+
+  it('assigns distinct synthetic IDs to two legacy rows that share the same composite key in one import', () => {
+    // Two same-day, same-name, unnamed "Yoga" extras in the same legacy
+    // export would otherwise hash to the identical stableExtraId, and
+    // historyStore.importExtraEntries only dedupes against pre-existing
+    // state (not within the incoming batch) — so both would be inserted
+    // under one colliding id, corrupting by-id edit/delete/outcome lookups.
+    const legacyExtraCsv =
+      `entryKind,planId,calendarDate,planDayIndex,planDayLabel,action,slotNames,workoutType,workoutName,completionState,perceivedEffort,durationActualMin,actualDistanceMiles,actualDurationMin,averagePaceSecondsPerMile,averageHeartRate,completedAsPlanned,completedAt,notes,createdAt\n` +
+      `extra,${plan.id},2026-04-11,,,,, yoga,Morning Yoga,,,,,,,,,,,2026-04-11T08:00:00Z\n` +
+      `extra,${plan.id},2026-04-11,,,,, yoga,Morning Yoga,,,,,,,,,,,2026-04-11T09:00:00Z`
     const { extras: parsed } = historyFromCsv(legacyExtraCsv, planIds)
-    expect(parsed).toHaveLength(1)
-    // No extraId column → fresh ID generated; just verify it's a non-empty string.
-    expect(typeof parsed[0].id).toBe('string')
-    expect(parsed[0].id.length).toBeGreaterThan(0)
+    expect(parsed).toHaveLength(2)
+    expect(parsed[0].id).not.toBe(parsed[1].id)
+
+    // Re-importing the same two-row file again must reproduce the same pair
+    // of ids in the same order, or the idempotency guarantee breaks for the
+    // second row.
+    const reparsed = historyFromCsv(legacyExtraCsv, planIds)
+    expect(reparsed.extras.map(e => e.id)).toEqual(parsed.map(e => e.id))
   })
 
   it('preserves source field through export/import round-trip', () => {
