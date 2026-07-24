@@ -303,6 +303,15 @@ describe('removeRetroJumpForDate', () => {
     }).not.toThrow()
     expect(getState().overrides).toHaveLength(0)
   })
+
+  it('matches by ISO date prefix regardless of time-of-day (UTC midnight safety)', () => {
+    // A jump logged at 00:30 UTC on Jan 15 should be matched by calendarDate
+    // '2026-01-15'. The old format() implementation would have shifted this to
+    // '2026-01-14' in UTC-1+ timezones. slice(0,10) is timezone-invariant.
+    getState().addOverride(makeOverride('2026-01-15T00:30:00.000Z', 'jump', { targetDayIndex: 1 }))
+    getState().removeRetroJumpForDate('plan-1', '2026-01-15')
+    expect(getState().overrides).toHaveLength(0)
+  })
 })
 
 // ── removeEntry ───────────────────────────────────────────────────────────────
