@@ -25,7 +25,12 @@ const STORES: { name: string; store: AnyStore; migrate?: MigrateFn }[] = [
     // handler from silently deleting user-added extras.
     migrate: (data) => migrateHistoryState(data, 0),
   },
-  { name: 'wpt_outcomes', store: useOutcomeStore as unknown as AnyStore },
+  {
+    name: 'wpt_outcomes',
+    store: useOutcomeStore as unknown as AnyStore,
+    // Identity migration — placeholder so future schema changes have a home here.
+    migrate: (data) => data,
+  },
   {
     name: 'wpt_plans',
     store: usePlanStore as unknown as AnyStore,
@@ -34,8 +39,18 @@ const STORES: { name: string; store: AnyStore; migrate?: MigrateFn }[] = [
     // deprecated `tags` field.
     migrate: (data) => migratePlanState(data),
   },
-  { name: 'wpt_program_vars', store: useProgramStore as unknown as AnyStore },
-  { name: 'wpt_exercise_history', store: useExerciseHistoryStore as unknown as AnyStore },
+  {
+    name: 'wpt_program_vars',
+    store: useProgramStore as unknown as AnyStore,
+    // Identity migration — placeholder so future schema changes have a home here.
+    migrate: (data) => data,
+  },
+  {
+    name: 'wpt_exercise_history',
+    store: useExerciseHistoryStore as unknown as AnyStore,
+    // Identity migration — placeholder so future schema changes have a home here.
+    migrate: (data) => data,
+  },
   {
     name: 'wpt_mobility',
     store: useMobilityStore as unknown as AnyStore,
@@ -48,7 +63,12 @@ const STORES: { name: string; store: AnyStore; migrate?: MigrateFn }[] = [
       return data
     },
   },
-  { name: 'wpt_settings', store: useSettingsStore as unknown as AnyStore },
+  {
+    name: 'wpt_settings',
+    store: useSettingsStore as unknown as AnyStore,
+    // Identity migration — placeholder so future schema changes have a home here.
+    migrate: (data) => data,
+  },
 ]
 
 function serializeState(state: Record<string, unknown>): Record<string, unknown> {
