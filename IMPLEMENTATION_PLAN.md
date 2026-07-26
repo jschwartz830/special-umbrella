@@ -4,11 +4,11 @@
 
 ### Baseline
 
-- Branch started from `main` (PR from pass 81 merged since then).
+- Branch started from `main` (PR from pass 81 merged since then, plus PR #210 from `claude/serene-cori-nbwqkx`).
 - **1121 tests passing** across 33 test files at start and end of pass (no regressions, no new tests this pass).
 - TypeScript: `tsc --noEmit` clean (0 errors). `npm run build` succeeds.
 
-### Architecture Summary (pass 82 scope)
+### Architecture Summary (pass 82 scope — 83sosx)
 
 Targeted bug-fix pass. Closed BUG-4's last remaining gap (identity migrate placeholders for 4 stores that had none in `storeSync.ts`) and exposed a long-hidden UI gap (extra-entry notes field existed in the type and store action but had no modal UI). Both changes are low-risk, additive, and independently revertable.
 
@@ -27,10 +27,41 @@ None. The `storeSync.ts` change touches identity logic already covered by the 13
 
 | Priority | Item |
 |---|---|
-| P1 | Begin `TodayPage.tsx` decomposition (ARCH-1) — 1832 lines, zero render-level tests. |
-| P2 | Add a render-level test harness for `TodayPage.tsx` — the two bugs fixed in pass 81 were both in untested conditional JSX. |
-| P3 | Add `draftVersion` to active-workout draft. |
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now ~1720 lines after nbwqkx pass. Next candidates: extract `<TodayWorkoutCard>` or `<TodayUpcomingList>`. |
+| P2 | Add a render-level test harness for `TodayPage.tsx` / `TodayBanners.tsx`. TodayBanners is now a pure component — easy to test with RTL if jsdom is added. |
 | P4 | `ActiveWorkoutTracker.tsx` (1872 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested. |
+
+---
+
+## Pass 82 — 2026-07-25 (branch `claude/serene-cori-nbwqkx`)
+
+### Baseline
+
+- Branch started from `main` (pass 81 PR merged: storeSync tests, streak-milestone divergence fix, mobility-continue-card fix, CSV within-batch collision fix).
+- **1121 tests passing** across 33 test files at start and end of pass.
+- TypeScript: `tsc --noEmit` clean (0 errors). `npm run build` succeeds.
+
+### Architecture Summary (pass 82 scope — nbwqkx)
+
+Targeted correctness + decomposition pass. Two related `WorkoutType` type-safety bugs in TodayPage.tsx were identified and fixed (same pattern as pass 80 CalendarPage and pass 70 HistoryPage fixes). The P1 ARCH-1 decomposition item was partially addressed by extracting `TodayBanners` (all six informational banners) into a standalone pure-display component, reducing TodayPage by ~120 lines of JSX. The P3 `draftVersion` guard was added to ActiveWorkoutTracker's localStorage draft. No new dependencies. No store schema changes.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File | Summary |
+|---|---|---|---|
+| BUG-REST-TODAYPAGE-1 | `65f0d57` | `TodayPage.tsx:549` | `workoutType: selectedSlot?.type ?? 'rest'` in `handleOutcomeConfirm` (double-day add-from-plan flow) — should use `'other'`, the current canonical fallback type. |
+| BUG-REST-TODAYPAGE-2 | `65f0d57` | `TodayPage.tsx:621` | `workoutType: bonusSlot?.type ?? 'rest'` in `handleUpcomingLog` (log-upcoming-as-today double-day flow) — same fix. |
+
+### Improvements Completed This Pass
+
+| Commit | Change |
+|---|---|
+| `65f0d57` | Extract six TodayPage banners into `src/components/today/TodayBanners.tsx` (pure display component, 18 props). TodayPage JSX reduced by ~120 lines. First step of ARCH-1. |
+| `fd431be` | Add `draftVersion: 1` to ActiveWorkoutTracker's localStorage draft. Drafts with a mismatched version field are discarded on load rather than partially applied. Closes P3. |
+
+### Tests Added This Pass
+
+None. The two TodayPage.tsx bug fixes had no test file to add to. The TodayBanners component is pure JSX. The `draftVersion` guard is in a component with no test file. Total remains 33 files, 1121 tests.
 
 ---
 

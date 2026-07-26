@@ -26,10 +26,37 @@ None. The `storeSync.ts` change adds identity logic already covered by the 13 te
 
 | Gap | Priority | Notes |
 |---|---|---|
-| `TodayPage.tsx` — 1832-line page component | P1 | Zero render-level tests. Both bugs fixed in pass 81 lived in untested conditional JSX. |
+| `TodayPage.tsx` / `TodayBanners.tsx` | P1 | Zero render-level tests. TodayBanners is now a pure component — easiest target if RTL is added. |
 | `ActiveWorkoutTracker.tsx` — 1872-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues — all manual-only. |
 | `CardioWorkoutTracker.tsx` auto-advance timer | P3 | The `setTimeout` → auto-advance flow is tested by manual QA only. |
 | `useToday.ts` midnight-advance timer | P4 | Timer setup is straightforward but untested. |
+
+---
+
+## 2026-07-25 (eighty-second pass) — branch `claude/serene-cori-nbwqkx`
+
+---
+
+### Baseline (before changes)
+
+- **33 test files, 1121 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+- `npm run build`: not re-run (no public-API changes to engine/store layers)
+
+### Tests Added/Updated This Pass
+
+None. No new tests were added this pass.
+
+- The two `'rest'` → `'other'` fixes have no test file to add to (TodayPage has zero render-level tests).
+- TodayBanners is a pure display component that could be unit-tested with `@testing-library/react`, but that dependency is not in the project.
+- The `draftVersion` guard in ActiveWorkoutTracker is in a component that also has no test file (P4 carried forward).
+
+### Final Results
+
+- **33 test files, 1121 tests — all passing** (unchanged from baseline)
+- `tsc --noEmit`: clean
+- Net test delta: ±0
 
 ---
 

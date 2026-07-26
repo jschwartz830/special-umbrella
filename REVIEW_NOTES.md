@@ -8,7 +8,7 @@
 
 1. **What changed**: 2 commits, 2 source files. No new test files. No new dependencies. No store schema changes.
 2. **Highest confidence**: `storeSync.ts` identity placeholders — purely additive, closes the last gap of BUG-4 which has been tracked since pass 78. The identity `(data) => data` functions are structurally identical to what Zustand's own `persist` middleware does by default when no `migrate` is supplied.
-3. **Risky items**: None. Both changes are additive. The extra-entry notes textarea saves `undefined` (not `''`) when blank, which is consistent with the existing optional field semantics on `ExtraWorkoutEntry.notes`.
+3. **Risky items**: None. Both changes are additive.
 4. **Review first**: The `saveAndCloseExtra` change adds `notes` to the `updateExtraEntry` patch. Verify the UI correctly initialises `editingExtraNotes` from `extra.notes ?? ''` so that opening an entry with existing notes pre-populates the field, and that saving with an empty textarea clears the note (by saving `undefined`).
 5. **Branch/merge policy conflict** carried forward from pass 81 — see "Open Questions".
 
@@ -20,7 +20,7 @@
 |---|---|---|
 | Medium | BUG-4 (final) | `storeSync.ts`: 4 of 7 stores (`wpt_outcomes`, `wpt_program_vars`, `wpt_exercise_history`, `wpt_settings`) had no `migrate` function in the STORES array. Cloud-hydrated data for these stores bypassed all migration logic — **fixed this pass**. |
 | Low | UI-NOTES | `HistoryPage.tsx`: extra-entry edit modal had no UI for the `notes` field that already existed on the type and the store action — **fixed this pass**. |
-| Debt | ARCH-1 | `TodayPage.tsx` is 1832 lines with zero render-level tests. Carried forward as P1. |
+| Debt | ARCH-1 | `TodayPage.tsx` is ~1720 lines (after nbwqkx extraction) with zero render-level tests. Carried forward as P1. |
 
 ---
 
@@ -39,12 +39,6 @@ Notes field exposed in extra-entry edit modal (UI-NOTES above). Already-present 
 
 ---
 
-### Medium-Complexity Feature Explored
-
-None this pass. The BUG-4 gap and the UI-NOTES gap were clear, low-risk improvements with strong "fix it now" rationale. The two items together are well within a single-pass scope.
-
----
-
 ### Definitely Keep
 
 - `9a9d77e` — storeSync identity placeholders. Zero risk, closes a 4-pass tracked debt item.
@@ -53,6 +47,45 @@ None this pass. The BUG-4 gap and the UI-NOTES gap were clear, low-risk improvem
 ### Open Questions
 
 **Branch/merge policy conflict** (carried from pass 81): `CLAUDE.md` says "Always commit directly to `main`" but the task prompt says "Develop on branch `claude/serene-cori-83sosx`" and "Work ONLY in the current branch. Do not merge to main." All 82 passes have opened PRs for human review rather than auto-merging. This PR follows that pattern.
+
+---
+
+## 2026-07-25 (eighty-second pass) — branch `claude/serene-cori-nbwqkx`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 2 commits, 3 source files (1 new). Two `WorkoutType` fallback bugs fixed in TodayPage.tsx, six banners extracted to a new TodayBanners component, and a `draftVersion` version guard added to the active-workout draft. No new dependencies. No store schema changes.
+2. **Highest confidence**: Both `'rest'` → `'other'` fixes are identical in pattern to fixes in CalendarPage (pass 80) and HistoryPage (pass 70), with clear rationale. The TodayBanners extraction is a pure JSX refactor (no logic moved). The `draftVersion` guard is additive and explicitly backwards-compatible with existing drafts.
+3. **Risky items**: None rated risky.
+4. **Review first**: The TodayBanners extraction (`65f0d57`) — worth a quick visual check that all six banners still render correctly (plan expiry, stall nudge, consecutive-skips, streak milestone, adaptation note, spacing warning). No logic was changed, but the prop mappings should be verified against the original JSX.
+5. A **branch/merge policy conflict** is still present — see "Open Questions" at the end of this document.
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | Description |
+|---|---|---|
+| Low | BUG-REST-TODAYPAGE-1 | `TodayPage.tsx:549`: `addExtraEntry` called with `workoutType: selectedSlot?.type ?? 'rest'` in the double-day add-from-plan flow — **fixed this pass** using `'other'`. |
+| Low | BUG-REST-TODAYPAGE-2 | `TodayPage.tsx:621`: `addExtraEntry` called with `workoutType: bonusSlot?.type ?? 'rest'` in the log-upcoming double-day flow — **fixed this pass** using `'other'`. |
+| Debt | ARCH-1 | `TodayPage.tsx` is ~1720 lines after this pass with zero render-level tests. Partially addressed (TodayBanners extracted), P1 carried forward. |
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `65f0d57` | `TodayPage.tsx` + `TodayBanners.tsx` (new): fix two `'rest'` type fallbacks; extract six banners to a pure display component |
+| `fd431be` | `ActiveWorkoutTracker.tsx`: add `draftVersion: 1` to draft snapshot; discard drafts with a mismatched version |
+
+---
+
+### Open Questions
+
+**Branch/merge policy conflict**: `CLAUDE.md` says "Always commit directly to `main`". The task instructions say to develop on a feature branch and create a PR. All 82 prior passes followed the PR-for-human-review approach.
 
 ---
 

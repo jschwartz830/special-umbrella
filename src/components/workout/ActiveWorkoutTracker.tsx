@@ -376,6 +376,7 @@ export function ActiveWorkoutTracker({
   onComplete,
 }: Props) {
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
+  const DRAFT_VERSION = 1
   const { startDelaySeconds, focusMode, setFocusMode } = useSettingsStore()
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [exercisePicker, setExercisePicker] = useState<ExercisePickerMode | null>(null)
@@ -594,6 +595,7 @@ export function ActiveWorkoutTracker({
     }
     try {
       const draft = JSON.parse(raw) as {
+        draftVersion?: number
         workoutStart?: string
         pausePeriods?: { start: string; end?: string }[]
         workoutElapsed?: number
@@ -607,6 +609,10 @@ export function ActiveWorkoutTracker({
         restOwner?: { exIdx: number; setIdx: number } | null
         activeSetTimer?: { exIdx: number; setIdx: number } | null
         exercises?: ExerciseTrackState[]
+      }
+      if (draft.draftVersion !== undefined && draft.draftVersion !== DRAFT_VERSION) {
+        window.localStorage.removeItem(draftStorageKey)
+        return
       }
       if (draft.workoutStart) workoutStartRef.current = draft.workoutStart
       if (draft.pausePeriods) pausePeriodsRef.current = draft.pausePeriods
@@ -662,6 +668,7 @@ export function ActiveWorkoutTracker({
 
   useEffect(() => {
     const draft = {
+      draftVersion: DRAFT_VERSION,
       workoutStart: workoutStartRef.current,
       pausePeriods: pausePeriodsRef.current,
       workoutElapsed,
