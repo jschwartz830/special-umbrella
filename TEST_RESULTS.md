@@ -1,5 +1,38 @@
 # Test Results
 
+## 2026-07-26 (eighty-second pass) — branch `claude/serene-cori-83sosx`
+
+---
+
+### Baseline (before changes)
+
+- **33 test files, 1121 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+- `npm run build`: succeeds
+
+### Tests Added/Updated This Pass
+
+None. The `storeSync.ts` change adds identity logic already covered by the 13 tests from pass 81. The `HistoryPage.tsx` change is UI-only with no unit-testable logic introduced.
+
+### Final Results
+
+- **33 test files, 1121 tests — all passing** (no change)
+- No regressions
+- `tsc --noEmit`: clean
+- `npm run build`: succeeds
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `TodayPage.tsx` — 1832-line page component | P1 | Zero render-level tests. Both bugs fixed in pass 81 lived in untested conditional JSX. |
+| `ActiveWorkoutTracker.tsx` — 1872-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues — all manual-only. |
+| `CardioWorkoutTracker.tsx` auto-advance timer | P3 | The `setTimeout` → auto-advance flow is tested by manual QA only. |
+| `useToday.ts` midnight-advance timer | P4 | Timer setup is straightforward but untested. |
+
+---
+
 ## 2026-07-24 (eighty-first pass) — branch `claude/nightly-codebase-audit-yfetx3`
 
 ---

@@ -1,5 +1,39 @@
 # Implementation Plan
 
+## Pass 82 — 2026-07-26 (branch `claude/serene-cori-83sosx`)
+
+### Baseline
+
+- Branch started from `main` (PR from pass 81 merged since then).
+- **1121 tests passing** across 33 test files at start and end of pass (no regressions, no new tests this pass).
+- TypeScript: `tsc --noEmit` clean (0 errors). `npm run build` succeeds.
+
+### Architecture Summary (pass 82 scope)
+
+Targeted bug-fix pass. Closed BUG-4's last remaining gap (identity migrate placeholders for 4 stores that had none in `storeSync.ts`) and exposed a long-hidden UI gap (extra-entry notes field existed in the type and store action but had no modal UI). Both changes are low-risk, additive, and independently revertable.
+
+### Bugs Fixed / Features Completed This Pass
+
+| # | Commit | File | Summary |
+|---|---|---|---|
+| BUG-4 (final) | `9a9d77e` | `storeSync.ts` | `wpt_outcomes`, `wpt_program_vars`, `wpt_exercise_history`, and `wpt_settings` had no `migrate` entry in the STORES array. Cloud-hydrated data for these stores bypassed migration entirely. Added identity placeholders so all 7 stores now have uniform pipeline coverage. |
+| UI-NOTES | `1314cf0` | `HistoryPage.tsx` | `ExtraWorkoutEntry.notes` existed on the type and `updateExtraEntry` already accepted it, but the extra-entry edit modal had no UI for notes. Added `editingExtraNotes` state wired through `openExtraEdit` and `saveAndCloseExtra`, plus a textarea to the modal. |
+
+### Tests Added This Pass
+
+None. The `storeSync.ts` change touches identity logic already covered by the 13 tests added in pass 81. The `HistoryPage.tsx` change adds UI only; no unit-testable logic was introduced. Total remains 33 files, 1121 tests.
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Begin `TodayPage.tsx` decomposition (ARCH-1) — 1832 lines, zero render-level tests. |
+| P2 | Add a render-level test harness for `TodayPage.tsx` — the two bugs fixed in pass 81 were both in untested conditional JSX. |
+| P3 | Add `draftVersion` to active-workout draft. |
+| P4 | `ActiveWorkoutTracker.tsx` (1872 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested. |
+
+---
+
 ## Pass 81 — 2026-07-24 (branch `claude/nightly-codebase-audit-yfetx3`)
 
 ### Baseline
