@@ -1,5 +1,38 @@
 # Implementation Plan
 
+## Pass 82 — 2026-07-26 (branch `claude/serene-cori-83sosx`)
+
+### Baseline
+
+- Branch started from `main` (PR from pass 81 merged since then, plus PR #210 from `claude/serene-cori-nbwqkx`).
+- **1121 tests passing** across 33 test files at start and end of pass (no regressions, no new tests this pass).
+- TypeScript: `tsc --noEmit` clean (0 errors). `npm run build` succeeds.
+
+### Architecture Summary (pass 82 scope — 83sosx)
+
+Targeted bug-fix pass. Closed BUG-4's last remaining gap (identity migrate placeholders for 4 stores that had none in `storeSync.ts`) and exposed a long-hidden UI gap (extra-entry notes field existed in the type and store action but had no modal UI). Both changes are low-risk, additive, and independently revertable.
+
+### Bugs Fixed / Features Completed This Pass
+
+| # | Commit | File | Summary |
+|---|---|---|---|
+| BUG-4 (final) | `9a9d77e` | `storeSync.ts` | `wpt_outcomes`, `wpt_program_vars`, `wpt_exercise_history`, and `wpt_settings` had no `migrate` entry in the STORES array. Cloud-hydrated data for these stores bypassed migration entirely. Added identity placeholders so all 7 stores now have uniform pipeline coverage. |
+| UI-NOTES | `1314cf0` | `HistoryPage.tsx` | `ExtraWorkoutEntry.notes` existed on the type and `updateExtraEntry` already accepted it, but the extra-entry edit modal had no UI for notes. Added `editingExtraNotes` state wired through `openExtraEdit` and `saveAndCloseExtra`, plus a textarea to the modal. |
+
+### Tests Added This Pass
+
+None. The `storeSync.ts` change touches identity logic already covered by the 13 tests added in pass 81. The `HistoryPage.tsx` change adds UI only; no unit-testable logic was introduced. Total remains 33 files, 1121 tests.
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now ~1720 lines after nbwqkx pass. Next candidates: extract `<TodayWorkoutCard>` or `<TodayUpcomingList>`. |
+| P2 | Add a render-level test harness for `TodayPage.tsx` / `TodayBanners.tsx`. TodayBanners is now a pure component — easy to test with RTL if jsdom is added. |
+| P4 | `ActiveWorkoutTracker.tsx` (1872 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested. |
+
+---
+
 ## Pass 82 — 2026-07-25 (branch `claude/serene-cori-nbwqkx`)
 
 ### Baseline
@@ -8,9 +41,9 @@
 - **1121 tests passing** across 33 test files at start and end of pass.
 - TypeScript: `tsc --noEmit` clean (0 errors). `npm run build` succeeds.
 
-### Architecture Summary (pass 82 scope)
+### Architecture Summary (pass 82 scope — nbwqkx)
 
-Targeted correctness + decomposition pass. Two related `WorkoutType` type-safety bugs in TodayPage.tsx were identified and fixed (same pattern as pass 80 CalendarPage and pass 70 HistoryPage fixes). The P1 ARCH-1 decomposition item was partially addressed by extracting `TodayBanners` (all six informational banners) into a standalone pure-display component, reducing TodayPage by ~120 lines of JSX. The P3 `draftVersion` guard was added to ActiveWorkoutTracker's localStorage draft. No new dependencies. No store schema changes. No feature work this pass.
+Targeted correctness + decomposition pass. Two related `WorkoutType` type-safety bugs in TodayPage.tsx were identified and fixed (same pattern as pass 80 CalendarPage and pass 70 HistoryPage fixes). The P1 ARCH-1 decomposition item was partially addressed by extracting `TodayBanners` (all six informational banners) into a standalone pure-display component, reducing TodayPage by ~120 lines of JSX. The P3 `draftVersion` guard was added to ActiveWorkoutTracker's localStorage draft. No new dependencies. No store schema changes.
 
 ### Bugs Fixed This Pass
 
@@ -28,20 +61,7 @@ Targeted correctness + decomposition pass. Two related `WorkoutType` type-safety
 
 ### Tests Added This Pass
 
-None. No new tests were added this pass. The two TodayPage.tsx bug fixes had no test file to add to (TodayPage still has zero render-level tests — ARCH-1 / P2 carried forward). The TodayBanners component is pure JSX and could in principle be unit-tested with jsdom, but no `@testing-library/react` or jsdom environment is available in this project; adding it requires a new devDependency (carried P4).
-
-### Prioritized Plan (for future passes)
-
-| Priority | Item |
-|---|---|
-| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now ~1720 lines after this pass. Next candidates: extract `<TodayWorkoutCard>` (the primary action card, ~lines 860–1000) or `<TodayUpcomingList>` (the upcoming workouts panel). |
-| P2 | Add a render-level test harness for `TodayPage.tsx` / `TodayBanners.tsx`. TodayBanners is now a pure component and would be easy to test with RTL if jsdom is added. Consider adding `@testing-library/react` and `jsdom` as devDependencies. |
-| P2 | Fix BUG-4: cloud hydration bypassing Zustand migrate pipeline for stores not explicitly listed in `storeSync.ts`'s `STORES` array. |
-| P4 | `ActiveWorkoutTracker.tsx` (1872 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested (carried forward from pass 78/80/81). |
-
-### Rationale for Sequencing
-
-The two `'rest'` fallback bugs were the obvious first fix — identical pattern to two prior passes, high confidence, zero risk. TodayBanners extraction was sequenced next because it directly supports the P1 ARCH-1 goal and has no behavior risk (pure JSX extraction with no logic changes). The draftVersion item was the lowest-risk P3 item and added defensive forward-compatibility for the tracker's draft storage.
+None. The two TodayPage.tsx bug fixes had no test file to add to. The TodayBanners component is pure JSX. The `draftVersion` guard is in a component with no test file. Total remains 33 files, 1121 tests.
 
 ---
 

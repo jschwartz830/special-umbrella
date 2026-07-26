@@ -2,6 +2,36 @@
 
 ---
 
+## Pass 82 — 2026-07-26 (branch `claude/serene-cori-83sosx`)
+
+### [9a9d77e] fix(storeSync): add identity migrate placeholders for all remaining stores
+
+**Summary**: `wpt_outcomes`, `wpt_program_vars`, `wpt_exercise_history`, and `wpt_settings` had no `migrate` entry in the STORES array. `syncOnLogin` applies the store's `migrate` fn to cloud data before calling `setState` — if the fn is absent, cloud data is hydrated raw, bypassing any future schema migration logic. This is BUG-4's final remaining gap (pass 81 added tests that exercised only `wpt_history` and `wpt_mobility` migrate wiring). Adding identity placeholders (`(data) => data`) gives all 7 stores uniform pipeline coverage and a clear extension point for real schema migrations.
+
+**Why it matters**: For any app version that adds a schema migration for these stores, users who are already logged in and whose cloud data was written by an older version would silently receive un-migrated data on next login. The fix is forward-safety with no behavioral change today.
+
+**Files changed**: `src/lib/storeSync.ts`
+
+**Risks**: None — identity functions are a no-op.
+
+**Rollback**: `git revert 9a9d77e`
+
+---
+
+### [1314cf0] feat(HistoryPage): expose notes field in extra-entry edit modal
+
+**Summary**: `ExtraWorkoutEntry.notes?: string` existed on the type, `historyStore.updateExtraEntry` already accepted a `notes` patch, and the extra-entry list in `HistoryPage` already rendered `extra.notes` when present — but the edit modal had no way to view or edit the note. Added `editingExtraNotes` state initialised from `extra.notes ?? ''` in `openExtraEdit`, included `notes` in the `updateExtraEntry` patch in `saveAndCloseExtra` (saving `undefined` instead of `''` so falsy semantics are preserved), and added a 3-row `textarea` to the modal after the Name field.
+
+**Why it matters**: Users who add notes via a route that does set them (e.g. a future API path or direct store interaction) had no way to view or edit those notes in the UI. This closes the display-vs-edit gap entirely.
+
+**Files changed**: `src/pages/HistoryPage.tsx`
+
+**Risks**: Very low. The store action already accepted `notes`; the only new code is the React state variable and the JSX field. Saving an empty textarea sends `undefined` which is the correct sentinel for "no note" on the optional field.
+
+**Rollback**: `git revert 1314cf0`
+
+---
+
 ## Pass 82 — 2026-07-25 (branch `claude/serene-cori-nbwqkx`)
 
 ### [65f0d57] fix(today): replace deprecated 'rest' fallback with 'other' in double-day flows; extract TodayBanners component
