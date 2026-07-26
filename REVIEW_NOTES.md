@@ -1,5 +1,62 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-25 (eighty-second pass) — branch `claude/serene-cori-nbwqkx`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 2 commits, 3 source files (1 new). Two `WorkoutType` fallback bugs fixed in TodayPage.tsx, six banners extracted to a new TodayBanners component, and a `draftVersion` version guard added to the active-workout draft. No new dependencies. No store schema changes. No feature work this pass.
+2. **Highest confidence**: Both `'rest'` → `'other'` fixes are identical in pattern to fixes in CalendarPage (pass 80) and HistoryPage (pass 70), with clear rationale. The TodayBanners extraction is a pure JSX refactor (no logic moved). The `draftVersion` guard is additive and explicitly backwards-compatible with existing drafts.
+3. **Risky items**: None rated risky.
+4. **Review first**: The TodayBanners extraction (`65f0d57`) — worth a quick visual check that all six banners still render correctly (plan expiry, stall nudge, consecutive-skips, streak milestone, adaptation note, spacing warning). No logic was changed, but the prop mappings (especially `unloggedCount = unloggedDates.length + olderUnloggedCount` and `hasUnloggedToday = unloggedDates.length > 0`) should be verified against the original JSX.
+5. A **branch/merge policy conflict** is still present — see "Open Questions" at the end of this document.
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | Description |
+|---|---|---|
+| Low | BUG-REST-TODAYPAGE-1 | `TodayPage.tsx:549`: `addExtraEntry` called with `workoutType: selectedSlot?.type ?? 'rest'` in the double-day add-from-plan flow — **fixed this pass** using `'other'`. |
+| Low | BUG-REST-TODAYPAGE-2 | `TodayPage.tsx:621`: `addExtraEntry` called with `workoutType: bonusSlot?.type ?? 'rest'` in the log-upcoming double-day flow — **fixed this pass** using `'other'`. |
+| Debt | ARCH-1 | `TodayPage.tsx` is ~1720 lines after this pass with zero render-level tests. Partially addressed (TodayBanners extracted), P1 carried forward. |
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `65f0d57` | `TodayPage.tsx` + `TodayBanners.tsx` (new): fix two `'rest'` type fallbacks; extract six banners to a pure display component |
+| `fd431be` | `ActiveWorkoutTracker.tsx`: add `draftVersion: 1` to draft snapshot; discard drafts with a mismatched version |
+
+---
+
+### Small Features Added
+
+None this pass.
+
+---
+
+### Remaining Known Issues (not addressed this pass)
+
+| ID | Priority | Description |
+|---|---|---|
+| ARCH-1 | P1 | TodayPage.tsx decomposition continues — `TodayBanners` extracted this pass; `TodayWorkoutCard` or `TodayUpcomingList` are logical next extractions. |
+| TEST-RTL | P2 | No render-level tests exist for TodayPage or TodayBanners. TodayBanners is now a pure component that would be straightforward to unit-test with `@testing-library/react`, but that dependency is not currently in the project. |
+| BUG-4 | P2 | Cloud hydration bypasses Zustand `migrate` for stores not in `storeSync.ts`'s `STORES` array. Requires architectural change. |
+
+---
+
+### Open Questions
+
+**Branch/merge policy conflict**: `CLAUDE.md` says "Always commit directly to `main`". The task instructions say to develop on `claude/serene-cori-nbwqkx` and create a PR. All 81 prior passes followed the PR-for-human-review approach (reasoning: the app auto-deploys to GitHub Pages from `main` on every push — a broken main is immediately live). This pass follows the same convention.
+
+**Decision needed**: Does the overnight task automation warrant an exception to the "no feature branches" rule, or should future passes commit directly to `main` with the understanding that any broken commit can be reverted? The revert instructions in `CLAUDE.md` cover this case cleanly. No action required this pass — flagging for awareness.
+
+---
+
 ## 2026-07-24 (eighty-first pass) — branch `claude/nightly-codebase-audit-yfetx3`
 
 ---

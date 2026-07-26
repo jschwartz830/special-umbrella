@@ -2,6 +2,38 @@
 
 ---
 
+## Pass 82 — 2026-07-25 (branch `claude/serene-cori-nbwqkx`)
+
+### [65f0d57] fix(today): replace deprecated 'rest' fallback with 'other' in double-day flows; extract TodayBanners component
+
+**Summary**: Fixed two `WorkoutType` fallback bugs in TodayPage.tsx that used `'rest'` (the deprecated legacy type) instead of `'other'` (the current canonical fallback) when creating `ExtraWorkoutEntry` records in the double-day flows. Both are in `addExtraEntry` calls: one in `handleOutcomeConfirm` (add-from-plan double-day) at line 549, and one in `handleUpcomingLog` (log-upcoming-as-today double-day) at line 621. The same bug was fixed in CalendarPage in pass 80 and in HistoryPage in pass 70 — TodayPage was the last remaining instance.
+
+Also extracted the six informational banners from TodayPage.tsx into a new pure-display component at `src/components/today/TodayBanners.tsx`. The banners extracted: plan expiry celebration, stalled-rotation nudge, consecutive-skips nudge, streak-milestone celebration, run adaptation note, and difficulty-spacing warning. TodayBanners receives all computed values as props (18 total) and has no store dependencies of its own. TodayPage's JSX shrinks by ~120 lines. This is the first step of the ARCH-1 decomposition priority.
+
+**Why it matters**: The `'rest'` type is no longer in `WORKOUT_TYPES` and is not offered anywhere in the UI. An `ExtraWorkoutEntry` written with type `'rest'` would display correctly (WORKOUT_META has a fallback entry for `'rest'`), but would be inconsistent with all other creation paths in the app. Any future code that filters or groups by `WorkoutType` may miss the entry.
+
+**Files changed**: `src/pages/TodayPage.tsx`, `src/components/today/TodayBanners.tsx` (new)
+
+**Risks**: Low. The bug fix touches fallback values on code paths that only fire when a plan day has no slots (unusual), and the type change is to the correct canonical value. The banner extraction is a pure JSX refactor with no logic changes; identical visual output.
+
+**Rollback**: `git revert 65f0d57`
+
+---
+
+### [fd431be] feat(tracker): add draftVersion field to active workout draft
+
+**Summary**: Added a `DRAFT_VERSION = 1` constant to `ActiveWorkoutTracker.tsx` and included it in every draft snapshot written to `localStorage`. On load, drafts with a defined `draftVersion` field that doesn't match the current constant are discarded and removed from storage, rather than being partially applied against a potentially incompatible state shape. Drafts without any `draftVersion` field (written by pre-pass-82 builds) are still accepted as-is, to avoid breaking in-progress workouts at the moment of update.
+
+**Why it matters**: The active-workout draft (`wpt_active_draft_${instanceId}`) has no version guard. If a future code change adds or renames required fields in the draft structure, an old draft from a previous app version could silently corrupt the active workout on resumption. The version check provides a clean, explicit bail-out path.
+
+**Files changed**: `src/components/workout/ActiveWorkoutTracker.tsx`
+
+**Risks**: Very low. Existing drafts (no `draftVersion` field) are explicitly allowed through the guard, so no in-progress workout is disrupted. Only drafts that somehow carry a `draftVersion !== 1` (which can only happen after this pass is deployed and then a future pass increments the constant) will be discarded.
+
+**Rollback**: `git revert fd431be`
+
+---
+
 ## Pass 81 — 2026-07-24 (branch `claude/nightly-codebase-audit-yfetx3`)
 
 ### [6036bcb] test(storeSync): add coverage for cloud-sync branching and debounce logic

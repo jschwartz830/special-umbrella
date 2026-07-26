@@ -1,5 +1,36 @@
 # Test Results
 
+## 2026-07-25 (eighty-second pass) — branch `claude/serene-cori-nbwqkx`
+
+---
+
+### Baseline (before changes)
+
+- **33 test files, 1121 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+- `npm run build`: not re-run (no public-API changes to engine/store layers)
+
+### Tests Reviewed
+
+No existing tests were reviewed for relevance to this pass's changes. The two bug fixes and the TodayBanners extraction are in TodayPage.tsx, which has no dedicated test file.
+
+### Tests Added/Updated This Pass
+
+None. No new tests were added this pass.
+
+- The two `'rest'` → `'other'` fixes have no test file to add to (TodayPage has zero render-level tests).
+- TodayBanners is a pure display component that could be unit-tested with `@testing-library/react`, but that dependency is not in the project.
+- The `draftVersion` guard in ActiveWorkoutTracker is in a component that also has no test file (P4 carried forward).
+
+### Final Results
+
+- **33 test files, 1121 tests — all passing** (unchanged from baseline)
+- `tsc --noEmit`: clean
+- Net test delta: ±0
+
+---
+
 ## 2026-07-24 (eighty-first pass) — branch `claude/nightly-codebase-audit-yfetx3`
 
 ---

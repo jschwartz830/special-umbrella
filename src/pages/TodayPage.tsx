@@ -14,7 +14,6 @@ import {
   Info,
   PlusCircle,
   X,
-  PartyPopper,
   CheckCircle2,
   Play,
   ChevronDown,
@@ -60,6 +59,7 @@ import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 import { outcomeSortKey } from '../lib/outcomeSortKey'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
+import { TodayBanners } from '../components/today/TodayBanners'
 import { WORKOUT_META } from '../lib/constants'
 import { estimateRunDurationMin } from '../lib/estimateRunDuration'
 
@@ -546,7 +546,7 @@ export function TodayPage() {
       const extraId = addExtraEntry({
         planId: plan!.id,
         calendarDate: today,
-        workoutType: selectedSlot?.type ?? 'rest',
+        workoutType: selectedSlot?.type ?? 'other',
         workoutName: selectedPlanDay.label,
         source: 'double_day',
         advancedRotation: willAdvance,
@@ -618,7 +618,7 @@ export function TodayPage() {
       const extraId = addExtraEntry({
         planId: plan!.id,
         calendarDate: today,
-        workoutType: bonusSlot?.type ?? 'rest',
+        workoutType: bonusSlot?.type ?? 'other',
         workoutName: rd.planDay.label,
         source: 'double_day',
         advancedRotation: true,
@@ -714,126 +714,26 @@ export function TodayPage() {
         </button>
       </div>
 
-      {/* Plan completion / expiry banner */}
-      {planExpired && !expiryBannerDismissed && (
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
-          <PartyPopper size={14} className="text-purple-400 mt-0.5 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-purple-300 font-medium">Plan complete!</p>
-            <p className="text-xs text-purple-400/70 mt-0.5">
-              You've finished all {plan.duration.value} {plan.duration.type} of this plan.
-              Consider activating a new plan or cycling this one.
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/plans')}
-            className="text-xs text-purple-400 hover:text-purple-200 font-medium flex-shrink-0 ml-1"
-          >
-            Plans →
-          </button>
-          <button
-            onClick={dismissExpiryBanner}
-            className="text-purple-400/60 hover:text-purple-200 flex-shrink-0 transition-colors"
-            aria-label="Dismiss"
-          >
-            <X size={13} />
-          </button>
-        </div>
-      )}
-
-      {/* Compact stalled-rotation nudge — dismissible */}
-      {showStallNudge && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-700/50 border border-slate-600/50">
-          <Info size={13} className="text-slate-400 flex-shrink-0" />
-          <p className="flex-1 text-xs text-slate-400 min-w-0">
-            Rotation may be stalled
-            {(unloggedDates.length + olderUnloggedCount) > 0 && (
-              <span className="text-slate-500">
-                {' '}· {unloggedDates.length + olderUnloggedCount} unlogged day{(unloggedDates.length + olderUnloggedCount) === 1 ? '' : 's'}
-              </span>
-            )}
-          </p>
-          {unloggedDates.length > 0 && (
-            <button
-              onClick={() => setShowCatchupConfirm(true)}
-              className="text-xs text-amber-400 font-medium flex-shrink-0 hover:text-amber-300 transition-colors"
-            >
-              Fix
-            </button>
-          )}
-          <button
-            onClick={() => navigate('/calendar')}
-            className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
-          >
-            Review
-          </button>
-          <button
-            onClick={dismissStallNudge}
-            className="text-slate-500 hover:text-slate-300 flex-shrink-0 transition-colors"
-            aria-label="Dismiss"
-          >
-            <X size={13} />
-          </button>
-        </div>
-      )}
-
-      {/* Consecutive skips nudge */}
-      {!planExpired && consecutiveSkips >= 3 && (
-        <div className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-          <Info size={13} className="text-amber-400 flex-shrink-0" />
-          <p className="flex-1 text-xs text-amber-300">
-            {consecutiveSkips} workout{consecutiveSkips === 1 ? '' : 's'} skipped in a row — you've got this!
-          </p>
-          <button
-            onClick={() => navigate('/calendar')}
-            className="text-xs text-sky-400 font-medium flex-shrink-0 hover:text-sky-300 transition-colors"
-          >
-            Calendar →
-          </button>
-        </div>
-      )}
-
-      {/* Streak milestone celebration — shown once per milestone per plan */}
-      {!planExpired && streakMilestone !== null && !streakMilestoneDismissed && (
-        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-          <span className="text-sm flex-shrink-0" role="img" aria-label="fire">🔥</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-amber-300 font-medium">{streakMilestone}-day streak!</p>
-            <p className="text-xs text-amber-400/70">
-              {streakMilestone >= 365
-                ? 'One full year of consistency — incredible.'
-                : streakMilestone >= 90
-                ? 'Three months strong. Keep it up!'
-                : streakMilestone >= 30
-                ? 'A full month of consistency!'
-                : 'Keep the momentum going!'}
-            </p>
-          </div>
-          <button
-            onClick={dismissStreakMilestone}
-            className="text-amber-400/60 hover:text-amber-200 flex-shrink-0 transition-colors"
-            aria-label="Dismiss streak milestone"
-          >
-            <X size={13} />
-          </button>
-        </div>
-      )}
-
-      {/* Adaptation note for today's run */}
-      {todayAdaptationNote && (
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
-          <TrendingUp size={14} className="text-sky-400 mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-sky-300">{todayAdaptationNote}</p>
-        </div>
-      )}
-
-      {/* Difficulty spacing warning */}
-      {spacingWarning && (
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20">
-          <Info size={14} className="text-orange-400 mt-0.5 flex-shrink-0" />
-          <p className="text-xs text-orange-300">{spacingWarning}</p>
-        </div>
-      )}
+      <TodayBanners
+        planExpired={planExpired}
+        expiryBannerDismissed={expiryBannerDismissed}
+        planDurationValue={plan.duration.value}
+        planDurationType={plan.duration.type}
+        onNavigateToPlans={() => navigate('/plans')}
+        onDismissExpiry={dismissExpiryBanner}
+        showStallNudge={showStallNudge}
+        unloggedCount={unloggedDates.length + olderUnloggedCount}
+        hasUnloggedToday={unloggedDates.length > 0}
+        onOpenCatchup={() => setShowCatchupConfirm(true)}
+        onNavigateToCalendar={() => navigate('/calendar')}
+        onDismissStall={dismissStallNudge}
+        consecutiveSkips={consecutiveSkips}
+        streakMilestone={streakMilestone}
+        streakMilestoneDismissed={streakMilestoneDismissed}
+        onDismissStreakMilestone={dismissStreakMilestone}
+        todayAdaptationNote={todayAdaptationNote}
+        spacingWarning={spacingWarning || null}
+      />
 
       {/* Completed today summary */}
       {(todayResolved.status === 'today_complete' || todayExtras.length > 0) && (
