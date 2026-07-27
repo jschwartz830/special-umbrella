@@ -1,5 +1,37 @@
 # Test Results
 
+## 2026-07-27 (eighty-third pass) — branch `claude/serene-cori-xr8w3j`
+
+---
+
+### Baseline (before changes)
+
+- **33 test files, 1121 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+- `npm run build`: succeeds
+
+### Tests Added/Updated This Pass
+
+None. The bug fixes are in page-level event handlers (`handleOutcomeConfirm` in TodayPage, CalendarPage, HistoryPage) that are not covered by the existing unit-test suite. The `plansFromCsv` change adds a validation guard consistent with the already-tested `historyFromCsv` path.
+
+### Final Results
+
+- **33 test files, 1121 tests — all passing** (no change)
+- No regressions
+- `tsc --noEmit`: clean
+- `npm run build`: succeeds
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `TodayPage.tsx` / `TodayBanners.tsx` | P1 | Zero render-level tests. TodayBanners is now a pure component — easiest target if RTL is added. |
+| `ActiveWorkoutTracker.tsx` — 1872-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues — all manual-only. |
+| `CalendarPage.tsx` / `HistoryPage.tsx` handlers | P2 | `handleOutcomeConfirm` bugs were found via audit, not failing tests — render-level tests would have caught them. |
+
+---
+
 ## 2026-07-26 (eighty-second pass) — branch `claude/serene-cori-83sosx`
 
 ---

@@ -1,5 +1,42 @@
 # Implementation Plan
 
+## Pass 83 — 2026-07-27 (branch `claude/serene-cori-xr8w3j`)
+
+### Baseline
+
+- Branch started from `main` (PR from pass 82 merged since then).
+- **1121 tests passing** across 33 test files at start and end of pass (no regressions, no new tests this pass).
+- TypeScript: `tsc --noEmit` clean (0 errors). `npm run build` succeeds.
+
+### Architecture Summary (pass 83)
+
+Bug-fix pass. Deep codebase audit (via dedicated Explore subagent) surfaced a multi-site data-consistency bug in all three `handleOutcomeConfirm` handlers and an invalid-date edge case in `plansFromCsv`. All fixes are surgical, independently revertable, and leave all 1121 tests green.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-OUTCOME-DESYNC | `a5af931` | `TodayPage.tsx`, `CalendarPage.tsx`, `HistoryPage.tsx`, `csv.ts` | In all three `handleOutcomeConfirm` handlers, `removeOutcome` and the outcome `workoutInstanceId` remap ran unconditionally outside the `!destEntry` guard. When backdating to a date that already had a logged entry, the history entry correctly stayed at the original date but the outcome was remapped to the destination date — a silent data mismatch causing outcomes to disappear in History. Fix: moved the outcome remap inside the `!destEntry` guard so entry and outcome always end up at the same key. Also removed the dead `removeEntry(planId, completedDate)` calls that were inside `!destEntry` (confirmed-empty slot — always a no-op triggering a spurious Zustand re-render). `plansFromCsv` now validates `planStartDate` against a date-format regex and `isNaN` check (identical to `historyFromCsv`'s existing guard) to avoid silently persisting invalid date strings that would produce `NaN` in every downstream date computation. |
+
+### Action-Sync Secondary Fix (CalendarPage.tsx, HistoryPage.tsx)
+
+The action-sync lookup after `handleOutcomeConfirm` used only `completedDate` to find the history entry. When the move was blocked by `destEntry`, the entry stayed at `originalDate` and the lookup at `completedDate` found the blocking entry, potentially updating its action. Added a `?? originalDate` fallback so the lookup finds the entry wherever it ended up.
+
+### Tests Added This Pass
+
+None. The outcome-remap bug is in page-level event handlers that are not covered by the existing unit-test suite (which covers engine / store / lib functions only). All 1121 existing tests continue to pass.
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now ~1737 lines. Next candidates: extract `<TodayWorkoutCard>` or `<TodayUpcomingList>`. |
+| P2 | Add a render-level test harness for `TodayPage.tsx` / `TodayBanners.tsx`. TodayBanners is now a pure component — easy to test with RTL if jsdom is added. |
+| P3 | Undo handler: bonus extra backdated to past date is missed by `calendarDate === today` filter (Bug 4 in audit). Requires tracking session extra IDs or a `createdAt`-based filter with UTC→local alignment. |
+| P4 | `ActiveWorkoutTracker.tsx` (1872 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested. |
+
+---
+
 ## Pass 82 — 2026-07-26 (branch `claude/serene-cori-83sosx`)
 
 ### Baseline

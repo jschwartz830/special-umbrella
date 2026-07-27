@@ -351,7 +351,9 @@ export function plansFromCsv(text: string): PlansImportResult {
       status: status === 'active' ? 'inactive' : status,
       days,
       duration: { type: durationType, value: durationValue },
-      startDate: first.planStartDate || new Date().toISOString().slice(0, 10),
+      startDate: (first.planStartDate && /^\d{4}-\d{2}-\d{2}$/.test(first.planStartDate) && !isNaN(new Date(first.planStartDate).getTime()))
+        ? first.planStartDate
+        : new Date().toISOString().slice(0, 10),
       startDayIndex: toNum(first.planStartDayIndex) ?? 0,
       createdAt: now,
       updatedAt: now,

@@ -233,16 +233,15 @@ export function CalendarPage() {
           // Only clear the destination slot when it is free; otherwise leave the
           // existing independently-logged entry intact to prevent silent data loss.
           if (!destEntry) {
-            removeEntry(outcomeTarget.planId, completedDate)
             updateEntryDate(entry.id, completedDate)
+            // Remap the outcome only when the entry actually moved; when the move
+            // is blocked both entry and outcome must stay at originalDate to remain in sync.
+            const nextId = makeWorkoutInstanceId(outcomeTarget.planId, completedDate)
+            removeOutcome(nextId)
+            moveOutcome(outcomeTarget.instanceId, nextId)
+            finalOutcome = { ...outcome, workoutInstanceId: nextId }
           }
         }
-        const nextId = makeWorkoutInstanceId(outcomeTarget.planId, completedDate)
-        // Remove any existing outcome at the target date so its exercise history
-        // records don't become orphaned when the new outcome overwrites the key.
-        removeOutcome(nextId)
-        moveOutcome(outcomeTarget.instanceId, nextId)
-        finalOutcome = { ...outcome, workoutInstanceId: nextId }
       }
     }
 
@@ -254,10 +253,10 @@ export function CalendarPage() {
     // Ensure the history entry action is synced to the completion state.
     // Read from the live store — if the date changed, updateEntryDate already
     // moved the entry and the closure-captured `entries` would miss it.
+    // When the move was blocked (destEntry existed), the entry stays at originalDate.
     const liveEntries = useHistoryStore.getState().entries
-    const entry = liveEntries.find(
-      e => e.planId === outcomeTarget.planId && e.calendarDate === completedDate,
-    )
+    const entry = liveEntries.find(e => e.planId === outcomeTarget.planId && e.calendarDate === completedDate)
+      ?? liveEntries.find(e => e.planId === outcomeTarget.planId && e.calendarDate === originalDate)
     if (entry) {
       const action = completionStateToAction(outcome.completionState)
       if (entry.action !== action) {

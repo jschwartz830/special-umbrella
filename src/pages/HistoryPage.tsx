@@ -360,26 +360,25 @@ export function HistoryPage() {
           // Only clear the destination slot when it is free; otherwise leave the
           // existing independently-logged entry intact to prevent silent data loss.
           if (!destEntry) {
-            removeEntry(outcomeTarget.planId, completedDate)
             updateEntryDate(entryToMove.id, completedDate)
+            // Remap the outcome only when the entry actually moved; when the move
+            // is blocked both entry and outcome must stay at originalDate to remain in sync.
+            const nextId = makeWorkoutInstanceId(outcomeTarget.planId, completedDate)
+            removeOutcome(nextId)
+            moveOutcome(outcomeTarget.instanceId, nextId)
+            finalOutcome = { ...outcome, workoutInstanceId: nextId }
           }
         }
-        const nextId = makeWorkoutInstanceId(outcomeTarget.planId, completedDate)
-        // Remove any existing outcome at the destination so its exercise history
-        // records don't become orphaned when the moved outcome overwrites the key.
-        removeOutcome(nextId)
-        moveOutcome(outcomeTarget.instanceId, nextId)
-        finalOutcome = { ...outcome, workoutInstanceId: nextId }
       }
     }
 
     const slot = outcomeTarget.planDay.slots[0] ?? { id: '', type: 'other' as WorkoutType, name: '' }
     logOutcomeWithProgression(finalOutcome, slot)
-    // Read fresh store state — `entries` closure is stale if updateEntryDate ran above
+    // Read fresh store state — `entries` closure is stale if updateEntryDate ran above.
+    // When the move was blocked (destEntry existed), the entry stays at originalDate.
     const freshEntries = useHistoryStore.getState().entries
-    const entry = freshEntries.find(
-      e => e.planId === outcomeTarget.planId && e.calendarDate === completedDate,
-    )
+    const entry = freshEntries.find(e => e.planId === outcomeTarget.planId && e.calendarDate === completedDate)
+      ?? freshEntries.find(e => e.planId === outcomeTarget.planId && e.calendarDate === originalDate)
     if (entry && !outcomeTarget.instanceId.includes('_extra_')) {
       const action = completionStateToAction(outcome.completionState)
       if (entry.action !== action) updateAction(entry.planId, entry.calendarDate, action)

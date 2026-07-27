@@ -1,5 +1,53 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-27 (eighty-third pass) — branch `claude/serene-cori-xr8w3j`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 1 commit, 4 source files. No new test files. No new dependencies. No store schema changes.
+2. **Highest confidence**: The `!destEntry` guard tightening — both branches of the if/else (entry-moved vs. move-blocked) now have symmetric outcome handling. Before the fix, the "move blocked" branch silently ran the outcome remap that belongs only to the "entry moved" branch.
+3. **Risky items**: None. All changes narrow scope of existing operations; they never add new mutations.
+4. **Review first**: The action-sync `?? originalDate` fallback in CalendarPage and HistoryPage — verify that when `completedDate === originalDate` (no date change, normal edit), the fallback doesn't double-find the same entry or update the wrong entry. (It cannot: the first `.find()` at `completedDate` finds the entry since dates are equal; the `??` short-circuits and the second `.find()` never runs.)
+5. **Branch/merge policy conflict** carried forward from pass 82 — see "Open Questions".
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | Description |
+|---|---|---|
+| High | BUG-OUTCOME-DESYNC | All three `handleOutcomeConfirm` handlers (TodayPage, CalendarPage, HistoryPage) had `removeOutcome` and outcome `workoutInstanceId` remap outside the `!destEntry` guard. When backdating to an occupied date, the history entry correctly stayed at `originalDate` but the outcome was remapped to `completedDate` — creating a silent data mismatch where History showed the entry with a blank outcome panel. **Fixed this pass.** |
+| Low | BUG-DEAD-REMOVE | Dead `removeEntry(planId, completedDate)` calls inside `!destEntry` (confirmed-empty slot) — no-op that still triggered a spurious Zustand `set`. **Fixed this pass.** |
+| Low | BUG-ACTION-SYNC | Post-save action-sync in CalendarPage and HistoryPage searched only at `completedDate`. When move was blocked, lookup found `destEntry` and could update its action instead of the original entry's. **Fixed this pass.** |
+| Low | EDGE-CSV-DATE | `plansFromCsv` accepted any non-empty string as `planStartDate`. An invalid date string would produce `NaN` in every downstream rotation/date computation. **Fixed this pass.** |
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `a5af931` | Fix outcome-history desync in all three `handleOutcomeConfirm` handlers; fix action-sync fallback in CalendarPage + HistoryPage; validate `planStartDate` in `plansFromCsv` |
+
+---
+
+### Remaining Known Debt
+
+| ID | File | Description |
+|---|---|---|
+| ARCH-1 | `TodayPage.tsx` | ~1737 lines; zero render-level tests. P1. |
+| BUG-UNDO-BACKDATED-BONUS | `TodayPage.tsx` | Undo's `calendarDate === today` filter misses a bonus double-day extra that was backdated to a past date via the bonus outcome modal. Low real-world impact (niche flow, only relevant after the bonus is backdated and then Undo is immediately clicked). Tracked as P3. |
+
+---
+
+### Open Questions
+
+**Branch/merge policy conflict** (carried from pass 82): `CLAUDE.md` says "Always commit directly to `main`" but the task prompt says "Develop on branch `claude/serene-cori-xr8w3j`" and "Work ONLY in the current branch. Do not merge to main." All 83 passes have opened PRs for human review rather than auto-merging. This PR follows that pattern.
+
+---
+
 ## 2026-07-26 (eighty-second pass) — branch `claude/serene-cori-83sosx`
 
 ---
