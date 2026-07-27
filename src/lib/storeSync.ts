@@ -85,7 +85,7 @@ async function getUserId(): Promise<string | null> {
 async function pushStore(storeName: string, data: Record<string, unknown>): Promise<void> {
   const userId = await getUserId()
   if (!userId) return
-  const { error } = await supabase.from('user_store_data').upsert({
+  const { error } = await supabase.from('workout_user_store_data').upsert({
     user_id: userId,
     store_name: storeName,
     data,
@@ -102,7 +102,7 @@ export async function syncOnLogin(): Promise<void> {
   if (!userId) return
 
   const { data: rows, error: fetchError } = await supabase
-    .from('user_store_data')
+    .from('workout_user_store_data')
     .select('store_name, data')
     .eq('user_id', userId)
 
