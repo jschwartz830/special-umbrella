@@ -513,12 +513,13 @@ export function TodayPage() {
         // is already logged there, leave both entries in place to avoid silently
         // deleting a previously-logged workout, skip, or day-off.
         if (!destEntry) {
-          removeEntry(plan!.id, completedDate)
           updateEntryDate(todayEntry.id, completedDate)
+          // Only remap the outcome when the entry actually moved; if the move
+          // was blocked (destEntry exists) both stay at today so they stay in sync.
+          removeOutcome(makeWorkoutInstanceId(plan!.id, completedDate))
+          outcome = { ...outcome, workoutInstanceId: makeWorkoutInstanceId(plan!.id, completedDate) }
         }
       }
-      removeOutcome(makeWorkoutInstanceId(plan!.id, completedDate))
-      outcome = { ...outcome, workoutInstanceId: makeWorkoutInstanceId(plan!.id, completedDate) }
     }
 
     const primarySlotForLog = primaryPlanDay.slots[0]
