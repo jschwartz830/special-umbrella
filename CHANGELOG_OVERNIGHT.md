@@ -2,6 +2,27 @@
 
 ---
 
+## Pass 83 — 2026-07-27 (branch `claude/serene-cori-xr8w3j`)
+
+### [a5af931] fix: outcome-history desync when backdating to an occupied date
+
+**Summary**: In all three `handleOutcomeConfirm` handlers (TodayPage, CalendarPage, HistoryPage), `removeOutcome` and the outcome `workoutInstanceId` remap were executing unconditionally outside the `!destEntry` guard. The guard correctly prevents moving a history entry when the destination date is already occupied, but the outcome remap ran regardless. Result: when a user backdated a workout to a date that already had a logged entry, the history entry stayed at `today`/`originalDate` (correct) but the outcome was remapped to `completedDate` — a silent data mismatch where the History page displayed the entry with no matching outcome.
+
+Two secondary issues fixed in the same commit:
+1. **Dead `removeEntry` calls**: inside the `!destEntry` block, `removeEntry(planId, completedDate)` called on a date confirmed to have no entry — always a no-op that still triggered a spurious Zustand `set` and React re-render. Removed from all three handlers.
+2. **Action-sync lookup fallback** (CalendarPage, HistoryPage): after `handleOutcomeConfirm`, the post-save action-sync searched for the entry only at `completedDate`. When the move was blocked, the entry stayed at `originalDate`, so the lookup at `completedDate` found the blocking `destEntry` and could update its action. Added `?? originalDate` fallback so the sync always finds the entry at the date where it actually ended up.
+3. **`plansFromCsv` date validation** (csv.ts): `planStartDate` was accepted as any non-empty string. An invalid date (e.g. `"not-a-date"` or `"2023-02-30"`) was silently stored and would produce `NaN` in every downstream date computation (rotation engine, `dateDiffDays`, etc.). Added the same format regex + `isNaN(new Date(...).getTime())` guard that `historyFromCsv` already applied to `calendarDate`.
+
+**Why it matters**: The outcome-history desync is a data-integrity bug that silently deletes visible outcome data (exercise sets, notes, progression records) from the History view. Any user who backdated a workout to a date with an existing entry would see the corrected workout appear in History but with a blank outcome panel.
+
+**Files changed**: `src/pages/TodayPage.tsx`, `src/pages/CalendarPage.tsx`, `src/pages/HistoryPage.tsx`, `src/lib/csv.ts`
+
+**Risks**: Low. The outcome remap was correctly guarded in the branch that DOES move the entry; we only removed the remap from the branch that was already preventing the entry move. Logic becomes more symmetric: entry and outcome always move or stay together.
+
+**Rollback**: `git revert a5af931`
+
+---
+
 ## Pass 82 — 2026-07-26 (branch `claude/serene-cori-83sosx`)
 
 ### [9a9d77e] fix(storeSync): add identity migrate placeholders for all remaining stores
