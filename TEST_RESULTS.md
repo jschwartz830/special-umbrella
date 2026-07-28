@@ -1,5 +1,35 @@
 # Test Results
 
+## 2026-07-28 (eighty-fourth pass) — branch `claude/serene-cori-zfyw0n`
+
+---
+
+### Baseline (before changes)
+
+- **33 test files, 1121 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+
+### Tests Added/Updated This Pass
+
+None. The Undo bug fix is in a page-level event handler not covered by existing unit tests. The `TodayUpcomingList` extraction is a pure JSX refactor with no observable behavior change.
+
+### Final Results
+
+- **33 test files, 1121 tests — all passing** (no change)
+- No regressions
+- `tsc --noEmit`: clean
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `TodayPage.tsx` | P1 | Zero render-level tests. `TodayUpcomingList` is now a pure, prop-only component — good first RTL target. |
+| `ActiveWorkoutTracker.tsx` — 1872-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues — all manual-only. |
+| Undo handler (BUG-UNDO-BACKDATED-BONUS) | P3 | Fixed but not test-covered; requires RTL + store mocking. |
+
+---
+
 ## 2026-07-27 (eighty-third pass) — branch `claude/serene-cori-xr8w3j`
 
 ---
