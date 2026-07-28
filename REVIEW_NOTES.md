@@ -1,5 +1,52 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-28 (eighty-fourth pass) — branch `claude/serene-cori-zfyw0n`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 2 commits, 3 source files (1 new). No new test files. No new dependencies. No store schema changes.
+2. **Highest confidence**: The `TodayUpcomingList` extraction is a pure JSX extraction with zero logic change — risk is negligible. The `sessionExtrasRef` fix is contained to the Undo handler and two creation sites; all three paths use `useRef` (no re-render side effects).
+3. **Risky items**: None. Both changes are surgical and independently revertable.
+4. **Review first**: `sessionExtrasRef.current = new Set()` in the Undo handler — this replaces the entire Set rather than clearing it. Both approaches are correct; replacing creates a new reference which is fine since nothing else holds a reference to the old Set.
+5. **Branch/merge policy conflict** carried forward — see "Open Questions".
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | Description |
+|---|---|---|
+| Medium | BUG-UNDO-BACKDATED-BONUS | Undo handler used `ex.calendarDate === today` to find double-day extras to remove. Backdated bonus extras have their `calendarDate` changed by `updateExtraEntryDate`, causing Undo to silently skip them. Also, `makeExtraWorkoutInstanceId` was called with hardcoded `today` instead of `ex.calendarDate`, so the stale outcome key was never cleaned up. **Fixed this pass.** |
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `58a57c7` | Fix BUG-UNDO-BACKDATED-BONUS: session tracking ref + correct calendarDate in outcome removal |
+| `b247366` | Extract `TodayUpcomingList` component from TodayPage (ARCH-1 progress) |
+
+---
+
+### Remaining Known Debt
+
+| ID | File | Description |
+|---|---|---|
+| ARCH-1 | `TodayPage.tsx` | ~1697 lines; zero render-level tests. P1. Next extraction candidates: active-workout prompt section, CardioWorkoutTracker prompt, OutcomeModal call site. |
+| TEST-RENDER | `TodayUpcomingList.tsx` | Now a pure component; good candidate for RTL unit tests (jsdom setup needed). |
+| ARCH-2 | `ActiveWorkoutTracker.tsx` | 1872 lines; auto-advance timer untested. P3. |
+
+---
+
+### Open Questions
+
+**Branch/merge policy conflict** (carried from prior passes): `CLAUDE.md` says "Always commit directly to `main`" but the task prompt says "Develop on branch `claude/serene-cori-zfyw0n`." All 84 passes have opened PRs for human review rather than auto-merging. This PR follows that pattern.
+
+---
+
 ## 2026-07-27 (eighty-third pass) — branch `claude/serene-cori-xr8w3j`
 
 ---

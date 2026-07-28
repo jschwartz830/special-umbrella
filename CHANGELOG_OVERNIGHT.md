@@ -2,6 +2,30 @@
 
 ---
 
+## Pass 84 — 2026-07-28 (branch `claude/serene-cori-zfyw0n`)
+
+### [58a57c7] fix(TodayPage): Undo removes backdated double-day extras via session tracking
+
+**Summary**: The Undo handler (the "Undo" button shown after marking today's workout complete) filtered extra entries to remove by `ex.calendarDate === today`. This correctly removes a double-day bonus extra created in the same session — but fails when the user backdates the bonus via the outcome modal. `updateExtraEntryDate` moves the entry to the new date, so its `calendarDate` is no longer `today` and the filter skips it. A second bug compounded this: `removeOutcome` was called with `makeExtraWorkoutInstanceId(plan.id, today, ex.id)`, but after backdating, `moveOutcome` had already relocated the outcome key to `makeExtraWorkoutInstanceId(plan.id, completedDate, ex.id)`.
+
+**Fix**: Added `sessionExtrasRef` (`useRef<Set<string>>(new Set())`) to track IDs of double-day extras created during the current session. Both `handleOutcomeConfirm` (when `addFromPlanIdx !== null`) and `handleUpcomingLog` (double-day path) record the new extra ID into the ref immediately after `addExtraEntry`. The Undo handler now matches extras by `sessionExtrasRef.current.has(ex.id) || ex.calendarDate === today`, and always passes `ex.calendarDate` (not `today`) to `makeExtraWorkoutInstanceId`. The ref is cleared after a successful undo.
+
+**Files changed**: `src/pages/TodayPage.tsx`
+
+**Risks**: Low. The `useRef` holds no UI state; changing it never triggers a re-render. The Set is scoped to the current React component instance and is not persisted. Existing Undo behavior for non-backdated extras is unchanged (they still match `ex.calendarDate === today`).
+
+---
+
+### [b247366] refactor(TodayPage): extract TodayUpcomingList component (ARCH-1 progress)
+
+**Summary**: The upcoming-days section in `TodayPage.tsx` (~50 lines of JSX, plus per-item run-adaptation progression resolution inside the `.map`) was extracted into `src/components/today/TodayUpcomingList.tsx`. The new component accepts seven props and returns `null` when the list is empty (eliminating the `upcoming.length > 0` wrapper at the call site). Removed two now-unused imports from TodayPage: `TrendingUp` (lucide-react) and `resolveWorkoutDisplayTarget` (run-adaptation/selectors).
+
+**Files changed**: `src/pages/TodayPage.tsx`, `src/components/today/TodayUpcomingList.tsx` (new)
+
+**Risks**: Very low. Pure JSX extraction — no logic change, no state, no side effects.
+
+---
+
 ## Pass 83 — 2026-07-27 (branch `claude/serene-cori-xr8w3j`)
 
 ### [a5af931] fix: outcome-history desync when backdating to an occupied date

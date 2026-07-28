@@ -10,7 +10,6 @@ import {
   Pencil,
   ListPlus,
   RotateCcw,
-  TrendingUp,
   Info,
   PlusCircle,
   X,
@@ -43,7 +42,6 @@ import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../modules/recommendation/explanation'
-import { resolveWorkoutDisplayTarget } from '../modules/run-adaptation/selectors'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress } from '../lib/historyStats'
@@ -60,6 +58,7 @@ import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 import { outcomeSortKey } from '../lib/outcomeSortKey'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { TodayBanners } from '../components/today/TodayBanners'
+import { TodayUpcomingList } from '../components/today/TodayUpcomingList'
 import { WORKOUT_META } from '../lib/constants'
 import { estimateRunDurationMin } from '../lib/estimateRunDuration'
 
@@ -255,6 +254,10 @@ export function TodayPage() {
   const [editingExtra, setEditingExtra] = useState<ExtraWorkoutEntry | null>(null)
   // Preview toggle for today's workout exercises
   const [previewExpanded, setPreviewExpanded] = useState(false)
+
+  // Track IDs of double-day extras created in this session so the Undo handler
+  // can remove them even when they were backdated to a different calendarDate.
+  const sessionExtrasRef = useRef<Set<string>>(new Set())
 
   // Active workout tracker state: hidden | open | minimized
   const [activeWorkoutState, setActiveWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
@@ -552,6 +555,7 @@ export function TodayPage() {
         source: 'double_day',
         advancedRotation: willAdvance,
       })
+      sessionExtrasRef.current.add(extraId)
       if (willAdvance) {
         actions.advance()
         setBonusOutcome({ rd: upcoming[0], extraId })
@@ -624,6 +628,7 @@ export function TodayPage() {
         source: 'double_day',
         advancedRotation: true,
       })
+      sessionExtrasRef.current.add(extraId)
       actions.advance()
       setUpcomingLogError(null)
       setLoggingUpcoming({ rd, extraId })
@@ -964,14 +969,18 @@ export function TodayPage() {
               for (const ex of extraEntries) {
                 if (
                   ex.planId === plan.id &&
-                  ex.calendarDate === today &&
+                  (ex.calendarDate === today || sessionExtrasRef.current.has(ex.id)) &&
                   ex.source !== 'history'
                 ) {
-                  removeOutcome(makeExtraWorkoutInstanceId(plan.id, today, ex.id))
+                  // Use ex.calendarDate (not today) — the extra may have been
+                  // backdated via the bonus outcome modal, moving both the entry
+                  // and its outcome key to a different date.
+                  removeOutcome(makeExtraWorkoutInstanceId(plan.id, ex.calendarDate, ex.id))
                   removeExtraEntry(ex.id)
                   if (ex.advancedRotation ?? (ex.source === 'double_day')) removedDoubleDay = true
                 }
               }
+              sessionExtrasRef.current = new Set()
               if (removedDoubleDay) removeLastOverrideByType(plan.id, 'advance')
               setNewPRs(null)
             }}
@@ -1053,53 +1062,15 @@ export function TodayPage() {
       </section>
 
       {/* Upcoming */}
-      {upcoming.length > 0 && (
-        <section>
-          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-            Upcoming
-          </h2>
-          <div className="space-y-2">
-            {upcoming.slice(extraIsNextInPlan ? 1 : 0, extraIsNextInPlan ? 6 : 5).map(rd => {
-              const upcomingRunSlot = rd.planDay.slots.find(s => isRunType(s.type))
-              const upcomingGroupId = upcomingRunSlot?.runConfig?.progressionGroupId
-              const upcomingProgression = upcomingGroupId ? getProgressionState(upcomingGroupId) : null
-              const upcomingTarget = upcomingRunSlot
-                ? resolveWorkoutDisplayTarget(upcomingRunSlot, upcomingProgression)
-                : null
-              const upcomingNote = upcomingTarget?.adaptationNote
-
-              return (
-                <div key={rd.calendarDate} className="flex items-center gap-3">
-                  <div className="w-10 text-center flex-shrink-0">
-                    <p className="text-xs text-slate-500 font-medium">
-                      {new Date(rd.calendarDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'short' })}
-                    </p>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <WorkoutDayCard
-                      resolved={rd}
-                      planId={plan?.id}
-                      sessionCount={upcomingSessionCounts[rd.calendarDate]}
-                      onClick={() => setLoggingUpcoming({ rd })}
-                      collapsible
-                    />
-                    {upcomingNote && (
-                      <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
-                        <TrendingUp size={10} />{upcomingNote}
-                      </p>
-                    )}
-                    {upcomingSessionSummaries[rd.calendarDate] && (
-                      <p className="text-[10px] text-slate-500 mt-0.5 ml-1 truncate">
-                        Last: {upcomingSessionSummaries[rd.calendarDate]}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
+      <TodayUpcomingList
+        upcoming={upcoming}
+        extraIsNextInPlan={extraIsNextInPlan}
+        planId={plan?.id}
+        getProgressionState={getProgressionState}
+        upcomingSessionCounts={upcomingSessionCounts}
+        upcomingSessionSummaries={upcomingSessionSummaries}
+        onSelectUpcoming={(rd) => setLoggingUpcoming({ rd })}
+      />
 
       {/* Outcome modal */}
       {showOutcomeModal && (

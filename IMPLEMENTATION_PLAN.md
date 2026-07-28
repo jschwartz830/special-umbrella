@@ -1,5 +1,43 @@
 # Implementation Plan
 
+## Pass 84 — 2026-07-28 (branch `claude/serene-cori-zfyw0n`)
+
+### Baseline
+
+- Branch started from `main` (PR from pass 83 merged since then).
+- **1121 tests passing** across 33 test files at start and end of pass (no regressions, no new tests this pass).
+- TypeScript: `tsc --noEmit` clean (0 errors).
+
+### Architecture Summary (pass 84)
+
+Two-change pass: a targeted bug fix for the Undo handler's blindspot on backdated bonus extras (BUG-UNDO-BACKDATED-BONUS, previously P3), followed by extraction of the upcoming-days section from TodayPage into a standalone `TodayUpcomingList` component (ARCH-1 progress).
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-UNDO-BACKDATED-BONUS | `58a57c7` | `TodayPage.tsx` | Undo handler matched double-day extras by `ex.calendarDate === today`, which fails when the user backdates the bonus via the outcome modal (`updateExtraEntryDate` moves the entry to the new date). Also used hardcoded `today` as the date in `makeExtraWorkoutInstanceId`, but the outcome key was already moved by `moveOutcome` to the backdated date. Fix: added `sessionExtrasRef` (`useRef<Set<string>>`) to track extra IDs created in double-day flows during the current session. The Undo handler matches by session-ID membership **or** `calendarDate === today`, and always uses `ex.calendarDate` (not `today`) for the outcome instance ID. The set is cleared after a successful undo. |
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| ARCH-1 (partial) | `b247366` | `TodayPage.tsx`, `src/components/today/TodayUpcomingList.tsx` (new) | Extracted the upcoming-days section (~50 JSX lines + per-item run-adaptation resolution) into `TodayUpcomingList`. Component accepts `upcoming`, `extraIsNextInPlan`, `planId`, `getProgressionState`, `upcomingSessionCounts`, `upcomingSessionSummaries`, `onSelectUpcoming` as props; returns `null` when list is empty. Removed two now-unused imports from TodayPage (`TrendingUp`, `resolveWorkoutDisplayTarget`). |
+
+### Tests Added This Pass
+
+None. Bug was in page-level UI handlers not covered by unit tests. All 1121 existing tests continue to pass.
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now ~1697 lines. Next candidates: extract the active workout prompt section, the CardioWorkoutTracker prompt, or the OutcomeModal invocation. |
+| P2 | Add a render-level test harness for `TodayPage.tsx` / `TodayBanners.tsx` / `TodayUpcomingList.tsx`. `TodayUpcomingList` is now a pure component suitable for RTL unit tests. |
+| P3 | `ActiveWorkoutTracker.tsx` (1872 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested. |
+
+---
+
 ## Pass 83 — 2026-07-27 (branch `claude/serene-cori-xr8w3j`)
 
 ### Baseline
