@@ -256,6 +256,10 @@ export function TodayPage() {
   // Preview toggle for today's workout exercises
   const [previewExpanded, setPreviewExpanded] = useState(false)
 
+  // Track IDs of double-day extras created in this session so the Undo handler
+  // can remove them even when they were backdated to a different calendarDate.
+  const sessionExtrasRef = useRef<Set<string>>(new Set())
+
   // Active workout tracker state: hidden | open | minimized
   const [activeWorkoutState, setActiveWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
   // Exercises tracked during active session — used to pre-fill OutcomeModal
@@ -552,6 +556,7 @@ export function TodayPage() {
         source: 'double_day',
         advancedRotation: willAdvance,
       })
+      sessionExtrasRef.current.add(extraId)
       if (willAdvance) {
         actions.advance()
         setBonusOutcome({ rd: upcoming[0], extraId })
@@ -624,6 +629,7 @@ export function TodayPage() {
         source: 'double_day',
         advancedRotation: true,
       })
+      sessionExtrasRef.current.add(extraId)
       actions.advance()
       setUpcomingLogError(null)
       setLoggingUpcoming({ rd, extraId })
@@ -964,14 +970,18 @@ export function TodayPage() {
               for (const ex of extraEntries) {
                 if (
                   ex.planId === plan.id &&
-                  ex.calendarDate === today &&
+                  (ex.calendarDate === today || sessionExtrasRef.current.has(ex.id)) &&
                   ex.source !== 'history'
                 ) {
-                  removeOutcome(makeExtraWorkoutInstanceId(plan.id, today, ex.id))
+                  // Use ex.calendarDate (not today) — the extra may have been
+                  // backdated via the bonus outcome modal, moving both the entry
+                  // and its outcome key to a different date.
+                  removeOutcome(makeExtraWorkoutInstanceId(plan.id, ex.calendarDate, ex.id))
                   removeExtraEntry(ex.id)
                   if (ex.advancedRotation ?? (ex.source === 'double_day')) removedDoubleDay = true
                 }
               }
+              sessionExtrasRef.current = new Set()
               if (removedDoubleDay) removeLastOverrideByType(plan.id, 'advance')
               setNewPRs(null)
             }}
