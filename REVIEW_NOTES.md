@@ -1,5 +1,52 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-29 (eighty-fifth pass) — branch `claude/serene-cori-23vs7k`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 2 commits, 4 source files (2 new). No new test files. No new dependencies. No store schema changes.
+2. **Highest confidence**: `SwipeToDelete` extraction is a straight move of the local function to a shared file — identical implementation. `TodayCompletedSection` is a pure JSX extraction; all store callbacks remain in TodayPage via `onDeleteExtra`. The `isEditingOutcomeRef` fix is a 9-line change to a single handler — negligible risk.
+3. **Risky items**: None. All three changes are surgical and independently revertable.
+4. **Review first**: `isEditingOutcomeRef.current` reset at the **top** of `handleOutcomeConfirm` (before any early returns or async calls). There are no early returns in `handleOutcomeConfirm`, so the reset is always reached — no risk of a "stuck editing" ref.
+5. **Branch/merge policy conflict** carried forward — see "Open Questions".
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | Description |
+|---|---|---|
+| Low | BUG-PR-EDIT-DETECTION | PR celebration banner fired on every outcome save, including re-saves of an existing completed workout. A useRef flag now suppresses it in the edit path. **Fixed this pass.** |
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `eb29a6d` | Fix BUG-PR-EDIT-DETECTION: `isEditingOutcomeRef` gates PR detection in `handleOutcomeConfirm` |
+| `df29b22` | Extract `SwipeToDelete` to shared component; extract `TodayCompletedSection` (ARCH-1 progress) |
+
+---
+
+### Remaining Known Debt
+
+| ID | File | Description |
+|---|---|---|
+| ARCH-1 | `TodayPage.tsx` | ~1580 lines; zero render-level tests. P1. Next extraction candidates: ad-hoc workout modal section, habit summary ring row. |
+| TEST-RENDER | `TodayUpcomingList.tsx`, `TodayCompletedSection.tsx` | Both are now pure presentational components; good candidates for RTL unit tests (jsdom setup needed). |
+| ARCH-2 | `ActiveWorkoutTracker.tsx` | ~2144 lines; auto-advance timer untested. P3. |
+
+---
+
+### Open Questions
+
+**Branch/merge policy conflict** (carried from prior passes): `CLAUDE.md` says "Always commit directly to `main`" but the task prompt says "Develop on branch `claude/serene-cori-23vs7k`." All 85 passes have opened PRs for human review rather than auto-merging. This PR follows that pattern.
+
+---
+
 ## 2026-07-28 (eighty-fourth pass) — branch `claude/serene-cori-zfyw0n`
 
 ---

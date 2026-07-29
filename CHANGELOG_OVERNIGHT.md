@@ -2,6 +2,30 @@
 
 ---
 
+## Pass 85 — 2026-07-29 (branch `claude/serene-cori-23vs7k`)
+
+### [eb29a6d] fix(TodayPage): suppress PR celebration when editing an existing outcome
+
+**Summary**: The PR detection block in `handleOutcomeConfirm` compared each exercise's post-workout max load against the pre-workout max from `maxLoadByExercise`. This fired on every outcome save — including when the user re-opened the modal via "Edit" on an already-completed workout. Because `maxLoadByExercise` already reflected the loads from the original log, re-saving the same weights would detect a "new record" whenever a load exceeded the last-synced exercise history snapshot, showing a spurious "New personal record!" banner.
+
+**Fix**: Added `isEditingOutcomeRef` (`useRef<boolean>(false)`). `handleEditOutcome` sets it to `true` before opening the modal. At the top of `handleOutcomeConfirm`, the ref is captured into `const isEditing` and immediately reset to `false`. The PR detection block is gated on `!isEditing`.
+
+**Files changed**: `src/pages/TodayPage.tsx`
+
+**Risks**: Very low. `useRef` holds no UI state; changing it never triggers a re-render. The flag is reset unconditionally at the start of every `handleOutcomeConfirm` call, so a modal opened via any other path (first log, bonus outcome) always runs PR detection normally.
+
+---
+
+### [df29b22] refactor(arch): extract SwipeToDelete and TodayCompletedSection
+
+**Summary**: Two related extractions. First, the module-local `SwipeToDelete` touch-gesture component (58 lines) was moved from `TodayPage.tsx` to `src/components/shared/SwipeToDelete.tsx` so future today-section components can share it without coupling. Second, the "Completed today" section — a heading, one button for the primary plan-day workout, and a list of swipeable extra-workout rows — was extracted into `src/components/today/TodayCompletedSection.tsx`. Store action callbacks (`removeOutcome`, `removeExtraEntry`, `removeLastOverrideByType`) remain in TodayPage, passed via `onDeleteExtra`. The removed `useEffect` import (previously used only by SwipeToDelete) was cleaned up.
+
+**Files changed**: `src/pages/TodayPage.tsx`, `src/components/shared/SwipeToDelete.tsx` (new), `src/components/today/TodayCompletedSection.tsx` (new)
+
+**Risks**: Very low. Pure JSX extraction — no logic change, no state, no side effects. TodayPage is now ~47 lines shorter.
+
+---
+
 ## Pass 84 — 2026-07-28 (branch `claude/serene-cori-zfyw0n`)
 
 ### [58a57c7] fix(TodayPage): Undo removes backdated double-day extras via session tracking

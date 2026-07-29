@@ -1,5 +1,43 @@
 # Implementation Plan
 
+## Pass 85 — 2026-07-29 (branch `claude/serene-cori-23vs7k`)
+
+### Baseline
+
+- Branch started from `main` (PR from pass 84 merged since then).
+- **1121 tests passing** across 33 test files at start and end of pass (no regressions, no new tests this pass).
+- TypeScript: `tsc --noEmit` clean (0 errors).
+
+### Architecture Summary (pass 85)
+
+Two-change pass: a targeted bug fix for spurious PR celebration banners on workout edits (from a pass 62 "Keep with revisions" verdict), followed by extraction of `SwipeToDelete` and `TodayCompletedSection` components from TodayPage (ARCH-1 progress).
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-PR-EDIT-DETECTION | `eb29a6d` | `TodayPage.tsx` | PR celebration banner fired on every outcome save, including when the user re-opened the modal via "Edit" on an already-completed workout. Added `isEditingOutcomeRef` (`useRef<boolean>`), set to `true` only in `handleEditOutcome`, captured and reset at the start of `handleOutcomeConfirm`, then used to gate the PR detection block. Editing an existing outcome no longer triggers a false-positive PR banner. |
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| ARCH-1 (continued) | `df29b22` | `TodayPage.tsx`, `src/components/shared/SwipeToDelete.tsx` (new), `src/components/today/TodayCompletedSection.tsx` (new) | Moved the module-local `SwipeToDelete` touch-gesture component to `src/components/shared/SwipeToDelete.tsx` so future extracted components can share it. Extracted the "Completed today" section (primary plan-day button + swipeable extra-workout rows) into `TodayCompletedSection` with a typed props interface — store action callbacks remain in TodayPage via `onDeleteExtra`. Removed the now-unused `useEffect` import. TodayPage is down ~47 JSX lines and two files. |
+
+### Tests Added This Pass
+
+None. Bug was in page-level UI event handlers not covered by unit tests. All 1121 existing tests continue to pass.
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now ~1580 lines. Next candidates: ad-hoc workout modals (AdHocStartModal, adHocWorkoutState tracker section), or the habit summary ring row. |
+| P2 | Add a render-level test harness for `TodayPage.tsx` / `TodayBanners.tsx` / `TodayUpcomingList.tsx` / `TodayCompletedSection.tsx`. The last two are now pure presentational components suitable for RTL unit tests. |
+| P3 | `ActiveWorkoutTracker.tsx` (~2144 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested. |
+
+---
+
 ## Pass 84 — 2026-07-28 (branch `claude/serene-cori-zfyw0n`)
 
 ### Baseline

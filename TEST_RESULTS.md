@@ -1,5 +1,35 @@
 # Test Results
 
+## 2026-07-29 (eighty-fifth pass) — branch `claude/serene-cori-23vs7k`
+
+---
+
+### Baseline (before changes)
+
+- **33 test files, 1121 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+
+### Tests Added/Updated This Pass
+
+None. The PR detection fix is in a page-level event handler not covered by unit tests. Both ARCH-1 extractions are pure JSX refactors with no behavior change.
+
+### Final Results
+
+- **33 test files, 1121 tests — all passing** (no change)
+- No regressions
+- `tsc --noEmit`: clean
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `TodayPage.tsx` | P1 | Zero render-level tests. `TodayUpcomingList` and `TodayCompletedSection` are now pure prop-only components — good RTL targets. |
+| `ActiveWorkoutTracker.tsx` — ~2144-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues — all manual-only. |
+| `isEditingOutcomeRef` PR suppression | P3 | Fixed but not test-covered; requires RTL + store mocking. |
+
+---
+
 ## 2026-07-28 (eighty-fourth pass) — branch `claude/serene-cori-zfyw0n`
 
 ---

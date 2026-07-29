@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
@@ -59,6 +59,8 @@ import { outcomeSortKey } from '../lib/outcomeSortKey'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { TodayBanners } from '../components/today/TodayBanners'
 import { TodayUpcomingList } from '../components/today/TodayUpcomingList'
+import { TodayCompletedSection } from '../components/today/TodayCompletedSection'
+import { SwipeToDelete } from '../components/shared/SwipeToDelete'
 import { WORKOUT_META } from '../lib/constants'
 import { estimateRunDurationMin } from '../lib/estimateRunDuration'
 
@@ -117,65 +119,6 @@ function findPreviousWeightsOutcome(
   return best
 }
 
-
-function SwipeToDelete({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {
-  const [offset, setOffset] = useState(0)
-  const swipingRef = useRef(false)
-  const startXRef = useRef(0)
-  const startYRef = useRef(0)
-  const directionRef = useRef<'h' | 'v' | null>(null)
-  const innerRef = useRef<HTMLDivElement>(null)
-  const REVEAL = 68
-
-  useEffect(() => {
-    const el = innerRef.current
-    if (!el) return
-    const onMove = (e: TouchEvent) => {
-      const dx = e.touches[0].clientX - startXRef.current
-      const dy = e.touches[0].clientY - startYRef.current
-      if (directionRef.current === null) {
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 4) directionRef.current = 'h'
-        else if (Math.abs(dy) > 4) directionRef.current = 'v'
-      }
-      if (directionRef.current === 'h') {
-        e.preventDefault()
-        setOffset(Math.max(Math.min(dx, 0), -REVEAL))
-      }
-    }
-    el.addEventListener('touchmove', onMove, { passive: false })
-    return () => el.removeEventListener('touchmove', onMove)
-  }, [])
-
-  return (
-    <div className="relative overflow-hidden rounded-xl">
-      <div
-        className="absolute inset-y-0 right-0 flex items-center justify-center bg-red-500 rounded-r-xl"
-        style={{ width: REVEAL, opacity: offset < 0 ? 1 : 0, pointerEvents: offset < 0 ? 'auto' : 'none' }}
-      >
-        <button onClick={onDelete} aria-label="Delete" className="w-full h-full flex items-center justify-center">
-          <X size={16} className="text-white" />
-        </button>
-      </div>
-      <div
-        ref={innerRef}
-        style={{ transform: `translateX(${offset}px)`, transition: swipingRef.current ? 'none' : 'transform 0.2s ease' }}
-        onTouchStart={e => {
-          startXRef.current = e.touches[0].clientX
-          startYRef.current = e.touches[0].clientY
-          directionRef.current = null
-          swipingRef.current = true
-        }}
-        onTouchEnd={() => {
-          swipingRef.current = false
-          directionRef.current = null
-          setOffset(prev => (prev <= -(REVEAL / 2) ? -REVEAL : 0))
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  )
-}
 
 export function TodayPage() {
   const navigate = useNavigate()
@@ -258,6 +201,10 @@ export function TodayPage() {
   // Track IDs of double-day extras created in this session so the Undo handler
   // can remove them even when they were backdated to a different calendarDate.
   const sessionExtrasRef = useRef<Set<string>>(new Set())
+
+  // True only when the OutcomeModal was opened via "Edit" on an existing outcome.
+  // Prevents PR detection from firing again when the user re-saves the same workout.
+  const isEditingOutcomeRef = useRef(false)
 
   // Active workout tracker state: hidden | open | minimized
   const [activeWorkoutState, setActiveWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
@@ -494,6 +441,9 @@ export function TodayPage() {
   }
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
+    const isEditing = isEditingOutcomeRef.current
+    isEditingOutcomeRef.current = false
+
     setActiveTrackedExercises(null)
     setActiveTrackedDurationMin(null)
 
@@ -532,7 +482,7 @@ export function TodayPage() {
       useOutcomeStore.getState().setOutcome(outcome)
     }
 
-    if (outcome.weightsActual?.exercises?.length) {
+    if (!isEditing && outcome.weightsActual?.exercises?.length) {
       const prs = outcome.weightsActual.exercises.flatMap(ex => {
         const prevMax = preWorkoutMaxLoad[ex.exercise] ?? 0
         const todayMax = (ex.sets ?? [])
@@ -613,6 +563,7 @@ export function TodayPage() {
   }
 
   function handleEditOutcome() {
+    isEditingOutcomeRef.current = true
     setShowOutcomeModal(true)
   }
 
@@ -741,53 +692,18 @@ export function TodayPage() {
         spacingWarning={spacingWarning || null}
       />
 
-      {/* Completed today summary */}
-      {(todayResolved.status === 'today_complete' || todayExtras.length > 0) && (
-        <section className="space-y-2">
-          <h2 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">Completed today</h2>
-          {todayResolved.status === 'today_complete' && (
-            <button
-              onClick={handleEditOutcome}
-              className="w-full text-left flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors active:scale-[0.99]"
-            >
-              <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-emerald-200 font-medium truncate">{primaryPlanDay.label}</p>
-                {primaryPlanDay.slots.length > 0 && (
-                  <p className="text-xs text-emerald-300/70 mt-0.5 truncate">
-                    {primaryPlanDay.slots.map(s => s.name).join(' + ')}
-                  </p>
-                )}
-              </div>
-              <ChevronRight size={14} className="text-emerald-400/60 flex-shrink-0 mt-1" />
-            </button>
-          )}
-          {todayExtras.map(extra => (
-            <SwipeToDelete
-              key={extra.id}
-              onDelete={() => {
-                removeOutcome(makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id))
-                removeExtraEntry(extra.id)
-                if (extra.advancedRotation ?? (extra.source === 'double_day')) removeLastOverrideByType(plan.id, 'advance')
-              }}
-            >
-              <button
-                onClick={() => setEditingExtra(extra)}
-                className="w-full text-left flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors active:scale-[0.99]"
-              >
-                <CheckCircle2 size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-emerald-200 font-medium truncate">{extra.workoutName}</p>
-                  <p className="text-xs text-emerald-300/70 mt-0.5 truncate capitalize">
-                    {extra.workoutType.replace(/_/g, ' ')}
-                  </p>
-                </div>
-                <ChevronRight size={14} className="text-emerald-400/60 flex-shrink-0 mt-1" />
-              </button>
-            </SwipeToDelete>
-          ))}
-        </section>
-      )}
+      <TodayCompletedSection
+        status={todayResolved.status}
+        primaryPlanDay={primaryPlanDay}
+        todayExtras={todayExtras}
+        onEditOutcome={handleEditOutcome}
+        onEditExtra={setEditingExtra}
+        onDeleteExtra={(extra) => {
+          removeOutcome(makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id))
+          removeExtraEntry(extra.id)
+          if (extra.advancedRotation ?? (extra.source === 'double_day')) removeLastOverrideByType(plan.id, 'advance')
+        }}
+      />
 
       {/* Personal record celebration */}
       {newPRs && newPRs.length > 0 && (
