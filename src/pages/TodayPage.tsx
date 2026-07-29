@@ -259,6 +259,10 @@ export function TodayPage() {
   // can remove them even when they were backdated to a different calendarDate.
   const sessionExtrasRef = useRef<Set<string>>(new Set())
 
+  // True only when the OutcomeModal was opened via "Edit" on an existing outcome.
+  // Prevents PR detection from firing again when the user re-saves the same workout.
+  const isEditingOutcomeRef = useRef(false)
+
   // Active workout tracker state: hidden | open | minimized
   const [activeWorkoutState, setActiveWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
   // Exercises tracked during active session — used to pre-fill OutcomeModal
@@ -494,6 +498,9 @@ export function TodayPage() {
   }
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
+    const isEditing = isEditingOutcomeRef.current
+    isEditingOutcomeRef.current = false
+
     setActiveTrackedExercises(null)
     setActiveTrackedDurationMin(null)
 
@@ -532,7 +539,7 @@ export function TodayPage() {
       useOutcomeStore.getState().setOutcome(outcome)
     }
 
-    if (outcome.weightsActual?.exercises?.length) {
+    if (!isEditing && outcome.weightsActual?.exercises?.length) {
       const prs = outcome.weightsActual.exercises.flatMap(ex => {
         const prevMax = preWorkoutMaxLoad[ex.exercise] ?? 0
         const todayMax = (ex.sets ?? [])
@@ -613,6 +620,7 @@ export function TodayPage() {
   }
 
   function handleEditOutcome() {
+    isEditingOutcomeRef.current = true
     setShowOutcomeModal(true)
   }
 
