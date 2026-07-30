@@ -1,5 +1,36 @@
 # Test Results
 
+## 2026-07-30 (eighty-sixth pass) — branch `claude/serene-cori-fnly7t`
+
+---
+
+### Baseline (before changes)
+
+- **33 test files, 1121 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+
+### Tests Added/Updated This Pass
+
+| File | Count | Description |
+|---|---|---|
+| `src/engine/__tests__/rotationEngine.test.ts` | +5 | `getUpcomingDays` historyEntry attachment: day_off reflected, undefined for no entry, dedup (newest wins), plan isolation, pointer unchanged |
+
+### Final Results
+
+- **33 test files, 1126 tests — all passing** (+5 new tests, 0 regressions)
+- `tsc --noEmit`: clean
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `TodayPage.tsx` | P1 | Zero render-level tests. `TodayUpcomingList`, `TodayCompletedSection`, and `TodayHabitSummary` are now pure prop-only components — good RTL targets once jsdom is configured. |
+| `TodayUpcomingList` Day Off branch | P1 | The new `isPreloggedDayOff` branch renders a Coffee-icon placeholder instead of WorkoutDayCard. Not covered by unit tests (render-level only). |
+| `ActiveWorkoutTracker.tsx` — ~2144-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues — all manual-only. |
+
+---
+
 ## 2026-07-29 (eighty-fifth pass) — branch `claude/serene-cori-23vs7k`
 
 ---

@@ -145,6 +145,12 @@ export function getTodayResolvedDay(
 /**
  * Get upcoming workout days (tomorrow + next `count` days).
  * Applies today's overrides before projecting forward.
+ *
+ * Pre-logged entries for future dates (e.g. a day_off the user scheduled via
+ * the Calendar) are attached as `historyEntry` on each returned ResolvedDay
+ * so callers can surface the pre-logged state (e.g. show "Day Off" in the
+ * upcoming list). The rotation pointer is NOT affected by future entries —
+ * the projection is always positional.
  */
 export function getUpcomingDays(
   plan: Plan,
@@ -159,6 +165,17 @@ export function getUpcomingDays(
     .filter(o => o.planId === plan.id)
     .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt))
 
+  // Build a date → entry map so we can attach pre-logged future entries.
+  // Same dedup rule as computeCurrentDayIndex: newest createdAt wins per date.
+  const entryByDate = new Map<string, HistoryEntry>()
+  for (const e of entries) {
+    if (e.planId !== plan.id) continue
+    const existing = entryByDate.get(e.calendarDate)
+    if (!existing || e.createdAt > existing.createdAt) {
+      entryByDate.set(e.calendarDate, e)
+    }
+  }
+
   // Start from today's pointer (with today's overrides applied)
   let pointer = computeCurrentDayIndex(plan, entries, overrides, today)
   pointer = applyOverridesForDate(pointer, sortedOverrides, today, plan.days.length)
@@ -172,11 +189,13 @@ export function getUpcomingDays(
 
   for (let i = 1; i <= count; i++) {
     const date = format(addDays(todayParsed, i), 'yyyy-MM-dd')
+    const entry = entryByDate.get(date)
     result.push({
       calendarDate: date,
       planDayIndex: pointer,
       planDay: plan.days[pointer],
       status: 'future',
+      historyEntry: entry,
     })
     pointer = mod(pointer + 1, plan.days.length)
   }

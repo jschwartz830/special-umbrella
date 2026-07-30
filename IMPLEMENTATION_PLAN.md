@@ -1,5 +1,52 @@
 # Implementation Plan
 
+## Pass 86 — 2026-07-30 (branch `claude/serene-cori-fnly7t`)
+
+### Baseline
+
+- Branch started from `main` (PR from pass 85 merged since then).
+- **1121 tests passing** across 33 test files at start of pass.
+- **1126 tests passing** at end of pass (+5 new tests).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 86)
+
+Three-change pass: a targeted engine fix for `getUpcomingDays` (pre-logged future day_off entries now surface in the upcoming list), a companion UI change in `TodayUpcomingList` to display a "Day Off" placeholder for those days, and another ARCH-1 TodayPage extraction (`TodayHabitSummary`).
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-UPCOMING-DAYOFF | `68a1136` | `rotationEngine.ts` | `getUpcomingDays` projected the rotation forward without consulting stored entries for future dates. A day_off pre-logged via Calendar was invisible to the Today page upcoming list. Fixed by building an entry-by-date map (same dedup logic as `computeCurrentDayIndex`) and attaching the matching entry as `historyEntry` on each returned `ResolvedDay`. The rotation pointer is unchanged — future entries are informational only. |
+
+### Feature/UX Improvements This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| UX-UPCOMING-DAYOFF | `30cde3b` | `TodayUpcomingList.tsx` | Companion to the engine fix. When `rd.historyEntry?.action === 'day_off'`, the upcoming list renders a compact "Day Off" card (Coffee icon + muted label) in place of the workout card. The card remains clickable so the user can change their mind. Added `Coffee` to imports from lucide-react. |
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| ARCH-1 (continued) | `3907075` | `TodayPage.tsx`, `src/components/today/TodayHabitSummary.tsx` (new) | Extracted the compact habit-summary row (🔥 streak · total workouts · cycle progress · plan completion ring) and the `CompletedWorkoutsRing` SVG sub-component from TodayPage into `TodayHabitSummary`. `CompletedWorkoutsRing` is also used in the plan-progress detail modal with `size=88`, so it is exported and re-imported by TodayPage for that secondary usage. TodayPage is now 1561 lines (–64). |
+
+### Tests Added This Pass
+
+| File | Tests Added | Description |
+|---|---|---|
+| `rotationEngine.test.ts` | +5 | `getUpcomingDays` historyEntry attachment: day_off reflected, undefined for no entry, dedup (newest wins), plan isolation, pointer unchanged by future entries |
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now ~1561 lines. Next candidates: ad-hoc workout modal section, or the Plan Progress detail modal content. |
+| P2 | Add render-level tests for `TodayUpcomingList.tsx`, `TodayCompletedSection.tsx`, `TodayHabitSummary.tsx` — all three are now pure presentational components suited for RTL unit tests (jsdom setup needed). |
+| P3 | `ActiveWorkoutTracker.tsx` (~2144 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested. |
+
+---
+
 ## Pass 85 — 2026-07-29 (branch `claude/serene-cori-23vs7k`)
 
 ### Baseline
