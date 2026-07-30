@@ -1,4 +1,4 @@
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp, Coffee } from 'lucide-react'
 import type { ResolvedDay } from '../../types'
 import type { RunProgressionState } from '../../modules/run-adaptation/types'
 import { WorkoutDayCard } from '../workout/WorkoutDayCard'
@@ -42,6 +42,8 @@ export function TodayUpcomingList({
           const target = runSlot ? resolveWorkoutDisplayTarget(runSlot, progression) : null
           const adaptationNote = target?.adaptationNote
 
+          const isPreloggedDayOff = rd.historyEntry?.action === 'day_off'
+
           return (
             <div key={rd.calendarDate} className="flex items-center gap-3">
               <div className="w-10 text-center flex-shrink-0">
@@ -50,22 +52,36 @@ export function TodayUpcomingList({
                 </p>
               </div>
               <div className="flex-1 min-w-0">
-                <WorkoutDayCard
-                  resolved={rd}
-                  planId={planId}
-                  sessionCount={upcomingSessionCounts[rd.calendarDate]}
-                  onClick={() => onSelectUpcoming(rd)}
-                  collapsible
-                />
-                {adaptationNote && (
-                  <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
-                    <TrendingUp size={10} />{adaptationNote}
-                  </p>
-                )}
-                {upcomingSessionSummaries[rd.calendarDate] && (
-                  <p className="text-[10px] text-slate-500 mt-0.5 ml-1 truncate">
-                    Last: {upcomingSessionSummaries[rd.calendarDate]}
-                  </p>
+                {isPreloggedDayOff ? (
+                  <button
+                    onClick={() => onSelectUpcoming(rd)}
+                    className="w-full text-left rounded-xl border border-slate-700/50 bg-slate-800/80 p-3 opacity-60 hover:opacity-80 transition-opacity active:scale-[0.98]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Coffee size={13} className="text-slate-400 flex-shrink-0" />
+                      <span className="text-sm font-medium text-slate-400">Day Off</span>
+                    </div>
+                  </button>
+                ) : (
+                  <>
+                    <WorkoutDayCard
+                      resolved={rd}
+                      planId={planId}
+                      sessionCount={upcomingSessionCounts[rd.calendarDate]}
+                      onClick={() => onSelectUpcoming(rd)}
+                      collapsible
+                    />
+                    {adaptationNote && (
+                      <p className="text-[10px] text-sky-400/80 mt-1 ml-1 flex items-center gap-1">
+                        <TrendingUp size={10} />{adaptationNote}
+                      </p>
+                    )}
+                    {upcomingSessionSummaries[rd.calendarDate] && (
+                      <p className="text-[10px] text-slate-500 mt-0.5 ml-1 truncate">
+                        Last: {upcomingSessionSummaries[rd.calendarDate]}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
