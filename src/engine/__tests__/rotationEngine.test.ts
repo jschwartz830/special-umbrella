@@ -429,6 +429,68 @@ describe('getUpcomingDays', () => {
     expect(result.every(r => r.planDayIndex === 0)).toBe(true)
     expect(result[0].planDay.label).toBe('Day 1')
   })
+
+  // ── historyEntry attachment for pre-logged future dates ───────────────────
+
+  it('attaches historyEntry for a future date that has a pre-logged day_off', () => {
+    const plan = makePlan(4)
+    // User scheduled a rest day on Jan 3 via Calendar
+    const entries = [makeEntry('2026-01-03', 'day_off')]
+    const result = getUpcomingDays(plan, entries, [], '2026-01-01', 5)
+    const jan3 = result.find(r => r.calendarDate === '2026-01-03')!
+    expect(jan3).toBeDefined()
+    expect(jan3.historyEntry).toBeDefined()
+    expect(jan3.historyEntry?.action).toBe('day_off')
+  })
+
+  it('leaves historyEntry undefined for future dates with no pre-logged entry', () => {
+    const plan = makePlan(4)
+    const result = getUpcomingDays(plan, [], [], '2026-01-01', 3)
+    expect(result.every(r => r.historyEntry === undefined)).toBe(true)
+  })
+
+  it('uses the most recent entry when multiple entries exist for a future date', () => {
+    const plan = makePlan(4)
+    const entries: HistoryEntry[] = [
+      { ...makeEntry('2026-01-02', 'day_off'), id: 'older', createdAt: '2026-01-02T08:00:00Z' },
+      { ...makeEntry('2026-01-02', 'skip', 1), id: 'newer', createdAt: '2026-01-02T16:00:00Z' },
+    ]
+    const result = getUpcomingDays(plan, entries, [], '2026-01-01', 3)
+    const jan2 = result.find(r => r.calendarDate === '2026-01-02')!
+    expect(jan2.historyEntry?.id).toBe('newer')
+  })
+
+  it('does not attach entries from other plans', () => {
+    const plan = makePlan(4)
+    const otherPlanEntry: HistoryEntry = {
+      id: 'other-plan-entry',
+      planId: 'other-plan',
+      calendarDate: '2026-01-02',
+      action: 'day_off',
+      planDayIndex: undefined,
+      createdAt: '2026-01-02T12:00:00Z',
+    }
+    const result = getUpcomingDays(plan, [otherPlanEntry], [], '2026-01-01', 3)
+    const jan2 = result.find(r => r.calendarDate === '2026-01-02')!
+    expect(jan2.historyEntry).toBeUndefined()
+  })
+
+  it('attaching historyEntry does not affect rotation pointer projection', () => {
+    // Pre-logging a day_off on Jan 3 must not shift the pointer for Jan 4 onward —
+    // getUpcomingDays always projects positionally, not by consuming future entries.
+    const plan = makePlan(4)
+    const entries = [makeEntry('2026-01-03', 'day_off')]
+    const result = getUpcomingDays(plan, entries, [], '2026-01-01', 5)
+    // Without any prior entries before today, pointer starts at 0, +1 → 1 for tomorrow.
+    // Jan 2 → day 1, Jan 3 → day 2, Jan 4 → day 3, Jan 5 → day 0, Jan 6 → day 1.
+    // The day_off entry on Jan 3 should NOT stall the pointer.
+    expect(result[0].calendarDate).toBe('2026-01-02')
+    expect(result[0].planDayIndex).toBe(1)
+    expect(result[1].calendarDate).toBe('2026-01-03')
+    expect(result[1].planDayIndex).toBe(2)  // same as without the entry
+    expect(result[2].calendarDate).toBe('2026-01-04')
+    expect(result[2].planDayIndex).toBe(3)
+  })
 })
 
 // ── isPlanExpired ─────────────────────────────────────────────────────────────
