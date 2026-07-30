@@ -2,6 +2,50 @@
 
 ---
 
+## Pass 86 — 2026-07-30 (branch `claude/serene-cori-fnly7t`)
+
+### [68a1136] fix(engine): attach historyEntry to upcoming days with pre-logged future entries
+
+**Summary**: `getUpcomingDays` projected the rotation schedule forward without ever consulting stored entries for future dates. When a user pre-logged a day off on a future date via the Calendar, the Today page upcoming list had no way to know — it would show the scheduled workout card with no indication that a rest day had been planned.
+
+**Fix**: Build a `date → entry` map inside `getUpcomingDays` (same dedup logic as `computeCurrentDayIndex`: newest `createdAt` wins per date), then attach the matching entry as `historyEntry` on each returned `ResolvedDay`. The rotation pointer projection is unchanged — future pre-logged entries are informational and do not advance or stall the pointer.
+
+**Files changed**: `src/engine/rotationEngine.ts`
+
+**Risks**: Very low. `historyEntry` is an optional field on `ResolvedDay`. No existing caller checks it for future-status days, so all existing code paths are unchanged. The change is purely additive: new data is available but only consumed by callers that explicitly look for it.
+
+---
+
+### [30cde3b] feat(ui): show Day Off placeholder in upcoming list for pre-scheduled rest days
+
+**Summary**: Companion to the engine fix above. `TodayUpcomingList` now checks `rd.historyEntry?.action === 'day_off'` for each upcoming card. When true, a compact "Day Off" card (Coffee icon + muted "Day Off" label, 60% opacity) replaces the regular `WorkoutDayCard`. The card stays clickable so the user can open the calendar log flow and change their mind.
+
+**Files changed**: `src/components/today/TodayUpcomingList.tsx`
+
+**Risks**: Very low. The check is additive (new branch in JSX, no removal of old paths). Cards with no pre-logged entry (`historyEntry === undefined`) are completely unaffected. The `Coffee` icon is already bundled (used in TodayPage) so no new dependency.
+
+---
+
+### [d5843eb] test(engine): verify getUpcomingDays attaches historyEntry for future pre-logged dates
+
+**Summary**: Five new test cases added to `rotationEngine.test.ts` covering: (1) a pre-logged `day_off` is attached as `historyEntry`; (2) `historyEntry` is `undefined` when no entry exists; (3) dedup — the most recent entry wins when multiple entries share a date; (4) entries from other plans are not attached; (5) attaching `historyEntry` does not affect the rotation pointer projection.
+
+**Files changed**: `src/engine/__tests__/rotationEngine.test.ts`
+
+**Risks**: None. Additive test-only change.
+
+---
+
+### [3907075] refactor(arch): extract TodayHabitSummary component (ARCH-1 progress)
+
+**Summary**: Moved the compact habit-summary row (🔥 streak · total workouts · cycle progress · plan completion ring) from `TodayPage.tsx` into a new `TodayHabitSummary` component. The `CompletedWorkoutsRing` SVG sub-component (previously a module-local function in TodayPage) was co-located in the new file and exported — TodayPage re-imports it for the plan-progress detail modal, which uses `size={88}`. No logic or behaviour change.
+
+**Files changed**: `src/pages/TodayPage.tsx` (–64 lines), `src/components/today/TodayHabitSummary.tsx` (new)
+
+**Risks**: Very low. Pure JSX extraction — no state, no side effects, no logic change. All props thread through the component boundary unchanged.
+
+---
+
 ## Pass 85 — 2026-07-29 (branch `claude/serene-cori-23vs7k`)
 
 ### [eb29a6d] fix(TodayPage): suppress PR celebration when editing an existing outcome

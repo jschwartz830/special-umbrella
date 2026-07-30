@@ -1,5 +1,65 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-30 (eighty-sixth pass) — branch `claude/serene-cori-fnly7t`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 4 commits, 4 source files changed (1 new component, 1 engine fix, 1 UI update, 1 test file). No new dependencies. No store schema changes.
+2. **Highest confidence**: The engine fix (`getUpcomingDays` entry attachment) is purely additive — adds an optional field to returned structs, all existing callers are unaffected. The ARCH-1 refactor is a straight JSX extraction with no logic change. Both are covered by tests.
+3. **Risky items**: None. All changes are surgical and independently revertable.
+4. **Review first**: The `TodayUpcomingList` day-off branch (`isPreloggedDayOff`) — verify visually that the "Day Off" placeholder looks right and doesn't obscure the adaptation note or last-session summary paths (both are inside the `else` branch, so they are suppressed for day-off cards, which is intentional).
+5. **Branch/merge policy conflict** carried forward — see "Open Questions".
+
+---
+
+### Biggest Issues Found
+
+| Severity | ID | Description |
+|---|---|---|
+| Low | BUG-UPCOMING-DAYOFF | `getUpcomingDays` ignored stored entries for future dates — pre-logged day-offs were invisible on the Today page. **Fixed this pass.** |
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `68a1136` | Fix BUG-UPCOMING-DAYOFF: `getUpcomingDays` now builds an entry-by-date map and attaches `historyEntry` to each returned `ResolvedDay` |
+| `30cde3b` | `TodayUpcomingList`: render "Day Off" placeholder when upcoming `historyEntry.action === 'day_off'` |
+| `d5843eb` | 5 new tests for `getUpcomingDays` historyEntry attachment |
+| `3907075` | Extract `TodayHabitSummary` + `CompletedWorkoutsRing` from TodayPage (ARCH-1 progress) |
+
+---
+
+### Keep / Revise / Reject
+
+| Change | Verdict | Notes |
+|---|---|---|
+| Engine fix (`getUpcomingDays` historyEntry) | **Definitely keep** | Correct, well-tested, additive, no risk |
+| `TodayUpcomingList` Day Off placeholder | **Definitely keep** | Clear UX improvement; trivially revertable |
+| 5 new rotation engine tests | **Definitely keep** | Cover a previously-untested gap |
+| `TodayHabitSummary` extraction | **Definitely keep** | Clean extraction, no risk |
+
+---
+
+### Remaining Known Debt
+
+| ID | File | Description |
+|---|---|---|
+| ARCH-1 | `TodayPage.tsx` | ~1561 lines; zero render-level tests. P1. Next extraction candidates: ad-hoc workout modal section, Plan Progress detail modal content. |
+| TEST-RENDER | `TodayUpcomingList.tsx`, `TodayCompletedSection.tsx`, `TodayHabitSummary.tsx` | All three are now pure presentational components; good candidates for RTL unit tests (jsdom setup needed). |
+| ARCH-2 | `ActiveWorkoutTracker.tsx` | ~2144 lines; auto-advance timer untested. P3. |
+
+---
+
+### Open Questions
+
+**Branch/merge policy conflict** (carried from prior passes): `CLAUDE.md` says "Always commit directly to `main`" but the task prompt says "Develop on branch `claude/serene-cori-fnly7t`." All 86 passes have opened PRs for human review rather than auto-merging. This PR follows that pattern.
+
+---
+
 ## 2026-07-29 (eighty-fifth pass) — branch `claude/serene-cori-23vs7k`
 
 ---
