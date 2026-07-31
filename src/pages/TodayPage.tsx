@@ -19,8 +19,6 @@ import {
   Copy,
   Check,
   Trophy,
-  Plus,
-  Zap,
   ChevronUp,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
@@ -60,7 +58,9 @@ import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { TodayBanners } from '../components/today/TodayBanners'
 import { TodayUpcomingList } from '../components/today/TodayUpcomingList'
 import { TodayCompletedSection } from '../components/today/TodayCompletedSection'
-import { TodayHabitSummary, CompletedWorkoutsRing } from '../components/today/TodayHabitSummary'
+import { TodayHabitSummary } from '../components/today/TodayHabitSummary'
+import { TodayMobilitySection } from '../components/today/TodayMobilitySection'
+import { TodayPlanProgressModal } from '../components/today/TodayPlanProgressModal'
 import { SwipeToDelete } from '../components/shared/SwipeToDelete'
 import { WORKOUT_META } from '../lib/constants'
 import { estimateRunDurationMin } from '../lib/estimateRunDuration'
@@ -850,68 +850,15 @@ export function TodayPage() {
       )}
 
       {/* Mobility section */}
-      <section>
-        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <Zap size={11} /> Mobility
-        </h2>
-        {mobilityRoutine.length === 0 ? (
-          <button
-            onClick={() => navigate('/mobility')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-dashed border-slate-700/60 text-slate-600 hover:text-slate-400 hover:border-slate-600 transition-colors text-xs"
-          >
-            <Plus size={13} />
-            Set up daily mobility routine
-          </button>
-        ) : mobilityCompletion ? (
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-teal-500/12 border border-teal-500/30">
-            <CheckCircle2 size={14} className="text-teal-400 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-teal-200 font-medium">Mobility done</p>
-              <p className="text-xs text-teal-300/60 mt-0.5">
-                {mobilityCompletion.durationMin} min ·{' '}
-                {mobilityCompletion.completedExerciseIds.length}/{mobilityRoutine.length} exercises
-              </p>
-            </div>
-            <button
-              onClick={() => removeMobilityCompletion(today)}
-              className="text-teal-400/50 hover:text-teal-200 transition-colors"
-              aria-label="Undo mobility log"
-            >
-              <RotateCcw size={13} />
-            </button>
-          </div>
-        ) : mobilityInProgress ? (
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-sky-500/12 border border-sky-500/30">
-            <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-sky-200 font-medium">Mobility in progress</p>
-              <p className="text-xs text-sky-300/60 mt-0.5">
-                {mobilityActiveSession!.completedIds.length}/{mobilityRoutine.length} exercises done — pick up anytime
-              </p>
-            </div>
-            <button
-              onClick={() => setMobilityState('open')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-semibold text-xs transition-colors active:scale-[0.98] flex-shrink-0"
-            >
-              <Play size={13} /> Continue
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setMobilityState('open')}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700/60 hover:bg-slate-800 transition-colors active:scale-[0.99]"
-          >
-            <Zap size={14} className="text-teal-400 flex-shrink-0" />
-            <div className="flex-1 min-w-0 text-left">
-              <p className="text-sm text-slate-300 font-medium">Daily Mobility</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {mobilityRoutine.length} exercise{mobilityRoutine.length === 1 ? '' : 's'} · ~{Math.ceil(mobilityRoutine.reduce((s, e) => s + e.durationSec, 0) / 60)} min
-              </p>
-            </div>
-            <Play size={14} className="text-slate-500 flex-shrink-0" />
-          </button>
-        )}
-      </section>
+      <TodayMobilitySection
+        mobilityRoutine={mobilityRoutine}
+        mobilityCompletion={mobilityCompletion}
+        mobilityInProgress={mobilityInProgress}
+        mobilityActiveSession={mobilityActiveSession}
+        onUndoCompletion={() => removeMobilityCompletion(today)}
+        onOpenTracker={() => setMobilityState('open')}
+        onNavigate={() => navigate('/mobility')}
+      />
 
       {/* Upcoming */}
       <TodayUpcomingList
@@ -1191,63 +1138,18 @@ export function TodayPage() {
 
       {/* Plan progress detail — opened by tapping the ring in the habit summary row */}
       {showPlanProgressModal && (
-        <Modal title="Plan Progress" onClose={() => setShowPlanProgressModal(false)}>
-          <div className="space-y-5">
-            <div className="flex flex-col items-center gap-2 py-2">
-              <CompletedWorkoutsRing count={stats.totalCompleted} percent={planCompletionPercent} size={88} />
-              <p className="text-xs text-slate-500">{planCompletionPercent}% of plan complete</p>
-            </div>
-
-            <div className="rounded-xl bg-slate-800/80 border border-slate-700/60 divide-y divide-slate-700/60">
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-slate-400">Workouts completed</span>
-                <span className="text-sm font-semibold text-white">{stats.totalCompleted}</span>
-              </div>
-              <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-slate-400">Current streak</span>
-                <span className="text-sm font-semibold text-white">
-                  🔥 {planStreak} day{planStreak === 1 ? '' : 's'}
-                </span>
-              </div>
-              {weekProgress && (
-                <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm text-slate-400">Weeks elapsed</span>
-                  <span className="text-sm font-semibold text-white">{weekProgress.completed} / {weekProgress.total}</span>
-                </div>
-              )}
-              {cycleProgress && (
-                <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm text-slate-400">Current cycle</span>
-                  <span className="text-sm font-semibold text-white">
-                    {cycleProgress.justCompletedRotation
-                      ? 'Just completed'
-                      : `${cycleProgress.doneInCycle} / ${cycleProgress.rotationLength} days`}
-                  </span>
-                </div>
-              )}
-              {plan.duration.type === 'rotations' && (
-                <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm text-slate-400">Plan length</span>
-                  <span className="text-sm font-semibold text-white">
-                    {plan.duration.value} rotation{plan.duration.value === 1 ? '' : 's'}
-                  </span>
-                </div>
-              )}
-              {loggedRate !== null && (
-                <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm text-slate-400">Logged rate</span>
-                  <span className="text-sm font-semibold text-white">{loggedRate}%</span>
-                </div>
-              )}
-              {consecutiveSkips > 0 && (
-                <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm text-slate-400">Consecutive skips</span>
-                  <span className="text-sm font-semibold text-amber-400">{consecutiveSkips}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </Modal>
+        <TodayPlanProgressModal
+          totalCompleted={stats.totalCompleted}
+          planCompletionPercent={planCompletionPercent}
+          planStreak={planStreak}
+          weekProgress={weekProgress}
+          cycleProgress={cycleProgress}
+          planDurationType={plan.duration.type}
+          planDurationValue={plan.duration.value}
+          loggedRate={loggedRate}
+          consecutiveSkips={consecutiveSkips}
+          onClose={() => setShowPlanProgressModal(false)}
+        />
       )}
 
       {/* Edit outcome for a completed extra workout */}

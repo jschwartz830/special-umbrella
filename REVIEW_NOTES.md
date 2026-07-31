@@ -1,5 +1,59 @@
 # Review Notes — Overnight Audit
 
+## 2026-07-31 (eighty-seventh pass) — branch `claude/serene-cori-02lc31`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 1 commit, 3 source files changed (2 new components, 1 reduced page). No new dependencies. No store schema changes.
+2. **Highest confidence**: Both extractions are pure JSX moves with no logic change — zero risk of behavioral regression. TypeScript confirms correct types at all prop boundaries.
+3. **Risky items**: None.
+4. **Review first**: Verify `TodayPlanProgressModal` renders the `CompletedWorkoutsRing` at `size=88` correctly via cross-import from `TodayHabitSummary` — the ring was previously inline in TodayPage and the re-export is new.
+5. **Bug scan**: CalendarPage (1031 lines) and HistoryPage (1186 lines) audited thoroughly — no bugs found. Both pages share the correct pattern of accessing `.getState()` for fresh store state after stale-closure mutations.
+6. **Branch/merge policy conflict** carried forward — see "Open Questions".
+
+---
+
+### Biggest Issues Found
+
+None this pass.
+
+---
+
+### Improvements Completed
+
+| Commit | Change |
+|---|---|
+| `be0e55d` | Extract `TodayMobilitySection` + `TodayPlanProgressModal` from TodayPage (ARCH-1, −98 lines) |
+
+---
+
+### Keep / Revise / Reject
+
+| Change | Verdict | Notes |
+|---|---|---|
+| `TodayMobilitySection` extraction | **Definitely keep** | Clean extraction with all 4 display states; no logic changed |
+| `TodayPlanProgressModal` extraction | **Definitely keep** | Encapsulates ring + stats table; reuses shared Modal and exported ring component |
+
+---
+
+### Remaining Known Debt
+
+| ID | File | Description |
+|---|---|---|
+| ARCH-1 | `TodayPage.tsx` | ~1463 lines (down from 1561); zero render-level tests. P1. Next candidates: ad-hoc workout modal overlay, compact workout card. |
+| TEST-RENDER | `TodayMobilitySection.tsx`, `TodayPlanProgressModal.tsx`, `TodayUpcomingList.tsx`, `TodayCompletedSection.tsx`, `TodayHabitSummary.tsx` | All are now pure presentational components; good candidates for RTL unit tests (jsdom setup needed). |
+| ARCH-2 | `ActiveWorkoutTracker.tsx` | ~2144 lines; auto-advance timer untested. P3. |
+
+---
+
+### Open Questions
+
+**Branch/merge policy conflict** (carried from prior passes): `CLAUDE.md` says "Always commit directly to `main`" but the task prompt says "Develop on branch `claude/serene-cori-02lc31`." All 87 passes have opened PRs for human review rather than auto-merging. This PR follows that pattern.
+
+---
+
 ## 2026-07-30 (eighty-sixth pass) — branch `claude/serene-cori-fnly7t`
 
 ---

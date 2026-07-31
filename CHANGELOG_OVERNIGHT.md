@@ -2,6 +2,24 @@
 
 ---
 
+## Pass 87 — 2026-07-31 (branch `claude/serene-cori-02lc31`)
+
+### [be0e55d] refactor(arch): extract TodayMobilitySection and TodayPlanProgressModal (ARCH-1 progress)
+
+**Summary**: Two more pure-presentational components extracted from TodayPage as part of the ongoing ARCH-1 decomposition. TodayPage reduced from 1561 → ~1463 lines (−98).
+
+**`TodayMobilitySection`** (new at `src/components/today/TodayMobilitySection.tsx`): Renders the Daily Mobility area in 4 states — no-routine (dashed "Set up" button), completed (teal summary row with undo), in-progress (sky "Continue" button), and idle (tap-to-start card). Props: `mobilityRoutine`, `mobilityCompletion`, `mobilityInProgress`, `mobilityActiveSession`, `onUndoCompletion`, `onOpenTracker`, `onNavigate`.
+
+**`TodayPlanProgressModal`** (new at `src/components/today/TodayPlanProgressModal.tsx`): Renders the Plan Progress detail modal — completion ring (reuses `CompletedWorkoutsRing` re-exported from `TodayHabitSummary`) plus a stats table (workouts completed, streak, weeks elapsed, current cycle, plan length, logged rate, consecutive skips). Props: 10 typed fields.
+
+**Cleanup**: Removed now-unused `Zap`, `Plus` lucide icons and `CompletedWorkoutsRing` import from TodayPage.
+
+**Files changed**: `src/pages/TodayPage.tsx` (−98 lines), `src/components/today/TodayMobilitySection.tsx` (new, +88 lines), `src/components/today/TodayPlanProgressModal.tsx` (new, +90 lines)
+
+**Risks**: None. Pure JSX extraction, no logic change, TypeScript confirms all prop boundaries.
+
+---
+
 ## Pass 86 — 2026-07-30 (branch `claude/serene-cori-fnly7t`)
 
 ### [68a1136] fix(engine): attach historyEntry to upcoming days with pre-logged future entries

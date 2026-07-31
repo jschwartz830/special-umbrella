@@ -1,5 +1,41 @@
 # Implementation Plan
 
+## Pass 87 — 2026-07-31 (branch `claude/serene-cori-02lc31`)
+
+### Baseline
+
+- Branch started from `main` (PR from pass 86 merged since then).
+- **1126 tests passing** across 33 test files at start and end of pass (no regressions, no new tests this pass).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 87)
+
+Single-change pass: ARCH-1 TodayPage decomposition continued with two more component extractions. `TodayMobilitySection` and `TodayPlanProgressModal` extracted as pure presentational components, reducing TodayPage by 98 lines. No logic changed, no new dependencies.
+
+### Bugs Fixed This Pass
+
+None. Bug scan of CalendarPage.tsx (1031 lines) and HistoryPage.tsx (1186 lines) completed — no bugs found. Both files use well-established patterns (live store access via `.getState()` after stale closure mutations, plan-guarded rendering, correct mobility date isolation).
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| ARCH-1 (continued) | `be0e55d` | `TodayPage.tsx`, `TodayMobilitySection.tsx` (new), `TodayPlanProgressModal.tsx` (new) | Extracted the Daily Mobility section (4-state display: no-routine / completed / in-progress / idle) into `TodayMobilitySection` with 7 typed props. Extracted the Plan Progress detail modal (ring + stats table) into `TodayPlanProgressModal` with 10 typed props; internally imports `CompletedWorkoutsRing` from `TodayHabitSummary` and `Modal` from shared. Removed now-unused `Zap`, `Plus` (lucide-react) and `CompletedWorkoutsRing` imports from TodayPage. TodayPage is now ~1463 lines (−98 from pass 86 baseline). |
+
+### Tests Added This Pass
+
+None. Pass focused on pure JSX extraction with no new logic. All 1126 existing tests continue to pass.
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now ~1463 lines. Remaining candidates: ad-hoc workout modal overlay, today's compact workout card, override/jump confirmation sections. |
+| P2 | Add render-level tests for newly extracted `TodayMobilitySection.tsx` and `TodayPlanProgressModal.tsx` — both pure presentational, good RTL candidates (jsdom setup needed). |
+| P3 | `ActiveWorkoutTracker.tsx` (~2144 lines) and `CardioWorkoutTracker.tsx` auto-advance timer remain untested. |
+
+---
+
 ## Pass 86 — 2026-07-30 (branch `claude/serene-cori-fnly7t`)
 
 ### Baseline

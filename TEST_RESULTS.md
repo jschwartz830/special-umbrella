@@ -1,5 +1,33 @@
 # Test Results
 
+## 2026-07-31 (eighty-seventh pass) — branch `claude/serene-cori-02lc31`
+
+---
+
+### Baseline (before changes)
+
+- **33 test files, 1126 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+
+### Tests Added/Updated This Pass
+
+None. Pass focused on pure JSX extraction with no new logic. All 1126 existing tests continue to pass.
+
+### Final Results
+
+- **33 test files, 1126 tests — all passing** (0 new tests, 0 regressions)
+- `tsc --noEmit`: clean
+
+### Key Areas Still Untested
+
+| Gap | Priority | Notes |
+|---|---|---|
+| `TodayPage.tsx` | P1 | Zero render-level tests. `TodayMobilitySection`, `TodayPlanProgressModal`, `TodayUpcomingList`, `TodayCompletedSection`, and `TodayHabitSummary` are all now pure prop-only components — good RTL targets once jsdom is configured. |
+| `ActiveWorkoutTracker.tsx` — ~2144-line component | P2 | Set-by-set weights tracking, rest timer, run segment timer, voice cues — all manual-only. |
+
+---
+
 ## 2026-07-30 (eighty-sixth pass) — branch `claude/serene-cori-fnly7t`
 
 ---
