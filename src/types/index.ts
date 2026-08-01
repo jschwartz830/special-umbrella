@@ -9,13 +9,14 @@ export type WorkoutType =
   | 'recovery_run'
   | 'swim'
   | 'yoga'
+  | 'mobility'
   | 'rest'
 
 export type ActionType = 'complete' | 'skip' | 'day_off'
 
 // Re-export new metadata/outcome/adaptation types for convenience
 export type { WorkoutTag, WorkoutDifficulty, RunWorkoutConfig, RunWorkoutSubtype, PaceRange } from '../modules/workout-metadata/types'
-export type { WorkoutCompletionState, PerceivedEffort, WorkoutOutcome, RunWorkoutActual } from '../modules/workout-outcomes/types'
+export type { WorkoutCompletionState, PerceivedEffort, WorkoutOutcome, RunWorkoutActual, MobilityWorkoutActual, MobilityLoggedExercise, MobilityLoggedSet } from '../modules/workout-outcomes/types'
 export type { RunProgressionState, RunProgressionDecision, ResolvedWorkoutTarget } from '../modules/run-adaptation/types'
 export type { ExerciseSpec, SetSpec, RunSegment, DrillSpec, ProgressionRule, ProgramMeta, ProgramVarDefs } from './program'
 
@@ -82,6 +83,8 @@ export interface WorkoutSlot {
   segments?: import('./program').RunSegment[]
   /** Slot-level progression rule (typically used on run slots) */
   slotProgress?: import('./program').ProgressionRule
+  /** Structured mobility exercises with per-instance editable sets (timed hold or reps) */
+  mobilityExercises?: import('../lib/mobilityLibrary').MobilityRoutineExercise[]
 }
 
 /** One entry in the repeating day sequence */

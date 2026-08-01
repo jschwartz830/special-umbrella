@@ -18,6 +18,8 @@ import { nanoid } from '../lib/utils'
 import type { Plan, PlanDay, WorkoutSlot } from '../types'
 import type { ExerciseSpec, ProgressionType } from '../types/program'
 import { EXERCISE_LIBRARY, findExerciseByName } from '../lib/exerciseLibrary'
+import { MOBILITY_LIBRARY, singleTimedSet, type MobilityRoutineExercise, type MobilitySet } from '../lib/mobilityLibrary'
+import { MobilityRoutineEditor } from '../components/mobility/MobilityRoutineEditor'
 import type {
   WorkoutDifficulty,
   RunWorkoutSubtype,
@@ -159,6 +161,58 @@ function SlotEditor({
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
     updateExercises(next)
+  }
+
+  // ── Mobility exercises (slot.mobilityExercises) ──────────────────────────
+  function updateMobilityExercises(mobilityExercises: MobilityRoutineExercise[]) {
+    onChange({ ...slot, mobilityExercises })
+  }
+
+  const mobilityCallbacks = {
+    onUpdateExercise(id: string, patch: Partial<Pick<MobilityRoutineExercise, 'name' | 'restSec' | 'notes'>>) {
+      updateMobilityExercises((slot.mobilityExercises ?? []).map(e => e.id === id ? { ...e, ...patch } : e))
+    },
+    onAddSet(exerciseId: string, newSet?: MobilitySet) {
+      updateMobilityExercises((slot.mobilityExercises ?? []).map(e => {
+        if (e.id !== exerciseId) return e
+        const last = e.sets[e.sets.length - 1]
+        return { ...e, sets: [...e.sets, newSet ?? last ?? { durationSec: 30 }] }
+      }))
+    },
+    onUpdateSet(exerciseId: string, setIdx: number, patch: MobilitySet) {
+      updateMobilityExercises((slot.mobilityExercises ?? []).map(e => {
+        if (e.id !== exerciseId) return e
+        return { ...e, sets: e.sets.map((s, i) => i === setIdx ? { ...patch } : s) }
+      }))
+    },
+    onRemoveSet(exerciseId: string, setIdx: number) {
+      updateMobilityExercises((slot.mobilityExercises ?? []).map(e => {
+        if (e.id !== exerciseId || e.sets.length <= 1) return e
+        return { ...e, sets: e.sets.filter((_, i) => i !== setIdx) }
+      }))
+    },
+    onRemoveExercise(id: string) {
+      updateMobilityExercises((slot.mobilityExercises ?? []).filter(e => e.id !== id))
+    },
+  }
+
+  function reorderMobilityExercise(fromIdx: number, toIdx: number) {
+    const next = [...(slot.mobilityExercises ?? [])]
+    const [moved] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, moved)
+    updateMobilityExercises(next)
+  }
+
+  function addMobilityExerciseFromLibrary(libraryId: string) {
+    const existing = slot.mobilityExercises ?? []
+    if (existing.some(e => e.id === libraryId)) return
+    const libEx = MOBILITY_LIBRARY.find(e => e.id === libraryId)
+    if (!libEx) return
+    updateMobilityExercises([...existing, { id: libraryId, name: libEx.name, sets: singleTimedSet(libEx.durationSec) }])
+  }
+
+  function addCustomMobilityExercise(name: string, sets: MobilitySet[]) {
+    updateMobilityExercises([...(slot.mobilityExercises ?? []), { id: nanoid(), name, sets }])
   }
 
   return (
@@ -509,6 +563,19 @@ function SlotEditor({
                   )
                 })}
               </div>
+            </div>
+          )}
+
+          {slot.type === 'mobility' && (
+            <div className="space-y-1.5">
+              <p className="text-xs text-slate-400">Mobility exercises</p>
+              <MobilityRoutineEditor
+                exercises={slot.mobilityExercises ?? []}
+                onReorder={reorderMobilityExercise}
+                onAddFromLibrary={addMobilityExerciseFromLibrary}
+                onAddCustom={addCustomMobilityExercise}
+                {...mobilityCallbacks}
+              />
             </div>
           )}
 

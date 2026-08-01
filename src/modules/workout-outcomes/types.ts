@@ -48,6 +48,23 @@ export interface SwimWorkoutActual {
   completedAsPlanned?: boolean | null
 }
 
+export interface MobilityLoggedSet {
+  targetDurationSec?: number | null
+  targetReps?: number | null
+  actualDurationSec?: number | null
+  actualReps?: number | null
+  completed: boolean
+}
+
+export interface MobilityLoggedExercise {
+  exercise: string
+  sets: MobilityLoggedSet[]
+}
+
+export interface MobilityWorkoutActual {
+  exercises: MobilityLoggedExercise[]
+}
+
 export interface ProgressionRecommendation {
   discipline: 'weights' | 'run' | 'swim'
   mode: 'single' | 'double' | 'volume' | 'endurance' | 'speed' | 'maintenance'
@@ -70,6 +87,8 @@ export interface WorkoutOutcome {
   weightsActual?: WeightsWorkoutActual | null
   /** Only present for swim slots */
   swimActual?: SwimWorkoutActual | null
+  /** Only present for mobility slots */
+  mobilityActual?: MobilityWorkoutActual | null
   progressionRecommendation?: ProgressionRecommendation | null
 }
 

@@ -1,4 +1,4 @@
-import { Ruler, Timer, Zap, Dumbbell, Waves, Trophy } from 'lucide-react'
+import { Ruler, Timer, Zap, Dumbbell, Waves, Trophy, Activity } from 'lucide-react'
 import { formatPace, formatSwimPace } from '../../modules/workout-outcomes/types'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import type { RunProgressionState } from '../../modules/run-adaptation/types'
@@ -15,6 +15,11 @@ export function OutcomeMetrics({
   const weightSetCount = outcome.weightsActual?.exercises
     ?.flatMap(ex => ex.sets)
     .filter(s => s.completed).length ?? 0
+
+  const mobilitySets = outcome.mobilityActual?.exercises.flatMap(ex => ex.sets) ?? []
+  const mobilitySetCount = mobilitySets.filter(s => s.completed).length
+  const mobilityExerciseCount = outcome.mobilityActual?.exercises
+    .filter(ex => ex.sets.some(s => s.completed)).length ?? 0
 
   return (
     <div className="space-y-1.5 py-1">
@@ -62,6 +67,12 @@ export function OutcomeMetrics({
         </div>
       )}
 
+      {outcome.mobilityActual && (
+        <p className="text-xs text-slate-400 flex items-center gap-1">
+          <Activity size={10} /> {mobilityExerciseCount} exercise{mobilityExerciseCount === 1 ? '' : 's'} · {mobilitySetCount} set{mobilitySetCount === 1 ? '' : 's'}
+        </p>
+      )}
+
       {outcome.swimActual && (
         <div className="flex flex-wrap gap-3 text-xs text-slate-400">
           {outcome.swimActual.actualDistanceMeters != null && (
@@ -91,7 +102,7 @@ export function OutcomeMetrics({
         </p>
       )}
 
-      {!outcome.runActual && !outcome.swimActual && outcome.durationActualMin != null && (
+      {!outcome.runActual && !outcome.swimActual && !outcome.mobilityActual && outcome.durationActualMin != null && (
         <p className="text-xs text-slate-500">{outcome.durationActualMin} min</p>
       )}
     </div>

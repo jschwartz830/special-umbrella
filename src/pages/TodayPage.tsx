@@ -41,7 +41,8 @@ import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, WorkoutType, WorkoutSlot, PlanDay } from '../types'
-import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
+import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../modules/workout-outcomes/types'
+import type { MobilitySessionCheckpoint } from '../store/mobilityStore'
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { MobilityTracker } from '../components/workout/MobilityTracker'
 import { useMobilityStore } from '../store/mobilityStore'
@@ -190,7 +191,19 @@ export function TodayPage() {
   const mobilityRoutine = useMobilityStore(s => s.routine)
   const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
   const mobilityActiveSession = useMobilityStore(s => s.activeSession)
+  const mobilityLogCompletion = useMobilityStore(s => s.logCompletion)
+  const mobilityStartSession = useMobilityStore(s => s.startSession)
+  const mobilitySaveCheckpoint = useMobilityStore(s => s.saveCheckpoint)
+  const mobilityClearSession = useMobilityStore(s => s.clearSession)
+  const mobilitySoundEnabled = useMobilityStore(s => s.soundEnabled)
+  const mobilitySetSoundEnabled = useMobilityStore(s => s.setSoundEnabled)
   const [mobilityState, setMobilityState] = useState<'hidden' | 'open'>('hidden')
+  // Scheduled `mobility` slot inside today's plan day — distinct from the
+  // standalone global Daily Mobility Routine above. Session state lives only
+  // in this component (not persisted) since it tracks a specific plan day's
+  // slot rather than the global routine.
+  const [mobilitySlotState, setMobilitySlotState] = useState<'hidden' | 'open'>('hidden')
+  const [mobilitySlotSession, setMobilitySlotSession] = useState<MobilitySessionCheckpoint | null>(null)
   // A checkpoint left behind by closing the tracker mid-routine (see
   // MobilityTracker's handleClose) — lets today's card offer "Continue"
   // instead of starting the whole routine over. Deliberately does NOT
@@ -397,6 +410,47 @@ export function TodayPage() {
   function handleCardioCancel() {
     setCardioState('hidden')
     setShowOutcomeModal(true)
+  }
+
+  function handleMobilitySlotComplete(
+    slot: WorkoutSlot,
+    completedAt: string,
+    durationMin: number,
+    completedExerciseIds: string[],
+    completedSets: Record<string, number[]>,
+  ) {
+    const exercises = slot.mobilityExercises ?? []
+    const mobilityActual: MobilityWorkoutActual = {
+      exercises: exercises.map(ex => ({
+        exercise: ex.name,
+        sets: ex.sets.map((s, i) => {
+          const done = (completedSets[ex.id] ?? []).includes(i)
+          return {
+            targetDurationSec: s.durationSec ?? null,
+            targetReps: s.reps ?? null,
+            actualDurationSec: done ? s.durationSec ?? null : null,
+            actualReps: done ? s.reps ?? null : null,
+            completed: done,
+          }
+        }),
+      })),
+    }
+    const allDone = exercises.length > 0 && exercises.every(ex => completedExerciseIds.includes(ex.id))
+    const completionState: WorkoutCompletionState = exercises.length === 0
+      ? 'completed'
+      : allDone ? 'completed' : completedExerciseIds.length > 0 ? 'partially_completed' : 'skipped'
+
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: makeWorkoutInstanceId(plan!.id, today),
+      completionState,
+      completedAt,
+      durationActualMin: durationMin,
+      mobilityActual,
+    }
+    logAction(plan!.id, today, primaryPlanDayIndex, completionStateToAction(completionState))
+    logOutcomeWithProgression(outcome, slot)
+    setMobilitySlotSession(null)
+    setMobilitySlotState('hidden')
   }
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
@@ -678,6 +732,8 @@ export function TodayPage() {
             const firstSlot = primaryPlanDay.slots[0]
             if (firstSlot && isRunType(firstSlot.type)) {
               setCardioState('open')
+            } else if (firstSlot && firstSlot.type === 'mobility') {
+              setMobilitySlotState('open')
             } else {
               setActiveWorkoutState('open')
             }
@@ -1060,10 +1116,53 @@ export function TodayPage() {
       {mobilityState !== 'hidden' && (
         <MobilityTracker
           today={today}
+          routine={mobilityRoutine}
+          activeSession={mobilityActiveSession}
+          soundEnabled={mobilitySoundEnabled}
+          setSoundEnabled={mobilitySetSoundEnabled}
+          startSession={mobilityStartSession}
+          saveCheckpoint={mobilitySaveCheckpoint}
+          clearSession={mobilityClearSession}
+          onLogCompletion={({ completedAt, durationMin, completedExerciseIds }) => {
+            mobilityLogCompletion(today, { completedAt, durationMin, completedExerciseIds })
+          }}
           onClose={() => setMobilityState('hidden')}
           onManageRoutine={() => {
             setMobilityState('hidden')
             navigate('/mobility')
+          }}
+        />
+      )}
+
+      {/* Scheduled mobility slot tracker — a `mobility` slot inside today's
+          plan day, as opposed to the standalone daily routine above */}
+      {mobilitySlotState !== 'hidden' && primarySlot && primarySlot.type === 'mobility' && (
+        <MobilityTracker
+          today={today}
+          title={primarySlot.name || 'Mobility'}
+          routine={primarySlot.mobilityExercises ?? []}
+          activeSession={mobilitySlotSession}
+          soundEnabled={mobilitySoundEnabled}
+          setSoundEnabled={mobilitySetSoundEnabled}
+          startSession={(date, exerciseIds) => setMobilitySlotSession({
+            date,
+            exerciseIds,
+            currentIdx: 0,
+            currentSetIdx: 0,
+            completedIds: [],
+            completedSets: {},
+            totalElapsedSec: 0,
+            exElapsedSec: 0,
+          })}
+          saveCheckpoint={cp => setMobilitySlotSession(cp)}
+          clearSession={() => setMobilitySlotSession(null)}
+          onLogCompletion={({ completedAt, durationMin, completedExerciseIds, completedSets }) => {
+            handleMobilitySlotComplete(primarySlot, completedAt, durationMin, completedExerciseIds, completedSets)
+          }}
+          onClose={() => setMobilitySlotState('hidden')}
+          onManageRoutine={() => {
+            setMobilitySlotState('hidden')
+            navigate(`/plans/${plan!.id}/edit`)
           }}
         />
       )}

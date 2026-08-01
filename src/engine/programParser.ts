@@ -16,17 +16,20 @@ import type {
   YamlRunSegment,
   YamlDrillSpec,
   YamlWarmupRampSpec,
+  YamlMobilityExercise,
+  YamlMobilitySet,
 } from '../types/program'
 import type {
   WeightsFocusArea,
   WeightsTrainingIntent,
   WorkoutDifficulty,
 } from '../modules/workout-metadata/types'
+import type { MobilityRoutineExercise, MobilitySet } from '../lib/mobilityLibrary'
 
 // ── Type coercions ────────────────────────────────────────────────────────────
 
 const VALID_WORKOUT_TYPES: WorkoutType[] = [
-  'weights', 'run', 'swim', 'yoga', 'other',
+  'weights', 'run', 'swim', 'yoga', 'mobility', 'other',
   // legacy kept for compat
   'weightlifting', 'long_run', 'recovery_run', 'rest',
 ]
@@ -128,6 +131,39 @@ function parseDrill(raw: YamlDrillSpec): DrillSpec {
   }
 }
 
+// ── Mobility exercise parsing ──────────────────────────────────────────────────
+
+/** Parses a duration expression ("45s", "1m", or a plain number of seconds) into seconds. */
+function parseDurationSecs(v: string | number | undefined): number | undefined {
+  if (v == null) return undefined
+  if (typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : undefined
+  const s = v.trim().toLowerCase()
+  if (s.endsWith('m')) return Math.round(Number(s.slice(0, -1)) * 60)
+  if (s.endsWith('s')) return Number(s.slice(0, -1))
+  const n = Number(s)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+function parseMobilitySet(raw: YamlMobilitySet): MobilitySet {
+  return {
+    durationSec: parseDurationSecs(raw.duration),
+    reps: raw.reps,
+  }
+}
+
+function parseMobilityExercise(raw: YamlMobilityExercise): MobilityRoutineExercise {
+  const sets = Array.isArray(raw.sets) && raw.sets.length > 0
+    ? raw.sets.map(parseMobilitySet)
+    : [{ durationSec: 45 }]
+  return {
+    id: raw.id ?? nanoid(),
+    name: raw.name,
+    sets,
+    restSec: parseDurationSecs(raw.rest),
+    notes: normStr(raw.notes),
+  }
+}
+
 // ── Run segment parsing ───────────────────────────────────────────────────────
 
 const VALID_SEGMENT_TYPES = ['warmup', 'cooldown', 'easy', 'tempo', 'interval', 'race_pace', 'drills', 'rest']
@@ -156,6 +192,7 @@ function parseSlot(raw: YamlSlot): WorkoutSlot {
   const type = coerceWorkoutType(raw.type ?? 'other')
   const isRun = type === 'run' || type === 'long_run' || type === 'recovery_run'
   const isWeights = type === 'weights' || type === 'weightlifting'
+  const isMobility = type === 'mobility'
 
   const slotProgress: ProgressionRule | undefined = raw.progress
     ? { if: raw.progress.if, then: raw.progress.then, else: raw.progress.else }
@@ -173,13 +210,17 @@ function parseSlot(raw: YamlSlot): WorkoutSlot {
     ? raw.segments.map(parseRunSegment)
     : undefined
 
+  const mobilityExercises = isMobility && Array.isArray(raw.mobilityExercises)
+    ? raw.mobilityExercises.map(parseMobilityExercise)
+    : undefined
+
   // Build a structureDescription summary for display in the existing UI
   const structureDescription = buildStructureDescription(raw, isWeights, isRun)
 
   return {
     id: nanoid(),
     type,
-    name: raw.name ?? (isWeights ? 'Weights' : isRun ? 'Run' : 'Workout'),
+    name: raw.name ?? (isWeights ? 'Weights' : isRun ? 'Run' : isMobility ? 'Mobility' : 'Workout'),
     subtype: raw.subtype,
     durationMin: raw.durationMin,
     difficulty: coerceDifficulty(raw.difficulty),
@@ -191,6 +232,7 @@ function parseSlot(raw: YamlSlot): WorkoutSlot {
     warmup,
     exercises,
     segments,
+    mobilityExercises,
     slotProgress,
   }
 }

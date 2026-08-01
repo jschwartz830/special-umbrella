@@ -226,6 +226,53 @@
         }
       }
     },
+    "mobilitySet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "duration": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" }
+          ]
+        },
+        "reps": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "mobilityExercise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mobilitySet"
+          }
+        },
+        "rest": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "number" }
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
     "drill": {
       "type": "object",
       "additionalProperties": false,
@@ -370,6 +417,7 @@
             "run",
             "swim",
             "yoga",
+            "mobility",
             "other",
             "weightlifting",
             "long_run",
@@ -435,6 +483,12 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/segment"
+          }
+        },
+        "mobilityExercises": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mobilityExercise"
           }
         },
         "progress": {

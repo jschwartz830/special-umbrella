@@ -31,6 +31,66 @@ export interface MobilityLibraryExercise {
   bilateral?: boolean // performed one side at a time — cue a switch at the halfway mark
 }
 
+// ── Routine exercise (per-instance, editable dosing) ────────────────────────
+// Used both by the standalone global routine (mobilityStore) and by a
+// program day's `mobility` slot (WorkoutSlot.mobilityExercises). A set is
+// either a timed hold (durationSec) or rep-based (reps) — never both.
+
+export interface MobilitySet {
+  durationSec?: number
+  reps?: number
+}
+
+export interface MobilityRoutineExercise {
+  id: string // MOBILITY_LIBRARY id, or generated for custom entries
+  name: string
+  sets: MobilitySet[] // always >=1; independently editable, not inherited from the library
+  restSec?: number // optional rest between sets
+  notes?: string
+}
+
+/** A single timed-hold set — the common case, and the shape used before sets existed. */
+export function singleTimedSet(durationSec: number): MobilitySet[] {
+  return [{ durationSec }]
+}
+
+/** Formats a duration in seconds as "45s" / "2m" / "2m 15s". */
+export function formatMobilityDuration(sec: number): string {
+  const m = Math.floor(sec / 60)
+  const r = sec % 60
+  if (m === 0) return `${r}s`
+  if (r === 0) return `${m}m`
+  return `${m}m ${r}s`
+}
+
+/** Total duration of a routine exercise's timed sets, in seconds (rep-only sets contribute 0). */
+export function totalTimedSec(sets: MobilitySet[]): number {
+  return sets.reduce((sum, s) => sum + (s.durationSec ?? 0), 0)
+}
+
+/** Short human summary of a routine exercise's dosing, e.g. "3 sets · 45s hold" or "2 sets × 10 reps". */
+export function summarizeMobilitySets(sets: MobilitySet[]): string {
+  if (sets.length === 0) return ''
+  const allTimed = sets.every(s => s.durationSec != null)
+  const allReps = sets.every(s => s.reps != null)
+  const setLabel = `${sets.length} set${sets.length === 1 ? '' : 's'}`
+  if (sets.length === 1) {
+    const s = sets[0]
+    if (s.durationSec != null) return formatMobilityDuration(s.durationSec)
+    if (s.reps != null) return `${s.reps} reps`
+    return setLabel
+  }
+  if (allTimed) {
+    const same = sets.every(s => s.durationSec === sets[0].durationSec)
+    return same ? `${setLabel} · ${formatMobilityDuration(sets[0].durationSec!)} hold` : setLabel
+  }
+  if (allReps) {
+    const same = sets.every(s => s.reps === sets[0].reps)
+    return same ? `${setLabel} × ${sets[0].reps} reps` : setLabel
+  }
+  return setLabel
+}
+
 export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
   // ── Scapula & Shoulder ──────────────────────────────────────────────────
   {

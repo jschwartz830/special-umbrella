@@ -1,25 +1,23 @@
 import { useState } from 'react'
-import { ArrowLeft, Plus, Trash2, GripVertical, BookOpen, Layers, Info, Check } from 'lucide-react'
+import { ArrowLeft, Plus, GripVertical, BookOpen, Layers, Info, Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useMobilityStore, type MobilityExercise } from '../store/mobilityStore'
+import { useMobilityStore } from '../store/mobilityStore'
+import { MobilityExerciseRow } from '../components/mobility/MobilityRoutineEditor'
 import {
   MOBILITY_LIBRARY,
   MOBILITY_PRESETS,
   CATEGORY_LABELS,
   CATEGORY_COLORS,
+  formatMobilityDuration,
+  singleTimedSet,
+  totalTimedSec,
   type MobilityCategory,
   type MobilityLibraryExercise,
 } from '../lib/mobilityLibrary'
 
 type Tab = 'routine' | 'library' | 'presets'
 
-function fmt(s: number): string {
-  const m = Math.floor(s / 60)
-  const r = s % 60
-  if (m === 0) return `${r}s`
-  if (r === 0) return `${m}m`
-  return `${m}m ${r}s`
-}
+const fmt = formatMobilityDuration
 
 // ── My Routine tab ────────────────────────────────────────────────────────────
 
@@ -28,6 +26,10 @@ function RoutineTab() {
   const addExercise = useMobilityStore(s => s.addExercise)
   const removeExercise = useMobilityStore(s => s.removeExercise)
   const reorderExercise = useMobilityStore(s => s.reorderExercise)
+  const updateExercise = useMobilityStore(s => s.updateExercise)
+  const addSet = useMobilityStore(s => s.addSet)
+  const updateSet = useMobilityStore(s => s.updateSet)
+  const removeSet = useMobilityStore(s => s.removeSet)
 
   const [newName, setNewName] = useState('')
   const [newDuration, setNewDuration] = useState('60')
@@ -38,13 +40,13 @@ function RoutineTab() {
     const name = newName.trim()
     const sec = parseInt(newDuration)
     if (!name || !Number.isFinite(sec) || sec <= 0) return
-    addExercise(name, sec)
+    addExercise(name, singleTimedSet(sec))
     setNewName('')
     setNewDuration('60')
     setAdding(false)
   }
 
-  const totalSec = routine.reduce((sum, e) => sum + e.durationSec, 0)
+  const totalSec = routine.reduce((sum, e) => sum + totalTimedSec(e.sets), 0)
 
   return (
     <div className="space-y-2">
@@ -61,34 +63,22 @@ function RoutineTab() {
         </p>
       )}
 
-      {routine.map((ex: MobilityExercise, idx) => (
-        <div
+      {routine.map((ex, idx) => (
+        <MobilityExerciseRow
           key={ex.id}
+          exercise={ex}
           draggable
+          dragHandle={<GripVertical size={16} className="text-slate-600 flex-shrink-0 cursor-grab active:cursor-grabbing" />}
           onDragStart={() => setDragIdx(idx)}
-          onDragOver={e => {
-            e.preventDefault()
-            if (dragIdx === null || dragIdx === idx) return
-            reorderExercise(dragIdx, idx)
-            setDragIdx(idx)
-          }}
+          onDragOver={() => { if (dragIdx !== null && dragIdx !== idx) { reorderExercise(dragIdx, idx); setDragIdx(idx) } }}
           onDragEnd={() => setDragIdx(null)}
-          className={`flex items-center gap-3 px-3 py-3 rounded-xl border bg-slate-800/80 transition-colors ${
-            dragIdx === idx ? 'border-sky-500/50 opacity-60' : 'border-slate-700/60'
-          }`}
-        >
-          <GripVertical size={16} className="text-slate-600 flex-shrink-0 cursor-grab active:cursor-grabbing" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-200 truncate">{ex.name}</p>
-            <p className="text-xs text-slate-500">{fmt(ex.durationSec)}</p>
-          </div>
-          <button
-            onClick={() => removeExercise(ex.id)}
-            className="p-1.5 rounded text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
+          dragActive={dragIdx === idx}
+          onUpdateExercise={updateExercise}
+          onAddSet={addSet}
+          onUpdateSet={updateSet}
+          onRemoveSet={removeSet}
+          onRemoveExercise={removeExercise}
+        />
       ))}
 
       {adding ? (

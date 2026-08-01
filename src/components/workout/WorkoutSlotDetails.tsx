@@ -7,6 +7,7 @@ import { resolveWorkoutDisplayTarget } from '../../modules/run-adaptation/select
 import { useOutcomeStore } from '../../store/outcomeStore'
 import { useProgramStore } from '../../store/programStore'
 import { resolveLoad } from '../../lib/expressionEval'
+import { summarizeMobilitySets } from '../../lib/mobilityLibrary'
 
 interface Props {
   slot: WorkoutSlot
@@ -113,6 +114,9 @@ export function WorkoutSlotDetails({ slot, planId, className, collapsed }: Props
 
   const resolved = resolveWorkoutDisplayTarget(slot, progressionState)
   const exerciseLines = formatExercisePrescription(slot, vars)
+  const mobilityLines = (slot.mobilityExercises ?? []).map(
+    ex => `${ex.name}: ${summarizeMobilitySets(ex.sets)}`,
+  )
 
   return (
     <div className={className}>
@@ -179,6 +183,14 @@ export function WorkoutSlotDetails({ slot, planId, className, collapsed }: Props
       {!collapsed && exerciseLines.length > 0 && (
         <div className="mt-1.5 space-y-1">
           {exerciseLines.map(line => (
+            <p key={line} className="text-[11px] text-slate-400 leading-snug">{line}</p>
+          ))}
+        </div>
+      )}
+
+      {!collapsed && mobilityLines.length > 0 && (
+        <div className="mt-1.5 space-y-1">
+          {mobilityLines.map(line => (
             <p key={line} className="text-[11px] text-slate-400 leading-snug">{line}</p>
           ))}
         </div>

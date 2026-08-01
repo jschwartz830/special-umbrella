@@ -216,6 +216,19 @@ export interface YamlRunSegment {
   notes?: string
 }
 
+export interface YamlMobilitySet {
+  duration?: string | number
+  reps?: number
+}
+
+export interface YamlMobilityExercise {
+  id?: string
+  name: string
+  sets?: YamlMobilitySet[]
+  rest?: string | number
+  notes?: string
+}
+
 export interface YamlSlot {
   type: string
   name?: string
@@ -228,6 +241,7 @@ export interface YamlSlot {
   warmup?: YamlExerciseSpec[]
   exercises?: YamlExerciseSpec[]
   segments?: YamlRunSegment[]
+  mobilityExercises?: YamlMobilityExercise[]
   progress?: { if?: string; then: string; else?: string }
   notes?: string
 }

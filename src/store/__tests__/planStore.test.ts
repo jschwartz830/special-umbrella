@@ -12,7 +12,7 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { usePlanStore } from '../planStore'
+import { usePlanStore, makeSlot } from '../planStore'
 // eslint-disable-next-line import/first
 import type { Plan } from '../../types'
 
@@ -428,5 +428,28 @@ describe('duplicatePlan', () => {
     const newId = getState().duplicatePlan('plan-1')
     // Base is "Workout A"; first available copy name is "Workout A (copy)"
     expect(getState().plans[newId].name).toBe('Workout A (copy)')
+  })
+})
+
+// ── makeSlot ──────────────────────────────────────────────────────────────────
+
+describe('makeSlot', () => {
+  it('creates a mobility slot with an empty exercise list and "Mobility" name', () => {
+    const slot = makeSlot('mobility')
+    expect(slot.type).toBe('mobility')
+    expect(slot.name).toBe('Mobility')
+    expect(slot.mobilityExercises).toEqual([])
+  })
+
+  it('creates a weights slot named "Weights"', () => {
+    const slot = makeSlot('weights')
+    expect(slot.type).toBe('weights')
+    expect(slot.name).toBe('Weights')
+  })
+
+  it('assigns a unique id to each slot', () => {
+    const a = makeSlot('mobility')
+    const b = makeSlot('mobility')
+    expect(a.id).not.toBe(b.id)
   })
 })
