@@ -1,5 +1,44 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-01 (eighty-eighth pass) — branch `claude/serene-cori-bl4pj8`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 2 commits, 4 source files changed (1 new component, bug fix in 2 files, 1 page reduced). No new dependencies. No store schema changes.
+2. **Highest confidence**: Bug fix removes two redundant JSX text literals — visually obvious change, zero logic risk. Component extraction is a pure structural refactor.
+3. **Risky items**: None.
+4. **Review first**: In TodayPage's pending card, the "· PB" amber styling relies on `lastSessionSummary.endsWith(' · PB')` followed by `slice(0, -5)` — this pattern is now replicated identically in `TodayPendingCard.tsx`. Any future change to the suffix string needs to be applied in the new location.
+5. **Bug scan**: `buildLastSessionSummary` and both render sites now emit `"Last: …"` exactly once. Confirmed correct by reading `sessionSummary.ts` (function prefixes) and both JSX sites (no literal prefix remaining).
+
+---
+
+### Biggest Issues Found
+
+#### Rendering bug: "Last: Last: …" in session summary display (FIXED)
+
+`buildLastSessionSummary` returns strings beginning with `"Last: "`. Both
+TodayPage (pending card) and TodayUpcomingList independently prepended another
+`"Last: "` literal in JSX. The bug was present in both components and would
+have appeared on screen for any user who:
+- Had completed the same plan day at least once before, AND
+- Was viewing today's pending workout card OR the upcoming workout list.
+
+This bug survived multiple passes because the test suite only tests the pure
+function (which returns the correct prefix) and does not test rendered output.
+The fix is two one-line removals.
+
+---
+
+### Open Questions (carried forward)
+
+- Branch/merge policy conflict: CLAUDE.md says "commit directly to main" but
+  the overnight task creates a feature branch and PR. Carrying forward as a
+  known, stable pattern.
+
+---
+
 ## 2026-07-31 (eighty-seventh pass) — branch `claude/serene-cori-02lc31`
 
 ---

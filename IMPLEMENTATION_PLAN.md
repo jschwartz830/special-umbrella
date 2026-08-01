@@ -1,5 +1,48 @@
 # Implementation Plan
 
+## Pass 88 — 2026-08-01 (branch `claude/serene-cori-bl4pj8`)
+
+### Baseline
+
+- Branch started from `main` (PR from pass 87 merged since then).
+- **1126 tests passing** across 33 test files at start and end of pass (no regressions, no new tests this pass).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 88)
+
+Two-change pass: a rendering bug fix (double "Last:" prefix) and another ARCH-1
+TodayPage component extraction (TodayPendingCard). TodayPage shrinks to 1,395
+lines.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-DOUBLE-LAST | `566dbd7` | `TodayPage.tsx`, `TodayUpcomingList.tsx` | `buildLastSessionSummary` returns strings already prefixed with `"Last: "`. Both render sites also had a hardcoded `"Last: "` literal in JSX, producing `"Last: Last: 3×8 @ 135 lb Bench Press"` for every user with previous session data. Removed the redundant JSX prefixes. |
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| ARCH-1 (continued) | `4b3b73d` | `TodayPendingCard.tsx` (new), `TodayPage.tsx` | Extracted the ~85-line pending workout compact card into `src/components/today/TodayPendingCard.tsx`. `previewExpanded` useState moved inside the component. Three now-unused imports removed from TodayPage (`ChevronDown`, `ChevronUp`, `WorkoutSlotDetails`). TodayPage is now 1,395 lines (−68 from pass 87 baseline). |
+
+### Tests Added This Pass
+
+None. Bug fixes were in render-path JSX (no testable pure logic). The ARCH-1
+extraction is a structural refactor with no new logic. All 1,126 existing tests
+continue to pass.
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now 1,395 lines. Next candidates: ad-hoc workout modal overlay (multiple useState + handler), or the upcoming-log modal section. |
+| P2 | `updateEntryAction` historyStore: changing away from `day_off` without a `planDayIndex` leaves the entry with `planDayIndex: undefined`. Fix requires CalendarPage to thread the index through the `outcomeTarget` state shape. |
+| P3 | Remove or document `getFutureProjection` dead code in `calendarProjection.ts` (already has an inline note; safe to delete). |
+| P4 | Add render-level tests for `TodayPendingCard`, `TodayUpcomingList`, `TodayCompletedSection` — all pure-presentational, good RTL candidates. |
+
+---
+
 ## Pass 87 — 2026-07-31 (branch `claude/serene-cori-02lc31`)
 
 ### Baseline

@@ -1,5 +1,39 @@
 # Test Results
 
+## 2026-08-01 (eighty-eighth pass) — branch `claude/serene-cori-bl4pj8`
+
+---
+
+### Baseline (before changes)
+
+- **33 test files, 1126 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+
+### Tests Added/Updated This Pass
+
+None. Both changes this pass (bug fix in JSX render path, and structural
+component extraction) have no new pure logic to unit-test. The session summary
+function `buildLastSessionSummary` is already tested by `sessionSummary.test.ts`
+and those tests confirm the function returns a `"Last: …"` prefix. The rendering
+test gap (that the prefix is not doubled in JSX) remains — it would require a
+jsdom/RTL environment that this project does not currently have set up.
+
+### Results After Changes
+
+- **33 test files, 1126 tests — all passing** (no change)
+- TypeScript: `tsc --noEmit` — clean (0 errors)
+
+### Coverage Gap Note
+
+The doubled-prefix rendering bug survived many passes because the test suite
+covers `buildLastSessionSummary` as a pure function but not the JSX rendering
+layer. Adding render tests (RTL + jsdom) for `TodayPendingCard` and
+`TodayUpcomingList` would catch this class of bug earlier. This is tracked as
+P4 in IMPLEMENTATION_PLAN.md.
+
+---
+
 ## 2026-07-31 (eighty-seventh pass) — branch `claude/serene-cori-02lc31`
 
 ---
