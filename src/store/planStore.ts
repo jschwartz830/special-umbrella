@@ -215,6 +215,7 @@ export function makeSlot(type: WorkoutType = 'weights'): WorkoutSlot {
   else if (type === 'recovery_run') { defaults.name = 'Run'; defaults.targetDistance = 3; defaults.subtype = 'recovery' }
   else if (type === 'swim') { defaults.name = 'Swim'; defaults.targetDuration = 45 }
   else if (type === 'yoga') { defaults.name = 'Yoga'; defaults.targetDuration = 30 }
+  else if (type === 'mobility') { defaults.name = 'Mobility'; defaults.mobilityExercises = [] }
   else { defaults.name = 'Other'; defaults.subtype = 'rest' }
   return { id: nanoid(), type, ...defaults } as WorkoutSlot
 }

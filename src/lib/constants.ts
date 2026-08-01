@@ -5,6 +5,7 @@ import {
   Flower2,
   Moon,
   Circle,
+  Activity,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { WorkoutType } from '../types'
@@ -76,6 +77,14 @@ export const WORKOUT_META: Record<WorkoutType, WorkoutMeta> = {
     ringColor: 'ring-purple-400',
     icon: Flower2,
   },
+  mobility: {
+    label: 'Mobility',
+    bgColor: 'bg-teal-500',
+    borderColor: 'border-teal-500',
+    textColor: 'text-teal-600',
+    ringColor: 'ring-teal-400',
+    icon: Activity,
+  },
   other: {
     label: 'Other',
     bgColor: 'bg-slate-500',
@@ -99,6 +108,7 @@ export const WORKOUT_TYPES: WorkoutType[] = [
   'run',
   'swim',
   'yoga',
+  'mobility',
   'other',
 ]
 
@@ -108,6 +118,7 @@ export const WORKOUT_TYPE_OPTIONS: { type: WorkoutType; label: string }[] = [
   { type: 'run', label: 'Run' },
   { type: 'swim', label: 'Swim' },
   { type: 'yoga', label: 'Yoga' },
+  { type: 'mobility', label: 'Mobility' },
   { type: 'other', label: 'Other' },
 ]
 

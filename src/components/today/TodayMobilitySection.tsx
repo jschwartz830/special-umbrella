@@ -1,5 +1,6 @@
 import { CheckCircle2, Play, Plus, RotateCcw, Zap } from 'lucide-react'
 import type { MobilityCompletion, MobilityExercise, MobilitySessionCheckpoint } from '../../store/mobilityStore'
+import { totalTimedSec } from '../../lib/mobilityLibrary'
 
 interface TodayMobilitySectionProps {
   mobilityRoutine: MobilityExercise[]
@@ -76,7 +77,7 @@ export function TodayMobilitySection({
           <div className="flex-1 min-w-0 text-left">
             <p className="text-sm text-slate-300 font-medium">Daily Mobility</p>
             <p className="text-xs text-slate-500 mt-0.5">
-              {mobilityRoutine.length} exercise{mobilityRoutine.length === 1 ? '' : 's'} · ~{Math.ceil(mobilityRoutine.reduce((s, e) => s + e.durationSec, 0) / 60)} min
+              {mobilityRoutine.length} exercise{mobilityRoutine.length === 1 ? '' : 's'} · ~{Math.ceil(mobilityRoutine.reduce((s, e) => s + totalTimedSec(e.sets), 0) / 60)} min
             </p>
           </div>
           <Play size={14} className="text-slate-500 flex-shrink-0" />

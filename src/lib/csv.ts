@@ -251,7 +251,7 @@ function planHeaderCells(
 }
 
 const VALID_WORKOUT_TYPES: WorkoutType[] = [
-  'weights', 'run', 'swim', 'yoga', 'other',
+  'weights', 'run', 'swim', 'yoga', 'mobility', 'other',
   'weightlifting', 'long_run', 'recovery_run', 'rest',
 ]
 const VALID_STATUSES: PlanStatus[] = ['active', 'inactive', 'archived']
@@ -440,6 +440,7 @@ function defaultNameForType(type: WorkoutType): string {
     case 'recovery_run': return 'Recovery Run'
     case 'swim': return 'Swim'
     case 'yoga': return 'Yoga'
+    case 'mobility': return 'Mobility'
     case 'rest': return 'Rest'
   }
 }

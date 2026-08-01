@@ -1,13 +1,15 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { nanoid } from '../lib/utils'
-import { MOBILITY_LIBRARY, type MobilityPreset } from '../lib/mobilityLibrary'
+import {
+  MOBILITY_LIBRARY,
+  singleTimedSet,
+  type MobilityPreset,
+  type MobilityRoutineExercise,
+  type MobilitySet,
+} from '../lib/mobilityLibrary'
 
-export interface MobilityExercise {
-  id: string
-  name: string
-  durationSec: number
-}
+export type MobilityExercise = MobilityRoutineExercise
 
 export interface MobilityCompletion {
   completedAt: string
@@ -19,19 +21,21 @@ export interface MobilitySessionCheckpoint {
   date: string
   exerciseIds: string[]   // routine snapshot at session start
   currentIdx: number
-  completedIds: string[]
+  currentSetIdx: number   // which set within the current exercise
+  completedIds: string[]  // exercises with every set completed
+  completedSets: Record<string, number[]>  // exerciseId -> completed set indices
   totalElapsedSec: number
-  exElapsedSec: number    // accumulated time on current exercise before pause
+  exElapsedSec: number    // accumulated time on the current timed set before pause
 }
 
 const DEFAULT_ROUTINE: MobilityExercise[] = [
-  { id: 'hip-90-90', name: 'Hip 90/90', durationSec: 60 },
-  { id: 'worlds-greatest', name: "World's Greatest Stretch", durationSec: 60 },
-  { id: 'cat-cow', name: 'Cat-Cow', durationSec: 60 },
-  { id: 'thread-needle', name: 'Thread the Needle', durationSec: 45 },
-  { id: 'pigeon-pose', name: 'Pigeon Pose', durationSec: 60 },
-  { id: 'shoulder-cars', name: 'Shoulder CARs', durationSec: 30 },
-  { id: 'ankle-circles', name: 'Ankle Circles', durationSec: 30 },
+  { id: 'hip-90-90', name: 'Hip 90/90', sets: singleTimedSet(60) },
+  { id: 'worlds-greatest', name: "World's Greatest Stretch", sets: singleTimedSet(60) },
+  { id: 'cat-cow', name: 'Cat-Cow', sets: singleTimedSet(60) },
+  { id: 'thread-needle', name: 'Thread the Needle', sets: singleTimedSet(45) },
+  { id: 'pigeon-pose', name: 'Pigeon Pose', sets: singleTimedSet(60) },
+  { id: 'shoulder-cars', name: 'Shoulder CARs', sets: singleTimedSet(30) },
+  { id: 'ankle-circles', name: 'Ankle Circles', sets: singleTimedSet(30) },
 ]
 
 interface MobilityState {
@@ -42,10 +46,14 @@ interface MobilityState {
 
   setSoundEnabled: (enabled: boolean) => void
   setRoutine: (exercises: MobilityExercise[]) => void
-  addExercise: (name: string, durationSec: number) => void
+  addExercise: (name: string, sets?: MobilitySet[]) => void
   addExerciseFromLibrary: (libraryId: string) => void
   removeExercise: (id: string) => void
   reorderExercise: (fromIdx: number, toIdx: number) => void
+  updateExercise: (id: string, patch: Partial<Pick<MobilityExercise, 'name' | 'restSec' | 'notes'>>) => void
+  addSet: (exerciseId: string, set?: MobilitySet) => void
+  updateSet: (exerciseId: string, setIdx: number, patch: MobilitySet) => void
+  removeSet: (exerciseId: string, setIdx: number) => void
   loadPreset: (preset: MobilityPreset, mode: 'replace' | 'append') => void
   logCompletion: (date: string, completion: MobilityCompletion) => void
   removeCompletion: (date: string) => void
@@ -70,9 +78,9 @@ export const useMobilityStore = create<MobilityState>()(
         set({ routine: exercises })
       },
 
-      addExercise(name, durationSec) {
+      addExercise(name, sets) {
         set(s => ({
-          routine: [...s.routine, { id: nanoid(), name, durationSec }],
+          routine: [...s.routine, { id: nanoid(), name, sets: sets && sets.length > 0 ? sets : singleTimedSet(30) }],
         }))
       },
 
@@ -81,7 +89,7 @@ export const useMobilityStore = create<MobilityState>()(
         if (!libEx) return
         set(s => {
           if (s.routine.some(e => e.id === libraryId)) return s
-          return { routine: [...s.routine, { id: libraryId, name: libEx.name, durationSec: libEx.durationSec }] }
+          return { routine: [...s.routine, { id: libraryId, name: libEx.name, sets: singleTimedSet(libEx.durationSec) }] }
         })
       },
 
@@ -98,10 +106,44 @@ export const useMobilityStore = create<MobilityState>()(
         })
       },
 
+      updateExercise(id, patch) {
+        set(s => ({
+          routine: s.routine.map(e => e.id === id ? { ...e, ...patch } : e),
+        }))
+      },
+
+      addSet(exerciseId, newSet) {
+        set(s => ({
+          routine: s.routine.map(e => {
+            if (e.id !== exerciseId) return e
+            const last = e.sets[e.sets.length - 1]
+            return { ...e, sets: [...e.sets, newSet ?? last ?? { durationSec: 30 }] }
+          }),
+        }))
+      },
+
+      updateSet(exerciseId, setIdx, patch) {
+        set(s => ({
+          routine: s.routine.map(e => {
+            if (e.id !== exerciseId) return e
+            return { ...e, sets: e.sets.map((st, i) => i === setIdx ? { ...patch } : st) }
+          }),
+        }))
+      },
+
+      removeSet(exerciseId, setIdx) {
+        set(s => ({
+          routine: s.routine.map(e => {
+            if (e.id !== exerciseId || e.sets.length <= 1) return e
+            return { ...e, sets: e.sets.filter((_, i) => i !== setIdx) }
+          }),
+        }))
+      },
+
       loadPreset(preset, mode) {
         const incoming: MobilityExercise[] = preset.exercises.map(pe => {
           const libEx = MOBILITY_LIBRARY.find(e => e.id === pe.exerciseId)
-          return { id: pe.exerciseId, name: libEx?.name ?? pe.exerciseId, durationSec: pe.durationSec }
+          return { id: pe.exerciseId, name: libEx?.name ?? pe.exerciseId, sets: singleTimedSet(pe.durationSec) }
         })
         set(s => {
           if (mode === 'replace') return { routine: incoming }
@@ -129,7 +171,9 @@ export const useMobilityStore = create<MobilityState>()(
             date,
             exerciseIds,
             currentIdx: 0,
+            currentSetIdx: 0,
             completedIds: [],
+            completedSets: {},
             totalElapsedSec: 0,
             exElapsedSec: 0,
           },
@@ -146,13 +190,25 @@ export const useMobilityStore = create<MobilityState>()(
     }),
     {
       name: 'wpt_mobility',
-      version: 2,
-      migrate(state: unknown, fromVersion: number) {
-        if (fromVersion === 1) {
-          return { ...(state as object), activeSession: null }
-        }
-        return state
-      },
+      version: 3,
+      migrate: migrateMobilityState,
     },
   ),
 )
+
+/** @internal Exported for testing — see src/store/__tests__/mobilityStore.test.ts */
+export function migrateMobilityState(state: unknown, fromVersion: number): unknown {
+  if (fromVersion <= 1) {
+    state = { ...(state as object), activeSession: null }
+  }
+  if (fromVersion <= 2) {
+    const s = state as { routine?: Array<{ id: string; name: string; durationSec?: number; sets?: MobilitySet[] }> }
+    const routine = (s.routine ?? []).map(e => ({
+      id: e.id,
+      name: e.name,
+      sets: e.sets ?? singleTimedSet(e.durationSec ?? 30),
+    }))
+    state = { ...(state as object), routine, activeSession: null }
+  }
+  return state
+}

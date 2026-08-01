@@ -6,27 +6,36 @@
 import { describe, it, expect } from 'vitest'
 import { reconcileCheckpoint } from '../MobilityTracker'
 import type { MobilitySessionCheckpoint } from '../../../store/mobilityStore'
+import type { MobilityRoutineExercise } from '../../../lib/mobilityLibrary'
 
 function cp(overrides: Partial<MobilitySessionCheckpoint> = {}): MobilitySessionCheckpoint {
   return {
     date: '2026-07-23',
     exerciseIds: ['a', 'b', 'c'],
     currentIdx: 1,
+    currentSetIdx: 0,
     completedIds: ['a'],
+    completedSets: { a: [0] },
     totalElapsedSec: 90,
     exElapsedSec: 20,
     ...overrides,
   }
 }
 
-const ex = (id: string) => ({ id })
+const ex = (id: string, setCount = 1): MobilityRoutineExercise => ({
+  id,
+  name: id,
+  sets: Array.from({ length: setCount }, () => ({ durationSec: 30 })),
+})
 
 describe('reconcileCheckpoint', () => {
   it('keeps progress unchanged when the routine is untouched', () => {
     const result = reconcileCheckpoint(cp(), [ex('a'), ex('b'), ex('c')])
     expect(result).toEqual({
       currentIdx: 1,
+      currentSetIdx: 0,
       completedIds: ['a'],
+      completedSets: { a: [0] },
       totalElapsedSec: 90,
       exElapsedSec: 20,
     })
@@ -41,15 +50,17 @@ describe('reconcileCheckpoint', () => {
   })
 
   it('drops completed ids for exercises that were removed', () => {
-    const withTwoDone = cp({ completedIds: ['a', 'b'], currentIdx: 2 })
+    const withTwoDone = cp({ completedIds: ['a', 'b'], completedSets: { a: [0], b: [0] }, currentIdx: 2 })
     const result = reconcileCheckpoint(withTwoDone, [ex('a'), ex('c')]) // "b" removed
     expect(result.completedIds).toEqual(['a'])
+    expect(result.completedSets).toEqual({ a: [0] })
   })
 
   it('advances past a removed current exercise to the next incomplete one', () => {
     // "b" (idx 1) was current and gets removed entirely
     const result = reconcileCheckpoint(cp(), [ex('a'), ex('c')])
     expect(result.currentIdx).toBe(1) // "c" — the next not-yet-completed exercise
+    expect(result.currentSetIdx).toBe(0)
     expect(result.exElapsedSec).toBe(0) // timer reset — it was for the removed exercise
     expect(result.totalElapsedSec).toBe(90) // total session time is preserved regardless
   })
@@ -59,6 +70,19 @@ describe('reconcileCheckpoint', () => {
     const result = reconcileCheckpoint(allButCurrentDone, [ex('a'), ex('c')]) // "b" removed
     expect(result.currentIdx).toBe(1) // last remaining index
     expect(result.exElapsedSec).toBe(0)
+  })
+
+  it('clamps the current set index when the live exercise has fewer sets than before', () => {
+    const midSet = cp({ currentIdx: 1, currentSetIdx: 2 })
+    const result = reconcileCheckpoint(midSet, [ex('a'), ex('b', 1), ex('c')]) // "b" now has only 1 set
+    expect(result.currentIdx).toBe(1)
+    expect(result.currentSetIdx).toBe(0)
+  })
+
+  it('drops completed set indices past the live exercise\'s set count', () => {
+    const withSets = cp({ completedIds: [], completedSets: { b: [0, 1, 2] }, currentIdx: 1, currentSetIdx: 1 })
+    const result = reconcileCheckpoint(withSets, [ex('a'), ex('b', 2), ex('c')])
+    expect(result.completedSets.b).toEqual([0, 1])
   })
 
   it('handles an empty routine without throwing', () => {

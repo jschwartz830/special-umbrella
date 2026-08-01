@@ -1,32 +1,34 @@
 /**
  * Tests for mobilityStore business logic.
- * Covers: addExercise, removeExercise, reorderExercise, logCompletion,
- * removeCompletion, default routine, addExerciseFromLibrary, loadPreset,
- * startSession, saveCheckpoint, clearSession.
+ * Covers: addExercise, removeExercise, reorderExercise, updateExercise,
+ * addSet/updateSet/removeSet, logCompletion, removeCompletion, default
+ * routine, addExerciseFromLibrary, loadPreset, startSession, saveCheckpoint,
+ * clearSession, and the v2->v3 migration to the sets-based model.
  *
  * The persist middleware is mocked as a pass-through so the store works
  * in a Node test environment without localStorage. This also bypasses the
- * v1→v2 migration, which adds { activeSession: null } to persisted state.
+ * v1->v2 migration, which adds { activeSession: null } to persisted state.
  * The migration itself is a trivial one-liner and is not separately tested here.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { singleTimedSet } from '../../lib/mobilityLibrary'
 
 vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
 }))
 
 // eslint-disable-next-line import/first
-import { useMobilityStore } from '../mobilityStore'
+import { useMobilityStore, migrateMobilityState } from '../mobilityStore'
 import type { MobilityCompletion, MobilitySessionCheckpoint } from '../mobilityStore'
 
 const DEFAULT_ROUTINE = [
-  { id: 'hip-90-90',       name: 'Hip 90/90',                  durationSec: 60 },
-  { id: 'worlds-greatest', name: "World's Greatest Stretch",    durationSec: 60 },
-  { id: 'cat-cow',         name: 'Cat-Cow',                    durationSec: 60 },
-  { id: 'thread-needle',   name: 'Thread the Needle',          durationSec: 45 },
-  { id: 'pigeon-pose',     name: 'Pigeon Pose',                durationSec: 60 },
-  { id: 'shoulder-cars',   name: 'Shoulder CARs',              durationSec: 30 },
-  { id: 'ankle-circles',   name: 'Ankle Circles',              durationSec: 30 },
+  { id: 'hip-90-90',       name: 'Hip 90/90',                  sets: singleTimedSet(60) },
+  { id: 'worlds-greatest', name: "World's Greatest Stretch",    sets: singleTimedSet(60) },
+  { id: 'cat-cow',         name: 'Cat-Cow',                    sets: singleTimedSet(60) },
+  { id: 'thread-needle',   name: 'Thread the Needle',          sets: singleTimedSet(45) },
+  { id: 'pigeon-pose',     name: 'Pigeon Pose',                sets: singleTimedSet(60) },
+  { id: 'shoulder-cars',   name: 'Shoulder CARs',              sets: singleTimedSet(30) },
+  { id: 'ankle-circles',   name: 'Ankle Circles',              sets: singleTimedSet(30) },
 ]
 
 function resetStore() {
@@ -53,16 +55,23 @@ describe('addExercise', () => {
   beforeEach(resetStore)
 
   it('appends a new exercise to the routine', () => {
-    useMobilityStore.getState().addExercise('Dead Hang', 30)
+    useMobilityStore.getState().addExercise('Dead Hang', singleTimedSet(30))
     const { routine } = useMobilityStore.getState()
     const added = routine[routine.length - 1]
     expect(added.name).toBe('Dead Hang')
-    expect(added.durationSec).toBe(30)
+    expect(added.sets[0].durationSec).toBe(30)
+  })
+
+  it('defaults to a single 30s timed set when no sets are given', () => {
+    useMobilityStore.getState().addExercise('Dead Hang')
+    const { routine } = useMobilityStore.getState()
+    const added = routine[routine.length - 1]
+    expect(added.sets).toEqual([{ durationSec: 30 }])
   })
 
   it('generates a unique id for the new exercise', () => {
-    useMobilityStore.getState().addExercise('A', 10)
-    useMobilityStore.getState().addExercise('B', 20)
+    useMobilityStore.getState().addExercise('A', singleTimedSet(10))
+    useMobilityStore.getState().addExercise('B', singleTimedSet(20))
     const { routine } = useMobilityStore.getState()
     const last2 = routine.slice(-2)
     expect(last2[0].id).toBeTruthy()
@@ -72,7 +81,7 @@ describe('addExercise', () => {
 
   it('increments the routine length by 1', () => {
     const before = useMobilityStore.getState().routine.length
-    useMobilityStore.getState().addExercise('Nordic Curl', 45)
+    useMobilityStore.getState().addExercise('Nordic Curl', singleTimedSet(45))
     expect(useMobilityStore.getState().routine).toHaveLength(before + 1)
   })
 })
@@ -137,6 +146,66 @@ describe('reorderExercise', () => {
     const len = useMobilityStore.getState().routine.length
     useMobilityStore.getState().reorderExercise(0, len - 1)
     expect(useMobilityStore.getState().routine).toHaveLength(len)
+  })
+})
+
+describe('updateExercise', () => {
+  beforeEach(resetStore)
+
+  it('patches name/restSec/notes for the matching exercise', () => {
+    const id = useMobilityStore.getState().routine[0].id
+    useMobilityStore.getState().updateExercise(id, { name: 'Renamed', restSec: 15, notes: 'go slow' })
+    const ex = useMobilityStore.getState().routine.find(e => e.id === id)!
+    expect(ex.name).toBe('Renamed')
+    expect(ex.restSec).toBe(15)
+    expect(ex.notes).toBe('go slow')
+  })
+
+  it('leaves other exercises untouched', () => {
+    const [first, second] = useMobilityStore.getState().routine
+    useMobilityStore.getState().updateExercise(first.id, { name: 'Changed' })
+    const after = useMobilityStore.getState().routine.find(e => e.id === second.id)!
+    expect(after.name).toBe(second.name)
+  })
+})
+
+describe('addSet / updateSet / removeSet', () => {
+  beforeEach(resetStore)
+
+  it('addSet duplicates the last set by default', () => {
+    const id = useMobilityStore.getState().routine[0].id // Hip 90/90, sets: [{durationSec:60}]
+    useMobilityStore.getState().addSet(id)
+    const ex = useMobilityStore.getState().routine.find(e => e.id === id)!
+    expect(ex.sets).toEqual([{ durationSec: 60 }, { durationSec: 60 }])
+  })
+
+  it('addSet uses the provided set when given', () => {
+    const id = useMobilityStore.getState().routine[0].id
+    useMobilityStore.getState().addSet(id, { reps: 10 })
+    const ex = useMobilityStore.getState().routine.find(e => e.id === id)!
+    expect(ex.sets[1]).toEqual({ reps: 10 })
+  })
+
+  it('updateSet replaces the set at the given index', () => {
+    const id = useMobilityStore.getState().routine[0].id
+    useMobilityStore.getState().updateSet(id, 0, { reps: 12 })
+    const ex = useMobilityStore.getState().routine.find(e => e.id === id)!
+    expect(ex.sets[0]).toEqual({ reps: 12 })
+  })
+
+  it('removeSet removes the set at the given index', () => {
+    const id = useMobilityStore.getState().routine[0].id
+    useMobilityStore.getState().addSet(id, { reps: 8 })
+    useMobilityStore.getState().removeSet(id, 0)
+    const ex = useMobilityStore.getState().routine.find(e => e.id === id)!
+    expect(ex.sets).toEqual([{ reps: 8 }])
+  })
+
+  it('removeSet is a no-op when only one set remains', () => {
+    const id = useMobilityStore.getState().routine[0].id
+    useMobilityStore.getState().removeSet(id, 0)
+    const ex = useMobilityStore.getState().routine.find(e => e.id === id)!
+    expect(ex.sets).toHaveLength(1)
   })
 })
 
@@ -212,11 +281,11 @@ describe('addExerciseFromLibrary', () => {
     expect(added.name).toBe('Wall Slides')
   })
 
-  it('uses the library durationSec for the added exercise', () => {
+  it('uses the library durationSec as a single timed set', () => {
     useMobilityStore.getState().addExerciseFromLibrary('lib-wall-slides')
     const { routine } = useMobilityStore.getState()
     const added = routine[routine.length - 1]
-    expect(added.durationSec).toBe(45)
+    expect(added.sets).toEqual([{ durationSec: 45 }])
   })
 
   it('increments routine length by 1 for a new exercise', () => {
@@ -267,7 +336,7 @@ describe('loadPreset', () => {
   it('replace mode uses preset durationSec, not library default', () => {
     useMobilityStore.getState().loadPreset(testPreset, 'replace')
     const ex = useMobilityStore.getState().routine[0]
-    expect(ex.durationSec).toBe(90)  // preset value, not library's 60
+    expect(ex.sets).toEqual([{ durationSec: 90 }]) // preset value, not library's 60
   })
 
   it('append mode adds exercises not already in the routine', () => {
@@ -295,7 +364,7 @@ describe('loadPreset', () => {
     const ex = useMobilityStore.getState().routine[0]
     expect(ex.id).toBe('custom-unknown')
     expect(ex.name).toBe('custom-unknown')
-    expect(ex.durationSec).toBe(30)
+    expect(ex.sets).toEqual([{ durationSec: 30 }])
   })
 })
 
@@ -312,14 +381,18 @@ describe('startSession', () => {
     expect(s?.exerciseIds).toEqual(ids)
   })
 
-  it('initializes currentIdx to 0', () => {
+  it('initializes currentIdx and currentSetIdx to 0', () => {
     useMobilityStore.getState().startSession('2026-07-01', ['hip-90-90'])
-    expect(useMobilityStore.getState().activeSession?.currentIdx).toBe(0)
+    const s = useMobilityStore.getState().activeSession
+    expect(s?.currentIdx).toBe(0)
+    expect(s?.currentSetIdx).toBe(0)
   })
 
-  it('initializes completedIds to an empty array', () => {
+  it('initializes completedIds and completedSets to empty', () => {
     useMobilityStore.getState().startSession('2026-07-01', ['hip-90-90'])
-    expect(useMobilityStore.getState().activeSession?.completedIds).toEqual([])
+    const s = useMobilityStore.getState().activeSession
+    expect(s?.completedIds).toEqual([])
+    expect(s?.completedSets).toEqual({})
   })
 
   it('initializes totalElapsedSec and exElapsedSec to 0', () => {
@@ -347,7 +420,9 @@ describe('saveCheckpoint', () => {
     date: '2026-07-01',
     exerciseIds: ['hip-90-90', 'cat-cow', 'pigeon-pose'],
     currentIdx: 1,
+    currentSetIdx: 0,
     completedIds: ['hip-90-90'],
+    completedSets: { 'hip-90-90': [0] },
     totalElapsedSec: 75,
     exElapsedSec: 12.5,
   }
@@ -403,5 +478,39 @@ describe('clearSession', () => {
     useMobilityStore.getState().clearSession()
     expect(useMobilityStore.getState().routine).toHaveLength(DEFAULT_ROUTINE.length)
     expect(useMobilityStore.getState().completions['2026-07-01']).toEqual(completion)
+  })
+})
+
+// ── v2 -> v3 migration ──────────────────────────────────────────────────────
+
+describe('migrateMobilityState (v2 -> v3)', () => {
+  it('converts legacy durationSec routine items into a single timed set', () => {
+    const legacyState = {
+      routine: [{ id: 'hip-90-90', name: 'Hip 90/90', durationSec: 60 }],
+      completions: {},
+      activeSession: null,
+    }
+    const migrated = migrateMobilityState(legacyState, 2) as { routine: Array<{ sets: Array<{ durationSec?: number }> }> }
+    expect(migrated.routine[0].sets).toEqual([{ durationSec: 60 }])
+  })
+
+  it('nulls out an in-flight activeSession from before v3', () => {
+    const legacyState = {
+      routine: [],
+      completions: {},
+      activeSession: { date: '2026-01-01', exerciseIds: [], currentIdx: 0, completedIds: [], totalElapsedSec: 0, exElapsedSec: 0 },
+    }
+    const migrated = migrateMobilityState(legacyState, 2) as { activeSession: unknown }
+    expect(migrated.activeSession).toBeNull()
+  })
+
+  it('leaves an already-migrated (v3) routine untouched', () => {
+    const state = {
+      routine: [{ id: 'a', name: 'A', sets: [{ reps: 10 }] }],
+      completions: {},
+      activeSession: null,
+    }
+    const migrated = migrateMobilityState(state, 3) as typeof state
+    expect(migrated).toBe(state)
   })
 })

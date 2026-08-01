@@ -127,5 +127,19 @@ export function buildLastSessionSummary(
     if (swimPace != null) parts.push(formatSwimPace(swimPace))
     if (parts.length) return `Last: ${parts.join(' · ')}`
   }
+  // Mobility: exercise/set count and total duration when available
+  const mobility = outcome.mobilityActual
+  if (mobility) {
+    const doneExercises = mobility.exercises.filter(ex => ex.sets.some(s => s.completed))
+    if (doneExercises.length > 0) {
+      const doneSets = doneExercises.flatMap(ex => ex.sets).filter(s => s.completed).length
+      const parts = [
+        `${doneExercises.length} exercise${doneExercises.length === 1 ? '' : 's'}`,
+        `${doneSets} set${doneSets === 1 ? '' : 's'}`,
+      ]
+      if (outcome.durationActualMin != null) parts.push(`${outcome.durationActualMin} min`)
+      return `Last: ${parts.join(' · ')}`
+    }
+  }
   return null
 }
