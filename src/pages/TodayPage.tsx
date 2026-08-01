@@ -712,7 +712,6 @@ export function TodayPage() {
               <div className="space-y-0.5">
                 {lastSessionSummary && (
                   <p className="text-xs text-slate-500 truncate">
-                    Last:{' '}
                     {lastSessionSummary.endsWith(' · PB')
                       ? <>{lastSessionSummary.slice(0, -5)}<span className="text-amber-400 font-medium"> · PB</span></>
                       : lastSessionSummary}

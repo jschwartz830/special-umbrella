@@ -78,7 +78,7 @@ export function TodayUpcomingList({
                     )}
                     {upcomingSessionSummaries[rd.calendarDate] && (
                       <p className="text-[10px] text-slate-500 mt-0.5 ml-1 truncate">
-                        Last: {upcomingSessionSummaries[rd.calendarDate]}
+                        {upcomingSessionSummaries[rd.calendarDate]}
                       </p>
                     )}
                   </>
