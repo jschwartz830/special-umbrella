@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Plus, Trash2, Timer, Hash, Info, Check } from '
 import {
   MOBILITY_LIBRARY,
   CATEGORY_LABELS,
+  normalizeMobilityRoutine,
   singleTimedSet,
   summarizeMobilitySets,
   type MobilityCategory,
@@ -31,7 +32,7 @@ interface RowProps extends MobilityRoutineCallbacks {
 }
 
 export function MobilityExerciseRow({
-  exercise: ex,
+  exercise: exRaw,
   onUpdateExercise,
   onAddSet,
   onUpdateSet,
@@ -45,6 +46,7 @@ export function MobilityExerciseRow({
   dragHandle,
 }: RowProps) {
   const [expanded, setExpanded] = useState(false)
+  const ex = normalizeMobilityRoutine([exRaw])[0]
 
   function setMode(setIdx: number, mode: 'timed' | 'reps') {
     if (mode === 'timed') onUpdateSet(ex.id, setIdx, { durationSec: ex.sets[setIdx].durationSec ?? 30 })

@@ -63,14 +63,38 @@ export function formatMobilityDuration(sec: number): string {
   return `${m}m ${r}s`
 }
 
-/** Total duration of a routine exercise's timed sets, in seconds (rep-only sets contribute 0). */
-export function totalTimedSec(sets: MobilitySet[]): number {
-  return sets.reduce((sum, s) => sum + (s.durationSec ?? 0), 0)
+/**
+ * Total duration of a routine exercise's timed sets, in seconds (rep-only sets contribute 0).
+ * Tolerates missing/malformed `sets` (e.g. stale cached data from before the sets-based
+ * routine model shipped) by treating it as empty rather than throwing.
+ */
+export function totalTimedSec(sets: MobilitySet[] | undefined | null): number {
+  if (!Array.isArray(sets)) return 0
+  return sets.reduce((sum, s) => sum + (s?.durationSec ?? 0), 0)
 }
 
-/** Short human summary of a routine exercise's dosing, e.g. "3 sets · 45s hold" or "2 sets × 10 reps". */
-export function summarizeMobilitySets(sets: MobilitySet[]): string {
-  if (sets.length === 0) return ''
+/**
+ * Guarantees every exercise in a routine has a valid, non-empty `sets` array — defends
+ * against stale/malformed data (e.g. localStorage written before the sets-based routine
+ * model shipped, or a mid-deploy cache skew) reaching code that assumes the current shape.
+ */
+export function normalizeMobilityRoutine(
+  routine: MobilityRoutineExercise[] | undefined | null,
+): MobilityRoutineExercise[] {
+  if (!Array.isArray(routine)) return []
+  return routine.map(ex => {
+    if (Array.isArray(ex.sets) && ex.sets.length > 0) return ex
+    const legacyDurationSec = (ex as unknown as { durationSec?: number }).durationSec
+    return { ...ex, sets: singleTimedSet(legacyDurationSec ?? 30) }
+  })
+}
+
+/**
+ * Short human summary of a routine exercise's dosing, e.g. "3 sets · 45s hold" or "2 sets × 10 reps".
+ * Tolerates missing/malformed `sets` — see totalTimedSec.
+ */
+export function summarizeMobilitySets(sets: MobilitySet[] | undefined | null): string {
+  if (!Array.isArray(sets) || sets.length === 0) return ''
   const allTimed = sets.every(s => s.durationSec != null)
   const allReps = sets.every(s => s.reps != null)
   const setLabel = `${sets.length} set${sets.length === 1 ? '' : 's'}`

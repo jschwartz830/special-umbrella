@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Settings2, ChevronLeft, Trash2, Check, Volume2, VolumeX, ArrowLeftRight } from 'lucide-react'
 import type { MobilitySessionCheckpoint } from '../../store/mobilityStore'
-import { MOBILITY_LIBRARY, isBilateralExercise, summarizeMobilitySets, type MobilityRoutineExercise } from '../../lib/mobilityLibrary'
+import { MOBILITY_LIBRARY, isBilateralExercise, normalizeMobilityRoutine, summarizeMobilitySets, type MobilityRoutineExercise } from '../../lib/mobilityLibrary'
 import { primeAudio, playExerciseEndSound, playSwitchSidesSound, playSessionCompleteSound } from '../../lib/timerSounds'
 
 function fmtTime(sec: number): string {
@@ -27,7 +27,7 @@ export interface MobilityLoggedCompletion {
 // routine, or advanced to the next not-yet-completed exercise if it was removed.
 export function reconcileCheckpoint(
   cp: MobilitySessionCheckpoint,
-  liveRoutine: MobilityRoutineExercise[],
+  liveRoutineRaw: MobilityRoutineExercise[],
 ): {
   currentIdx: number
   currentSetIdx: number
@@ -36,6 +36,7 @@ export function reconcileCheckpoint(
   totalElapsedSec: number
   exElapsedSec: number
 } {
+  const liveRoutine = normalizeMobilityRoutine(liveRoutineRaw)
   const liveIds = liveRoutine.map(e => e.id)
   const completedIds = cp.completedIds.filter(id => liveIds.includes(id))
 
@@ -87,7 +88,7 @@ interface Props {
 export function MobilityTracker({
   today,
   title = 'Daily Routine',
-  routine,
+  routine: routineRaw,
   activeSession,
   soundEnabled,
   setSoundEnabled,
@@ -98,6 +99,10 @@ export function MobilityTracker({
   onClose,
   onManageRoutine,
 }: Props) {
+  // Defends against stale/malformed persisted routine data (e.g. from before
+  // the sets-based model shipped) — see normalizeMobilityRoutine.
+  const routine = normalizeMobilityRoutine(routineRaw)
+
   // Validate checkpoint: must match today's date. The routine's exercises may
   // have been added/removed/reordered since the session started (e.g. via
   // "Manage routine") — reconcile() below re-maps progress onto the live

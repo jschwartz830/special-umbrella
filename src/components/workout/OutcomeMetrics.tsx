@@ -16,10 +16,11 @@ export function OutcomeMetrics({
     ?.flatMap(ex => ex.sets)
     .filter(s => s.completed).length ?? 0
 
-  const mobilitySets = outcome.mobilityActual?.exercises.flatMap(ex => ex.sets) ?? []
+  const mobilityExercises = outcome.mobilityActual?.exercises ?? []
+  const mobilitySets = mobilityExercises.flatMap(ex => ex.sets ?? [])
   const mobilitySetCount = mobilitySets.filter(s => s.completed).length
-  const mobilityExerciseCount = outcome.mobilityActual?.exercises
-    .filter(ex => ex.sets.some(s => s.completed)).length ?? 0
+  const mobilityExerciseCount = mobilityExercises
+    .filter(ex => (ex.sets ?? []).some(s => s.completed)).length
 
   return (
     <div className="space-y-1.5 py-1">
