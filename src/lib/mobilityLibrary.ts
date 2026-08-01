@@ -142,6 +142,30 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     description: 'Pin a lacrosse ball between the back of the shoulder (rotator cuff/posterior capsule) and a wall or the floor. Apply sustained pressure and roll slowly to release tension. 5 minutes per side.',
     bilateral: true,
   },
+  {
+    id: 'lib-banded-wall-slide-w-to-y',
+    name: 'Banded Wall Slide (W to Y)',
+    categories: ['scapula-shoulder', 'posture'],
+    durationSec: 45,
+    description: 'Loop a flat band around both wrists, palms facing each other, elbows bent 90° in a "W." Slide hands up the wall against band resistance, opening arms into a V and finishing overhead in a Y. Builds lower trap/serratus strength with external-rotation resistance.',
+  },
+  {
+    id: 'lib-overhead-kb-carry',
+    name: 'Single-Arm Overhead Kettlebell Carry',
+    categories: ['scapula-shoulder'],
+    durationSec: 60,
+    description: 'Press a kettlebell overhead with arm locked straight and shoulder actively retracted/depressed. Walk while keeping the bell stacked over the shoulder without shrugging. Builds overhead shoulder stability and scapular control under load.',
+    bilateral: true,
+  },
+  {
+    id: 'lib-kb-arm-bar',
+    name: 'Bottoms-Up Kettlebell Arm Bar Roll',
+    categories: ['scapula-shoulder'],
+    durationSec: 60,
+    description: 'Lie on back, knees bent, holding a kettlebell bottoms-up directly over the shoulder with arm straight and shoulder retracted. Roll toward the opposite side, keeping the arm vertical by actively repacking/retracting the shoulder blade as you move. Trains shoulder stability and control through rotation.',
+    note: 'Move slowly and only as far as the shoulder stays pain-free and the arm stays vertical.',
+    bilateral: true,
+  },
 
   // ── Ankle & Achilles ──────────────────────────────────────────────────
   {
