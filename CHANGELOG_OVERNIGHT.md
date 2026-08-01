@@ -2,6 +2,47 @@
 
 ---
 
+## Pass 88 — 2026-08-01 (branch `claude/serene-cori-bl4pj8`)
+
+### [566dbd7] fix: remove duplicate 'Last:' prefix in session summary display
+
+**Summary**: `buildLastSessionSummary` (lib/sessionSummary.ts) already returns
+strings prefixed with `"Last: "` (e.g. `"Last: 3×8 @ 135 lb Bench Press"`).
+Both render sites in TodayPage and TodayUpcomingList also prepended the literal
+`"Last: "` in their JSX, producing `"Last: Last: …"` on screen for any user
+who had previous session data logged for that plan day.
+
+**Files changed**:
+- `src/pages/TodayPage.tsx` — removed `Last:{' '}` text node from the pending
+  card last-session paragraph.
+- `src/components/today/TodayUpcomingList.tsx` — removed `"Last: "` literal
+  from the upcoming session summary paragraph.
+
+**Risk**: Low. No logic changes; only two rendered text literals removed.
+
+---
+
+### [4b3b73d] refactor(ARCH-1): extract TodayPendingCard from TodayPage
+
+**Summary**: The ~85-line pending workout compact card (the card shown on Today
+when the primary plan workout is not yet logged) is now a standalone component
+`src/components/today/TodayPendingCard.tsx`. The `previewExpanded` useState
+hook, which controlled the "Preview exercises" toggle, moved inside the new
+component. Three now-unused imports were removed from TodayPage (`ChevronDown`,
+`ChevronUp`, `WorkoutSlotDetails`). TodayPage.tsx shrinks from 1,463 → 1,395
+lines (−68).
+
+**Files changed**:
+- `src/components/today/TodayPendingCard.tsx` (new) — 112-line pure component
+  with 11 typed props and internal `previewExpanded` state.
+- `src/pages/TodayPage.tsx` — import added, pending card block replaced with
+  `<TodayPendingCard ... />`, `previewExpanded` state and three imports removed.
+
+**Risk**: Low. Pure structural refactor. TypeScript verified clean. All 1,126
+tests pass unchanged.
+
+---
+
 ## Pass 87 — 2026-07-31 (branch `claude/serene-cori-02lc31`)
 
 ### [be0e55d] refactor(arch): extract TodayMobilitySection and TodayPlanProgressModal (ARCH-1 progress)
