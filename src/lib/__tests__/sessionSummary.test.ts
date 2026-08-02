@@ -725,4 +725,109 @@ describe('buildLastSessionSummary', () => {
     }
     expect(buildLastSessionSummary(outcome)).toBe('Last: 1000 m · 30 min · 2:00 /100m')
   })
+
+  it('formats mobility outcome with exercise count, set count, and duration', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T09:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: 12,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      mobilityActual: {
+        exercises: [
+          {
+            exercise: 'Hip 90/90',
+            sets: [
+              { targetDurationSec: 60, actualDurationSec: 60, targetReps: null, actualReps: null, completed: true },
+              { targetDurationSec: 60, actualDurationSec: 60, targetReps: null, actualReps: null, completed: true },
+            ],
+          },
+          {
+            exercise: "World's Greatest Stretch",
+            sets: [
+              { targetDurationSec: 60, actualDurationSec: 60, targetReps: null, actualReps: null, completed: true },
+            ],
+          },
+        ],
+      },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 2 exercises · 3 sets · 12 min')
+  })
+
+  it('formats mobility outcome with singular exercise/set labels', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T09:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      mobilityActual: {
+        exercises: [
+          {
+            exercise: 'Cat-Cow',
+            sets: [
+              { targetDurationSec: 60, actualDurationSec: 60, targetReps: null, actualReps: null, completed: true },
+            ],
+          },
+        ],
+      },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 1 exercise · 1 set')
+  })
+
+  it('returns null for mobility outcome with no completed exercises', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'skipped',
+      completedAt: '2026-05-01T09:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: null,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      mobilityActual: {
+        exercises: [
+          {
+            exercise: 'Hip 90/90',
+            sets: [
+              { targetDurationSec: 60, actualDurationSec: null, targetReps: null, actualReps: null, completed: false },
+            ],
+          },
+        ],
+      },
+    }
+    expect(buildLastSessionSummary(outcome)).toBeNull()
+  })
+
+  it('excludes non-completed sets from the mobility set count', () => {
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'partially_completed',
+      completedAt: '2026-05-01T09:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: 5,
+      notes: null,
+      runActual: null,
+      swimActual: null,
+      mobilityActual: {
+        exercises: [
+          {
+            exercise: 'Hip 90/90',
+            sets: [
+              { targetDurationSec: 60, actualDurationSec: 60, targetReps: null, actualReps: null, completed: true },
+              { targetDurationSec: 60, actualDurationSec: null, targetReps: null, actualReps: null, completed: false },
+            ],
+          },
+        ],
+      },
+    }
+    // 1 exercise done (has at least one completed set), 1 set completed (not 2)
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 1 exercise · 1 set · 5 min')
+  })
 })
