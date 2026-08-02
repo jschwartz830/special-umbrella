@@ -4,11 +4,8 @@ import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
   SkipForward,
   Coffee,
-  ChevronRight,
-  ChevronLeft,
   Shuffle,
   Pencil,
-  ListPlus,
   RotateCcw,
   Info,
   PlusCircle,
@@ -60,6 +57,7 @@ import { TodayHabitSummary } from '../components/today/TodayHabitSummary'
 import { TodayMobilitySection } from '../components/today/TodayMobilitySection'
 import { TodayPendingCard } from '../components/today/TodayPendingCard'
 import { TodayPlanProgressModal } from '../components/today/TodayPlanProgressModal'
+import { TodayRotationModals } from '../components/today/TodayRotationModals'
 import { SwipeToDelete } from '../components/shared/SwipeToDelete'
 import { WORKOUT_META } from '../lib/constants'
 import { estimateRunDurationMin } from '../lib/estimateRunDuration'
@@ -1336,159 +1334,34 @@ export function TodayPage() {
         </Modal>
       )}
 
-      {/* Override modal */}
-      {showOverride && (
-        <Modal title="Override rotation" onClose={() => setShowOverride(false)}>
-          <div className="space-y-2">
-            <button
-              onClick={() => { actions.advance(); setShowOverride(false) }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
-            >
-              <ChevronRight size={18} className="text-sky-400" />
-              <div>
-                <p className="text-sm font-medium text-white">Advance one day</p>
-                <p className="text-xs text-slate-400">Move to the next workout in the rotation</p>
-              </div>
-            </button>
-            <button
-              onClick={() => { actions.goBack(); setShowOverride(false) }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
-            >
-              <ChevronLeft size={18} className="text-sky-400" />
-              <div>
-                <p className="text-sm font-medium text-white">Go back one day</p>
-                <p className="text-xs text-slate-400">Return to the previous workout in the rotation</p>
-              </div>
-            </button>
-            <button
-              onClick={() => { setShowOverride(false); setShowJump(true) }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
-            >
-              <ListPlus size={18} className="text-sky-400" />
-              <div>
-                <p className="text-sm font-medium text-white">Jump to specific day</p>
-                <p className="text-xs text-slate-400">Pick any day from the rotation</p>
-              </div>
-            </button>
-            {isPending && (
-              <button
-                onClick={() => { handleSkip(); setShowOverride(false) }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
-              >
-                <SkipForward size={18} className="text-slate-400" />
-                <div>
-                  <p className="text-sm font-medium text-white">Skip today</p>
-                  <p className="text-xs text-slate-400">Mark today as skipped and move on</p>
-                </div>
-              </button>
-            )}
-          </div>
-        </Modal>
-      )}
-
-      {/* Add Workout picker */}
-      {showAddWorkout && (
-        <Modal title="Add Workout" onClose={() => setShowAddWorkout(false)}>
-          <div className="space-y-2">
-            <button
-              onClick={() => { setShowAddWorkout(false); setShowAddFromPlan(true) }}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
-            >
-              <PlusCircle size={18} className="text-sky-400 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-white">Add from plan</p>
-                <p className="text-xs text-slate-400">Pick any workout from your plan to stack today</p>
-              </div>
-            </button>
-            {adHocWorkoutState === 'hidden' && !showAdHocOutcome && (
-              <button
-                onClick={() => {
-                  setAdHocName('')
-                  setAdHocType('weights')
-                  setAdHocModalOpen(true)
-                  setShowAddWorkout(false)
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-left transition-colors"
-              >
-                <ListPlus size={18} className="text-sky-400 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-white">Add ad hoc</p>
-                  <p className="text-xs text-slate-400">Log a custom workout outside your plan</p>
-                </div>
-              </button>
-            )}
-          </div>
-        </Modal>
-      )}
-
-      {/* Add from plan picker */}
-      {showAddFromPlan && (
-        <Modal title="Add from plan" onClose={() => setShowAddFromPlan(false)}>
-          <div className="space-y-2">
-            {plan.days.map((day, idx) => {
-              const isScheduled = idx === todayResolved.planDayIndex
-              const isAlreadyAdded = idx === addFromPlanIdx
-              return (
-                <button
-                  key={day.id}
-                  disabled={isScheduled}
-                  onClick={() => {
-                    setAddFromPlanIdx(isAlreadyAdded ? null : idx)
-                    setShowAddFromPlan(false)
-                  }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors ${
-                    isScheduled
-                      ? 'bg-slate-800/50 opacity-40 cursor-not-allowed'
-                      : isAlreadyAdded
-                      ? 'bg-sky-500/20 border border-sky-500/50'
-                      : 'bg-slate-700 hover:bg-slate-600'
-                  }`}
-                >
-                  <span className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0">
-                    {idx + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${isScheduled ? 'text-slate-400' : 'text-white'}`}>{day.label}</p>
-                    <p className="text-xs text-slate-400 truncate">{day.slots.map(s => s.name).join(' + ')}</p>
-                  </div>
-                  {isScheduled && <span className="text-xs text-slate-500 flex-shrink-0">Scheduled</span>}
-                  {isAlreadyAdded && <span className="text-xs text-sky-400 font-medium flex-shrink-0">Added</span>}
-                </button>
-              )
-            })}
-          </div>
-        </Modal>
-      )}
-
-      {/* Jump modal */}
-      {showJump && (
-        <Modal title="Change Workout" onClose={() => setShowJump(false)}>
-          <div className="space-y-2">
-            {plan.days.map((day, idx) => (
-              <button
-                key={day.id}
-                onClick={() => { actions.jumpTo(idx); setShowJump(false) }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors ${
-                  idx === todayResolved.planDayIndex
-                    ? 'bg-sky-500/20 border border-sky-500/50'
-                    : 'bg-slate-700 hover:bg-slate-600'
-                }`}
-              >
-                <span className="w-6 h-6 rounded-full bg-slate-600 flex items-center justify-center text-xs font-bold text-slate-300">
-                  {idx + 1}
-                </span>
-                <div>
-                  <p className="text-sm font-medium text-white">{day.label}</p>
-                  <p className="text-xs text-slate-400">{day.slots.map(s => s.name).join(' + ')}</p>
-                </div>
-                {idx === todayResolved.planDayIndex && (
-                  <span className="ml-auto text-xs text-sky-400 font-medium">Current</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </Modal>
-      )}
+      <TodayRotationModals
+        showOverride={showOverride}
+        onCloseOverride={() => setShowOverride(false)}
+        onAdvance={() => { actions.advance(); setShowOverride(false) }}
+        onGoBack={() => { actions.goBack(); setShowOverride(false) }}
+        onGoToJump={() => { setShowOverride(false); setShowJump(true) }}
+        onSkipToday={() => { handleSkip(); setShowOverride(false) }}
+        isPending={isPending}
+        showJump={showJump}
+        onCloseJump={() => setShowJump(false)}
+        onJumpTo={(idx) => { actions.jumpTo(idx); setShowJump(false) }}
+        showAddWorkout={showAddWorkout}
+        onCloseAddWorkout={() => setShowAddWorkout(false)}
+        onGoToAddFromPlan={() => { setShowAddWorkout(false); setShowAddFromPlan(true) }}
+        canAddAdHoc={adHocWorkoutState === 'hidden' && !showAdHocOutcome}
+        onOpenAdHoc={() => {
+          setAdHocName('')
+          setAdHocType('weights')
+          setAdHocModalOpen(true)
+          setShowAddWorkout(false)
+        }}
+        showAddFromPlan={showAddFromPlan}
+        onCloseAddFromPlan={() => setShowAddFromPlan(false)}
+        addFromPlanIdx={addFromPlanIdx}
+        onSelectFromPlan={(idx) => { setAddFromPlanIdx(idx); setShowAddFromPlan(false) }}
+        planDays={plan.days}
+        currentPlanDayIndex={todayResolved.planDayIndex}
+      />
     </div>
   )
 }
