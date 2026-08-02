@@ -1,5 +1,51 @@
 # Implementation Plan
 
+## Pass 89 — 2026-08-02 (branch `claude/serene-cori-uv7ebe`)
+
+### Baseline
+
+- Branch started from `main` after PRs #219–#221 (mobility feature additions) merged since pass 88.
+- **1177 tests passing** across 34 test files at start of pass (mobility features added 51 tests between passes).
+- **1181 tests passing** at end of pass (+4 new tests).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 89)
+
+Two-change pass focused on ARCH-1 continuation and test coverage gap closure. The
+TodayPage grew to 1,494 lines because the mobility workout type feature (PRs #219–#221)
+added new modal UI inline. The 4 rotation-override modals were extracted to a new
+`TodayRotationModals` component, bringing TodayPage back to 1,367 lines. A test
+gap for the `buildLastSessionSummary` mobility path was also closed.
+
+### Bugs Fixed This Pass
+
+None. Bug scan focused on the new mobility feature code path (mobilityExercises array
+handling, set completion logic) — no correctness bugs found in the path from
+`buildLastSessionSummary` through to display.
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| ARCH-1 (continued) | `c33f341` | `TodayRotationModals.tsx` (new), `TodayPage.tsx` | Extracted the Override, Jump-to-day, Add Workout, and Add-from-Plan modals (~150 lines of JSX) into `src/components/today/TodayRotationModals.tsx` with a typed `TodayRotationModalsProps` interface (~20 props). Three now-unused lucide-react icon imports (`ChevronRight`, `ChevronLeft`, `ListPlus`) removed from TodayPage. TodayPage reduced from 1,494 → 1,367 lines (−127). |
+
+### Tests Added This Pass
+
+| File | Tests Added | Description |
+|---|---|---|
+| `sessionSummary.test.ts` | +4 | Mobility outcome path for `buildLastSessionSummary`: (1) multi-exercise with duration; (2) singular labels (1 exercise, 1 set, no duration); (3) all-skipped returns `null`; (4) partial completion counts only completed sets |
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|---|---|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now 1,367 lines. Next candidates: ad-hoc workout overlay state group or the active-workout entry-point button block. |
+| P2 | `updateEntryAction` historyStore: changing away from `day_off` without a `planDayIndex` leaves the entry with `planDayIndex: undefined`. |
+| P3 | Remove or document `getFutureProjection` dead code in `calendarProjection.ts`. |
+| P4 | Add render-level tests for `TodayRotationModals`, `TodayPendingCard`, `TodayUpcomingList` — all pure-presentational, good RTL candidates. |
+
+---
+
 ## Pass 88 — 2026-08-01 (branch `claude/serene-cori-bl4pj8`)
 
 ### Baseline

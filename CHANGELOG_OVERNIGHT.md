@@ -2,6 +2,28 @@
 
 ---
 
+## Pass 89 — 2026-08-02 (branch `claude/serene-cori-uv7ebe`)
+
+### Change 1: ARCH-1 — Extract TodayRotationModals
+
+- **Commit**: `c33f341`
+- **What changed**: Created `src/components/today/TodayRotationModals.tsx` containing the Override rotation modal, Jump-to-day modal, Add Workout picker modal, and Add-from-Plan picker modal. All four were previously inline JSX in `TodayPage.tsx`. Props interface `TodayRotationModalsProps` defines ~20 typed props covering all state booleans, callbacks, and shared data (`planDays`, `currentPlanDayIndex`). Three lucide-react icon imports (`ChevronRight`, `ChevronLeft`, `ListPlus`) removed from `TodayPage.tsx` as they are now only needed by the new component. TodayPage reduced from 1,494 → 1,367 lines (−127).
+- **Why it matters**: TodayPage grew back above 1,400 lines when the mobility feature (PRs #219–#221) added new inline modal UI. Extracting the rotation-override modals — a self-contained logical group — restores progress on the ARCH-1 decomposition goal. The 4 modals share data (`planDays`, `currentPlanDayIndex`) and are only conditionally rendered, making them a clean single-responsibility unit.
+- **Files changed**: `src/components/today/TodayRotationModals.tsx` (new), `src/pages/TodayPage.tsx`
+- **Risks / tradeoffs**: Pure structural refactor — no logic moved, no state ownership changed. The `onSelectFromPlan` handler closes the modal on selection; this co-location of state mutation and UI close remained in TodayPage (`setAddFromPlanIdx(idx); setShowAddFromPlan(false)`) and is passed down as a single callback, preserving the original behavior.
+- **Rollback**: Revert `c33f341`. TodayPage returns to 1,494 lines, TodayRotationModals.tsx can be deleted.
+
+### Change 2: Tests — Add mobility outcome coverage for buildLastSessionSummary
+
+- **Commit**: `d0057f2`
+- **What changed**: Added 4 test cases to `src/lib/__tests__/sessionSummary.test.ts` targeting the mobility path of `buildLastSessionSummary`. Tests cover: (1) multi-exercise mobility with duration → `'Last: 2 exercises · 3 sets · 12 min'`; (2) singular labels (1 exercise, 1 set, no duration) → `'Last: 1 exercise · 1 set'`; (3) all-skipped mobility outcome → `null`; (4) partial completion where only completed sets are counted → `'Last: 1 exercise · 1 set · 5 min'`.
+- **Why it matters**: The mobility workout type was added in PRs #219–#221 with a full outcome logging path, but `sessionSummary.test.ts` had zero test cases for the mobility branch. Any regression in set-completion counting, duration formatting, or singular/plural labeling would be undetected. The 4 tests pin the exact output strings and edge cases.
+- **Files changed**: `src/lib/__tests__/sessionSummary.test.ts`
+- **Risks / tradeoffs**: Tests only — no production logic changed. All 4 tests pass immediately, confirming the existing `buildLastSessionSummary` mobility implementation is correct.
+- **Rollback**: Revert `d0057f2`. No production behavior changes.
+
+---
+
 ## Pass 88 — 2026-08-01 (branch `claude/serene-cori-bl4pj8`)
 
 ### [566dbd7] fix: remove duplicate 'Last:' prefix in session summary display
