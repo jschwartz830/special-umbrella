@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2, Timer, Hash, Info, Check, BookmarkPlus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Timer, Hash, Info, Check, BookmarkPlus, GripVertical } from 'lucide-react'
 import {
   MOBILITY_LIBRARY,
   CATEGORY_LABELS,
@@ -34,6 +34,42 @@ interface RowProps extends MobilityRoutineCallbacks {
   dragHandle?: React.ReactNode
 }
 
+function MobilityDoseInput({ value, min, max, onCommit }: {
+  value: number
+  min: number
+  max: number
+  onCommit: (value: number) => void
+}) {
+  const [draft, setDraft] = useState(String(value))
+
+  useEffect(() => setDraft(String(value)), [value])
+
+  function commit() {
+    const parsed = Number.parseInt(draft, 10)
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value))
+      return
+    }
+    const next = Math.min(max, Math.max(min, parsed))
+    setDraft(String(next))
+    onCommit(next)
+  }
+
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={min}
+      max={max}
+      value={draft}
+      onChange={event => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur() }}
+      className="w-16 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+    />
+  )
+}
+
 export function MobilityExerciseRow({
   exercise: exRaw,
   onUpdateExercise,
@@ -58,16 +94,17 @@ export function MobilityExerciseRow({
 
   return (
     <div
-      draggable={draggable}
-      onDragStart={onDragStart}
       onDragOver={e => { if (onDragOver) { e.preventDefault(); onDragOver() } }}
-      onDragEnd={onDragEnd}
       className={`rounded-xl border bg-slate-800/80 transition-colors ${
         dragActive ? 'border-sky-500/50 opacity-60' : 'border-slate-700/60'
       }`}
     >
       <div className="flex items-center gap-3 px-3 py-3">
-        {dragHandle}
+        {draggable && (
+          <span draggable onDragStart={onDragStart} onDragEnd={onDragEnd}>
+            {dragHandle ?? <GripVertical size={16} className="text-slate-600 flex-shrink-0 cursor-grab active:cursor-grabbing" />}
+          </span>
+        )}
         <button
           type="button"
           onClick={() => setExpanded(v => !v)}
@@ -117,17 +154,11 @@ export function MobilityExerciseRow({
                     <Hash size={11} /> Reps
                   </button>
                 </div>
-                <input
-                  type="number"
+                <MobilityDoseInput
+                  value={mode === 'timed' ? s.durationSec ?? 30 : s.reps ?? 10}
                   min={mode === 'timed' ? 5 : 1}
                   max={mode === 'timed' ? 1800 : 200}
-                  value={mode === 'timed' ? s.durationSec ?? 0 : s.reps ?? 0}
-                  onChange={e => {
-                    const n = parseInt(e.target.value)
-                    if (!Number.isFinite(n)) return
-                    onUpdateSet(ex.id, i, mode === 'timed' ? { durationSec: n } : { reps: n })
-                  }}
-                  className="w-16 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500"
+                  onCommit={n => onUpdateSet(ex.id, i, mode === 'timed' ? { durationSec: n } : { reps: n })}
                 />
                 <span className="text-[11px] text-slate-500 flex-shrink-0">{mode === 'timed' ? 'sec' : 'reps'}</span>
                 <button

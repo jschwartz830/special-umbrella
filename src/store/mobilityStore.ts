@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { nanoid } from '../lib/utils'
 import {
   MOBILITY_LIBRARY,
+  normalizeMobilityRoutine,
   singleTimedSet,
   type MobilityPreset,
   type MobilityRoutineExercise,
@@ -40,7 +41,7 @@ const DEFAULT_ROUTINE: MobilityExercise[] = [
 ]
 
 function cloneExercises(exercises: MobilityRoutineExercise[]): MobilityRoutineExercise[] {
-  return exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }))
+  return normalizeMobilityRoutine(exercises).map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }))
 }
 
 interface MobilityState {
@@ -125,7 +126,7 @@ export const useMobilityStore = create<MobilityState>()(
 
       addSet(exerciseId, newSet) {
         set(s => ({
-          routine: s.routine.map(e => {
+          routine: normalizeMobilityRoutine(s.routine).map(e => {
             if (e.id !== exerciseId) return e
             const last = e.sets[e.sets.length - 1]
             return { ...e, sets: [...e.sets, newSet ?? last ?? { durationSec: 30 }] }
@@ -135,7 +136,7 @@ export const useMobilityStore = create<MobilityState>()(
 
       updateSet(exerciseId, setIdx, patch) {
         set(s => ({
-          routine: s.routine.map(e => {
+          routine: normalizeMobilityRoutine(s.routine).map(e => {
             if (e.id !== exerciseId) return e
             return { ...e, sets: e.sets.map((st, i) => i === setIdx ? { ...patch } : st) }
           }),
@@ -144,7 +145,7 @@ export const useMobilityStore = create<MobilityState>()(
 
       removeSet(exerciseId, setIdx) {
         set(s => ({
-          routine: s.routine.map(e => {
+          routine: normalizeMobilityRoutine(s.routine).map(e => {
             if (e.id !== exerciseId || e.sets.length <= 1) return e
             return { ...e, sets: e.sets.filter((_, i) => i !== setIdx) }
           }),
@@ -245,14 +246,14 @@ export const useMobilityStore = create<MobilityState>()(
 
 /** @internal Exported for testing — see src/store/__tests__/mobilityStore.test.ts */
 export function migrateMobilityState(state: unknown, fromVersion: number): unknown {
+  if (fromVersion >= 4) return state
   if (fromVersion <= 1) {
     state = { ...(state as object), activeSession: null }
   }
   if (fromVersion <= 2) {
     const s = state as { routine?: Array<{ id: string; name: string; durationSec?: number; sets?: MobilitySet[] }> }
     const routine = (s.routine ?? []).map(e => ({
-      id: e.id,
-      name: e.name,
+      ...e,
       sets: e.sets ?? singleTimedSet(e.durationSec ?? 30),
     }))
     state = { ...(state as object), routine, activeSession: null }
@@ -261,5 +262,17 @@ export function migrateMobilityState(state: unknown, fromVersion: number): unkno
     const s = state as { customTemplates?: MobilityUserTemplate[] }
     state = { ...(state as object), customTemplates: s.customTemplates ?? [] }
   }
-  return state
+  // Cloud sync restores state directly with setState, bypassing Zustand's
+  // versioned localStorage migration. Always normalize the routine here so a
+  // legacy cloud payload cannot leave the editor rendering fallback sets that
+  // its actions are then unable to update or save as a template.
+  const current = state as { routine?: MobilityRoutineExercise[]; customTemplates?: MobilityUserTemplate[] }
+  return {
+    ...(state as object),
+    routine: normalizeMobilityRoutine(current.routine),
+    customTemplates: (current.customTemplates ?? []).map(template => ({
+      ...template,
+      exercises: cloneExercises(template.exercises ?? []),
+    })),
+  }
 }
