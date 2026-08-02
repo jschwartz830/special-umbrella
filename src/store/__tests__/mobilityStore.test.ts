@@ -208,6 +208,15 @@ describe('addSet / updateSet / removeSet', () => {
     const ex = useMobilityStore.getState().routine.find(e => e.id === id)!
     expect(ex.sets).toHaveLength(1)
   })
+
+  it('normalizes a legacy duration before editing or adding sets', () => {
+    useMobilityStore.setState({
+      routine: [{ id: 'legacy', name: 'Legacy Hold', durationSec: 75 } as never],
+    })
+    useMobilityStore.getState().updateSet('legacy', 0, { reps: 12 })
+    useMobilityStore.getState().addSet('legacy')
+    expect(useMobilityStore.getState().routine[0].sets).toEqual([{ reps: 12 }, { reps: 12 }])
+  })
 })
 
 describe('logCompletion', () => {
@@ -415,6 +424,13 @@ describe('saveAsTemplate', () => {
     useMobilityStore.getState().saveAsTemplate('Stable', exercises)
     exercises[0].sets[0].durationSec = 999
     expect(useMobilityStore.getState().customTemplates[0].exercises[0].sets[0].durationSec).toBe(30)
+  })
+
+  it('saves a legacy routine after normalizing its duration to a timed set', () => {
+    useMobilityStore.getState().saveAsTemplate('Legacy', [
+      { id: 'legacy', name: 'Legacy Hold', durationSec: 45 } as never,
+    ])
+    expect(useMobilityStore.getState().customTemplates[0].exercises[0].sets).toEqual([{ durationSec: 45 }])
   })
 })
 

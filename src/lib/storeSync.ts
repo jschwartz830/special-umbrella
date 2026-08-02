@@ -4,7 +4,7 @@ import { useOutcomeStore } from '../store/outcomeStore'
 import { usePlanStore, migratePlanState } from '../store/planStore'
 import { useProgramStore } from '../store/programStore'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
-import { useMobilityStore } from '../store/mobilityStore'
+import { migrateMobilityState, useMobilityStore } from '../store/mobilityStore'
 import { useSettingsStore } from '../store/settingsStore'
 
 type AnyStore = {
@@ -54,14 +54,9 @@ const STORES: { name: string; store: AnyStore; migrate?: MigrateFn }[] = [
   {
     name: 'wpt_mobility',
     store: useMobilityStore as unknown as AnyStore,
-    // v1 mobility state is missing `activeSession`; add it as null so the
-    // tracker never receives undefined where null | MobilitySessionCheckpoint
-    // is expected.
-    migrate: (data) => {
-      const s = data as Record<string, unknown>
-      if (s && !('activeSession' in s)) return { ...s, activeSession: null }
-      return data
-    },
+    // Cloud data bypasses Zustand persist's migration hook, so run the full
+    // mobility migration before hydrating the live store.
+    migrate: (data) => migrateMobilityState(data, 0),
   },
   {
     name: 'wpt_settings',
