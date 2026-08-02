@@ -20,6 +20,7 @@ import type { ExerciseSpec, ProgressionType } from '../types/program'
 import { EXERCISE_LIBRARY, findExerciseByName } from '../lib/exerciseLibrary'
 import { MOBILITY_LIBRARY, singleTimedSet, type MobilityRoutineExercise, type MobilitySet } from '../lib/mobilityLibrary'
 import { MobilityRoutineEditor } from '../components/mobility/MobilityRoutineEditor'
+import { useMobilityStore } from '../store/mobilityStore'
 import type {
   WorkoutDifficulty,
   RunWorkoutSubtype,
@@ -213,6 +214,22 @@ function SlotEditor({
 
   function addCustomMobilityExercise(name: string, sets: MobilitySet[]) {
     updateMobilityExercises([...(slot.mobilityExercises ?? []), { id: nanoid(), name, sets }])
+  }
+
+  const mobilityTemplates = useMobilityStore(s => s.customTemplates)
+  const saveMobilityTemplate = useMobilityStore(s => s.saveAsTemplate)
+
+  function loadMobilityTemplate(templateId: string, mode: 'replace' | 'append') {
+    const template = mobilityTemplates.find(t => t.id === templateId)
+    if (!template) return
+    const incoming = template.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }))
+    if (mode === 'replace') { updateMobilityExercises(incoming); return }
+    const existing = new Set((slot.mobilityExercises ?? []).map(e => e.id))
+    updateMobilityExercises([...(slot.mobilityExercises ?? []), ...incoming.filter(e => !existing.has(e.id))])
+  }
+
+  function saveMobilityAsTemplate(name: string) {
+    saveMobilityTemplate(name, slot.mobilityExercises ?? [])
   }
 
   return (
@@ -574,6 +591,9 @@ function SlotEditor({
                 onReorder={reorderMobilityExercise}
                 onAddFromLibrary={addMobilityExerciseFromLibrary}
                 onAddCustom={addCustomMobilityExercise}
+                templates={mobilityTemplates}
+                onLoadTemplate={loadMobilityTemplate}
+                onSaveAsTemplate={saveMobilityAsTemplate}
                 {...mobilityCallbacks}
               />
             </div>

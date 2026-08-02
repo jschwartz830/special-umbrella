@@ -499,6 +499,19 @@ export interface MobilityPreset {
   exercises: Array<{ exerciseId: string; durationSec: number }>
 }
 
+/**
+ * A user-saved routine template — full per-set dosing (reps, timed holds, rest),
+ * unlike the fixed MOBILITY_PRESETS above which only carry a single durationSec
+ * per exercise. Reusable across the standalone daily routine and a plan day's
+ * mobility slot.
+ */
+export interface MobilityUserTemplate {
+  id: string
+  name: string
+  exercises: MobilityRoutineExercise[]
+  createdAt: string
+}
+
 export const MOBILITY_PRESETS: MobilityPreset[] = [
   {
     id: 'preset-quick-5',

@@ -1,14 +1,17 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Plus, Trash2, Timer, Hash, Info, Check } from 'lucide-react'
+import { ChevronDown, ChevronUp, Plus, Trash2, Timer, Hash, Info, Check, BookmarkPlus } from 'lucide-react'
 import {
   MOBILITY_LIBRARY,
   CATEGORY_LABELS,
   normalizeMobilityRoutine,
   singleTimedSet,
   summarizeMobilitySets,
+  totalTimedSec,
+  formatMobilityDuration,
   type MobilityCategory,
   type MobilityRoutineExercise,
   type MobilitySet,
+  type MobilityUserTemplate,
 } from '../../lib/mobilityLibrary'
 
 export interface MobilityRoutineCallbacks {
@@ -176,6 +179,10 @@ interface EditorProps extends MobilityRoutineCallbacks {
   onReorder: (fromIdx: number, toIdx: number) => void
   onAddFromLibrary: (libraryId: string) => void
   onAddCustom: (name: string, sets: MobilitySet[]) => void
+  /** Saved routine templates available to load. Omit to hide the Templates section entirely. */
+  templates?: MobilityUserTemplate[]
+  onLoadTemplate?: (id: string, mode: 'replace' | 'append') => void
+  onSaveAsTemplate?: (name: string) => void
 }
 
 const LIBRARY_CATEGORIES: Array<MobilityCategory | 'all'> = [
@@ -187,6 +194,9 @@ export function MobilityRoutineEditor({
   onReorder,
   onAddFromLibrary,
   onAddCustom,
+  templates,
+  onLoadTemplate,
+  onSaveAsTemplate,
   ...callbacks
 }: EditorProps) {
   const [dragIdx, setDragIdx] = useState<number | null>(null)
@@ -196,6 +206,9 @@ export function MobilityRoutineEditor({
   const [addingCustom, setAddingCustom] = useState(false)
   const [customName, setCustomName] = useState('')
   const [customDuration, setCustomDuration] = useState('30')
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
 
   const inRoutineIds = new Set(exercises.map(e => e.id))
   const filtered = activeCategory === 'all'
@@ -210,6 +223,14 @@ export function MobilityRoutineEditor({
     setCustomName('')
     setCustomDuration('30')
     setAddingCustom(false)
+  }
+
+  function handleSaveTemplate() {
+    const name = templateName.trim()
+    if (!name || !onSaveAsTemplate) return
+    onSaveAsTemplate(name)
+    setTemplateName('')
+    setSavingTemplate(false)
   }
 
   return (
@@ -305,6 +326,97 @@ export function MobilityRoutineEditor({
           </div>
         )}
       </div>
+
+      {/* Templates — load a saved routine, or save the current one for reuse */}
+      {(onLoadTemplate || onSaveAsTemplate) && (
+        <div className="rounded-xl border border-slate-700/60 overflow-hidden">
+          <button
+            onClick={() => setShowTemplates(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-800/60 transition-colors"
+          >
+            Templates
+            {showTemplates ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+          {showTemplates && (
+            <div className="px-3 pb-3 space-y-2 border-t border-slate-700/40 pt-2.5">
+              {onSaveAsTemplate && (
+                savingTemplate ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Template name"
+                      value={templateName}
+                      onChange={e => setTemplateName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveTemplate() }}
+                      autoFocus
+                      className="flex-1 min-w-0 bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
+                    />
+                    <button
+                      onClick={handleSaveTemplate}
+                      disabled={!templateName.trim()}
+                      className="px-2.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-600 disabled:opacity-40 text-white text-xs font-semibold transition-colors flex-shrink-0"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setSavingTemplate(false); setTemplateName('') }}
+                      className="px-2 py-1.5 rounded-lg border border-slate-600 text-slate-400 hover:text-slate-200 text-xs transition-colors flex-shrink-0"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setSavingTemplate(true)}
+                    disabled={exercises.length === 0}
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500 disabled:opacity-30 text-xs font-medium transition-colors"
+                  >
+                    <BookmarkPlus size={13} />
+                    Save current as template
+                  </button>
+                )
+              )}
+
+              {onLoadTemplate && (
+                <div className="space-y-1.5">
+                  {(templates ?? []).length === 0 ? (
+                    <p className="text-[11px] text-slate-500 py-1">
+                      No saved templates yet — save your current routine above to reuse it later.
+                    </p>
+                  ) : (
+                    (templates ?? []).map(t => (
+                      <div
+                        key={t.id}
+                        className="flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-800/60 px-2.5 py-2"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-slate-200 truncate">{t.name}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {t.exercises.length} exercise{t.exercises.length === 1 ? '' : 's'} · ~
+                            {formatMobilityDuration(t.exercises.reduce((sum, e) => sum + totalTimedSec(e.sets), 0))}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => onLoadTemplate(t.id, 'append')}
+                          className="flex-shrink-0 px-2 py-1 rounded-lg border border-slate-600 text-slate-300 hover:border-sky-500 hover:text-sky-300 text-[11px] font-medium transition-colors"
+                        >
+                          Append
+                        </button>
+                        <button
+                          onClick={() => onLoadTemplate(t.id, 'replace')}
+                          className="flex-shrink-0 px-2 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 hover:bg-sky-500/25 text-[11px] font-medium transition-colors"
+                        >
+                          Replace
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add custom */}
       {addingCustom ? (

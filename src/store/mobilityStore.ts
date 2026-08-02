@@ -7,6 +7,7 @@ import {
   type MobilityPreset,
   type MobilityRoutineExercise,
   type MobilitySet,
+  type MobilityUserTemplate,
 } from '../lib/mobilityLibrary'
 
 export type MobilityExercise = MobilityRoutineExercise
@@ -38,11 +39,16 @@ const DEFAULT_ROUTINE: MobilityExercise[] = [
   { id: 'ankle-circles', name: 'Ankle Circles', sets: singleTimedSet(30) },
 ]
 
+function cloneExercises(exercises: MobilityRoutineExercise[]): MobilityRoutineExercise[] {
+  return exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) }))
+}
+
 interface MobilityState {
   routine: MobilityExercise[]
   completions: Record<string, MobilityCompletion>
   activeSession: MobilitySessionCheckpoint | null
   soundEnabled: boolean
+  customTemplates: MobilityUserTemplate[]
 
   setSoundEnabled: (enabled: boolean) => void
   setRoutine: (exercises: MobilityExercise[]) => void
@@ -55,6 +61,10 @@ interface MobilityState {
   updateSet: (exerciseId: string, setIdx: number, patch: MobilitySet) => void
   removeSet: (exerciseId: string, setIdx: number) => void
   loadPreset: (preset: MobilityPreset, mode: 'replace' | 'append') => void
+  saveAsTemplate: (name: string, exercises: MobilityRoutineExercise[]) => void
+  renameTemplate: (id: string, name: string) => void
+  deleteTemplate: (id: string) => void
+  loadTemplate: (id: string, mode: 'replace' | 'append') => void
   logCompletion: (date: string, completion: MobilityCompletion) => void
   removeCompletion: (date: string) => void
   startSession: (date: string, exerciseIds: string[]) => void
@@ -69,6 +79,7 @@ export const useMobilityStore = create<MobilityState>()(
       completions: {},
       activeSession: null,
       soundEnabled: true,
+      customTemplates: [],
 
       setSoundEnabled(enabled) {
         set({ soundEnabled: enabled })
@@ -153,6 +164,42 @@ export const useMobilityStore = create<MobilityState>()(
         })
       },
 
+      saveAsTemplate(name, exercises) {
+        const trimmed = name.trim()
+        if (!trimmed || exercises.length === 0) return
+        const template: MobilityUserTemplate = {
+          id: nanoid(),
+          name: trimmed,
+          exercises: cloneExercises(exercises),
+          createdAt: new Date().toISOString(),
+        }
+        set(s => ({ customTemplates: [...s.customTemplates, template] }))
+      },
+
+      renameTemplate(id, name) {
+        const trimmed = name.trim()
+        if (!trimmed) return
+        set(s => ({
+          customTemplates: s.customTemplates.map(t => t.id === id ? { ...t, name: trimmed } : t),
+        }))
+      },
+
+      deleteTemplate(id) {
+        set(s => ({ customTemplates: s.customTemplates.filter(t => t.id !== id) }))
+      },
+
+      loadTemplate(id, mode) {
+        set(s => {
+          const template = s.customTemplates.find(t => t.id === id)
+          if (!template) return s
+          const incoming = cloneExercises(template.exercises)
+          if (mode === 'replace') return { routine: incoming }
+          const existing = new Set(s.routine.map(e => e.id))
+          const toAdd = incoming.filter(e => !existing.has(e.id))
+          return { routine: [...s.routine, ...toAdd] }
+        })
+      },
+
       logCompletion(date, completion) {
         set(s => ({ completions: { ...s.completions, [date]: completion } }))
       },
@@ -190,7 +237,7 @@ export const useMobilityStore = create<MobilityState>()(
     }),
     {
       name: 'wpt_mobility',
-      version: 3,
+      version: 4,
       migrate: migrateMobilityState,
     },
   ),
@@ -209,6 +256,10 @@ export function migrateMobilityState(state: unknown, fromVersion: number): unkno
       sets: e.sets ?? singleTimedSet(e.durationSec ?? 30),
     }))
     state = { ...(state as object), routine, activeSession: null }
+  }
+  if (fromVersion <= 3) {
+    const s = state as { customTemplates?: MobilityUserTemplate[] }
+    state = { ...(state as object), customTemplates: s.customTemplates ?? [] }
   }
   return state
 }
