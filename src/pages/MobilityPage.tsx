@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ArrowLeft, Plus, GripVertical, BookOpen, Layers, Info, Check, BookmarkPlus, Trash2, Pencil } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useMobilityStore } from '../store/mobilityStore'
@@ -36,13 +36,16 @@ function RoutineTab() {
   const [newDuration, setNewDuration] = useState('60')
   const [adding, setAdding] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const dragIdxRef = useRef<number | null>(null)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
+  const [savedTemplateName, setSavedTemplateName] = useState('')
 
   function handleSaveTemplate() {
     const name = templateName.trim()
     if (!name) return
     saveAsTemplate(name, routine)
+    setSavedTemplateName(name)
     setTemplateName('')
     setSavingTemplate(false)
   }
@@ -55,6 +58,24 @@ function RoutineTab() {
     setNewName('')
     setNewDuration('60')
     setAdding(false)
+  }
+
+  function startDrag(idx: number) {
+    dragIdxRef.current = idx
+    setDragIdx(idx)
+  }
+
+  function moveDrag(targetIdx: number) {
+    const currentIdx = dragIdxRef.current
+    if (currentIdx === null || currentIdx === targetIdx) return
+    reorderExercise(currentIdx, targetIdx)
+    dragIdxRef.current = targetIdx
+    setDragIdx(targetIdx)
+  }
+
+  function endDrag() {
+    dragIdxRef.current = null
+    setDragIdx(null)
   }
 
   const totalSec = routine.reduce((sum, e) => sum + totalTimedSec(e.sets), 0)
@@ -111,15 +132,23 @@ function RoutineTab() {
         </div>
       )}
 
+      {savedTemplateName && !savingTemplate && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300" role="status">
+          <span className="flex items-center gap-1.5"><Check size={13} /> “{savedTemplateName}” saved to Presets.</span>
+          <button onClick={() => setSavedTemplateName('')} className="text-emerald-300/60 hover:text-emerald-200" aria-label="Dismiss confirmation">×</button>
+        </div>
+      )}
+
       {routine.map((ex, idx) => (
         <MobilityExerciseRow
           key={ex.id}
           exercise={ex}
           draggable
+          dragIndex={idx}
           dragHandle={<GripVertical size={16} className="text-slate-600 flex-shrink-0 cursor-grab active:cursor-grabbing" />}
-          onDragStart={() => setDragIdx(idx)}
-          onDragOver={() => { if (dragIdx !== null && dragIdx !== idx) { reorderExercise(dragIdx, idx); setDragIdx(idx) } }}
-          onDragEnd={() => setDragIdx(null)}
+          onDragStart={() => startDrag(idx)}
+          onDragOver={moveDrag}
+          onDragEnd={endDrag}
           dragActive={dragIdx === idx}
           onUpdateExercise={updateExercise}
           onAddSet={addSet}
