@@ -1,5 +1,48 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-02 (eighty-ninth pass) — branch `claude/serene-cori-uv7ebe`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 2 commits, 3 source files changed (1 new component, 1 page reduced, 1 test file extended). No new dependencies. No store schema changes.
+2. **Highest confidence**: Component extraction is a pure structural refactor — all logic, state, and handlers remain in TodayPage; only JSX co-location changed. Test additions exercise existing code paths and pass immediately.
+3. **Risky items**: None.
+4. **Review first**: `TodayRotationModalsProps` passes `onSelectFromPlan: (idx: number | null) => void` as a single callback. The caller in TodayPage closes the modal inside this handler (`setAddFromPlanIdx(idx); setShowAddFromPlan(false)`). If future changes split these two operations (e.g. to support multi-select), the callback signature will need updating.
+5. **Bug scan**: Reviewed `buildLastSessionSummary` mobility path (lines 131–145 of `sessionSummary.ts`). Logic correctly counts `doneExercises` (exercises with at least one completed set), counts completed individual sets, and appends duration only when present. The 4 new tests confirm all branches.
+
+---
+
+### Biggest Issues Found
+
+#### Test gap: mobility path of buildLastSessionSummary had no coverage (FIXED)
+
+- **Location**: `src/lib/sessionSummary.ts` lines 131–145; tested in `src/lib/__tests__/sessionSummary.test.ts`
+- **Issue**: The mobility workout type was added as a full feature (PRs #219–#221) with outcome logging, but the unit test file for `buildLastSessionSummary` covered weights, run, and swim paths only — zero mobility tests.
+- **Fix**: Added 4 test cases covering the main success path, singular labels, all-skipped (returns null), and partial completion counting.
+- **Impact**: Medium — the code was correct, but regressions in this path would have been invisible.
+
+#### ARCH-1 regression: TodayPage grew to 1,494 lines (FIXED)
+
+- **Location**: `src/pages/TodayPage.tsx`
+- **Issue**: The mobility feature added new inline modal UI (Add Workout and Add-from-Plan pickers now include mobility-aware logic), pushing TodayPage from the 1,395 lines it ended at in pass 88 back to 1,494 lines.
+- **Fix**: Extracted the 4 rotation-override modals (a self-contained group) into `TodayRotationModals.tsx`, reducing TodayPage to 1,367 lines — below the pass-88 baseline.
+- **Impact**: Low immediate impact, but the decomposition is necessary for long-term maintainability.
+
+---
+
+### Items Not Fixed (tracked for future passes)
+
+| ID | Severity | Description |
+|----|----------|-------------|
+| ARCH-1 | Debt | TodayPage is now 1,367 lines — further decomposition needed. |
+| BUG-DAYOFF-INDEX | Low | `updateEntryAction` changing away from `day_off` leaves `planDayIndex: undefined`. |
+| TEST-3 | High | `ActiveWorkoutTracker.tsx` (~2144 lines) untested (requires RTL/Playwright). |
+| DEAD-CODE-1 | Low | `getFutureProjection` in `calendarProjection.ts` appears unused. |
+
+---
+
 ## 2026-08-01 (eighty-eighth pass) — branch `claude/serene-cori-bl4pj8`
 
 ---

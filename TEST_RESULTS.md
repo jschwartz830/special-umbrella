@@ -1,5 +1,40 @@
 # Test Results
 
+## 2026-08-02 (eighty-ninth pass) — branch `claude/serene-cori-uv7ebe`
+
+---
+
+### Baseline (before changes)
+
+- **34 test files, 1177 tests — all passing**
+- Runner: Vitest 4.1.4, node environment
+- `tsc --noEmit`: clean
+- Note: baseline is 34 files / 1177 tests (not 33 / 1126 from pass 88) because mobility feature PRs #219–#221 merged to main between passes, adding a new test file and 51 tests.
+
+### Tests Added/Updated This Pass
+
+| File | Tests Added | Test Names |
+|------|-------------|------------|
+| `src/lib/__tests__/sessionSummary.test.ts` | +4 | `mobility: multi-exercise with duration`; `mobility: singular labels (1 exercise, 1 set, no duration)`; `mobility: all skipped returns null`; `mobility: partial completion counts only completed sets` |
+
+**Details of each new test:**
+
+1. **Multi-exercise with duration** — outcome has 2 exercises each with 1 completed set + 1 skipped set, and `durationMin: 12`. Expected: `'Last: 2 exercises · 3 sets · 12 min'`. Verifies that completed-set counting (not total-set counting) is used, and that duration appends correctly.
+
+2. **Singular labels** — 1 exercise, 1 completed set, no `durationMin`. Expected: `'Last: 1 exercise · 1 set'`. Verifies the `exercise`/`set` singular forms (not `exercises`/`sets`).
+
+3. **All skipped** — 2 exercises each with only skipped sets. Expected: `null`. Verifies that `buildLastSessionSummary` returns `null` rather than a `'Last: 0 exercises'` string when nothing was completed.
+
+4. **Partial completion** — 2 exercises, but only 1 has a completed set (the other's sets are all skipped). `durationMin: 5`. Expected: `'Last: 1 exercise · 1 set · 5 min'`. Verifies that `doneExercises` count (exercises with ≥1 completed set) is used, not the total exercise count.
+
+### Results After Changes
+
+- **34 test files, 1181 tests — all passing**
+- TypeScript: `tsc --noEmit` — clean (0 errors)
+- Net new: +4 tests
+
+---
+
 ## 2026-08-01 (eighty-eighth pass) — branch `claude/serene-cori-bl4pj8`
 
 ---
