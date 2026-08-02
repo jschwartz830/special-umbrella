@@ -36,6 +36,7 @@ function resetStore() {
     routine: DEFAULT_ROUTINE,
     completions: {},
     activeSession: null,
+    customTemplates: [],
   })
 }
 
@@ -368,6 +369,156 @@ describe('loadPreset', () => {
   })
 })
 
+// ── saveAsTemplate / renameTemplate / deleteTemplate / loadTemplate ──────────
+
+describe('saveAsTemplate', () => {
+  beforeEach(resetStore)
+
+  it('appends a new template with the given name and a deep-cloned exercise list', () => {
+    const exercises = [{ id: 'a', name: 'A', sets: [{ durationSec: 30 }] }]
+    useMobilityStore.getState().saveAsTemplate('Morning Routine', exercises)
+    const { customTemplates } = useMobilityStore.getState()
+    expect(customTemplates).toHaveLength(1)
+    expect(customTemplates[0].name).toBe('Morning Routine')
+    expect(customTemplates[0].exercises).toEqual(exercises)
+    expect(customTemplates[0].exercises).not.toBe(exercises) // deep clone, not shared reference
+  })
+
+  it('trims the template name', () => {
+    useMobilityStore.getState().saveAsTemplate('  Evening  ', [{ id: 'a', name: 'A', sets: [{ durationSec: 30 }] }])
+    expect(useMobilityStore.getState().customTemplates[0].name).toBe('Evening')
+  })
+
+  it('generates a unique id and createdAt timestamp', () => {
+    const exercises = [{ id: 'a', name: 'A', sets: [{ durationSec: 30 }] }]
+    useMobilityStore.getState().saveAsTemplate('One', exercises)
+    useMobilityStore.getState().saveAsTemplate('Two', exercises)
+    const [first, second] = useMobilityStore.getState().customTemplates
+    expect(first.id).toBeTruthy()
+    expect(second.id).toBeTruthy()
+    expect(first.id).not.toBe(second.id)
+    expect(first.createdAt).toBeTruthy()
+  })
+
+  it('is a no-op for a blank name', () => {
+    useMobilityStore.getState().saveAsTemplate('   ', [{ id: 'a', name: 'A', sets: [{ durationSec: 30 }] }])
+    expect(useMobilityStore.getState().customTemplates).toHaveLength(0)
+  })
+
+  it('is a no-op for an empty exercise list', () => {
+    useMobilityStore.getState().saveAsTemplate('Empty', [])
+    expect(useMobilityStore.getState().customTemplates).toHaveLength(0)
+  })
+
+  it('mutating the source exercises array after saving does not affect the stored template', () => {
+    const exercises = [{ id: 'a', name: 'A', sets: [{ durationSec: 30 }] }]
+    useMobilityStore.getState().saveAsTemplate('Stable', exercises)
+    exercises[0].sets[0].durationSec = 999
+    expect(useMobilityStore.getState().customTemplates[0].exercises[0].sets[0].durationSec).toBe(30)
+  })
+})
+
+describe('renameTemplate', () => {
+  beforeEach(() => {
+    resetStore()
+    useMobilityStore.getState().saveAsTemplate('Original', [{ id: 'a', name: 'A', sets: [{ durationSec: 30 }] }])
+  })
+
+  it('renames the matching template', () => {
+    const id = useMobilityStore.getState().customTemplates[0].id
+    useMobilityStore.getState().renameTemplate(id, 'Renamed')
+    expect(useMobilityStore.getState().customTemplates[0].name).toBe('Renamed')
+  })
+
+  it('trims the new name', () => {
+    const id = useMobilityStore.getState().customTemplates[0].id
+    useMobilityStore.getState().renameTemplate(id, '  Trimmed  ')
+    expect(useMobilityStore.getState().customTemplates[0].name).toBe('Trimmed')
+  })
+
+  it('is a no-op for a blank name', () => {
+    const id = useMobilityStore.getState().customTemplates[0].id
+    useMobilityStore.getState().renameTemplate(id, '   ')
+    expect(useMobilityStore.getState().customTemplates[0].name).toBe('Original')
+  })
+
+  it('is a no-op for an unknown id', () => {
+    useMobilityStore.getState().renameTemplate('nonexistent', 'Renamed')
+    expect(useMobilityStore.getState().customTemplates[0].name).toBe('Original')
+  })
+})
+
+describe('deleteTemplate', () => {
+  beforeEach(() => {
+    resetStore()
+    useMobilityStore.getState().saveAsTemplate('First', [{ id: 'a', name: 'A', sets: [{ durationSec: 30 }] }])
+    useMobilityStore.getState().saveAsTemplate('Second', [{ id: 'b', name: 'B', sets: [{ durationSec: 30 }] }])
+  })
+
+  it('removes the matching template', () => {
+    const id = useMobilityStore.getState().customTemplates[0].id
+    useMobilityStore.getState().deleteTemplate(id)
+    const { customTemplates } = useMobilityStore.getState()
+    expect(customTemplates).toHaveLength(1)
+    expect(customTemplates[0].name).toBe('Second')
+  })
+
+  it('is a no-op for an unknown id', () => {
+    const before = useMobilityStore.getState().customTemplates.length
+    useMobilityStore.getState().deleteTemplate('nonexistent')
+    expect(useMobilityStore.getState().customTemplates).toHaveLength(before)
+  })
+})
+
+describe('loadTemplate', () => {
+  beforeEach(() => {
+    resetStore()
+    useMobilityStore.getState().saveAsTemplate('Template A', [
+      { id: 'hip-90-90', name: 'Hip 90/90 Custom', sets: [{ reps: 12 }] },
+      { id: 'new-ex', name: 'New Exercise', sets: [{ durationSec: 40 }] },
+    ])
+  })
+
+  it('replace mode replaces the entire routine with the template exercises', () => {
+    const id = useMobilityStore.getState().customTemplates[0].id
+    useMobilityStore.getState().loadTemplate(id, 'replace')
+    const { routine } = useMobilityStore.getState()
+    expect(routine).toHaveLength(2)
+    expect(routine[0]).toEqual({ id: 'hip-90-90', name: 'Hip 90/90 Custom', sets: [{ reps: 12 }] })
+    expect(routine[1]).toEqual({ id: 'new-ex', name: 'New Exercise', sets: [{ durationSec: 40 }] })
+  })
+
+  it('append mode adds exercises not already in the routine', () => {
+    const before = useMobilityStore.getState().routine.length
+    const id = useMobilityStore.getState().customTemplates[0].id
+    useMobilityStore.getState().loadTemplate(id, 'append')
+    // 'hip-90-90' already exists in DEFAULT_ROUTINE, so only 'new-ex' is added
+    expect(useMobilityStore.getState().routine).toHaveLength(before + 1)
+    expect(useMobilityStore.getState().routine.find(e => e.id === 'new-ex')).toBeTruthy()
+  })
+
+  it('append mode does not overwrite an existing exercise with the same id', () => {
+    const id = useMobilityStore.getState().customTemplates[0].id
+    useMobilityStore.getState().loadTemplate(id, 'append')
+    const hip = useMobilityStore.getState().routine.find(e => e.id === 'hip-90-90')!
+    expect(hip.name).toBe('Hip 90/90') // original DEFAULT_ROUTINE name, not the template's override
+  })
+
+  it('is a no-op for an unknown template id', () => {
+    const before = useMobilityStore.getState().routine
+    useMobilityStore.getState().loadTemplate('nonexistent', 'replace')
+    expect(useMobilityStore.getState().routine).toBe(before)
+  })
+
+  it('loading the same template twice in replace mode is idempotent', () => {
+    const id = useMobilityStore.getState().customTemplates[0].id
+    useMobilityStore.getState().loadTemplate(id, 'replace')
+    const first = useMobilityStore.getState().routine
+    useMobilityStore.getState().loadTemplate(id, 'replace')
+    expect(useMobilityStore.getState().routine).toEqual(first)
+  })
+})
+
 // ── startSession ──────────────────────────────────────────────────────────────
 
 describe('startSession', () => {
@@ -504,13 +655,50 @@ describe('migrateMobilityState (v2 -> v3)', () => {
     expect(migrated.activeSession).toBeNull()
   })
 
-  it('leaves an already-migrated (v3) routine untouched', () => {
+  it('preserves already-present sets when re-applying the v2->v3 step', () => {
     const state = {
       routine: [{ id: 'a', name: 'A', sets: [{ reps: 10 }] }],
       completions: {},
       activeSession: null,
     }
-    const migrated = migrateMobilityState(state, 3) as typeof state
+    const migrated = migrateMobilityState(state, 2) as { routine: typeof state.routine }
+    expect(migrated.routine).toEqual(state.routine)
+  })
+})
+
+// ── v3 -> v4 migration ──────────────────────────────────────────────────────
+
+describe('migrateMobilityState (v3 -> v4)', () => {
+  it('adds an empty customTemplates array when missing', () => {
+    const legacyState = {
+      routine: DEFAULT_ROUTINE,
+      completions: {},
+      activeSession: null,
+    }
+    const migrated = migrateMobilityState(legacyState, 3) as { customTemplates: unknown }
+    expect(migrated.customTemplates).toEqual([])
+  })
+
+  it('preserves an existing customTemplates array', () => {
+    const templates = [{ id: 't1', name: 'Existing', exercises: [], createdAt: '2026-01-01T00:00:00.000Z' }]
+    const legacyState = {
+      routine: DEFAULT_ROUTINE,
+      completions: {},
+      activeSession: null,
+      customTemplates: templates,
+    }
+    const migrated = migrateMobilityState(legacyState, 3) as { customTemplates: unknown }
+    expect(migrated.customTemplates).toEqual(templates)
+  })
+
+  it('leaves an already-migrated (v4) state untouched', () => {
+    const state = {
+      routine: DEFAULT_ROUTINE,
+      completions: {},
+      activeSession: null,
+      customTemplates: [],
+    }
+    const migrated = migrateMobilityState(state, 4)
     expect(migrated).toBe(state)
   })
 })
