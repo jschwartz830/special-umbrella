@@ -13,6 +13,7 @@ import {
   type MobilitySet,
   type MobilityUserTemplate,
 } from '../../lib/mobilityLibrary'
+import { useDragReorder } from '../../hooks/useDragReorder'
 
 export interface MobilityRoutineCallbacks {
   onUpdateExercise: (id: string, patch: Partial<Pick<MobilityRoutineExercise, 'name' | 'restSec' | 'notes'>>) => void
@@ -27,9 +28,10 @@ export interface MobilityRoutineCallbacks {
 interface RowProps extends MobilityRoutineCallbacks {
   exercise: MobilityRoutineExercise
   draggable?: boolean
-  onDragStart?: () => void
-  onDragOver?: () => void
-  onDragEnd?: () => void
+  reorderIndex?: number
+  onPointerDragStart?: React.PointerEventHandler<HTMLElement>
+  onPointerDragMove?: React.PointerEventHandler<HTMLElement>
+  onPointerDragEnd?: React.PointerEventHandler<HTMLElement>
   dragActive?: boolean
   dragHandle?: React.ReactNode
 }
@@ -78,9 +80,10 @@ export function MobilityExerciseRow({
   onRemoveSet,
   onRemoveExercise,
   draggable,
-  onDragStart,
-  onDragOver,
-  onDragEnd,
+  reorderIndex,
+  onPointerDragStart,
+  onPointerDragMove,
+  onPointerDragEnd,
   dragActive,
   dragHandle,
 }: RowProps) {
@@ -94,16 +97,25 @@ export function MobilityExerciseRow({
 
   return (
     <div
-      onDragOver={e => { if (onDragOver) { e.preventDefault(); onDragOver() } }}
+      data-reorder-index={reorderIndex}
       className={`rounded-xl border bg-slate-800/80 transition-colors ${
         dragActive ? 'border-sky-500/50 opacity-60' : 'border-slate-700/60'
       }`}
     >
       <div className="flex items-center gap-3 px-3 py-3">
         {draggable && (
-          <span draggable onDragStart={onDragStart} onDragEnd={onDragEnd}>
+          <button
+            type="button"
+            aria-label={`Drag to reorder ${ex.name}`}
+            className="flex min-h-9 min-w-7 touch-none select-none items-center justify-center rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500/70"
+            tabIndex={0}
+            onPointerDown={onPointerDragStart}
+            onPointerMove={onPointerDragMove}
+            onPointerUp={onPointerDragEnd}
+            onPointerCancel={onPointerDragEnd}
+          >
             {dragHandle ?? <GripVertical size={16} className="text-slate-600 flex-shrink-0 cursor-grab active:cursor-grabbing" />}
-          </span>
+          </button>
         )}
         <button
           type="button"
@@ -230,7 +242,7 @@ export function MobilityRoutineEditor({
   onSaveAsTemplate,
   ...callbacks
 }: EditorProps) {
-  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const { dragIndex, startDrag, moveDrag, endDrag } = useDragReorder(onReorder)
   const [showLibrary, setShowLibrary] = useState(false)
   const [activeCategory, setActiveCategory] = useState<MobilityCategory | 'all'>('all')
   const [expandedLibId, setExpandedLibId] = useState<string | null>(null)
@@ -275,10 +287,11 @@ export function MobilityRoutineEditor({
           key={ex.id}
           exercise={ex}
           draggable
-          onDragStart={() => setDragIdx(idx)}
-          onDragOver={() => { if (dragIdx !== null && dragIdx !== idx) { onReorder(dragIdx, idx); setDragIdx(idx) } }}
-          onDragEnd={() => setDragIdx(null)}
-          dragActive={dragIdx === idx}
+          reorderIndex={idx}
+          onPointerDragStart={event => startDrag(idx, event)}
+          onPointerDragMove={moveDrag}
+          onPointerDragEnd={endDrag}
+          dragActive={dragIndex === idx}
           {...callbacks}
         />
       ))}
