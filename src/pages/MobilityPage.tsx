@@ -3,6 +3,7 @@ import { ArrowLeft, Plus, GripVertical, BookOpen, Layers, Info, Check, BookmarkP
 import { useNavigate } from 'react-router-dom'
 import { useMobilityStore } from '../store/mobilityStore'
 import { MobilityExerciseRow } from '../components/mobility/MobilityRoutineEditor'
+import { useDragReorder } from '../hooks/useDragReorder'
 import {
   MOBILITY_LIBRARY,
   MOBILITY_PRESETS,
@@ -35,7 +36,7 @@ function RoutineTab() {
   const [newName, setNewName] = useState('')
   const [newDuration, setNewDuration] = useState('60')
   const [adding, setAdding] = useState(false)
-  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const { dragIndex, startDrag, moveDrag, endDrag } = useDragReorder(reorderExercise)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [savedTemplateName, setSavedTemplateName] = useState('')
@@ -120,16 +121,21 @@ function RoutineTab() {
         </div>
       )}
 
+      {routine.length > 1 && (
+        <p className="pb-1 text-[11px] text-slate-600">Drag the handles to reorder your routine.</p>
+      )}
+
       {routine.map((ex, idx) => (
         <MobilityExerciseRow
           key={ex.id}
           exercise={ex}
           draggable
+          reorderIndex={idx}
           dragHandle={<GripVertical size={16} className="text-slate-600 flex-shrink-0 cursor-grab active:cursor-grabbing" />}
-          onDragStart={() => setDragIdx(idx)}
-          onDragOver={() => { if (dragIdx !== null && dragIdx !== idx) { reorderExercise(dragIdx, idx); setDragIdx(idx) } }}
-          onDragEnd={() => setDragIdx(null)}
-          dragActive={dragIdx === idx}
+          onPointerDragStart={event => startDrag(idx, event)}
+          onPointerDragMove={moveDrag}
+          onPointerDragEnd={endDrag}
+          dragActive={dragIndex === idx}
           onUpdateExercise={updateExercise}
           onAddSet={addSet}
           onUpdateSet={updateSet}
