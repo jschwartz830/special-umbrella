@@ -36,7 +36,7 @@ function RoutineTab() {
   const [newName, setNewName] = useState('')
   const [newDuration, setNewDuration] = useState('60')
   const [adding, setAdding] = useState(false)
-  const { dragIndex, startDrag, moveDrag, endDrag } = useDragReorder(reorderExercise)
+  const { dragIndex, dropIndex, startDrag, moveDrag, endDrag } = useDragReorder(reorderExercise)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [savedTemplateName, setSavedTemplateName] = useState('')
@@ -136,6 +136,9 @@ function RoutineTab() {
           onPointerDragMove={moveDrag}
           onPointerDragEnd={endDrag}
           dragActive={dragIndex === idx}
+          dropPosition={dragIndex !== null && dropIndex === idx && dropIndex !== dragIndex
+            ? (dropIndex < dragIndex ? 'before' : 'after')
+            : undefined}
           onUpdateExercise={updateExercise}
           onAddSet={addSet}
           onUpdateSet={updateSet}

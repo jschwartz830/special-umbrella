@@ -21,6 +21,7 @@ import { EXERCISE_LIBRARY, findExerciseByName } from '../lib/exerciseLibrary'
 import { MOBILITY_LIBRARY, singleTimedSet, type MobilityRoutineExercise, type MobilitySet } from '../lib/mobilityLibrary'
 import { MobilityRoutineEditor } from '../components/mobility/MobilityRoutineEditor'
 import { useMobilityStore } from '../store/mobilityStore'
+import { useDragReorder } from '../hooks/useDragReorder'
 import type {
   WorkoutDifficulty,
   RunWorkoutSubtype,
@@ -126,7 +127,13 @@ function SlotEditor({
   const SWIM_SUBTYPES: SwimWorkoutSubtype[] = ['easy', 'endurance', 'intervals', 'technique', 'recovery']
   const YOGA_SUBTYPES: YogaWorkoutSubtype[] = ['mobility', 'flow', 'recovery', 'strength', 'stretch']
   const OTHER_SUBTYPES: OtherWorkoutSubtype[] = ['rest', 'walk', 'sport', 'pt_rehab', 'mobility', 'custom']
-  const [dragExerciseIdx, setDragExerciseIdx] = useState<number | null>(null)
+  const {
+    dragIndex: dragExerciseIdx,
+    dropIndex: dropExerciseIdx,
+    startDrag: startExerciseDrag,
+    moveDrag: moveExerciseDrag,
+    endDrag: endExerciseDrag,
+  } = useDragReorder(moveExercise)
   const [exerciseInput, setExerciseInput] = useState('')
 
   function updateExercises(exercises: ExerciseSpec[]) {
@@ -624,15 +631,26 @@ function SlotEditor({
               {slot.exercises.map((ex, i) => (
                 <div
                   key={`${ex.exercise}-${i}`}
-                  draggable
-                  onDragStart={() => setDragExerciseIdx(i)}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={() => { if (dragExerciseIdx !== null) moveExercise(dragExerciseIdx, i); setDragExerciseIdx(null) }}
-                  onDragEnd={() => setDragExerciseIdx(null)}
-                  className="rounded-lg border border-slate-600 bg-slate-800/60 p-2 space-y-2"
+                  data-reorder-index={i}
+                  className={`relative rounded-lg border bg-slate-800/60 p-2 space-y-2 transition-all ${dragExerciseIdx === i ? 'border-sky-500/50 opacity-60 scale-[0.99]' : 'border-slate-600'}`}
                 >
+                  {dragExerciseIdx !== null && dropExerciseIdx === i && dropExerciseIdx !== dragExerciseIdx && (
+                    <div aria-hidden="true" className={`pointer-events-none absolute left-2 right-2 z-10 h-1 rounded-full bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.8)] ${dropExerciseIdx < dragExerciseIdx ? '-top-[3px]' : '-bottom-[3px]'}`}>
+                      <span className="absolute -left-1 -top-1 h-3 w-3 rounded-full bg-sky-400" />
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
-                    <GripVertical size={14} className="text-slate-500" />
+                    <button
+                      type="button"
+                      aria-label={`Drag to reorder ${ex.exercise}`}
+                      className="flex min-h-8 min-w-7 touch-none select-none items-center justify-center rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500/70"
+                      onPointerDown={event => startExerciseDrag(i, event)}
+                      onPointerMove={moveExerciseDrag}
+                      onPointerUp={endExerciseDrag}
+                      onPointerCancel={endExerciseDrag}
+                    >
+                      <GripVertical size={14} className="cursor-grab text-slate-500 active:cursor-grabbing" />
+                    </button>
                     <div className="flex-1 min-w-0">
                       <input
                         type="text"
