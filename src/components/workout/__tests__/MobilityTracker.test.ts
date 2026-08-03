@@ -4,7 +4,7 @@
  * reordered) mid-session, instead of discarding progress outright.
  */
 import { describe, it, expect } from 'vitest'
-import { reconcileCheckpoint } from '../MobilityTracker'
+import { firstIncompleteSetIndex, reconcileCheckpoint } from '../MobilityTracker'
 import type { MobilitySessionCheckpoint } from '../../../store/mobilityStore'
 import type { MobilityRoutineExercise } from '../../../lib/mobilityLibrary'
 
@@ -89,5 +89,21 @@ describe('reconcileCheckpoint', () => {
     const result = reconcileCheckpoint(cp(), [])
     expect(result.currentIdx).toBe(0)
     expect(result.completedIds).toEqual([])
+  })
+})
+
+describe('firstIncompleteSetIndex', () => {
+  it('returns the first unfinished set when revisiting a partially completed exercise', () => {
+    expect(firstIncompleteSetIndex(ex('a', 3), [0])).toBe(1)
+    expect(firstIncompleteSetIndex(ex('a', 3), [0, 1])).toBe(2)
+  })
+
+  it('handles sets completed out of order', () => {
+    expect(firstIncompleteSetIndex(ex('a', 3), [0, 2])).toBe(1)
+  })
+
+  it('falls back to the first set when no sets or all sets are complete', () => {
+    expect(firstIncompleteSetIndex(ex('a', 3))).toBe(0)
+    expect(firstIncompleteSetIndex(ex('a', 3), [0, 1, 2])).toBe(0)
   })
 })

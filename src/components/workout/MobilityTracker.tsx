@@ -13,6 +13,14 @@ type Phase = 'idle' | 'exercising' | 'resting' | 'finished'
 
 const SWIPE_MIN_DX = 50
 
+export function firstIncompleteSetIndex(
+  exercise: MobilityRoutineExercise,
+  completedSetIndices: number[] = [],
+): number {
+  const incompleteIdx = exercise.sets.findIndex((_, idx) => !completedSetIndices.includes(idx))
+  return incompleteIdx === -1 ? 0 : incompleteIdx
+}
+
 export interface MobilityLoggedCompletion {
   completedAt: string
   durationMin: number
@@ -271,21 +279,26 @@ export function MobilityTracker({
     switchCueTimerR.current = setTimeout(() => setShowSwitchCue(false), 2200)
   }
 
-  // Jump to any exercise by index (always its first set) — used by Previous
-  // (when crossing an exercise boundary), swipe, and the jump menu.
+  // Jump to any exercise by index. Unless a particular set is requested, land
+  // on its first incomplete set so returning to a partially completed exercise
+  // doesn't strand the user on an already-completed set.
   // Navigation never touches completedIds/completedSets; only completing a
   // set does.
-  function goToIndex(newIdx: number, newSetIdx = 0) {
+  function goToIndex(newIdx: number, newSetIdx?: number) {
     if (newIdx < 0 || newIdx >= routine.length) return
+    const targetSetIdx = newSetIdx ?? firstIncompleteSetIndex(
+      routine[newIdx],
+      doneSetsR.current[routine[newIdx].id],
+    )
     _snapshotEx()
     exR.current = { acc: 0, at: null }
     autoFiredR.current = false
     switchFiredR.current = false
     setShowSwitchCue(false)
     idxR.current = newIdx
-    setIdxR.current = newSetIdx
+    setIdxR.current = targetSetIdx
     setCurrentIdx(newIdx)
-    setCurrentSetIdx(newSetIdx)
+    setCurrentSetIdx(targetSetIdx)
     setExSec(0)
     phaseR.current = 'idle'
     setPhase('idle')
