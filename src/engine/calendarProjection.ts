@@ -7,7 +7,7 @@ import {
   endOfWeek,
 } from 'date-fns'
 import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay } from '../types'
-import { getResolvedDaysRange, getUpcomingDays, mod } from './rotationEngine'
+import { getResolvedDaysRange, mod } from './rotationEngine'
 
 export interface CalendarCell {
   date: string           // YYYY-MM-DD
@@ -92,26 +92,3 @@ export function buildMonthGrid(
 
 // Re-export mod so calendarProjection users don't need to import engine internals
 export { mod }
-
-/**
- * Generate a future projection starting from tomorrow.
- *
- * Delegates to getUpcomingDays (the canonical engine function) after
- * filtering entries and overrides to the given plan. Previously this
- * function had its own projection loop that diverged from getUpcomingDays
- * by not applying today's overrides and not advancing for day_off entries.
- *
- * Currently unused by active pages (TodayPage uses getUpcomingDays directly
- * via useActivePlan hook), but kept as a convenience wrapper.
- */
-export function getFutureProjection(
-  plan: Plan,
-  entries: HistoryEntry[],
-  overrides: OverrideEntry[],
-  today: string,
-  days: number,
-): ResolvedDay[] {
-  const planEntries = entries.filter(e => e.planId === plan.id)
-  const planOverrides = overrides.filter(o => o.planId === plan.id)
-  return getUpcomingDays(plan, planEntries, planOverrides, today, days)
-}
