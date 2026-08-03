@@ -33,6 +33,7 @@ interface RowProps extends MobilityRoutineCallbacks {
   onPointerDragMove?: React.PointerEventHandler<HTMLElement>
   onPointerDragEnd?: React.PointerEventHandler<HTMLElement>
   dragActive?: boolean
+  dropPosition?: 'before' | 'after'
   dragHandle?: React.ReactNode
 }
 
@@ -85,6 +86,7 @@ export function MobilityExerciseRow({
   onPointerDragMove,
   onPointerDragEnd,
   dragActive,
+  dropPosition,
   dragHandle,
 }: RowProps) {
   const [expanded, setExpanded] = useState(false)
@@ -98,10 +100,20 @@ export function MobilityExerciseRow({
   return (
     <div
       data-reorder-index={reorderIndex}
-      className={`rounded-xl border bg-slate-800/80 transition-colors ${
-        dragActive ? 'border-sky-500/50 opacity-60' : 'border-slate-700/60'
+      className={`relative rounded-xl border bg-slate-800/80 transition-all ${
+        dragActive ? 'border-sky-500/50 opacity-60 scale-[0.99]' : 'border-slate-700/60'
       }`}
     >
+      {dropPosition && (
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute left-2 right-2 z-10 h-1 rounded-full bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.8)] ${
+            dropPosition === 'before' ? '-top-[3px]' : '-bottom-[3px]'
+          }`}
+        >
+          <span className="absolute -left-1 -top-1 h-3 w-3 rounded-full bg-sky-400" />
+        </div>
+      )}
       <div className="flex items-center gap-3 px-3 py-3">
         {draggable && (
           <button
@@ -242,7 +254,7 @@ export function MobilityRoutineEditor({
   onSaveAsTemplate,
   ...callbacks
 }: EditorProps) {
-  const { dragIndex, startDrag, moveDrag, endDrag } = useDragReorder(onReorder)
+  const { dragIndex, dropIndex, startDrag, moveDrag, endDrag } = useDragReorder(onReorder)
   const [showLibrary, setShowLibrary] = useState(false)
   const [activeCategory, setActiveCategory] = useState<MobilityCategory | 'all'>('all')
   const [expandedLibId, setExpandedLibId] = useState<string | null>(null)
@@ -292,6 +304,9 @@ export function MobilityRoutineEditor({
           onPointerDragMove={moveDrag}
           onPointerDragEnd={endDrag}
           dragActive={dragIndex === idx}
+          dropPosition={dragIndex !== null && dropIndex === idx && dropIndex !== dragIndex
+            ? (dropIndex < dragIndex ? 'before' : 'after')
+            : undefined}
           {...callbacks}
         />
       ))}
