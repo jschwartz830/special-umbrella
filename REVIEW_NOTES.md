@@ -1,5 +1,47 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-03 (ninetieth pass) — branch `claude/serene-cori-lp74l7`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 2 commits, 3 source files changed (1 new component, 1 page reduced, 1 engine file pruned). No new dependencies. No store schema changes. No new tests.
+2. **Highest confidence**: Dead-code removal is zero-risk (`getFutureProjection` had no callers anywhere in the codebase). Component extraction is a structural refactor — all logic, state, and side effects migrate verbatim to the new component.
+3. **Risky items**: None.
+4. **Review first**: `TodayAdHocWorkout` calls `useOutcomeStore.getState().setOutcome(...)` directly (store escape hatch) inside `onConfirm`. This mirrors the pattern used in the ad-hoc inline code it replaced — not new risk, but worth noting for future refactors.
+5. **Bug scan**: No new bugs introduced. `TodayAdHocWorkout.useEffect` for `openRequested` uses `// eslint-disable-line` to suppress the exhaustive-deps warning for the `onOpenConsumed` callback. This is intentional — re-registering on every render of an inline callback would cause a loop. The props are stable in practice.
+
+---
+
+### Biggest Issues Found
+
+#### ARCH-1 continuing: TodayPage ad-hoc overlay (FIXED)
+
+- **Location**: `src/pages/TodayPage.tsx` (formerly lines 176–185, 977–1110)
+- **Issue**: The ad-hoc workout flow (start modal + tracker overlay + outcome modal) held 10 state variables and ~135 lines of JSX inline in TodayPage, all self-contained with no shared state with the rest of the page beyond a "canAddAdHoc" guard and an "open" trigger.
+- **Fix**: Extracted to `src/components/today/TodayAdHocWorkout.tsx`. Unlike previous extractions (which were stateless presentational components), this component is self-managing — it holds all its own state. TodayPage reduced from 1,374 → 1,238 lines.
+- **Impact**: Structural only — no behavior change.
+
+#### DEAD-CODE-1: getFutureProjection unused (FIXED)
+
+- **Location**: `src/engine/calendarProjection.ts` (formerly lines 107–117)
+- **Issue**: The function was a thin wrapper around `getUpcomingDays` with no callers in the codebase. Its own docstring said "Currently unused by active pages."
+- **Fix**: Removed the function and its now-unused `getUpcomingDays` import. `calendarProjection.ts`: 118 → 94 lines.
+- **Impact**: Eliminates a second projection entry point that would need to stay in sync with the canonical engine.
+
+---
+
+### Items Not Fixed (tracked for future passes)
+
+| ID | Severity | Description |
+|----|----------|-------------|
+| ARCH-1 | Debt | TodayPage is now 1,238 lines — further decomposition needed. |
+| BUG-DAYOFF-INDEX | Low | `updateEntryAction` changing away from `day_off` leaves `planDayIndex: undefined`. |
+| TEST-3 | High | `ActiveWorkoutTracker.tsx` (~2144 lines) untested (requires RTL/Playwright). |
+
+---
+
 ## 2026-08-02 (eighty-ninth pass) — branch `claude/serene-cori-uv7ebe`
 
 ---
