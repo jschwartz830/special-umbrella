@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Settings2, ChevronLeft, Trash2, Check, Volume2, VolumeX, ArrowLeftRight } from 'lucide-react'
+import { X, Settings2, ChevronLeft, ChevronUp, Trash2, Check, Volume2, VolumeX, ArrowLeftRight, Pause, Play, Maximize2, List } from 'lucide-react'
 import type { MobilitySessionCheckpoint } from '../../store/mobilityStore'
 import { MOBILITY_LIBRARY, isBilateralExercise, normalizeMobilityRoutine, summarizeMobilitySets, type MobilityRoutineExercise } from '../../lib/mobilityLibrary'
 import { primeAudio, playExerciseEndSound, playSwitchSidesSound, playSessionCompleteSound } from '../../lib/timerSounds'
@@ -91,6 +91,9 @@ interface Props {
   onLogCompletion: (completion: MobilityLoggedCompletion) => void
   onClose: () => void
   onManageRoutine: () => void
+  minimized?: boolean
+  onMinimize?: () => void
+  onResume?: () => void
 }
 
 export function MobilityTracker({
@@ -106,6 +109,9 @@ export function MobilityTracker({
   onLogCompletion,
   onClose,
   onManageRoutine,
+  minimized = false,
+  onMinimize = onClose,
+  onResume,
 }: Props) {
   // Defends against stale/malformed persisted routine data (e.g. from before
   // the sets-based model shipped) — see normalizeMobilityRoutine.
@@ -128,6 +134,8 @@ export function MobilityTracker({
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [showJumpMenu, setShowJumpMenu] = useState(false)
   const [showSwitchCue, setShowSwitchCue] = useState(false)
+  const [simplifiedView, setSimplifiedView] = useState(false)
+  const [sessionRunning, setSessionRunning] = useState(true)
 
   // Live display state (driven by 100ms tick) — shared by the exercising and
   // resting phases (whichever is active at the time).
@@ -156,6 +164,7 @@ export function MobilityTracker({
   const finalizedR = useRef(false) // set once session is logged or discarded — skip resave on unmount
   const swipeStartR = useRef<{ x: number; y: number } | null>(null)
   const soundOnR = useRef(soundEnabled) // stale-closure-safe mirror for the interval
+  const sessionRunningR = useRef(true)
   const restDurR = useRef(0)
   const restNextSetIdxR = useRef(0)
 
@@ -165,14 +174,16 @@ export function MobilityTracker({
   useEffect(() => { doneR.current = completedIds }, [completedIds])
   useEffect(() => { doneSetsR.current = completedSets }, [completedSets])
   useEffect(() => { soundOnR.current = soundEnabled }, [soundEnabled])
+  useEffect(() => { sessionRunningR.current = sessionRunning }, [sessionRunning])
 
   // Lock background scroll while the full-screen session view is open — prevents
   // the page behind it from scrolling/rubber-banding during timer drag gestures.
   useEffect(() => {
+    if (minimized) return
     const original = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = original }
-  }, [])
+  }, [minimized])
 
   // Snapshot the current wall-clock timers + progress into a resumable checkpoint.
   // Shared by the unmount cleanup and the explicit "close" action so a user can
@@ -386,6 +397,28 @@ export function MobilityTracker({
     setPhase('exercising')
   }
 
+  function toggleSession() {
+    if (sessionRunningR.current) {
+      _snapshotEx()
+      const now = Date.now()
+      if (totalR.current.at != null) {
+        totalR.current = {
+          acc: totalR.current.acc + (now - totalR.current.at) / 1000,
+          at: null,
+        }
+      }
+      sessionRunningR.current = false
+      setSessionRunning(false)
+      return
+    }
+    totalR.current.at = Date.now()
+    if (phaseR.current === 'exercising' || phaseR.current === 'resting') {
+      exR.current.at = Date.now()
+    }
+    sessionRunningR.current = true
+    setSessionRunning(true)
+  }
+
   function handleCompleteSet() {
     _markSetDone()
   }
@@ -433,15 +466,6 @@ export function MobilityTracker({
     finalizedR.current = true
     clearSession()
     setShowDiscardConfirm(false)
-    onClose()
-  }
-
-  // Close without finishing or discarding — saves a checkpoint so exercises
-  // already done (and time already spent) aren't lost. Lets the user knock
-  // out the routine bit by bit throughout the day instead of all at once.
-  function handleClose() {
-    finalizedR.current = true
-    saveCheckpoint(_computeCheckpoint())
     onClose()
   }
 
@@ -534,16 +558,46 @@ export function MobilityTracker({
 
   // ── Render ───────────────────────────────────────────────────────────────
 
+  if (minimized) {
+    return (
+      <div className="fixed bottom-[72px] inset-x-0 z-50 px-4 pb-2">
+        <button
+          onClick={onResume}
+          className="w-full flex items-center gap-3 px-4 py-3 bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl active:scale-[0.98] transition-transform"
+        >
+          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${sessionRunning ? 'bg-sky-400 animate-pulse' : 'bg-orange-400'}`} />
+          <div className="flex-1 min-w-0 text-left">
+            <p className="text-sm font-semibold text-white truncate">{title}</p>
+            <p className="text-xs text-slate-400">Mobility in progress — tap to resume</p>
+          </div>
+          <span className="font-mono text-sky-300 text-sm flex-shrink-0">{fmtTime(totalSec)}</span>
+          <ChevronUp size={16} className="text-slate-400 flex-shrink-0" />
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-900">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-4 pt-safe pb-3 border-b border-slate-800">
-        <div>
+      <div className="flex items-center gap-3 px-4 pt-safe pb-3 border-b border-slate-800">
+        <button onClick={onMinimize} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800" aria-label="Minimize mobility routine">
+          <X size={18} />
+        </button>
+        <div className="flex-1 min-w-0">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Mobility</p>
           <h2 className="text-lg font-bold text-white leading-tight">{title}</h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setSimplifiedView(v => !v)}
+            className="p-2 rounded-lg text-slate-500 hover:text-sky-300 hover:bg-slate-800 transition-colors"
+            aria-label={simplifiedView ? 'Show detailed exercise list' : 'Show simplified exercise view'}
+            title={simplifiedView ? 'Detailed view' : 'Simplified view'}
+          >
+            {simplifiedView ? <List size={16} /> : <Maximize2 size={16} />}
+          </button>
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
             className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
@@ -566,14 +620,6 @@ export function MobilityTracker({
           >
             <Trash2 size={16} />
           </button>
-          <button
-            onClick={handleClose}
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors"
-            aria-label="Close — progress is saved, resume anytime"
-            title="Close (progress saved)"
-          >
-            <X size={18} />
-          </button>
         </div>
       </div>
 
@@ -591,6 +637,13 @@ export function MobilityTracker({
             {fmtTime(totalSec)}
           </p>
           <button
+            onClick={toggleSession}
+            className={`p-2 rounded-lg border transition-colors ${sessionRunning ? 'border-sky-500/50 bg-sky-500/10 text-sky-300' : 'border-orange-500/50 bg-orange-500/10 text-orange-300'}`}
+            aria-label={sessionRunning ? 'Pause mobility routine' : 'Resume mobility routine'}
+          >
+            {sessionRunning ? <Pause size={14} /> : <Play size={14} />}
+          </button>
+          <button
             onClick={() => handleAdjustTotal(15)}
             className="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 text-xs font-semibold hover:bg-slate-700 active:scale-95 transition-all"
           >
@@ -600,7 +653,7 @@ export function MobilityTracker({
       </div>
 
       {/* ── Main content (phase-driven, swipeable) ── */}
-      <div
+      {simplifiedView ? <div
         className="flex-1 flex flex-col items-center justify-center px-6 py-4"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -736,6 +789,7 @@ export function MobilityTracker({
               phase === 'idle' ? (
                 <button
                   onClick={handleStart}
+                  disabled={!sessionRunning}
                   className="px-10 py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors active:scale-[0.97]"
                 >
                   Start
@@ -759,7 +813,68 @@ export function MobilityTracker({
             )}
           </div>
         )}
-      </div>
+      </div> : (
+        <div className="flex-1 overflow-y-auto px-4 py-3 pb-28 space-y-3">
+          {routine.length === 0 ? (
+            <div className="text-center py-10">
+              <p className="text-sm text-slate-400">No exercises in your routine.</p>
+              <button onClick={onManageRoutine} className="mt-3 text-xs text-sky-400">Add exercises →</button>
+            </div>
+          ) : routine.map((exercise, exerciseIdx) => {
+            const libraryInfo = MOBILITY_LIBRARY.find(item => item.id === exercise.id)
+            const doneForExercise = completedSets[exercise.id] ?? []
+            return (
+              <div key={exercise.id} className={`bg-slate-800/60 rounded-xl p-3 space-y-2 border ${exerciseIdx === currentIdx ? 'border-sky-500/40' : 'border-transparent'}`}>
+                <button onClick={() => goToIndex(exerciseIdx)} className="w-full flex items-start gap-3 text-left">
+                  <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${completedIds.includes(exercise.id) ? 'bg-emerald-500/20 text-emerald-300' : exerciseIdx === currentIdx ? 'bg-sky-500/20 text-sky-300' : 'bg-slate-700 text-slate-400'}`}>
+                    {completedIds.includes(exercise.id) ? <Check size={13} /> : exerciseIdx + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white">{exercise.name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{summarizeMobilitySets(exercise.sets)}</p>
+                    {libraryInfo?.description && <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{libraryInfo.description}</p>}
+                  </div>
+                </button>
+                <div className="grid grid-cols-[2rem_1fr_4.5rem] gap-2 text-[9px] uppercase tracking-wide text-slate-600 px-1">
+                  <span className="text-center">Set</span><span>Target</span><span className="text-center">Timer</span>
+                </div>
+                {exercise.sets.map((set, setIdx) => {
+                  const isCurrent = exerciseIdx === currentIdx && setIdx === currentSetIdx
+                  const isDone = doneForExercise.includes(setIdx)
+                  const display = set.durationSec != null ? fmtTime(set.durationSec) : `${set.reps ?? '—'} reps`
+                  return (
+                    <button
+                      key={setIdx}
+                      onClick={() => goToIndex(exerciseIdx, setIdx)}
+                      className={`w-full grid grid-cols-[2rem_1fr_4.5rem] gap-2 items-center rounded-lg px-1 py-2 text-sm ${isCurrent ? 'bg-sky-500/10 ring-1 ring-sky-500/30' : 'bg-slate-800/70'}`}
+                    >
+                      <span className="text-center text-slate-500">{setIdx + 1}</span>
+                      <span className={isDone ? 'text-emerald-300 line-through text-left' : 'text-slate-200 text-left'}>{display}</span>
+                      <span className={`font-mono text-center ${isCurrent && phase === 'exercising' ? 'text-amber-300' : 'text-slate-400'}`}>
+                        {isCurrent && set.durationSec != null ? fmtTime(remaining) : isDone ? 'Done' : '—'}
+                      </span>
+                    </button>
+                  )
+                })}
+                {exerciseIdx === currentIdx && phase !== 'resting' && phase !== 'finished' && (
+                  <button
+                    onClick={isTimedSet && phase === 'idle' ? handleStart : handleCompleteSet}
+                    disabled={!sessionRunning || currentExDone}
+                    className={`w-full py-2.5 rounded-lg text-xs font-semibold disabled:opacity-40 ${phase === 'exercising' || !isTimedSet ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300' : 'bg-sky-500 text-white'}`}
+                  >
+                    {isTimedSet && phase === 'idle' ? 'Start Set Timer' : 'Complete Set'}
+                  </button>
+                )}
+                {exerciseIdx === currentIdx && phase === 'resting' && (
+                  <button onClick={handleSkipRest} className="w-full py-2.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-semibold">
+                    Rest {fmtTime(remaining)} · Skip
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── Bottom: progress dots + nav + log ── */}
       <div className="px-4 pt-3 pb-4 border-t border-slate-800 space-y-3">

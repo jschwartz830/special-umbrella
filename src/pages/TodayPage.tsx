@@ -195,15 +195,15 @@ export function TodayPage() {
   const mobilityClearSession = useMobilityStore(s => s.clearSession)
   const mobilitySoundEnabled = useMobilityStore(s => s.soundEnabled)
   const mobilitySetSoundEnabled = useMobilityStore(s => s.setSoundEnabled)
-  const [mobilityState, setMobilityState] = useState<'hidden' | 'open'>('hidden')
+  const [mobilityState, setMobilityState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
   // Scheduled `mobility` slot inside today's plan day — distinct from the
   // standalone global Daily Mobility Routine above. Session state lives only
   // in this component (not persisted) since it tracks a specific plan day's
   // slot rather than the global routine.
-  const [mobilitySlotState, setMobilitySlotState] = useState<'hidden' | 'open'>('hidden')
+  const [mobilitySlotState, setMobilitySlotState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
   const [mobilitySlotSession, setMobilitySlotSession] = useState<MobilitySessionCheckpoint | null>(null)
-  // A checkpoint left behind by closing the tracker mid-routine (see
-  // MobilityTracker's handleClose) — lets today's card offer "Continue"
+  // A checkpoint left behind when the tracker unmounts mid-routine — lets
+  // today's card offer "Continue"
   // instead of starting the whole routine over. Deliberately does NOT
   // require the checkpoint's exerciseIds to exactly match the live routine:
   // MobilityTracker's reconcileCheckpoint() already re-maps progress onto
@@ -1125,6 +1125,9 @@ export function TodayPage() {
             mobilityLogCompletion(today, { completedAt, durationMin, completedExerciseIds })
           }}
           onClose={() => setMobilityState('hidden')}
+          minimized={mobilityState === 'minimized'}
+          onMinimize={() => setMobilityState('minimized')}
+          onResume={() => setMobilityState('open')}
           onManageRoutine={() => {
             setMobilityState('hidden')
             navigate('/mobility')
@@ -1158,6 +1161,9 @@ export function TodayPage() {
             handleMobilitySlotComplete(primarySlot, completedAt, durationMin, completedExerciseIds, completedSets)
           }}
           onClose={() => setMobilitySlotState('hidden')}
+          minimized={mobilitySlotState === 'minimized'}
+          onMinimize={() => setMobilitySlotState('minimized')}
+          onResume={() => setMobilitySlotState('open')}
           onManageRoutine={() => {
             setMobilitySlotState('hidden')
             navigate(`/plans/${plan!.id}/edit`)
