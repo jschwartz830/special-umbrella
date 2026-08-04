@@ -1,5 +1,45 @@
 # Feature Reviews
 
+## Pass 90 — 2026-08-04 (branch `claude/serene-cori-xidg8a`)
+
+### Feature Review: `computeWorkoutCompletionRate`
+
+#### What was actually built
+
+A pure function `computeWorkoutCompletionRate(planId, entries, today)` in `src/lib/historyStats.ts` returning a `WorkoutCompletionRate` object with five fields:
+
+- `completedCount` — raw count of `complete` entries
+- `skippedCount` — raw count of `skip` entries  
+- `dayOffCount` — raw count of `day_off` entries
+- `workoutCompletionRate` — `completed / (completed + skipped) * 100`, integer or `null`
+- `overallRate` — `completed / (completed + skipped + dayOff) * 100`, integer or `null`
+
+#### Design validation
+
+The two-rate design was validated against three user scenarios:
+
+1. **High consistency, low follow-through** (user logs every day but often skips): `computeLoggedRate` → high, `workoutCompletionRate` → low. The metrics together diagnose this.
+2. **Low consistency, high follow-through** (user only logs on days they complete): `computeLoggedRate` → low, `workoutCompletionRate` → high. Correctly distinguishes from scenario 1.
+3. **Heavy rest-day user** (many day_off entries): `workoutCompletionRate` is unaffected (day_off excluded); `overallRate` is lower. A user logging 4 complete + 3 day_off per week sees 100% workoutCompletionRate but ~57% overallRate — the former is the more actionable number.
+
+#### Test coverage
+
+10 tests, comprehensive: empty set, pure complete, pure skip, pure day_off, mixed, 75% mixed, future exclusion, today inclusion, planId filtering, and the null-vs-zero edge case for day_off-only.
+
+#### Not yet wired into UI
+
+The function was intentionally added as a utility only — no UI changes were made. This keeps the diff small and reviewable. The recommended next step (pass 91+) is to surface `workoutCompletionRate` in the HistoryPage stats card or the plan-progress modal.
+
+#### Comparison to existing functions
+
+| Function | Denominator | What it measures |
+|----------|------------|------------------|
+| `computeLoggedRate` | all past calendar days | how consistently the user records activity |
+| `computeWorkoutCompletionRate.workoutCompletionRate` | complete + skip entries | of scheduled workouts, how many were completed |
+| `computeWorkoutCompletionRate.overallRate` | complete + skip + day_off | of all logged days, how many were completions |
+
+---
+
 ## Pass 79 — 2026-07-19 (branch `claude/dreamy-mccarthy-0r25in`)
 
 ### Feature: Calendar Streak Day Highlighting

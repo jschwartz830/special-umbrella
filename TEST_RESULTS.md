@@ -1,5 +1,48 @@
 # Test Results
 
+## 2026-08-04 (ninetieth pass) — branch `claude/serene-cori-xidg8a`
+
+---
+
+### Baseline (before changes)
+
+- **34 test files, 1186 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Changes under test
+
+| File | Tests Added |
+|------|-------------|
+| `src/lib/__tests__/historyStats.test.ts` | +10 for `computeWorkoutCompletionRate` |
+
+### Final results
+
+```
+Test Files  34 passed (34)
+     Tests  1196 passed (1196)
+  Start at  07:30:25
+  Duration  5.47s (transform 2.75s, setup 0ms, import 5.73s, tests 1.04s)
+```
+
+### New test descriptions (`computeWorkoutCompletionRate`)
+
+1. Returns null rates when no entries exist
+2. Counts complete entries → 100% both rates
+3. Counts skipped entries → 0% both rates
+4. Counts day_off entries: null workoutCompletionRate, 0% overallRate
+5. Mixed (1 complete, 1 skip, 1 day_off): workoutCompletionRate=50%, overallRate=33%
+6. 75% workout completion rate (3 complete, 1 skip)
+7. Excludes entries after today
+8. Includes entries on today
+9. Filters by planId
+10. Returns null workoutCompletionRate when only day_off entries (overallRate=0%)
+
+### TypeScript
+
+`tsc --noEmit` reported 0 errors before and after changes.
+
+---
+
 ## 2026-08-02 (eighty-ninth pass) — branch `claude/serene-cori-uv7ebe`
 
 ---

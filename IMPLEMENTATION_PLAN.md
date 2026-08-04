@@ -1,5 +1,48 @@
 # Implementation Plan
 
+## Pass 90 — 2026-08-04 (branch `claude/serene-cori-xidg8a`)
+
+### Baseline
+
+- Branch started from `main` after pass 89 PR merged.
+- **1186 tests passing** across 34 test files at start of pass.
+- **1196 tests passing** at end of pass (+10 new tests).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 90)
+
+Two-change pass: a targeted bug fix for the BUG-2 `openExtraOutcome` edge case in
+`CalendarPage.tsx`, and a new `computeWorkoutCompletionRate` utility in `historyStats.ts`.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-2 (partial) | — | `CalendarPage.tsx` | `openExtraOutcome` did not set `planDayIndex` on `outcomeTarget`, so when the user tapped an extra workout on a day whose rotation entry was `day_off`, `handleOutcomeConfirm` called `updateEntryAction` with `entry.planDayIndex = undefined` AND `outcomeTarget.planDayIndex = undefined`, leaving the rotation entry as `complete` with `planDayIndex: undefined`. Fix: look up the resolved day from the existing calendar grid (`weeks.flat().find(…)`) and forward `resolvedDay?.planDayIndex`. This covers the remaining BUG-2 path; `openEditOutcome` and `logForDate` were already correct. |
+
+### Features Added This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| FEAT-1 | — | `historyStats.ts` | `computeWorkoutCompletionRate(planId, entries, today)` — returns `{ completedCount, skippedCount, dayOffCount, workoutCompletionRate, overallRate }`. `workoutCompletionRate` measures completed/(completed+skipped) excluding day_off entries. `overallRate` includes day_off in the denominator. Both are integers or `null` when denominator is 0. |
+
+### Tests Added This Pass
+
+| File | Tests Added | Description |
+|---|---|---|
+| `historyStats.test.ts` | +10 | Full coverage for `computeWorkoutCompletionRate`: empty entries → null rates; all-complete → 100%; all-skip → 0%; all-day_off → null workoutCompletionRate, 0% overallRate; mixed → correct percentages; future entries excluded; today's entries included; planId filtering; 75% mixed case; null workoutCompletionRate when only day_off. |
+
+### Prioritized Plan (for future passes)
+
+| Priority | Item |
+|----------|------|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now 1,367 lines. |
+| P1 | Wire `computeWorkoutCompletionRate` into a stats display (HistoryPage or plan stats card). |
+| P2 | Remove or document `getFutureProjection` dead code in `calendarProjection.ts`. |
+| P3 | Add render-level tests for `TodayRotationModals`, `TodayPendingCard`, `TodayUpcomingList`. |
+
+---
+
 ## Pass 89 — 2026-08-02 (branch `claude/serene-cori-uv7ebe`)
 
 ### Baseline
