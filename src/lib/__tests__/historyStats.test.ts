@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags, buildPRFlagsMap } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags, buildPRFlagsMap, computeWorkoutCompletionRate } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -2836,5 +2836,109 @@ describe('buildPRFlagsMap', () => {
     const records = [makeExRecord('plan-1_2026-01-10', 'Plank', '2026-01-10', 0, null)]
     const map = buildPRFlagsMap(records)
     expect(map.get('plan-1_2026-01-10')).toEqual({ hasLoadPR: false, hasRepsPR: false })
+  })
+})
+
+// ── computeWorkoutCompletionRate ──────────────────────────────────────────────
+
+describe('computeWorkoutCompletionRate', () => {
+  it('returns null rates when no entries exist', () => {
+    const result = computeWorkoutCompletionRate('plan-1', [], '2026-06-11')
+    expect(result).toEqual({ completedCount: 0, skippedCount: 0, dayOffCount: 0, workoutCompletionRate: null, overallRate: null })
+  })
+
+  it('counts complete entries', () => {
+    const entries = [entry('2026-06-01', 'complete'), entry('2026-06-02', 'complete')]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.completedCount).toBe(2)
+    expect(result.skippedCount).toBe(0)
+    expect(result.dayOffCount).toBe(0)
+    expect(result.workoutCompletionRate).toBe(100)
+    expect(result.overallRate).toBe(100)
+  })
+
+  it('counts skipped entries', () => {
+    const entries = [entry('2026-06-01', 'skip'), entry('2026-06-02', 'skip')]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.completedCount).toBe(0)
+    expect(result.skippedCount).toBe(2)
+    expect(result.workoutCompletionRate).toBe(0)
+    expect(result.overallRate).toBe(0)
+  })
+
+  it('counts day_off entries and excludes them from workoutCompletionRate', () => {
+    const entries = [entry('2026-06-01', 'day_off'), entry('2026-06-02', 'day_off')]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.dayOffCount).toBe(2)
+    expect(result.workoutCompletionRate).toBeNull()
+    expect(result.overallRate).toBe(0)
+  })
+
+  it('computes workoutCompletionRate excluding day_off', () => {
+    const entries = [
+      entry('2026-06-01', 'complete'),
+      entry('2026-06-02', 'skip'),
+      entry('2026-06-03', 'day_off'),
+    ]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.completedCount).toBe(1)
+    expect(result.skippedCount).toBe(1)
+    expect(result.dayOffCount).toBe(1)
+    // workoutCompletionRate = 1/(1+1) = 50%
+    expect(result.workoutCompletionRate).toBe(50)
+    // overallRate = 1/(1+1+1) = 33%
+    expect(result.overallRate).toBe(33)
+  })
+
+  it('computes 75% workout completion rate', () => {
+    const entries = [
+      entry('2026-06-01', 'complete'),
+      entry('2026-06-02', 'complete'),
+      entry('2026-06-03', 'complete'),
+      entry('2026-06-04', 'skip'),
+    ]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.workoutCompletionRate).toBe(75)
+    expect(result.overallRate).toBe(75)
+  })
+
+  it('excludes entries after today', () => {
+    const entries = [
+      entry('2026-06-01', 'complete'),
+      entry('2026-06-20', 'skip'), // future
+    ]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.completedCount).toBe(1)
+    expect(result.skippedCount).toBe(0)
+    expect(result.workoutCompletionRate).toBe(100)
+  })
+
+  it('includes entries on today', () => {
+    const entries = [entry('2026-06-11', 'complete')]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.completedCount).toBe(1)
+    expect(result.workoutCompletionRate).toBe(100)
+  })
+
+  it('filters by planId', () => {
+    const entries = [
+      entry('2026-06-01', 'complete', 'plan-1'),
+      entry('2026-06-02', 'skip', 'plan-2'),
+    ]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.completedCount).toBe(1)
+    expect(result.skippedCount).toBe(0)
+    expect(result.workoutCompletionRate).toBe(100)
+  })
+
+  it('returns null workoutCompletionRate when only day_off entries', () => {
+    const entries = [
+      entry('2026-06-01', 'day_off'),
+      entry('2026-06-02', 'day_off'),
+      entry('2026-06-03', 'day_off'),
+    ]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.workoutCompletionRate).toBeNull()
+    expect(result.overallRate).toBe(0)
   })
 })

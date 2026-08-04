@@ -256,6 +256,65 @@ export function computeLoggedRate(
   return Math.min(Math.round((loggedDates.size / activeDays) * 100), 100)
 }
 
+// ── Workout completion rate ───────────────────────────────────────────────────
+
+export interface WorkoutCompletionRate {
+  /** Number of rotation entries with action = 'complete'. */
+  completedCount: number
+  /** Number of rotation entries with action = 'skip'. */
+  skippedCount: number
+  /** Number of rotation entries with action = 'day_off'. */
+  dayOffCount: number
+  /**
+   * Percentage of non-day_off entries that were completed.
+   * `null` when there are no complete or skip entries (nothing to measure against).
+   */
+  workoutCompletionRate: number | null
+  /**
+   * Percentage of all logged entries (including day_off) that were completed.
+   * `null` when there are no entries at all.
+   */
+  overallRate: number | null
+}
+
+/**
+ * Compute what fraction of logged rotation days were actually completed.
+ *
+ * - `workoutCompletionRate` = completed / (completed + skipped) × 100.
+ *   Excludes day_off entries, which are not "skipped" workouts.
+ * - `overallRate` = completed / (completed + skipped + day_off) × 100.
+ *   Treats every logged day the same.
+ *
+ * Both rates are integers (Math.round) and `null` when the denominator is 0.
+ * Only entries up to and including `today` are counted.
+ */
+export function computeWorkoutCompletionRate(
+  planId: string,
+  entries: HistoryEntry[],
+  today: string,
+): WorkoutCompletionRate {
+  let completedCount = 0
+  let skippedCount = 0
+  let dayOffCount = 0
+
+  for (const e of entries) {
+    if (e.planId !== planId || e.calendarDate > today) continue
+    if (e.action === 'complete') completedCount++
+    else if (e.action === 'skip') skippedCount++
+    else if (e.action === 'day_off') dayOffCount++
+  }
+
+  const workoutTotal = completedCount + skippedCount
+  const workoutCompletionRate =
+    workoutTotal === 0 ? null : Math.round((completedCount / workoutTotal) * 100)
+
+  const allTotal = completedCount + skippedCount + dayOffCount
+  const overallRate =
+    allTotal === 0 ? null : Math.round((completedCount / allTotal) * 100)
+
+  return { completedCount, skippedCount, dayOffCount, workoutCompletionRate, overallRate }
+}
+
 /** Difference in calendar days between two YYYY-MM-DD strings (b − a). */
 function dateDiffDays(a: string, b: string): number {
   const [ay, am, ad] = a.split('-').map(Number)
