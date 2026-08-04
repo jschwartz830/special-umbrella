@@ -2,6 +2,25 @@
 
 ---
 
+## Pass 90 — 2026-08-04 (branch `claude/serene-cori-xidg8a`)
+
+### Fix: BUG-2 (partial) — `openExtraOutcome` now forwards `planDayIndex` to `outcomeTarget`
+
+- **File**: `src/pages/CalendarPage.tsx`
+- **What changed**: Added a one-line `weeks.flat().find(…)` lookup in `openExtraOutcome` to resolve the calendar grid cell for the extra's date, then passed `planDayIndex: resolvedDay?.planDayIndex` to `setOutcomeTarget`. Previously `outcomeTarget.planDayIndex` was always `undefined` when the flow entered via `openExtraOutcome`.
+- **Why it matters**: `handleOutcomeConfirm` calls `updateEntryAction(entry.planId, entry.calendarDate, action, entry.planDayIndex ?? outcomeTarget.planDayIndex)`. On a day where the rotation entry was `day_off`, `entry.planDayIndex` is `undefined`. With `outcomeTarget.planDayIndex` also `undefined`, the resulting rotation entry had `planDayIndex: undefined` after the action change (BUG-2). The rotation engine uses `planDayIndex` to attribute history entries to a specific plan day; a missing index causes `computeWorkoutTypeBreakdown` and stats functions to skip the entry entirely.
+- **Risks**: Very low. `weeks` is already computed by `useMemo` on the same cycle; `.flat().find(…)` is an O(cells) scan at most (~35 cells per month). `resolvedDay` is undefined for days outside the active plan, in which case `planDayIndex` stays `undefined` — the same as the pre-fix behavior, so no regression.
+- **Rollback**: Revert the two-line addition in `openExtraOutcome`.
+
+### Feature: `computeWorkoutCompletionRate` in `src/lib/historyStats.ts`
+
+- **What changed**: Added `WorkoutCompletionRate` interface and `computeWorkoutCompletionRate(planId, entries, today)` function. The function counts `complete`, `skip`, and `day_off` entries for a plan up to `today`, then computes two complementary rates: `workoutCompletionRate` (completed/(completed+skipped)×100, excludes day_off) and `overallRate` (completed/all×100). Both are integers or `null` when the denominator is zero.
+- **Why it matters**: `computeLoggedRate` already measures *whether* days are logged; this new function measures *how often* logged workout days end in completion vs a skip. Together they give a more complete picture: a user with 95% logged rate but 40% completion rate is consistently recording but frequently skipping — a different pattern from 95% logged, 95% completed.
+- **Tests**: +10 tests in `historyStats.test.ts`. Total tests: 1186 → 1196.
+- **Risks**: None. Pure function with no side effects, no store dependencies, and no new imports.
+
+---
+
 ## Pass 89 — 2026-08-02 (branch `claude/serene-cori-uv7ebe`)
 
 ### Change 1: ARCH-1 — Extract TodayRotationModals

@@ -195,12 +195,14 @@ export function CalendarPage() {
 
   function openExtraOutcome(extra: ExtraWorkoutEntry) {
     if (!plan) return
+    const resolvedDay = weeks.flat().find(cell => cell.date === extra.calendarDate)?.resolvedDay
     setSelected(null)
     setOutcomeTarget({
       planId: plan.id,
       calendarDate: extra.calendarDate,
       planDay: extraToPlanDay(extra),
       instanceId: makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id),
+      planDayIndex: resolvedDay?.planDayIndex,
     })
   }
 

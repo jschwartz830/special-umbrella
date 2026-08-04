@@ -11,6 +11,26 @@
 
 ### Architecture Summary (pass 90)
 
+Two-change pass: a targeted bug fix for the BUG-2 `openExtraOutcome` edge case in
+`CalendarPage.tsx`, and a new `computeWorkoutCompletionRate` utility in `historyStats.ts`.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-2 (partial) | — | `CalendarPage.tsx` | `openExtraOutcome` did not set `planDayIndex` on `outcomeTarget`, so when the user tapped an extra workout on a day whose rotation entry was `day_off`, `handleOutcomeConfirm` called `updateEntryAction` with `entry.planDayIndex = undefined` AND `outcomeTarget.planDayIndex = undefined`, leaving the rotation entry as `complete` with `planDayIndex: undefined`. Fix: look up the resolved day from the existing calendar grid (`weeks.flat().find(…)`) and forward `resolvedDay?.planDayIndex`. This covers the remaining BUG-2 path; `openEditOutcome` and `logForDate` were already correct. |
+
+### Features Added This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| FEAT-1 | — | `historyStats.ts` | `computeWorkoutCompletionRate(planId, entries, today)` — returns `{ completedCount, skippedCount, dayOffCount, workoutCompletionRate, overallRate }`. `workoutCompletionRate` measures completed/(completed+skipped) excluding day_off entries. `overallRate` includes day_off in the denominator. Both are integers or `null` when denominator is 0. |
+
+### Tests Added This Pass
+
+| File | Tests Added | Description |
+|---|---|---|
+| `historyStats.test.ts` | +10 | Full coverage for `computeWorkoutCompletionRate`: empty entries → null rates; all-complete → 100%; all-skip → 0%; all-day_off → null workoutCompletionRate, 0% overallRate; mixed → correct percentages; future entries excluded; today's entries included; planId filtering; 75% mixed case; null workoutCompletionRate when only day_off. |
 Two-change pass: removed the `getFutureProjection` dead code from `calendarProjection.ts` and extracted the ad-hoc workout flow from `TodayPage.tsx` into a new self-managing `TodayAdHocWorkout` component.
 
 The dead code (`getFutureProjection`) had been marked "currently unused" in its own docstring since at least pass 88 and appeared in `REVIEW_NOTES.md` as `DEAD-CODE-1`. No callers existed anywhere in the codebase.
@@ -36,6 +56,10 @@ None. Both changes are structural/dead-code removals with no new logic to test.
 
 | Priority | Item |
 |----------|------|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now 1,367 lines. |
+| P1 | Wire `computeWorkoutCompletionRate` into a stats display (HistoryPage or plan stats card). |
+| P2 | Remove or document `getFutureProjection` dead code in `calendarProjection.ts`. |
+| P3 | Add render-level tests for `TodayRotationModals`, `TodayPendingCard`, `TodayUpcomingList`. |
 | P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now 1,238 lines. Next candidates: the "PR celebration" banner (inline JSX ~20 lines) could join `TodayCompletedSection`; or the catch-up confirm modal (~40 lines) into a `TodayCatchupModal` component. |
 | P2 | `updateEntryAction` historyStore: changing away from `day_off` without a `planDayIndex` leaves the entry with `planDayIndex: undefined`. Fix requires CalendarPage to thread the index through the `outcomeTarget` state shape. |
 | P3 | Update `REVIEW_NOTES.md` and `WEB_APP_INVENTORY.md` to remove now-deleted `getFutureProjection` references. |

@@ -1,11 +1,43 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-04 (ninetieth pass) — branch `claude/serene-cori-xidg8a`
 ## 2026-08-03 (ninetieth pass) — branch `claude/serene-cori-lp74l7`
 
 ---
 
 ### Executive Summary
 
+1. **What changed**: 2 production files modified (`CalendarPage.tsx`, `historyStats.ts`), 2 test/doc files updated (+10 tests, IMPLEMENTATION_PLAN.md + CHANGELOG_OVERNIGHT.md appended). No new dependencies. No store schema changes.
+2. **Highest confidence**: The `computeWorkoutCompletionRate` addition is a pure function with no side effects — 10 tests cover all branches exhaustively. The `openExtraOutcome` fix is a two-line read-only addition that cannot cause regressions.
+3. **Risk assessment**: Both changes are low-risk. The BUG-2 fix adds a data read (not a write) to `openExtraOutcome`; only the `planDayIndex` field on `outcomeTarget` is affected.
+
+### Change Review
+
+#### Fix: `openExtraOutcome` BUG-2 (CalendarPage.tsx)
+
+- **Nature**: Bug fix, additive-only (one line of lookup + one field in an object literal)
+- **Before**: `outcomeTarget.planDayIndex` was always `undefined` for the `openExtraOutcome` path
+- **After**: Looks up the resolved calendar cell for the extra's date from the pre-computed `weeks` grid; passes `resolvedDay?.planDayIndex` (still `undefined` when no plan day maps to that date — identical to before for the common case)
+- **Impact on `handleOutcomeConfirm`**: `updateEntryAction(entry.planId, entry.calendarDate, action, entry.planDayIndex ?? outcomeTarget.planDayIndex)` now has a valid fallback when `entry.planDayIndex` is undefined (day_off rotation entries)
+- **Regression risk**: None. `weeks` is already computed in scope; the find is read-only; all other code paths in `handleOutcomeConfirm` are unchanged
+
+#### Feature: `computeWorkoutCompletionRate` (historyStats.ts)
+
+- **Nature**: Additive — new exported function + interface; no existing function modified
+- **API**: `computeWorkoutCompletionRate(planId, entries, today): WorkoutCompletionRate`
+- **Design decisions**:
+  - Two rates: `workoutCompletionRate` (excluding day_off) and `overallRate` (including day_off). They measure different things — a day_off is neither a completed nor a skipped workout, so omitting it from `workoutCompletionRate` gives the cleaner "of workouts I intended to do, how many did I actually do?" metric.
+  - `null` return (not 0) when denominator is 0 — consistent with `computeLoggedRate` convention
+  - `Math.round` integers — consistent with all other rate functions in the module
+- **Not yet wired into any UI** — pure utility addition for future use by HistoryPage or a plan stats card
+
+### Open Issues
+
+| ID | Status | Note |
+|----|--------|------|
+| BUG-2 | Partially fixed | The `openExtraOutcome` path is now fixed. The root `updateEntryAction` function itself still accepts `undefined` planDayIndex when changing away from day_off — the BUG-2 test in `historyStore.test.ts` still documents the underlying behavior. A future pass could add a guard in `updateEntryAction` itself, but the fix is low-urgency now that CalendarPage always provides the index. |
+| ARCH-1 | Open | TodayPage.tsx at ~1,367 lines; decomposition continues |
+| TEST-3 | Open | ActiveWorkoutTracker needs RTL/Playwright tests |
 1. **What changed**: 2 commits, 3 source files changed (1 new component, 1 page reduced, 1 engine file pruned). No new dependencies. No store schema changes. No new tests.
 2. **Highest confidence**: Dead-code removal is zero-risk (`getFutureProjection` had no callers anywhere in the codebase). Component extraction is a structural refactor — all logic, state, and side effects migrate verbatim to the new component.
 3. **Risky items**: None.

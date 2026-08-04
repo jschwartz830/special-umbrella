@@ -1,5 +1,42 @@
 # Feature Proposals
 
+## Pass 90 — 2026-08-04 (branch `claude/serene-cori-xidg8a`)
+
+### Feature: `computeWorkoutCompletionRate` — workout quality metric
+
+**Status**: Implemented this pass.
+
+**Context**: `computeLoggedRate` already measures what fraction of past days have any history entry logged ("consistency"). The missing complementary metric is: of those logged days, how many resulted in actually completing the workout vs. skipping? This is the "quality" or "follow-through" rate.
+
+**What was built**:
+
+```typescript
+export interface WorkoutCompletionRate {
+  completedCount: number
+  skippedCount: number
+  dayOffCount: number
+  workoutCompletionRate: number | null  // completed/(completed+skipped)*100
+  overallRate: number | null            // completed/all*100
+}
+
+export function computeWorkoutCompletionRate(
+  planId: string,
+  entries: HistoryEntry[],
+  today: string,
+): WorkoutCompletionRate
+```
+
+**Why two rates?**
+- `workoutCompletionRate` answers "of the days I planned to work out (complete or skip), how many did I actually finish?" Day-off days are excluded — they represent planned rest, not abandoned workouts.
+- `overallRate` answers "of every logged day, how many were full completions?" More conservative; day-off days drag the number down.
+
+**Potential future usage**:
+- HistoryPage stats card: "X% completion rate" alongside the existing streak and total counts
+- Plan stats modal: Show workoutCompletionRate to help users see if they're consistently skipping one type of day
+- Weekly breakdown: Augment `WeeklyBreakdown` with per-week completion rates
+
+---
+
 ## Pass 80 — 2026-07-21 (branch `claude/dreamy-mccarthy-h2vbby`)
 
 ### Proposal: Extra Workout Notes in HistoryPage Edit Modal
