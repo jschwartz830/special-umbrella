@@ -37,13 +37,12 @@ import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress } from '../lib/historyStats'
-import type { ResolvedDay, ExtraWorkoutEntry, WorkoutType, WorkoutSlot, PlanDay } from '../types'
+import type { ResolvedDay, ExtraWorkoutEntry, WorkoutSlot } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../modules/workout-outcomes/types'
 import type { MobilitySessionCheckpoint } from '../store/mobilityStore'
 import { extraToPlanDay } from '../lib/planDayUtils'
 import { MobilityTracker } from '../components/workout/MobilityTracker'
 import { useMobilityStore } from '../store/mobilityStore'
-import { nanoid } from '../lib/utils'
 import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -56,6 +55,7 @@ import { TodayCompletedSection } from '../components/today/TodayCompletedSection
 import { TodayHabitSummary } from '../components/today/TodayHabitSummary'
 import { TodayMobilitySection } from '../components/today/TodayMobilitySection'
 import { TodayPendingCard } from '../components/today/TodayPendingCard'
+import { TodayAdHocWorkout } from '../components/today/TodayAdHocWorkout'
 import { TodayPlanProgressModal } from '../components/today/TodayPlanProgressModal'
 import { TodayRotationModals } from '../components/today/TodayRotationModals'
 import { SwipeToDelete } from '../components/shared/SwipeToDelete'
@@ -172,17 +172,6 @@ export function TodayPage() {
   // Cardio phase state: shown after weights (or as standalone for run-only days)
   const [cardioState, setCardioState] = useState<'hidden' | 'prompt' | 'open' | 'minimized'>('hidden')
   const [cardioTrackedDurationMin, setCardioTrackedDurationMin] = useState<number | null>(null)
-  // Ad hoc workout state
-  const [adHocModalOpen, setAdHocModalOpen] = useState(false)
-  const [adHocName, setAdHocName] = useState('')
-  const [adHocType, setAdHocType] = useState<WorkoutType>('weights')
-  const [adHocWorkoutState, setAdHocWorkoutState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
-  const [adHocExtraId, setAdHocExtraId] = useState<string | null>(null)
-  const [adHocSlot, setAdHocSlot] = useState<WorkoutSlot | null>(null)
-  const [adHocPlanDay, setAdHocPlanDay] = useState<PlanDay | null>(null)
-  const [adHocTrackedExercises, setAdHocTrackedExercises] = useState<LoggedExerciseActual[] | null>(null)
-  const [adHocTrackedDurationMin, setAdHocTrackedDurationMin] = useState<number | null>(null)
-  const [showAdHocOutcome, setShowAdHocOutcome] = useState(false)
   // Mobility state
   const mobilityCompletions = useMobilityStore(s => s.completions)
   const mobilityCompletion = mobilityCompletions[today] ?? null
@@ -201,6 +190,9 @@ export function TodayPage() {
   // in this component (not persisted) since it tracks a specific plan day's
   // slot rather than the global routine.
   const [mobilitySlotState, setMobilitySlotState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
+  // Ad hoc workout — start-modal trigger and tracker-active flag; full state lives in TodayAdHocWorkout
+  const [adHocOpenRequest, setAdHocOpenRequest] = useState(false)
+  const [adHocActive, setAdHocActive] = useState(false)
   const [mobilitySlotSession, setMobilitySlotSession] = useState<MobilitySessionCheckpoint | null>(null)
   // A checkpoint left behind when the tracker unmounts mid-routine — lets
   // today's card offer "Continue"
@@ -973,141 +965,16 @@ export function TodayPage() {
         )
       })()}
 
-      {/* Ad hoc workout tracker */}
-      {adHocWorkoutState !== 'hidden' && adHocExtraId && adHocSlot && adHocPlanDay && plan && (
-        <ActiveWorkoutTracker
-          planId={plan.id}
-          workoutInstanceId={makeExtraWorkoutInstanceId(plan.id, today, adHocExtraId)}
-          planDay={adHocPlanDay}
-          slot={adHocSlot}
-          programVars={{}}
-          previousOutcome={null}
-          resumeOutcome={null}
-          previousSetsByExercise={{}}
-          minimized={adHocWorkoutState === 'minimized'}
-          onMinimize={() => setAdHocWorkoutState('minimized')}
-          onResume={() => setAdHocWorkoutState('open')}
-          onCancel={() => {
-            if (adHocExtraId) removeExtraEntry(adHocExtraId)
-            setAdHocExtraId(null)
-            setAdHocSlot(null)
-            setAdHocPlanDay(null)
-            setAdHocWorkoutState('hidden')
-          }}
-          onComplete={(exercises, meta) => {
-            setAdHocTrackedExercises(exercises)
-            setAdHocTrackedDurationMin(Math.round(meta.totalElapsedSeconds / 60) || null)
-            setAdHocWorkoutState('hidden')
-            setShowAdHocOutcome(true)
-          }}
-        />
-      )}
-
-      {/* Ad hoc outcome modal */}
-      {showAdHocOutcome && adHocExtraId && adHocPlanDay && plan && (() => {
-        const instanceId = makeExtraWorkoutInstanceId(plan.id, today, adHocExtraId)
-        return (
-          <OutcomeModal
-            planId={plan.id}
-            calendarDate={today}
-            planDay={adHocPlanDay}
-            previousSetsByExercise={{}}
-            isFromActiveWorkout={true}
-            existingOutcome={{
-              workoutInstanceId: instanceId,
-              completionState: 'completed',
-              completedAt: new Date().toISOString(),
-              durationActualMin: adHocTrackedDurationMin,
-              perceivedEffort: null,
-              notes: null,
-              runActual: null,
-              swimActual: null,
-              weightsActual: adHocTrackedExercises ? { exercises: adHocTrackedExercises } : null,
-            }}
-            onConfirm={(outcome) => {
-              useOutcomeStore.getState().setOutcome({ ...outcome, workoutInstanceId: instanceId })
-              setShowAdHocOutcome(false)
-              setAdHocExtraId(null)
-              setAdHocSlot(null)
-              setAdHocPlanDay(null)
-              setAdHocTrackedExercises(null)
-              setAdHocTrackedDurationMin(null)
-            }}
-            onClose={() => {
-              setShowAdHocOutcome(false)
-              setAdHocExtraId(null)
-              setAdHocSlot(null)
-              setAdHocPlanDay(null)
-              setAdHocTrackedExercises(null)
-              setAdHocTrackedDurationMin(null)
-            }}
-          />
-        )
-      })()}
-
-      {/* Ad hoc start modal */}
-      {adHocModalOpen && plan && (
-        <Modal title="Ad Hoc Workout" onClose={() => setAdHocModalOpen(false)}>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                Workout name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Upper Body, Garage Workout…"
-                value={adHocName}
-                onChange={e => setAdHocName(e.target.value)}
-                autoFocus
-                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                Type
-              </label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(['weights', 'run', 'other'] as WorkoutType[]).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setAdHocType(t)}
-                    className={`py-2 rounded-lg border text-xs font-medium transition-colors capitalize ${
-                      adHocType === t
-                        ? 'bg-sky-500/20 border-sky-500/50 text-sky-300'
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {t === 'weights' ? 'Weights' : t === 'run' ? 'Cardio' : 'Other'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                const name = adHocName.trim() || 'Ad Hoc Workout'
-                const slotId = nanoid()
-                const slot: WorkoutSlot = { id: slotId, type: adHocType, name }
-                const day: PlanDay = { id: nanoid(), label: name, slots: [slot] }
-                const extraId = addExtraEntry({
-                  planId: plan.id,
-                  calendarDate: today,
-                  workoutType: adHocType,
-                  workoutName: name,
-                  source: 'history',
-                })
-                setAdHocSlot(slot)
-                setAdHocPlanDay(day)
-                setAdHocExtraId(extraId)
-                setAdHocModalOpen(false)
-                setAdHocWorkoutState('open')
-              }}
-              className="w-full py-3.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors active:scale-[0.98]"
-            >
-              Start
-            </button>
-          </div>
-        </Modal>
-      )}
+      {/* Ad hoc workout — manages its own start-modal/tracker/outcome flow */}
+      <TodayAdHocWorkout
+        planId={plan.id}
+        today={today}
+        addExtraEntry={addExtraEntry}
+        removeExtraEntry={removeExtraEntry}
+        openRequested={adHocOpenRequest}
+        onOpenConsumed={() => setAdHocOpenRequest(false)}
+        onActiveChange={setAdHocActive}
+      />
 
       {/* Mobility tracker — closing saves a checkpoint so the routine can be
           finished bit by bit throughout the day instead of all at once */}
@@ -1354,11 +1221,9 @@ export function TodayPage() {
         showAddWorkout={showAddWorkout}
         onCloseAddWorkout={() => setShowAddWorkout(false)}
         onGoToAddFromPlan={() => { setShowAddWorkout(false); setShowAddFromPlan(true) }}
-        canAddAdHoc={adHocWorkoutState === 'hidden' && !showAdHocOutcome}
+        canAddAdHoc={!adHocActive}
         onOpenAdHoc={() => {
-          setAdHocName('')
-          setAdHocType('weights')
-          setAdHocModalOpen(true)
+          setAdHocOpenRequest(true)
           setShowAddWorkout(false)
         }}
         showAddFromPlan={showAddFromPlan}

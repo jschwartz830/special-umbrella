@@ -149,7 +149,7 @@ These are the exact case sets a faithful rebuild must reproduce (source: `src/mo
   - Entry de-duplication everywhere keeps the newest `createdAt` per date.
   - `mod()` is a symmetric modulo so `go_back` from index 0 wraps correctly.
 - **Plan expiry** (`isPlanExpired`): `weeks` plans expire when `today >= startDate + value*7` days; `rotations` plans expire when `floor(complete+skip count / days.length) >= value` (`day_off` excluded).
-- **Calendar month projection** (`engine/calendarProjection.ts`): `buildMonthGrid` clamps `fromDate` to `plan.startDate` (pre-start cells render neutral). `getFutureProjection` delegates to `getUpcomingDays`.
+- **Calendar month projection** (`engine/calendarProjection.ts`): `buildMonthGrid` clamps `fromDate` to `plan.startDate` (pre-start cells render neutral).
 - **Stats / progress** (`lib/historyStats.ts`): `computeHistoryStats` (totals, 7/30-day windows, current + longest streak — streak counts `complete`/`day_off` rotation entries or any extra; lone `skip` or empty day breaks it; future-dated entries excluded from longest), `computePlanProgress`, `computeRotationCycleProgress`, `computeRotationPlanRemaining`, `countPastUnloggedDays`/`getUnloggedPastDates`, `computeWorkoutTypeBreakdown` (rotation type from the day's **first slot**, extras by `workoutType`, `day_off` excluded, avg effort from outcomes), `computePersonalRecords`, `computePlanStreak`, `countPlanDayCompletions`, `computeWeeklyBreakdown` (+ `padWeekGaps`, ISO weeks Monday-start). Internal date math uses UTC string helpers (`shiftDay`, `dateDiffDays`, `isoWeekStart`).
 - **Outcome progression pipeline** (`outcomeStore.logOutcomeWithProgression`):
   1. Attach a recommendation (`buildProgressionRecommendation`) and persist the outcome (`setOutcome` → also syncs weights to `exerciseHistoryStore`).
@@ -215,8 +215,6 @@ These are the exact case sets a faithful rebuild must reproduce (source: `src/mo
 - `swap_slot` exists in the model and `usePlanActions` but has no first-class user-facing control.
 - Settings "Force refresh" is destructive for offline cache and may surprise users if not clearly messaged (web-specific behavior).
 - **`ExtraWorkoutEntry.source` has two conflicting "safe" defaults.** The store migration backfills `undefined → 'history'` (so Undo *keeps* legacy extras), but the type doc-comment and the CSV `extraSource` cutover treat `undefined → 'double_day'` (so Undo *removes* them). Persisted records are migrated, so the conflict only surfaces on freshly imported/unmigrated rows — but the two code paths encode opposite intentions and should be reconciled (see Open Questions #13).
-- `calendarProjection.getFutureProjection` exists but is effectively unused — `TodayPage` calls `getUpcomingDays` directly. Harmless drift, but a second projection entry point to keep in sync.
-
 ## Open Questions / Ambiguities (Updated with Product Direction)
 
 1. **Planned sessions per day**: Multi-planned sessions/day are allowed. Default projection logic should still assume each rotation item maps to subsequent days unless explicitly marked day off or otherwise overridden.

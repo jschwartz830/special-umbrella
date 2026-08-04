@@ -1,12 +1,12 @@
 # Implementation Plan
 
-## Pass 90 — 2026-08-04 (branch `claude/serene-cori-xidg8a`)
+## Pass 90 — 2026-08-03 (branch `claude/serene-cori-lp74l7`)
 
 ### Baseline
 
-- Branch started from `main` after pass 89 PR merged.
+- Branch started from `main` after PRs #227–#229 (drag-reorder, MobilityTracker set-completion fix, minimize/resume UX) merged since pass 89.
 - **1186 tests passing** across 34 test files at start of pass.
-- **1196 tests passing** at end of pass (+10 new tests).
+- **1186 tests passing** at end of pass (no regressions, no new tests this pass).
 - TypeScript: `tsc --noEmit` clean throughout.
 
 ### Architecture Summary (pass 90)
@@ -31,6 +31,26 @@ Two-change pass: a targeted bug fix for the BUG-2 `openExtraOutcome` edge case i
 | File | Tests Added | Description |
 |---|---|---|
 | `historyStats.test.ts` | +10 | Full coverage for `computeWorkoutCompletionRate`: empty entries → null rates; all-complete → 100%; all-skip → 0%; all-day_off → null workoutCompletionRate, 0% overallRate; mixed → correct percentages; future entries excluded; today's entries included; planId filtering; 75% mixed case; null workoutCompletionRate when only day_off. |
+Two-change pass: removed the `getFutureProjection` dead code from `calendarProjection.ts` and extracted the ad-hoc workout flow from `TodayPage.tsx` into a new self-managing `TodayAdHocWorkout` component.
+
+The dead code (`getFutureProjection`) had been marked "currently unused" in its own docstring since at least pass 88 and appeared in `REVIEW_NOTES.md` as `DEAD-CODE-1`. No callers existed anywhere in the codebase.
+
+For the ARCH-1 extraction: the ad-hoc workout overlay had 10 state variables and three JSX blocks (start modal, tracker overlay, outcome modal). These were entirely self-contained — the only external contract was an "open" trigger from `TodayRotationModals` and a `canAddAdHoc` boolean guard. The new `TodayAdHocWorkout` component holds all 10 state variables internally and exposes exactly those two contracts via `openRequested` + `onActiveChange` props. This is a step forward from previous ARCH-1 extractions (which followed the stateless "dumb component" pattern) — the component is self-managing.
+
+### Bugs Fixed This Pass
+
+None.
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| DEAD-CODE-1 | `2d435d4` | `calendarProjection.ts` | Removed `getFutureProjection` function (lines 107–117) and its now-unused `getUpcomingDays` import. The function was a thin wrapper around `getUpcomingDays` with no callers. `calendarProjection.ts`: 118 → 94 lines (−24). |
+| ARCH-1 (continued) | `4f06fc0` | `TodayAdHocWorkout.tsx` (new), `TodayPage.tsx` | Extracted the ad-hoc workout start-modal, tracker overlay, and outcome modal into `src/components/today/TodayAdHocWorkout.tsx`. The component manages 10 state variables internally and exposes `openRequested` + `onActiveChange` props to the parent. Three now-unused imports removed from TodayPage (`nanoid`, `WorkoutType`, `PlanDay`). TodayPage: 1,374 → 1,238 lines (−136). |
+
+### Tests Added This Pass
+
+None. Both changes are structural/dead-code removals with no new logic to test.
 
 ### Prioritized Plan (for future passes)
 
@@ -40,6 +60,10 @@ Two-change pass: a targeted bug fix for the BUG-2 `openExtraOutcome` edge case i
 | P1 | Wire `computeWorkoutCompletionRate` into a stats display (HistoryPage or plan stats card). |
 | P2 | Remove or document `getFutureProjection` dead code in `calendarProjection.ts`. |
 | P3 | Add render-level tests for `TodayRotationModals`, `TodayPendingCard`, `TodayUpcomingList`. |
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now 1,238 lines. Next candidates: the "PR celebration" banner (inline JSX ~20 lines) could join `TodayCompletedSection`; or the catch-up confirm modal (~40 lines) into a `TodayCatchupModal` component. |
+| P2 | `updateEntryAction` historyStore: changing away from `day_off` without a `planDayIndex` leaves the entry with `planDayIndex: undefined`. Fix requires CalendarPage to thread the index through the `outcomeTarget` state shape. |
+| P3 | Update `REVIEW_NOTES.md` and `WEB_APP_INVENTORY.md` to remove now-deleted `getFutureProjection` references. |
+| P4 | Add render-level tests for `TodayAdHocWorkout`, `TodayRotationModals`, `TodayPendingCard` — pure-presentational and self-managing components with well-defined prop interfaces. |
 
 ---
 
