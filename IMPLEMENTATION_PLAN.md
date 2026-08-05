@@ -1,5 +1,52 @@
 # Implementation Plan
 
+## Pass 91 — 2026-08-05 (branch `claude/serene-cori-msn7bs`)
+
+### Baseline
+
+- Branch started from `main` after PR #232 (pass 90) merged.
+- **1196 tests passing** across 34 test files at start of pass.
+- **1196 tests passing** at end of pass (no regressions, no new tests this pass).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 91)
+
+Two-change pass: wired the `computeWorkoutCompletionRate` function (added in pass 90 as a P1 item)
+into both the `TodayPlanProgressModal` stats display and the `HistoryPage` plan-stats bar, and
+extracted the catchup-confirm modal from `TodayPage` into a standalone `TodayCatchupModal` component
+(P1 ARCH-1 candidate explicitly listed in pass 90's plan).
+
+### Bugs Fixed This Pass
+
+None.
+
+### Features Added This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| FEAT-1 | `8f6cb85` | `TodayPlanProgressModal.tsx`, `TodayPage.tsx`, `HistoryPage.tsx` | Wired `computeWorkoutCompletionRate` into UI. The Plan Progress modal (Today tab) now shows a "Completion rate" row alongside the existing "Logged rate" row. HistoryPage plan-stats section now shows a second progress bar (emerald) for completion rate below the existing sky-blue logged-rate bar. |
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| ARCH-1 (continued) | `e29fe69` | `TodayCatchupModal.tsx` (new), `TodayPage.tsx` | Extracted the "Mark as Day Off?" catchup-confirm modal (35 inline lines) from `TodayPage` into `src/components/today/TodayCatchupModal.tsx`. Pure stateless component with 3 props. TodayPage: 1,240 → 1,217 lines (−23). |
+
+### Tests Added This Pass
+
+None. All changed logic is either pure UI wiring (computeWorkoutCompletionRate was already tested with 10 tests in pass 90) or pure structural refactoring (TodayCatchupModal).
+
+### Prioritized Plan (for next pass)
+
+| Priority | Item |
+|----------|------|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now 1,217 lines. Next candidates: the in-line "PR celebration" banner (~20 lines) or the SwapWorkout modal section. |
+| P2 | `updateEntryAction` historyStore: changing away from `day_off` without a `planDayIndex` leaves the entry with `planDayIndex: undefined`. Fix requires CalendarPage to thread the index through the `outcomeTarget` state shape. |
+| P3 | Update `WEB_APP_INVENTORY.md` to reflect the new `TodayCatchupModal` and `TodayAdHocWorkout` components added in passes 90–91. |
+| P4 | Add render-level tests for `TodayCatchupModal`, `TodayPlanProgressModal`, `TodayPendingCard` — pure-presentational components with well-defined prop interfaces. |
+
+---
+
 ## Pass 90 — 2026-08-03 (branch `claude/serene-cori-lp74l7`)
 
 ### Baseline

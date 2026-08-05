@@ -28,7 +28,7 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv, personalRecordsToCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate, findBestWeek, buildPRFlagsMap } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate, findBestWeek, buildPRFlagsMap, computeWorkoutCompletionRate } from '../lib/historyStats'
 import type { PersonalRecord, WeeklyBreakdown, WorkoutTypeBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -190,6 +190,14 @@ export function HistoryPage() {
     if (!p) return null
     return computeLoggedRate(filterPlanId, filteredEntries, p.startDate, today)
   }, [filterPlanId, filteredEntries, plans, today])
+
+  // Workout completion rate: completed / (completed + skipped).
+  // Only meaningful for a single-plan view (null for "all plans").
+  const completionRate = useMemo(() => {
+    if (filterPlanId === 'all') return null
+    const rate = computeWorkoutCompletionRate(filterPlanId, filteredEntries, today)
+    return rate.workoutCompletionRate
+  }, [filterPlanId, filteredEntries, today])
 
   // For single-plan view: use computeWorkoutTypeBreakdown which gives completed/skipped
   // counts and avgEffort per type from outcome data. For 'all' plans, fall back to the
@@ -510,17 +518,34 @@ export function HistoryPage() {
             {typeMixLabel && (
               <p className="text-xs text-slate-500 text-center">{typeMixLabel}</p>
             )}
-            {loggedRate !== null && (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1 rounded-full bg-slate-700/60 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-sky-500/60 transition-all"
-                    style={{ width: `${loggedRate}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-slate-500 flex-shrink-0 tabular-nums">
-                  {loggedRate}% logged
-                </span>
+            {(loggedRate !== null || completionRate !== null) && (
+              <div className="space-y-1.5">
+                {loggedRate !== null && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1 rounded-full bg-slate-700/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-sky-500/60 transition-all"
+                        style={{ width: `${loggedRate}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 flex-shrink-0 tabular-nums">
+                      {loggedRate}% logged
+                    </span>
+                  </div>
+                )}
+                {completionRate !== null && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1 rounded-full bg-slate-700/60 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-emerald-500/60 transition-all"
+                        style={{ width: `${completionRate}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-500 flex-shrink-0 tabular-nums">
+                      {completionRate}% completed
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

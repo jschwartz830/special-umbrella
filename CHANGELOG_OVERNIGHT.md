@@ -2,6 +2,31 @@
 
 ---
 
+## Pass 91 — 2026-08-05 (branch `claude/serene-cori-msn7bs`)
+
+### Feature: Wire `computeWorkoutCompletionRate` into plan stats UI
+
+- **Commit**: `8f6cb85`
+- **Files**: `src/pages/TodayPage.tsx`, `src/components/today/TodayPlanProgressModal.tsx`, `src/pages/HistoryPage.tsx`
+- **What changed**:
+  - `TodayPage.tsx`: Added `computeWorkoutCompletionRate` computation after the existing `loggedRate` line. The result is passed as `workoutCompletionRate` prop to `TodayPlanProgressModal`.
+  - `TodayPlanProgressModal.tsx`: Added `workoutCompletionRate: WorkoutCompletionRate` to the props interface. A new "Completion rate" row is rendered after the existing "Logged rate" row when `workoutCompletionRate.workoutCompletionRate !== null`.
+  - `HistoryPage.tsx`: Added `completionRate` useMemo (gated on a specific plan being selected). A second progress bar (emerald color) now appears below the existing sky-blue logged-rate bar in the plan-stats section.
+- **Why it matters**: `computeWorkoutCompletionRate` was added in pass 90 as a pure function with no UI connection. Two stats surfaces now consume it: the Today tab plan-progress modal and the History page per-plan stats. Together the two metrics tell a fuller story — a high logged rate with a low completion rate signals consistent recording but frequent skipping, while both high means the plan is genuinely being followed.
+- **Risks**: Very low. The function is pure and already tested with 10 tests. Both new UI rows are gated on `!== null`, so they are invisible until the plan has at least one logged workout-or-skip entry.
+- **Rollback**: Revert `8f6cb85`.
+
+### Refactor: Extract `TodayCatchupModal` from `TodayPage` (ARCH-1)
+
+- **Commit**: `e29fe69`
+- **Files**: `src/components/today/TodayCatchupModal.tsx` (new), `src/pages/TodayPage.tsx`
+- **What changed**: The 35-line inline "Mark as Day Off?" confirmation modal was extracted into a standalone stateless component `TodayCatchupModal` with three props: `unloggedDates: string[]`, `onConfirm: () => void`, `onClose: () => void`. TodayPage now imports and renders `<TodayCatchupModal>` in place of the inline JSX block.
+- **Why it matters**: The catchup-confirm modal was explicitly listed as the next ARCH-1 candidate in pass 90's plan. Extracting it makes TodayPage easier to scan and makes the modal reusable and independently testable.
+- **Risks**: Pure structural refactor — no logic moved, no state ownership changed. TodayPage: 1,240 → 1,217 lines (−23).
+- **Rollback**: Revert `e29fe69`. TodayCatchupModal.tsx can be deleted.
+
+---
+
 ## Pass 90 — 2026-08-04 (branch `claude/serene-cori-xidg8a`)
 
 ### Fix: BUG-2 (partial) — `openExtraOutcome` now forwards `planDayIndex` to `outcomeTarget`

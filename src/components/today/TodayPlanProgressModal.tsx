@@ -1,6 +1,6 @@
 import { Modal } from '../shared/Modal'
 import { CompletedWorkoutsRing } from './TodayHabitSummary'
-import type { RotationCycleProgress } from '../../lib/historyStats'
+import type { RotationCycleProgress, WorkoutCompletionRate } from '../../lib/historyStats'
 
 interface TodayPlanProgressModalProps {
   totalCompleted: number
@@ -11,6 +11,7 @@ interface TodayPlanProgressModalProps {
   planDurationType: string
   planDurationValue: number
   loggedRate: number | null
+  workoutCompletionRate: WorkoutCompletionRate
   consecutiveSkips: number
   onClose: () => void
 }
@@ -24,6 +25,7 @@ export function TodayPlanProgressModal({
   planDurationType,
   planDurationValue,
   loggedRate,
+  workoutCompletionRate,
   consecutiveSkips,
   onClose,
 }: TodayPlanProgressModalProps) {
@@ -74,6 +76,12 @@ export function TodayPlanProgressModal({
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-sm text-slate-400">Logged rate</span>
               <span className="text-sm font-semibold text-white">{loggedRate}%</span>
+            </div>
+          )}
+          {workoutCompletionRate.workoutCompletionRate !== null && (
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm text-slate-400">Completion rate</span>
+              <span className="text-sm font-semibold text-white">{workoutCompletionRate.workoutCompletionRate}%</span>
             </div>
           )}
           {consecutiveSkips > 0 && (

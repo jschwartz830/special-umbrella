@@ -1,5 +1,46 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-05 (ninety-first pass) — branch `claude/serene-cori-msn7bs`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 3 production files modified (`TodayPage.tsx`, `TodayPlanProgressModal.tsx`, `HistoryPage.tsx`), 1 new component created (`TodayCatchupModal.tsx`), 4 doc files updated. No new dependencies. No store schema changes.
+2. **Why it's safe**: Both commits are pure wiring/structural changes. `computeWorkoutCompletionRate` was already tested with 10 tests in pass 90; connecting it to two UI surfaces adds no new logic. The `TodayCatchupModal` extraction moves code verbatim with no behavior change.
+3. **Risk level**: Very low. All changes are additive UI wiring or structural refactoring. The completion-rate rows are null-gated and invisible until meaningful data exists. TypeScript and all 1196 tests pass cleanly.
+4. **Net change**: +1 component file, TodayPage −23 lines (1,240 → 1,217). Two new stat displays (Today modal + History bar). Test count unchanged at 1196.
+
+### Pass 91 Open Risk Table (cumulative)
+
+| ID | Severity | Area | Status |
+|----|----------|------|--------|
+| TEST-1 | High | storeSync.ts | Open — still no unit tests; requires Supabase mock |
+| TEST-3 | High | ActiveWorkoutTracker.tsx | Open — requires @testing-library/react |
+| BUG-11 | Low | csv.ts | Open — legacy CSV extraId collision unresolved |
+| ARCH-1 | Debt | TodayPage.tsx | Ongoing — 1,217 lines, further decomposition planned |
+
+### Prioritized Plan for Next Pass
+
+| Priority | Item |
+|----------|------|
+| P1 | Continue ARCH-1: extract next self-contained block from TodayPage (now 1,217 lines) |
+| P2 | Fix BUG-11: legacy CSV extraId collision — warn or re-key on import |
+| P3 | Update `WEB_APP_INVENTORY.md` to reflect new components added in passes 90–91 |
+| P4 | Add render-level tests for `TodayCatchupModal` and `TodayPlanProgressModal` |
+
+### Known Issues / Incomplete Work
+
+- `storeSync.ts` has zero unit tests (TEST-1). Requires Supabase client mock infrastructure.
+- `ActiveWorkoutTracker.tsx` has zero tests (TEST-3). Requires @testing-library/react.
+- BUG-11 (CSV extraId collision) documented but not fixed.
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-08-04 (ninetieth pass) — branch `claude/serene-cori-xidg8a`
 ## 2026-08-03 (ninetieth pass) — branch `claude/serene-cori-lp74l7`
 

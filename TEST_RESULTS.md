@@ -1,5 +1,43 @@
 # Test Results
 
+## Pass 91 — 2026-08-05 (branch `claude/serene-cori-msn7bs`)
+
+---
+
+### Baseline (before changes)
+
+- **34 test files, 1196 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Tests added
+
+None. Both changes this pass are UI wiring and structural refactoring with no new logic:
+- `computeWorkoutCompletionRate` wiring: the function was already tested with 10 tests added in pass 90.
+- `TodayCatchupModal` extraction: pure structural refactor, no behavior change, no new logic.
+
+### Final results
+
+```
+Test Files  34 passed (34)
+     Tests  1196 passed (1196)
+  Start at  07:23:28
+  Duration  3.69s
+```
+
+No failures. Net 0 new tests vs. baseline.
+
+### Still untested (significant gaps)
+
+| Module | Gap | Why deferred |
+|--------|-----|--------------|
+| `storeSync.ts` | Cloud sync, migration application, debounce, flush | Requires Supabase client mock (vi.mock) — infrastructure not yet in place |
+| `ActiveWorkoutTracker.tsx` | Draft persistence, rest timer, superset grouping | Requires `@testing-library/react` (not in devDeps) |
+| `TodayCatchupModal.tsx` | Render, confirm/cancel callbacks | Requires `@testing-library/react` |
+| `TodayPlanProgressModal.tsx` | Completion rate row visibility | Requires `@testing-library/react` |
+| `authStore.ts` | All paths | Requires Supabase mock |
+
+---
+
 ## 2026-08-04 (ninetieth pass) — branch `claude/serene-cori-xidg8a`
 
 ---
