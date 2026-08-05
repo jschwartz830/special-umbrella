@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List } from 'lucide-react'
+import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List, Target } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
 import type { ExerciseSpec, WarmupRampSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
@@ -415,6 +415,10 @@ export function ActiveWorkoutTracker({
   const [suppressedExercises, setSuppressedExercises] = useState<Set<number>>(() => new Set())
   const [revealedSets, setRevealedSets] = useState<Set<string>>(() => new Set())
   const [supersetPicker, setSupersetPicker] = useState<number | null>(null) // exIdx being assigned
+  // Manually-picked focus target, set from the full exercise list (e.g. "start here"
+  // instead of the plan's order). Falls back to the first incomplete set once this
+  // exercise's own sets are all logged.
+  const [manualFocusExIdx, setManualFocusExIdx] = useState<number | null>(null)
 
   const hasVars = Object.keys(programVars).length > 0
   const evalCtx: EvalContext = { vars: programVars }
@@ -1423,8 +1427,16 @@ export function ActiveWorkoutTracker({
   // ── Focus mode ────────────────────────────────────────────────────────────
   // A single-set view driven by the same timer/logging handlers as the list.
 
-  /** First set anywhere in the workout that hasn't been completed yet. */
+  /**
+   * The set focus mode should show next: the first incomplete set of the
+   * manually-picked exercise (if one was chosen from the full list and still
+   * has sets left), otherwise the first incomplete set anywhere in the workout.
+   */
   function findCurrentSet(): { exIdx: number; setIdx: number } | null {
+    if (manualFocusExIdx != null && exercises[manualFocusExIdx]) {
+      const setIdx = exercises[manualFocusExIdx].sets.findIndex(s => !s.completed)
+      if (setIdx !== -1) return { exIdx: manualFocusExIdx, setIdx }
+    }
     for (let ei = 0; ei < exercises.length; ei++) {
       for (let si = 0; si < exercises[ei].sets.length; si++) {
         if (!exercises[ei].sets[si].completed) return { exIdx: ei, setIdx: si }
@@ -1856,6 +1868,13 @@ export function ActiveWorkoutTracker({
                     title="Replace exercise"
                   >
                     <ArrowLeftRight size={13} />
+                  </button>
+                  <button
+                    onClick={() => { setManualFocusExIdx(exIdx); setFocusMode(true) }}
+                    className={`p-1 rounded transition-colors ${manualFocusExIdx === exIdx ? 'text-sky-400' : 'text-slate-600 hover:text-slate-300 hover:bg-slate-700'}`}
+                    title="Start focus mode on this exercise"
+                  >
+                    <Target size={13} />
                   </button>
                 </div>
               </div>

@@ -347,3 +347,14 @@ export const EXERCISE_LIBRARY: ExerciseLibraryItem[] = [
 export function findExerciseByName(name: string): ExerciseLibraryItem | undefined {
   return EXERCISE_LIBRARY.find(ex => ex.name.toLowerCase() === name.trim().toLowerCase())
 }
+
+/** Equipment is encoded as the text after the last comma in the library name, e.g. "Squat, Barbell" → "Barbell". */
+export function exerciseEquipment(name: string): string {
+  const idx = name.lastIndexOf(',')
+  return idx === -1 ? 'Other' : name.slice(idx + 1).trim()
+}
+
+/** Primary muscle group targeted, used for sorting/grouping the exercise picker. */
+export function exercisePrimaryMuscle(ex: ExerciseLibraryItem): string {
+  return ex.target[0] ?? 'other'
+}

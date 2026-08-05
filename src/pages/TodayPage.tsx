@@ -95,6 +95,7 @@ export function TodayPage() {
   const removeExtraEntry = useHistoryStore(s => s.removeExtraEntry)
   const markDaysAsOff = useHistoryStore(s => s.markDaysAsOff)
   const removeLastOverrideByType = useHistoryStore(s => s.removeLastOverrideByType)
+  const allEntries = useHistoryStore(s => s.entries)
   const extraEntries = useHistoryStore(s => s.extraEntries)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const getOutcome = useOutcomeStore(s => s.getOutcome)
@@ -218,12 +219,14 @@ export function TodayPage() {
   // Computed here (before the early-return guard below) since the milestone hook — a
   // Rules-of-Hooks requirement — must be called unconditionally on every render.
   const mobilityDateSet = useMemo(() => new Set(Object.keys(mobilityCompletions)), [mobilityCompletions])
+  // Global (not plan-scoped) so switching the active plan doesn't reset the streak — a
+  // completed workout counts toward it regardless of which plan was active that day.
   const earlyPlanStreak = useMemo(
-    () => (plan ? computePlanStreak(plan.id, planEntries, planExtras, today, mobilityDateSet) : 0),
-    [plan, planEntries, planExtras, today, mobilityDateSet],
+    () => (plan ? computePlanStreak(null, allEntries, extraEntries, today, mobilityDateSet) : 0),
+    [plan, allEntries, extraEntries, today, mobilityDateSet],
   )
   const { isDismissed: streakMilestoneDismissed, dismiss: dismissStreakMilestone, milestone: streakMilestone } =
-    useStreakMilestoneDismiss(plan?.id ?? null, earlyPlanStreak)
+    useStreakMilestoneDismiss(earlyPlanStreak)
 
   if (!plan || !todayResolved) {
     return (
@@ -280,8 +283,9 @@ export function TodayPage() {
     tomorrowSlot?.difficulty,
   )
 
-  // Stats for the compact habit row (scoped to the active plan's history)
-  const stats = computeHistoryStats(planEntries, planExtras, today)
+  // Stats for the compact habit row — global (all plans), same reasoning as
+  // earlyPlanStreak above: a completed workout counts regardless of active plan.
+  const stats = computeHistoryStats(allEntries, extraEntries, today)
   // Same computation as earlyPlanStreak above (mobility dates included) — reuse it
   // rather than recomputing now that both use the same inputs.
   const planStreak = earlyPlanStreak

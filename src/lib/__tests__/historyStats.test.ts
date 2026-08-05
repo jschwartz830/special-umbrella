@@ -1374,6 +1374,20 @@ describe('computePlanStreak', () => {
     expect(computePlanStreak('plan-1', entries, extras, TODAY)).toBe(1)
   })
 
+  // ── planId: null (global streak, survives switching the active plan) ────────
+
+  it('planId null spans multiple plans — switching active plans does not reset the streak', () => {
+    const entries = [
+      planEntry('2026-05-10', 'complete', 'plan-1'),
+      planEntry('2026-05-11', 'complete', 'plan-2'),
+      planEntry(TODAY, 'complete', 'plan-2'),
+    ]
+    // Plan-scoped: plan-2 alone only sees 2 consecutive days.
+    expect(computePlanStreak('plan-2', entries, [], TODAY)).toBe(2)
+    // Global: the plan-1 day before it still extends the streak.
+    expect(computePlanStreak(null, entries, [], TODAY)).toBe(3)
+  })
+
   // ── additionalDates ──────────────────────────────────────────────────────────
 
   it('additionalDates: today-only date starts a streak of 1', () => {
