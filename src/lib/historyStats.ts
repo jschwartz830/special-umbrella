@@ -738,10 +738,11 @@ export function getStreakDatesSet(
 // ── Plan-scoped streak ────────────────────────────────────────────────────────
 
 /**
- * Compute the current consecutive-day streak for a single plan.
+ * Compute the current consecutive-day streak for a single plan, or across all
+ * plans when `planId` is null.
  *
  * Counts backward from `today` (inclusive) while each day has at least one
- * of the following for `planId`:
+ * of the following (scoped to `planId` when given):
  *   - a `complete` or `day_off` rotation entry, OR
  *   - any extra workout entry, OR
  *   - a date in `additionalDates` (e.g. mobility completions).
@@ -749,10 +750,14 @@ export function getStreakDatesSet(
  * A `skip` entry alone does NOT count — the same deliberate rule as the
  * global streak in `computeHistoryStats`.
  *
- * Returns 0 if today has no qualifying activity for this plan.
+ * `planId: null` computes a habit streak that survives switching the active
+ * plan — a completed workout counts toward it no matter which plan it
+ * belonged to.
+ *
+ * Returns 0 if today has no qualifying activity.
  */
 export function computePlanStreak(
-  planId: string,
+  planId: string | null,
   entries: HistoryEntry[],
   extras: ExtraWorkoutEntry[],
   today: string,

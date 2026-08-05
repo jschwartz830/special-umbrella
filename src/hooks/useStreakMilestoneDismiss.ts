@@ -15,14 +15,18 @@ export function getActiveStreakMilestone(streak: number): number | null {
   return active
 }
 
-const KEY_PREFIX = 'wpt_streak_ms_v1_'
+const KEY_PREFIX = 'wpt_streak_ms_v2_'
 
-function storageKey(planId: string, milestone: number): string {
-  return `${KEY_PREFIX}${planId}_${milestone}`
+function storageKey(milestone: number): string {
+  return `${KEY_PREFIX}${milestone}`
 }
 
 /**
- * Per-plan, per-milestone dismissal hook for streak celebration banners.
+ * Per-milestone dismissal hook for streak celebration banners.
+ *
+ * The streak itself is global (survives switching the active plan — see
+ * `computePlanStreak(null, ...)`), so dismissal is keyed only by milestone,
+ * not by plan.
  *
  * Takes the raw `streak` count (not a pre-computed milestone) so the hook
  * can be called before the streak is filtered through `getActiveStreakMilestone`,
@@ -32,12 +36,12 @@ function storageKey(planId: string, milestone: number): string {
  * so it reflects the current milestone key without extra state management.
  * A `dismiss()` call writes to localStorage and triggers a re-render.
  *
- * Each (planId, milestone) pair is independently dismissable — a 7-day
- * dismissal does not suppress the later 14-day banner.
+ * Each milestone is independently dismissable — a 7-day dismissal does not
+ * suppress the later 14-day banner.
  */
-export function useStreakMilestoneDismiss(planId: string | null, streak: number) {
+export function useStreakMilestoneDismiss(streak: number) {
   const milestone = getActiveStreakMilestone(streak)
-  const key = planId && milestone !== null ? storageKey(planId, milestone) : null
+  const key = milestone !== null ? storageKey(milestone) : null
 
   // Used only to force a re-render after dismiss() so isDismissed updates.
   const [, rerender] = useState(0)
