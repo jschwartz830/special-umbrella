@@ -36,7 +36,8 @@ import { completionStateToAction } from '../modules/workout-outcomes/types'
 import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../modules/recommendation/explanation'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate } from '../lib/historyStats'
+import type { WorkoutCompletionRate } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, WorkoutSlot } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../modules/workout-outcomes/types'
 import type { MobilitySessionCheckpoint } from '../store/mobilityStore'
@@ -291,6 +292,7 @@ export function TodayPage() {
   const olderUnloggedCount = Math.max(0, totalUnlogged - unloggedDates.length)
 
   const loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)
+  const workoutCompletionRate: WorkoutCompletionRate = computeWorkoutCompletionRate(plan.id, planEntries, today)
 
   const weekProgress = plan.duration.type === 'weeks'
     ? computePlanProgress(plan, planEntries, today)
@@ -1049,6 +1051,7 @@ export function TodayPage() {
           planDurationType={plan.duration.type}
           planDurationValue={plan.duration.value}
           loggedRate={loggedRate}
+          workoutCompletionRate={workoutCompletionRate}
           consecutiveSkips={consecutiveSkips}
           onClose={() => setShowPlanProgressModal(false)}
         />
