@@ -1,5 +1,53 @@
 # Implementation Plan
 
+## Pass 92 — 2026-08-06 (branch `claude/serene-cori-5z2kwb`)
+
+### Baseline
+
+- Branch started from `main` after PR #234 (passes 91 + plan builder) merged.
+- **1203 tests passing** across 35 test files at start of pass.
+- **1203 tests passing** at end of pass (no regressions, no new tests this pass).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 92)
+
+Two-change pass: extracted the inline "Log upcoming workout" action picker modal from `TodayPage.tsx` into a standalone `TodayLogUpcomingModal` component (ARCH-1, P1), and updated `WEB_APP_INVENTORY.md` to document all 11 Today subcomponents that have accumulated across passes 83–92 (P3).
+
+### Bugs Fixed This Pass
+
+None.
+
+### Features Added This Pass
+
+None.
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| ARCH-1 (continued) | `4289181` | `TodayLogUpcomingModal.tsx` (new), `TodayPage.tsx` | Extracted the 47-line inline "Log upcoming workout" modal into `src/components/today/TodayLogUpcomingModal.tsx`. Pure stateless component with 4 props: `rd`, `error`, `onLog`, `onClose`. Three now-unused lucide imports (`Info`, `CheckCircle2`, `SkipForward`) also removed from TodayPage. TodayPage: 1,221 → 1,180 lines (−41). |
+
+### Docs Updated This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| P3 | `62ccd6e` | `WEB_APP_INVENTORY.md` | Added "Today subcomponents" section listing all 11 components in `src/components/today/`. Previously the inventory listed none of them. |
+
+### Tests Added This Pass
+
+None. The extraction is a pure structural refactor (no logic moved) and the inventory update is docs-only.
+
+### Prioritized Plan (for next pass)
+
+| Priority | Item |
+|----------|------|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now 1,180 lines. Candidates: the "PR celebration" amber banner block (~20 lines), or the swap-slot confirmation dialog. |
+| P2 | Fix BUG-11: legacy CSV extraId collision — warn or re-key on import |
+| P3 | Add render-level tests for `TodayLogUpcomingModal`, `TodayCatchupModal`, `TodayPlanProgressModal` (pure-presentational, well-defined props) |
+| P4 | `updateEntryAction` historyStore: BUG-2 (day_off → complete without planDayIndex) — low practical impact but a latent bug |
+
+---
+
 ## Pass 91 — 2026-08-05 (branch `claude/serene-cori-msn7bs`)
 
 ### Baseline

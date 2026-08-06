@@ -2,6 +2,28 @@
 
 ---
 
+## Pass 92 — 2026-08-06 (branch `claude/serene-cori-5z2kwb`)
+
+### Refactor: Extract `TodayLogUpcomingModal` from `TodayPage` (ARCH-1)
+
+- **Commit**: `4289181`
+- **Files**: `src/components/today/TodayLogUpcomingModal.tsx` (new), `src/pages/TodayPage.tsx`
+- **What changed**: The 47-line inline "Log upcoming workout" action picker modal was extracted into a standalone stateless component `TodayLogUpcomingModal` with four props: `rd: ResolvedDay`, `error: string | null`, `onLog: (action) => void`, `onClose: () => void`. TodayPage now imports and renders `<TodayLogUpcomingModal>` in place of the inline JSX block. Three lucide icon imports (`Info`, `CheckCircle2`, `SkipForward`) that were only used by the extracted block were also removed from TodayPage.
+- **Why it matters**: This is the eleventh Today subcomponent extracted as part of ARCH-1. The modal is independently testable and clearly describes its interface contract. TodayPage: 1,221 → 1,180 lines (−41).
+- **Risks**: Pure structural refactor — identical render output. TypeScript confirmed no unused identifiers remain. All 1203 tests pass.
+- **Rollback**: Revert `4289181`. `TodayLogUpcomingModal.tsx` can be deleted.
+
+### Docs: Update `WEB_APP_INVENTORY.md` with all Today subcomponents (P3)
+
+- **Commit**: `62ccd6e`
+- **Files**: `WEB_APP_INVENTORY.md`
+- **What changed**: Added a new "Today subcomponents" bullet group listing all 11 components in `src/components/today/` with one-line descriptions of each. Previously the inventory listed zero of them, making the directory invisible to readers of the doc.
+- **Why it matters**: The inventory is the primary orientation doc for the repo. Eleven components accumulated across 9 passes (83–92) without being documented — a reader consulting the inventory would not know these existed.
+- **Risks**: None. Docs-only change.
+- **Rollback**: Revert `62ccd6e`.
+
+---
+
 ## Pass 91 — 2026-08-05 (branch `claude/serene-cori-msn7bs`)
 
 ### Feature: Wire `computeWorkoutCompletionRate` into plan stats UI
