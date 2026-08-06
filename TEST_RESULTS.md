@@ -1,5 +1,44 @@
 # Test Results
 
+## Pass 92 — 2026-08-06 (branch `claude/serene-cori-5z2kwb`)
+
+---
+
+### Baseline (before changes)
+
+- **35 test files, 1203 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Tests added
+
+None. Both changes this pass are pure structural refactoring or docs:
+- `TodayLogUpcomingModal` extraction: verbatim JSX lift, no logic, no new behavior.
+- `WEB_APP_INVENTORY.md` update: docs-only.
+
+### Final results
+
+```
+Test Files  35 passed (35)
+     Tests  1203 passed (1203)
+  Start at  07:21:51
+  Duration  3.64s
+```
+
+No failures. Net 0 new tests vs. baseline.
+
+### Still untested (significant gaps)
+
+| Module | Gap | Why deferred |
+|--------|-----|--------------|
+| `storeSync.ts` | Cloud sync, migration application, debounce, flush | Requires Supabase client mock (vi.mock) — infrastructure not yet in place |
+| `ActiveWorkoutTracker.tsx` | Draft persistence, rest timer, superset grouping | Requires `@testing-library/react` (not in devDeps) |
+| `TodayLogUpcomingModal.tsx` | Render, onLog/onClose callbacks | Requires `@testing-library/react` |
+| `TodayCatchupModal.tsx` | Render, confirm/cancel callbacks | Requires `@testing-library/react` |
+| `TodayPlanProgressModal.tsx` | Completion rate row visibility | Requires `@testing-library/react` |
+| `authStore.ts` | All paths | Requires Supabase mock |
+
+---
+
 ## Pass 91 — 2026-08-05 (branch `claude/serene-cori-msn7bs`)
 
 ---

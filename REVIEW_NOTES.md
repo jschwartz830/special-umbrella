@@ -1,5 +1,48 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-06 (ninety-second pass) — branch `claude/serene-cori-5z2kwb`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 1 new component created (`TodayLogUpcomingModal.tsx`), 1 production file modified (`TodayPage.tsx` −41 lines, 3 imports removed), 1 doc file updated (`WEB_APP_INVENTORY.md`). No new dependencies. No store schema changes. No logic moved.
+2. **Why it's safe**: Pure structural refactoring — the 47-line modal JSX was lifted verbatim into a stateless component with identical render output. The prop types are fully covered by TypeScript. Three lucide icon imports (`Info`, `CheckCircle2`, `SkipForward`) removed from TodayPage were confirmed unused after extraction.
+3. **Risk level**: Minimal. No behavior changes. TypeScript and all 1203 tests pass cleanly.
+4. **Net change**: +1 component file, TodayPage 1,221 → 1,180 lines (−41). Inventory now documents all 11 Today subcomponents. Test count unchanged at 1203.
+
+### Pass 92 Open Risk Table (cumulative)
+
+| ID | Severity | Area | Status |
+|----|----------|------|--------|
+| TEST-1 | High | storeSync.ts | Open — still no unit tests; requires Supabase mock |
+| TEST-3 | High | ActiveWorkoutTracker.tsx | Open — requires @testing-library/react |
+| BUG-11 | Low | csv.ts | Open — legacy CSV extraId collision unresolved |
+| ARCH-1 | Debt | TodayPage.tsx | Ongoing — 1,180 lines, further decomposition planned |
+| BUG-2 | Low | historyStore.ts | Open — updateEntryAction day_off→complete without planDayIndex leaves planDayIndex undefined |
+
+### Prioritized Plan for Next Pass
+
+| Priority | Item |
+|----------|------|
+| P1 | Continue ARCH-1: extract next self-contained block from TodayPage (now 1,180 lines) |
+| P2 | Fix BUG-11: legacy CSV extraId collision — warn or re-key on import |
+| P3 | Add render-level tests for `TodayLogUpcomingModal`, `TodayCatchupModal`, `TodayPlanProgressModal` |
+| P4 | BUG-2: fix updateEntryAction day_off→complete without planDayIndex |
+
+### Known Issues / Incomplete Work
+
+- `storeSync.ts` has zero unit tests (TEST-1). Requires Supabase client mock infrastructure.
+- `ActiveWorkoutTracker.tsx` has zero tests (TEST-3). Requires @testing-library/react.
+- BUG-11 (CSV extraId collision) documented but not fixed.
+- BUG-2 (updateEntryAction planDayIndex) documented in test file, low practical impact.
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-08-05 (ninety-first pass) — branch `claude/serene-cori-msn7bs`
 
 ---
