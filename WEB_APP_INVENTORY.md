@@ -64,6 +64,18 @@ Routing is defined in `src/App.tsx` and wrapped in `ErrorBoundary` + `AppShell` 
   - `OutcomeModal`: canonical outcome capture/edit surface. Status (completed/partial), perceived effort (1–5), `completedAt`, duration, modality sections (weights set grid with previous-set baseline; run distance/time/pace with derived pace; swim distance/time/pace), notes. Resolves set defaults from template + program vars (`buildInitialWeightActuals`, `resolveRepsFromVars`, `parseNumericLoad`, `parseRestToSeconds`). Discard-confirm on dirty close.
   - `OutcomeMetrics`: compact metric preview (effort dots, completed-set count, run/swim distance/duration/pace, progression recommendation).
   - `ActiveWorkoutTracker`: full-screen live session. Per-set reps/load/done grid, warmup vs working-set numbering, swipe-to-delete sets, add/replace exercise (optionally saved back to the plan template via `usePlanStore`), workout/rest/set timers using **wall-clock reconciliation** across background/visibility changes, **pre-scheduled AudioContext** rest tones (-15s warning + end chord), wake-lock during rest, audio keepalive oscillator (iOS), progression preview + suppression toggle, and **draft persistence** to localStorage (`wpt_active_draft_${workoutInstanceId}`). Emits `LoggedExerciseActual[]` + session meta (`startTime`, `endTime`, `pausePeriods`, `totalElapsedSeconds`) on complete. Reads `startDelaySeconds` from `settingsStore`.
+- **Today subcomponents** (`src/components/today/`) — stateless presentational blocks extracted from `TodayPage.tsx` as part of the ongoing ARCH-1 decomposition:
+  - `TodayBanners`: streak milestone + stall nudge + expiry banners; dismissal state owned by caller.
+  - `TodayPendingCard`: the "do it today" primary workout card for `today_pending` state; renders slot details, last-session summary, copy button, and Complete / Skip / Day Off controls.
+  - `TodayCompletedSection`: post-completion view showing completed workout card, PR-celebration amber banner, and Undo button.
+  - `TodayHabitSummary`: compact habit ring / streak summary strip shown below the primary card.
+  - `TodayUpcomingList`: scrollable list of upcoming-day cards (next 7 days); each card is tappable to open `TodayLogUpcomingModal`.
+  - `TodayMobilitySection`: mobility tracker section with exercise list, set-level checkboxes, and "Start Mobility Session" CTA.
+  - `TodayAdHocWorkout`: "Log ad hoc workout" collapsible section with type picker and name input.
+  - `TodayPlanProgressModal`: plan-progress stats modal (logged rate, completion rate, rotation cycle, remaining).
+  - `TodayCatchupModal`: "Mark unlogged days as Day Off?" confirmation modal (props: `unloggedDates`, `onConfirm`, `onClose`).
+  - `TodayLogUpcomingModal`: action picker for logging a future/past day (Complete / Skip / Day Off) opened from an upcoming card (props: `rd`, `error`, `onLog`, `onClose`).
+  - `TodayRotationModals`: shuffle / go-back / advance confirmation dialogs.
 - **Shared infra components**
   - `Modal`: bottom-sheet on mobile / centered on desktop, Escape + backdrop close, safe-area aware, optional footer.
   - `EmptyState`: icon + title + description + optional action.
