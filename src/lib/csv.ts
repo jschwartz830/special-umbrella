@@ -650,9 +650,32 @@ export function historyFromCsv(
   const extras: ExtraWorkoutEntry[] = []
   const outcomes: WorkoutOutcome[] = []
   const now = new Date().toISOString()
-  // Tracks how many times each (planId, date, type, name) composite key has
-  // been seen so far in THIS import — see stableExtraId's `occurrence` param.
-  const legacyIdOccurrences = new Map<string, number>()
+
+  // Pre-compute stable occurrence numbers for legacy extra rows (those without
+  // an explicit extraId column). Rows with the same composite key get occurrences
+  // assigned in ascending createdAt order so re-importing the same CSV in a
+  // different row order produces identical IDs. (BUG-11 fix.)
+  const legacyKeyGroups = new Map<string, { rowIdx: number; createdAt: string }[]>()
+  records.forEach((row, i) => {
+    const kind = (row.entryKind?.trim() || 'rotation').toLowerCase()
+    if (kind !== 'extra' || row.extraId?.trim()) return
+    const pId = row.planId?.trim()
+    const cDate = row.calendarDate?.trim()
+    const wType = row.workoutType?.trim()
+    if (!pId || !cDate || !wType) return
+    const wName = row.workoutName?.trim() || defaultNameForType(wType as WorkoutType)
+    const key = `${pId}|${cDate}|${wType}|${wName}`
+    if (!legacyKeyGroups.has(key)) legacyKeyGroups.set(key, [])
+    legacyKeyGroups.get(key)!.push({ rowIdx: i, createdAt: row.createdAt?.trim() ?? '' })
+  })
+  for (const group of legacyKeyGroups.values()) {
+    group.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  }
+  // rowIdx → occurrence within its sorted key group
+  const legacyRowOccurrence = new Map<number, number>()
+  for (const group of legacyKeyGroups.values()) {
+    group.forEach(({ rowIdx }, occ) => legacyRowOccurrence.set(rowIdx, occ))
+  }
 
   records.forEach((row, i) => {
     const lineNum = i + 2
@@ -687,13 +710,12 @@ export function historyFromCsv(
       // Prefer the stable extraId from the CSV when present (2026-04-26+ exports)
       // so that re-importing the same file is idempotent. For older exports that
       // lack this column, derive a deterministic ID from the composite key so
-      // repeated reimports of the same file don't create duplicate entries. The
-      // occurrence counter disambiguates same-key rows within this one import.
+      // repeated reimports of the same file don't create duplicate entries.
+      // The occurrence was pre-computed above in createdAt order so the same
+      // ID is produced regardless of CSV row order (BUG-11 fix).
       let extraId = row.extraId?.trim()
       if (!extraId) {
-        const legacyKey = `${planId}|${calendarDate}|${workoutType}|${workoutName}`
-        const occurrence = legacyIdOccurrences.get(legacyKey) ?? 0
-        legacyIdOccurrences.set(legacyKey, occurrence + 1)
+        const occurrence = legacyRowOccurrence.get(i) ?? 0
         extraId = stableExtraId(planId, calendarDate, workoutType, workoutName, occurrence)
       }
       // Restore source field so Undo on TodayPage keeps the correct
