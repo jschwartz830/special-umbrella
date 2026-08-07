@@ -2,19 +2,13 @@ import { useState, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
-  SkipForward,
   Coffee,
   Shuffle,
   Pencil,
   RotateCcw,
-  Info,
   PlusCircle,
-  X,
-  CheckCircle2,
-  Play,
   Copy,
   Check,
-  Trophy,
 } from 'lucide-react'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { usePlanActions } from '../hooks/usePlanActions'
@@ -30,7 +24,6 @@ import { OutcomeModal } from '../components/workout/OutcomeModal'
 import { ActiveWorkoutTracker } from '../components/workout/ActiveWorkoutTracker'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
 import { CardioWorkoutTracker } from '../components/workout/CardioWorkoutTracker'
-import { Modal } from '../components/shared/Modal'
 import { EmptyState } from '../components/shared/EmptyState'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../modules/recommendation/explanation'
@@ -60,6 +53,9 @@ import { TodayAdHocWorkout } from '../components/today/TodayAdHocWorkout'
 import { TodayPlanProgressModal } from '../components/today/TodayPlanProgressModal'
 import { TodayCatchupModal } from '../components/today/TodayCatchupModal'
 import { TodayRotationModals } from '../components/today/TodayRotationModals'
+import { TodayPRBanner } from '../components/today/TodayPRBanner'
+import { TodayCardioPromptModal } from '../components/today/TodayCardioPromptModal'
+import { TodayUpcomingLogModal } from '../components/today/TodayUpcomingLogModal'
 import { SwipeToDelete } from '../components/shared/SwipeToDelete'
 import { WORKOUT_META } from '../lib/constants'
 import { estimateRunDurationMin } from '../lib/estimateRunDuration'
@@ -688,24 +684,7 @@ export function TodayPage() {
       />
 
       {/* Personal record celebration */}
-      {newPRs && newPRs.length > 0 && (
-        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25">
-          <Trophy size={14} className="text-amber-400 mt-0.5 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-amber-300">New personal record{newPRs.length > 1 ? 's' : ''}!</p>
-            <p className="text-xs text-amber-400/70 mt-0.5 truncate">
-              {newPRs.slice(0, 3).join(', ')}{newPRs.length > 3 ? ` +${newPRs.length - 3} more` : ''}
-            </p>
-          </div>
-          <button
-            onClick={() => setNewPRs(null)}
-            className="text-amber-400/50 hover:text-amber-200 flex-shrink-0 transition-colors"
-            aria-label="Dismiss"
-          >
-            <X size={13} />
-          </button>
-        </div>
-      )}
+      {newPRs && <TodayPRBanner newPRs={newPRs} onDismiss={() => setNewPRs(null)} />}
 
       {/* Today's workout — compact card */}
       {todayResolved.status === 'today_day_off' ? (
@@ -921,37 +900,14 @@ export function TodayPage() {
       {cardioState === 'prompt' && (() => {
         const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
         if (!runSlot) return null
-        const runEst = estimateRunDurationMin(runSlot, planProgramVars)
         return (
-          <Modal title="Nice work on the lifts!" onClose={handleCardioCancel}>
-            <div className="space-y-4">
-              <div className="rounded-xl bg-slate-800 border border-slate-700 p-4 space-y-1">
-                <p className="text-sm font-semibold text-slate-200">{runSlot.name}</p>
-                <p className="text-xs text-slate-400">~{runEst} min · scheduled cardio for today</p>
-                {runSlot.runConfig?.targetDistanceMiles && (
-                  <p className="text-xs text-slate-500">{runSlot.runConfig.targetDistanceMiles} mi target</p>
-                )}
-              </div>
-              <p className="text-xs text-slate-500">
-                Your session is already at {activeTrackedDurationMin ?? '?'} min.
-                Start the run now, or skip it and log the lifts.
-              </p>
-              <div className="space-y-2">
-                <button
-                  onClick={() => setCardioState('open')}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors"
-                >
-                  <Play size={16} /> Start {runSlot.name}
-                </button>
-                <button
-                  onClick={handleCardioCancel}
-                  className="w-full py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium transition-colors"
-                >
-                  Skip run — log lifts only
-                </button>
-              </div>
-            </div>
-          </Modal>
+          <TodayCardioPromptModal
+            runSlot={runSlot}
+            programVars={planProgramVars}
+            activeTrackedDurationMin={activeTrackedDurationMin}
+            onStart={() => setCardioState('open')}
+            onCancel={handleCardioCancel}
+          />
         )
       })()}
 
@@ -1098,51 +1054,12 @@ export function TodayPage() {
 
       {/* Log upcoming workout modal */}
       {loggingUpcoming && !showUpcomingOutcome && (
-        <Modal
-          title={new Date(loggingUpcoming.rd.calendarDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        <TodayUpcomingLogModal
+          resolvedDay={loggingUpcoming.rd}
+          error={upcomingLogError}
+          onLog={(action) => handleUpcomingLog(loggingUpcoming.rd, action)}
           onClose={() => { setLoggingUpcoming(null); setUpcomingLogError(null) }}
-        >
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              {loggingUpcoming.rd.planDay.slots.map(slot => (
-                <div key={slot.id} className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-slate-200">{slot.name}</span>
-                  {slot.targetDistance && <span className="text-xs text-slate-500 ml-auto">{slot.targetDistance} mi</span>}
-                  {slot.targetTime && !slot.targetDistance && <span className="text-xs text-slate-500 ml-auto">{slot.targetTime} min</span>}
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-2">
-              {upcomingLogError && (
-                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
-                  <Info size={13} className="text-red-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-red-300">{upcomingLogError}</p>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'complete')}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-sm font-medium transition-colors active:scale-95"
-                >
-                  <CheckCircle2 size={16} /> Complete
-                </button>
-                <button
-                  onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'skip')}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-300 text-sm font-medium transition-colors active:scale-95"
-                >
-                  <SkipForward size={16} /> Skip
-                </button>
-              </div>
-              <button
-                onClick={() => handleUpcomingLog(loggingUpcoming.rd, 'day_off')}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm font-medium transition-colors active:scale-95"
-              >
-                <Coffee size={16} /> Day Off
-              </button>
-            </div>
-          </div>
-        </Modal>
+        />
       )}
 
       {/* Outcome modal for upcoming workout */}
