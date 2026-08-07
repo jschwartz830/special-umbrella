@@ -2,6 +2,48 @@
 
 ---
 
+## Pass 92 — 2026-08-07 (branch `claude/serene-cori-9bci4x`)
+
+### Refactor: Extract TodayPRBanner, TodayCardioPromptModal, TodayUpcomingLogModal (ARCH-1)
+
+- **Commit**: `c69a137`
+- **Files**: `src/components/today/TodayPRBanner.tsx` (new), `src/components/today/TodayCardioPromptModal.tsx` (new), `src/components/today/TodayUpcomingLogModal.tsx` (new), `src/pages/TodayPage.tsx`
+- **What changed**:
+  - `TodayPRBanner`: receives `newPRs: string[]` + `onDismiss: () => void`; renders the amber trophy banner with exercise list and ×-dismiss button.
+  - `TodayCardioPromptModal`: receives `runSlot`, `programVars`, `activeTrackedDurationMin`, `onStart`, `onCancel`; renders the "Nice work on the lifts!" modal with start/skip CTA.
+  - `TodayUpcomingLogModal`: receives `resolvedDay`, `error`, `onLog`, `onClose`; renders the date-labeled modal with Complete/Skip/Day Off actions and an inline error display.
+  - `TodayPage.tsx`: three inline JSX blocks replaced with single-line component calls. Icon imports `Trophy`, `Play`, `Info`, `CheckCircle2`, `SkipForward` and the `Modal` import removed as now unused.
+- **Why it matters**: Each extracted block was 19–47 lines of pure display logic with no shared state — the clearest kind of extraction. TodayPage drops from 1221 → 1138 lines (−83), continuing the ARCH-1 effort.
+- **Risks**: Structural only; no logic changed. TypeScript passes cleanly. All 1203 existing tests still pass.
+- **Rollback**: `git revert c69a137` removes all three files and restores TodayPage.
+
+---
+
+### Fix: Stable legacy extraId assignment regardless of CSV row order (BUG-11)
+
+- **Commit**: `b08ee78`
+- **Files**: `src/lib/csv.ts`, `src/lib/__tests__/csv.test.ts`
+- **What changed**:
+  - `historyFromCsv` now pre-scans all legacy extra rows (those without an explicit `extraId` column), groups them by the `planId|calendarDate|workoutType|workoutName` composite key, and sorts each group by `createdAt` ascending before assigning occurrence numbers.
+  - The old approach assigned occurrences by CSV row order — re-importing the same file with rows in a different sequence would produce swapped IDs, causing `historyStore.importExtraEntries` to match/update the wrong entries instead of deduping.
+  - For the common case (unique composite key, occurrence=0), the generated ID is identical to before. Only duplicate-key groups are affected, and for them the mapping is now deterministic.
+  - One new regression test added to lock in the behavior.
+- **Why it matters**: CSV re-import is the primary backup/restore path. ID swaps are silent data mutations with no user-visible feedback beyond wrong outcome data being associated with the wrong entry.
+- **Risks**: Low. The pre-scan adds negligible overhead (O(N) over the record array). The ID for any row that was the only row with its key (occurrence=0) is unchanged. The fix changes IDs only for users who already imported legacy CSVs with duplicate-key extras — an edge case, and only when their createdAt order differs from their CSV row order.
+- **Rollback**: `git revert b08ee78`.
+
+---
+
+### Docs: Update WEB_APP_INVENTORY.md
+
+- **Commit**: `e7a7e67`
+- **Files**: `WEB_APP_INVENTORY.md`
+- **What changed**: Added the 13 `TodayPage` sub-components extracted across passes 89–92 plus `SwipeToDelete` to the Components section. These were production code absent from the inventory.
+- **Risks**: Documentation only.
+- **Rollback**: `git revert e7a7e67`.
+
+---
+
 ## Pass 91 — 2026-08-05 (branch `claude/serene-cori-msn7bs`)
 
 ### Feature: Wire `computeWorkoutCompletionRate` into plan stats UI
