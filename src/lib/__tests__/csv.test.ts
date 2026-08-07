@@ -490,6 +490,29 @@ describe('historyToCsv + historyFromCsv', () => {
     expect(reparsed.extras.map(e => e.id)).toEqual(parsed.map(e => e.id))
   })
 
+  it('assigns the same IDs when duplicate-key legacy rows appear in a different CSV order (BUG-11 regression)', () => {
+    // The old implementation assigned occurrences by CSV row order — so
+    // reversing the two rows would swap their IDs, causing a re-import to
+    // "see" different IDs and insert duplicates instead of deduping.
+    // The fix sorts by createdAt before assigning occurrences so the
+    // mapping is stable regardless of row order.
+    const legacyHeaders =
+      `entryKind,planId,calendarDate,planDayIndex,planDayLabel,action,slotNames,workoutType,workoutName,completionState,perceivedEffort,durationActualMin,actualDistanceMiles,actualDurationMin,averagePaceSecondsPerMile,averageHeartRate,completedAsPlanned,completedAt,notes,createdAt`
+    const rowA = `extra,${plan.id},2026-05-01,,,,, yoga,Morning Yoga,,,,,,,,,,,2026-05-01T07:00:00Z`
+    const rowB = `extra,${plan.id},2026-05-01,,,,, yoga,Morning Yoga,,,,,,,,,,,2026-05-01T09:00:00Z`
+
+    const { extras: forwardOrder } = historyFromCsv(`${legacyHeaders}\n${rowA}\n${rowB}`, planIds)
+    const { extras: reverseOrder } = historyFromCsv(`${legacyHeaders}\n${rowB}\n${rowA}`, planIds)
+
+    expect(forwardOrder).toHaveLength(2)
+    expect(reverseOrder).toHaveLength(2)
+
+    // Same IDs regardless of row order — earlier createdAt always gets occ=0.
+    const idsForward = new Set(forwardOrder.map(e => e.id))
+    const idsReverse = new Set(reverseOrder.map(e => e.id))
+    expect(idsForward).toEqual(idsReverse)
+  })
+
   it('preserves source field through export/import round-trip', () => {
     const extras: ExtraWorkoutEntry[] = [
       {

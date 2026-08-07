@@ -64,12 +64,27 @@ Routing is defined in `src/App.tsx` and wrapped in `ErrorBoundary` + `AppShell` 
   - `OutcomeModal`: canonical outcome capture/edit surface. Status (completed/partial), perceived effort (1–5), `completedAt`, duration, modality sections (weights set grid with previous-set baseline; run distance/time/pace with derived pace; swim distance/time/pace), notes. Resolves set defaults from template + program vars (`buildInitialWeightActuals`, `resolveRepsFromVars`, `parseNumericLoad`, `parseRestToSeconds`). Discard-confirm on dirty close.
   - `OutcomeMetrics`: compact metric preview (effort dots, completed-set count, run/swim distance/duration/pace, progression recommendation).
   - `ActiveWorkoutTracker`: full-screen live session. Per-set reps/load/done grid, warmup vs working-set numbering, swipe-to-delete sets, add/replace exercise (optionally saved back to the plan template via `usePlanStore`), workout/rest/set timers using **wall-clock reconciliation** across background/visibility changes, **pre-scheduled AudioContext** rest tones (-15s warning + end chord), wake-lock during rest, audio keepalive oscillator (iOS), progression preview + suppression toggle, and **draft persistence** to localStorage (`wpt_active_draft_${workoutInstanceId}`). Emits `LoggedExerciseActual[]` + session meta (`startTime`, `endTime`, `pausePeriods`, `totalElapsedSeconds`) on complete. Reads `startDelaySeconds` from `settingsStore`.
+- **Today sub-components** (all in `src/components/today/`)
+  - `TodayBanners`: stateless banner row — expiry, stall nudge, skip-streak, streak milestone, run-adaptation note, difficulty-spacing warning.
+  - `TodayHabitSummary`: compact stat row (streak, total workouts, plan-progress ring); tapping the ring opens `TodayPlanProgressModal`.
+  - `TodayPlanProgressModal`: plan-progress detail modal (completion rate, logged rate, streak, week/cycle progress, skip count).
+  - `TodayPendingCard`: today's "pending" workout card with start-workout CTA, last-session summary, and session count.
+  - `TodayCompletedSection`: list of completed today entries (primary + extras) with edit/delete swipe actions.
+  - `TodayMobilitySection`: global daily mobility routine status row (not tied to a plan slot).
+  - `TodayUpcomingList`: upcoming-day cards list (next 7 days) with tap-to-log affordance.
+  - `TodayRotationModals`: override / jump / add-workout / add-from-plan modal group.
+  - `TodayCatchupModal`: "Mark unlogged days as Day Off" confirmation modal.
+  - `TodayAdHocWorkout`: self-managing ad hoc workout flow (start-modal → tracker → outcome); holds all its own state.
+  - `TodayPRBanner`: personal-record celebration banner (trophy icon + exercise list + dismiss).
+  - `TodayCardioPromptModal`: "Nice work on the lifts!" prompt after a weights session with a scheduled run slot.
+  - `TodayUpcomingLogModal`: upcoming-workout action picker (Complete / Skip / Day Off) with error display.
 - **Shared infra components**
   - `Modal`: bottom-sheet on mobile / centered on desktop, Escape + backdrop close, safe-area aware, optional footer.
   - `EmptyState`: icon + title + description + optional action.
   - `CsvToolbar`: export/import buttons; import returns `{ summary, warnings }` shown in a result modal, errors in an error modal.
   - `NumericInputField`: custom on-screen numeric keypad (portal), ± delta buttons, optional integer-only, null-safe.
   - `ErrorBoundary`: class component fallback with "Try again".
+  - `SwipeToDelete`: swipe-left gesture wrapper with a trash-icon reveal.
 
 ## User Flows
 

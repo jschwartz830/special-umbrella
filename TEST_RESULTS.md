@@ -1,5 +1,39 @@
 # Test Results
 
+## Pass 92 — 2026-08-07 (branch `claude/serene-cori-9bci4x`)
+
+---
+
+### Baseline (before changes)
+
+- **35 test files, 1203 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Tests added
+
+| File | Count | Coverage |
+|---|---|---|
+| `src/lib/__tests__/csv.test.ts` | +1 | BUG-11 regression: dual-row legacy extras produce identical ID sets regardless of CSV row order. Asserts `Set(idsForward) === Set(idsReverse)` for two rows with the same composite key but different `createdAt` values. |
+
+### Final results
+
+```
+Test Files  35 passed (35)
+     Tests  1204 passed (1204)
+  Start at  07:28:20
+  Duration  3.33s
+```
+
+No failures. +1 test vs. baseline.
+
+### Still untested (significant gaps)
+
+- `storeSync.ts` — no tests (TEST-1). Needs Supabase client mock.
+- `ActiveWorkoutTracker.tsx` — no tests (TEST-3). Needs @testing-library/react.
+- `TodayPRBanner`, `TodayCatchupModal`, `TodayPlanProgressModal`, `TodayCardioPromptModal`, `TodayUpcomingLogModal` — pure-presentational components with well-defined interfaces, testable with RTL but not yet added.
+
+---
+
 ## Pass 91 — 2026-08-05 (branch `claude/serene-cori-msn7bs`)
 
 ---

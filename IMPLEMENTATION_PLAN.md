@@ -1,5 +1,49 @@
 # Implementation Plan
 
+## Pass 92 — 2026-08-07 (branch `claude/serene-cori-9bci4x`)
+
+### Baseline
+
+- Branch started from `main` after PR #234 (plan-builder exercise picker) merged.
+- **1203 tests passing** across 35 test files at start of pass.
+- **1204 tests passing** at end of pass (+1 BUG-11 regression test).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 92)
+
+Three-change pass:
+1. **ARCH-1 (continued)**: three JSX blocks extracted from `TodayPage.tsx` into dedicated components. TodayPage: 1221 → 1138 lines (−83).
+2. **BUG-11 fix**: legacy CSV `stableExtraId` occurrence assignment now sorts by `createdAt` before assigning positions, so the same IDs are produced regardless of CSV row order.
+3. **WEB_APP_INVENTORY.md update**: catalogued the 13 TodayPage sub-components and `SwipeToDelete` that were missing from the inventory.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-11 | `b08ee78` | `csv.ts`, `csv.test.ts` | Legacy extra rows sharing the same composite key now get stable occurrence assignments sorted by `createdAt`, preventing ID swaps when the same CSV is re-imported with rows in a different order. |
+
+### Refactoring This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| ARCH-1 (continued) | `c69a137` | `TodayPRBanner.tsx` (new), `TodayCardioPromptModal.tsx` (new), `TodayUpcomingLogModal.tsx` (new), `TodayPage.tsx` | Extracted 3 self-contained JSX blocks from TodayPage. TodayPage: 1221 → 1138 lines (−83). Five icon imports and one Modal import removed from TodayPage. |
+
+### Tests Added This Pass
+
+| File | Tests Added | Description |
+|---|---|---|
+| `csv.test.ts` | +1 | BUG-11 regression: verifies that two legacy extra rows with the same composite key produce identical IDs regardless of which order they appear in the CSV. |
+
+### Prioritized Plan (for next pass)
+
+| Priority | Item |
+|----------|------|
+| P1 | Continue `TodayPage.tsx` decomposition (ARCH-1) — now 1,138 lines. Next candidates: the inline "Add plan workout preview" section (lines ~746-760), the "secondary workout-management actions" button row (pending state), or the "resolved actions" button row (Edit/Undo/Override). |
+| P2 | `updateEntryAction` historyStore: changing away from `day_off` without a `planDayIndex` leaves the entry with `planDayIndex: undefined`. |
+| P3 | Add render-level tests for `TodayPRBanner`, `TodayCatchupModal`, and `TodayPlanProgressModal` (requires `@testing-library/react`). |
+
+---
+
 ## Pass 91 — 2026-08-05 (branch `claude/serene-cori-msn7bs`)
 
 ### Baseline

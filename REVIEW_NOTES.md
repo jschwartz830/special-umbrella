@@ -1,5 +1,75 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-07 (ninety-second pass) — branch `claude/serene-cori-9bci4x`
+
+---
+
+### Executive Summary
+
+1. **What changed**: 3 new component files created (`TodayPRBanner.tsx`, `TodayCardioPromptModal.tsx`, `TodayUpcomingLogModal.tsx`), `TodayPage.tsx` reduced by 83 lines, `csv.ts` BUG-11 fixed with 1 new test, `WEB_APP_INVENTORY.md` updated. No store schema changes. No new dependencies.
+2. **Highest confidence**: Component extractions are verbatim code moves with no logic changes; TypeScript and 1204 tests (up from 1203) pass cleanly. The BUG-11 fix has a direct regression test and leaves non-duplicate-key legacy rows unchanged.
+3. **Risk level**: Very low. All three changes are either structural refactors or a targeted fix with proof-of-correctness via test.
+4. **Net change**: TodayPage 1221 → 1138 lines (−83). BUG-11 closed. Inventory updated.
+
+### Pass 92 Open Risk Table (cumulative)
+
+| ID | Severity | Area | Status |
+|----|----------|------|--------|
+| TEST-1 | High | storeSync.ts | Open — still no unit tests; requires Supabase mock |
+| TEST-3 | High | ActiveWorkoutTracker.tsx | Open — requires @testing-library/react |
+| ARCH-1 | Debt | TodayPage.tsx | Ongoing — 1,138 lines, further decomposition planned |
+
+### Prioritized Plan for Next Pass
+
+| Priority | Item |
+|----------|------|
+| P1 | Continue ARCH-1: extract next self-contained block from TodayPage (now 1,138 lines). Candidates: inline "Add plan workout preview" section, the two button-row sections (pending actions + resolved actions). |
+| P2 | `updateEntryAction` historyStore: changing away from `day_off` without a `planDayIndex` leaves the entry with `planDayIndex: undefined`. Safe additive fix. |
+| P3 | Add render-level tests for `TodayPRBanner`, `TodayCatchupModal`, `TodayPlanProgressModal` — all are now pure-presentational. Would require installing `@testing-library/react`. |
+
+### Changes Completed This Pass
+
+#### ARCH-1 continued: three JSX blocks extracted from TodayPage
+
+- **Nature**: Structural extraction, no logic change.
+- **Components**: `TodayPRBanner` (19-line amber trophy block), `TodayCardioPromptModal` (37-line "Nice work on the lifts!" modal), `TodayUpcomingLogModal` (47-line upcoming-day action picker).
+- **Impact**: TodayPage −83 lines (1221→1138). Six now-unused imports removed.
+
+#### BUG-11 fixed: CSV legacy extraId stable ordering
+
+- **Nature**: Bug fix with regression test.
+- **Root cause**: `legacyIdOccurrences` counter walked CSV rows in sequence; different row order → different occurrence → different ID.
+- **Fix**: Pre-scan + sort by `createdAt`; stable assignment independent of CSV order.
+- **Test coverage**: +1 test in `csv.test.ts`.
+
+#### WEB_APP_INVENTORY.md updated
+
+- **Nature**: Documentation catch-up.
+- **Added**: 13 Today sub-components, `SwipeToDelete`.
+
+### Definitely Keep
+
+- All three component extractions (pure structural cleanup, zero risk)
+- BUG-11 fix (closes a documented silent-data-corruption risk in the CSV backup/restore path)
+- WEB_APP_INVENTORY.md update
+
+### Open Questions
+
+- Should `@testing-library/react` be added to enable render-level tests for the growing library of pure presentational Today components? These are now 13 components with well-defined prop surfaces — the investment would pay off quickly.
+- Is the `updateEntryAction` / `planDayIndex: undefined` issue (BUG-DAYOFF-INDEX) worth fixing this cycle? It only manifests when changing a `day_off` entry away from `day_off` via CalendarPage, and is partially mitigated by the pass-90 `openExtraOutcome` fix.
+
+### Known Issues / Incomplete Work
+
+- `storeSync.ts` has zero unit tests (TEST-1). Requires Supabase client mock infrastructure.
+- `ActiveWorkoutTracker.tsx` has zero tests (TEST-3). Requires @testing-library/react.
+- `TodayPage.tsx` at 1,138 lines — ARCH-1 decomposition continues.
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-08-05 (ninety-first pass) — branch `claude/serene-cori-msn7bs`
 
 ---
