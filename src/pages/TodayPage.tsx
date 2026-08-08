@@ -179,6 +179,7 @@ export function TodayPage() {
   const mobilityActiveSession = useMobilityStore(s => s.activeSession)
   const mobilityLogCompletion = useMobilityStore(s => s.logCompletion)
   const mobilityStartSession = useMobilityStore(s => s.startSession)
+  const mobilityResumeCompletion = useMobilityStore(s => s.resumeCompletion)
   const mobilitySaveCheckpoint = useMobilityStore(s => s.saveCheckpoint)
   const mobilityClearSession = useMobilityStore(s => s.clearSession)
   const mobilitySoundEnabled = useMobilityStore(s => s.soundEnabled)
@@ -444,6 +445,13 @@ export function TodayPage() {
     logOutcomeWithProgression(outcome, slot)
     setMobilitySlotSession(null)
     setMobilitySlotState('hidden')
+  }
+
+  // Reopen a day that's already been logged so the remaining exercises can be
+  // finished — seeds a resumable session from the logged completion.
+  function handleResumeMobilityCompletion() {
+    mobilityResumeCompletion(today, mobilityRoutine.map(ex => ex.id))
+    setMobilityState('open')
   }
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
@@ -821,6 +829,7 @@ export function TodayPage() {
         mobilityActiveSession={mobilityActiveSession}
         onUndoCompletion={() => removeMobilityCompletion(today)}
         onOpenTracker={() => setMobilityState('open')}
+        onResumeCompletion={handleResumeMobilityCompletion}
         onNavigate={() => navigate('/mobility')}
       />
 
@@ -951,8 +960,8 @@ export function TodayPage() {
           startSession={mobilityStartSession}
           saveCheckpoint={mobilitySaveCheckpoint}
           clearSession={mobilityClearSession}
-          onLogCompletion={({ completedAt, durationMin, completedExerciseIds }) => {
-            mobilityLogCompletion(today, { completedAt, durationMin, completedExerciseIds })
+          onLogCompletion={({ completedAt, durationMin, completedExerciseIds, completedSets }) => {
+            mobilityLogCompletion(today, { completedAt, durationMin, completedExerciseIds, completedSets })
           }}
           onClose={() => setMobilityState('hidden')}
           minimized={mobilityState === 'minimized'}

@@ -617,6 +617,88 @@ describe('saveCheckpoint', () => {
   })
 })
 
+// ── resumeCompletion ──────────────────────────────────────────────────────────
+
+describe('resumeCompletion', () => {
+  beforeEach(resetStore)
+
+  const ids = ['hip-90-90', 'worlds-greatest', 'cat-cow']
+
+  it('seeds an activeSession from the logged completion', () => {
+    useMobilityStore.getState().logCompletion('2026-07-01', {
+      completedAt: '2026-07-01T08:00:00.000Z',
+      durationMin: 5,
+      completedExerciseIds: ['hip-90-90'],
+      completedSets: { 'hip-90-90': [0] },
+    })
+    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
+    const s = useMobilityStore.getState().activeSession
+    expect(s?.date).toBe('2026-07-01')
+    expect(s?.completedIds).toEqual(['hip-90-90'])
+    expect(s?.completedSets).toEqual({ 'hip-90-90': [0] })
+    expect(s?.totalElapsedSec).toBe(300)
+  })
+
+  it('positions currentIdx at the first not-yet-completed exercise', () => {
+    useMobilityStore.getState().logCompletion('2026-07-01', {
+      completedAt: '2026-07-01T08:00:00.000Z',
+      durationMin: 5,
+      completedExerciseIds: ['hip-90-90'],
+    })
+    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
+    expect(useMobilityStore.getState().activeSession?.currentIdx).toBe(1) // worlds-greatest
+  })
+
+  it('lands on the last exercise when every exercise was already completed', () => {
+    useMobilityStore.getState().logCompletion('2026-07-01', {
+      completedAt: '2026-07-01T08:00:00.000Z',
+      durationMin: 5,
+      completedExerciseIds: ids,
+    })
+    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
+    expect(useMobilityStore.getState().activeSession?.currentIdx).toBe(ids.length - 1)
+  })
+
+  it('is a no-op when there is no completion for the date', () => {
+    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
+    expect(useMobilityStore.getState().activeSession).toBeNull()
+  })
+
+  it('does not clobber an already-active session for the same date', () => {
+    useMobilityStore.getState().logCompletion('2026-07-01', {
+      completedAt: '2026-07-01T08:00:00.000Z',
+      durationMin: 5,
+      completedExerciseIds: ['hip-90-90'],
+    })
+    useMobilityStore.getState().startSession('2026-07-01', ids)
+    useMobilityStore.getState().saveCheckpoint({
+      date: '2026-07-01',
+      exerciseIds: ids,
+      currentIdx: 2,
+      currentSetIdx: 0,
+      completedIds: ['hip-90-90', 'worlds-greatest'],
+      completedSets: {},
+      totalElapsedSec: 999,
+      exElapsedSec: 0,
+    })
+    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
+    const s = useMobilityStore.getState().activeSession
+    expect(s?.currentIdx).toBe(2)
+    expect(s?.totalElapsedSec).toBe(999)
+  })
+
+  it('leaves the original completion untouched', () => {
+    const completion = {
+      completedAt: '2026-07-01T08:00:00.000Z',
+      durationMin: 5,
+      completedExerciseIds: ['hip-90-90'],
+    }
+    useMobilityStore.getState().logCompletion('2026-07-01', completion)
+    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
+    expect(useMobilityStore.getState().completions['2026-07-01']).toEqual(completion)
+  })
+})
+
 // ── clearSession ──────────────────────────────────────────────────────────────
 
 describe('clearSession', () => {

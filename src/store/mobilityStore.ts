@@ -17,6 +17,9 @@ export interface MobilityCompletion {
   completedAt: string
   durationMin: number
   completedExerciseIds: string[]
+  /** Set indices completed per exercise, keyed by exercise id — lets a resumed
+   *  session restore per-set progress instead of just whole-exercise checkmarks. */
+  completedSets?: Record<string, number[]>
 }
 
 export interface MobilitySessionCheckpoint {
@@ -69,6 +72,11 @@ interface MobilityState {
   logCompletion: (date: string, completion: MobilityCompletion) => void
   removeCompletion: (date: string) => void
   startSession: (date: string, exerciseIds: string[]) => void
+  /** Reopens a day that already has a logged completion, seeding a resumable
+   *  session from its progress so the remaining exercises can be finished.
+   *  No-ops if a session for `date` is already active (don't clobber unsaved
+   *  progress) or if there's no completion to resume from. */
+  resumeCompletion: (date: string, exerciseIds: string[]) => void
   saveCheckpoint: (cp: MobilitySessionCheckpoint) => void
   clearSession: () => void
 }
@@ -225,6 +233,27 @@ export const useMobilityStore = create<MobilityState>()(
             totalElapsedSec: 0,
             exElapsedSec: 0,
           },
+        })
+      },
+
+      resumeCompletion(date, exerciseIds) {
+        set(s => {
+          if (s.activeSession?.date === date) return s
+          const completion = s.completions[date]
+          if (!completion) return s
+          const firstIncompleteIdx = exerciseIds.findIndex(id => !completion.completedExerciseIds.includes(id))
+          return {
+            activeSession: {
+              date,
+              exerciseIds,
+              currentIdx: firstIncompleteIdx === -1 ? Math.max(0, exerciseIds.length - 1) : firstIncompleteIdx,
+              currentSetIdx: 0,
+              completedIds: completion.completedExerciseIds,
+              completedSets: completion.completedSets ?? {},
+              totalElapsedSec: completion.durationMin * 60,
+              exElapsedSec: 0,
+            },
+          }
         })
       },
 
