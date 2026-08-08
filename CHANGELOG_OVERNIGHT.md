@@ -2,6 +2,30 @@
 
 ---
 
+## Pass 93 — 2026-08-08 (branch `claude/serene-cori-f62mw0`)
+
+### Fix: CalendarPage historical tracker — planDayIndex missing from outcomeTarget (BUG-DAYOFF-INDEX)
+
+- **Commit**: `57388c1`
+- **Files**: `src/pages/CalendarPage.tsx`
+- **What changed**: In `handleHistoricalActiveComplete`, the `setOutcomeTarget` call now derives `planDayIndex` via `plan.days.indexOf(activeWorkoutTarget.planDay)` and includes it in the outcome target object. Previously `planDayIndex` was absent, so if the live history entry for that date had `action: 'day_off'` (and thus `planDayIndex: undefined`), `handleOutcomeConfirm` would call `updateEntryAction(planId, date, 'complete')` without a valid index. The resulting entry — now `complete` but `planDayIndex: undefined` — was silently excluded from all stats functions that filter on `e.planDayIndex !== undefined`.
+- **Why it matters**: A user who completes a historical workout via the in-calendar tracker on a date they previously marked as Day Off would see their workout logged as `complete` but never reflected in completion rates, cycle progress, or PR tracking. The fix closes this silent data gap without any store schema change.
+- **Risks**: Very low. `plan.days.indexOf` uses reference equality; the plan object from `useActivePlan()` doesn't change during a tracker session, so the index is reliable. If `indexOf` returns -1 (impossible in practice — the active tracker can only reference a valid plan day), the `planDayIndex` field falls back to `undefined`, which preserves the pre-fix behavior.
+- **Rollback**: `git revert 57388c1`
+
+---
+
+### Fix: computeWorkoutCompletionRate deduplication (STATS-DEDUP)
+
+- **Commit**: `384820e`
+- **Files**: `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts`
+- **What changed**: `computeWorkoutCompletionRate` now deduplicates entries by `calendarDate` before counting, keeping the entry with the newest `createdAt` when multiple entries share the same date. The old implementation counted every entry row, potentially double-counting dates with duplicates (e.g. from a cloud-sync race or a bad import). All other plan-stats functions — `computePlanProgress`, `computeRotationCycleProgress`, `computeRotationPlanRemaining` — already deduplicate; this brings `computeWorkoutCompletionRate` into alignment.
+- **Why it matters**: An inflated completion rate (e.g. showing 110% workouts completed out of a date range) would confuse users and undermine trust in the stats screen. The `addEntry` store action already enforces one entry per (planId, calendarDate), but `importEntries` and cloud sync paths could theoretically produce duplicates in edge cases.
+- **Risks**: Very low. The change only affects counts for users with duplicate entries, which should not exist under normal conditions. Two regression tests added to verify the behavior.
+- **Rollback**: `git revert 384820e`
+
+---
+
 ## Pass 92 — 2026-08-07 (branch `claude/serene-cori-9bci4x`)
 
 ### Refactor: Extract TodayPRBanner, TodayCardioPromptModal, TodayUpcomingLogModal (ARCH-1)

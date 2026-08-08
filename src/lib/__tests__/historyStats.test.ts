@@ -2955,4 +2955,29 @@ describe('computeWorkoutCompletionRate', () => {
     expect(result.workoutCompletionRate).toBeNull()
     expect(result.overallRate).toBe(0)
   })
+
+  it('deduplicates by calendarDate — only the newest entry per date is counted', () => {
+    // Two entries for the same date (simulates a cloud-sync race producing a duplicate).
+    // The newer one (skip) should win; the earlier complete should be ignored.
+    const entries: HistoryEntry[] = [
+      { ...entry('2026-06-01', 'complete'), id: 'a', createdAt: '2026-06-01T08:00:00Z' },
+      { ...entry('2026-06-01', 'skip'),    id: 'b', createdAt: '2026-06-01T12:00:00Z' },
+    ]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.completedCount).toBe(0)
+    expect(result.skippedCount).toBe(1)
+    expect(result.workoutCompletionRate).toBe(0)
+  })
+
+  it('deduplication does not affect normal entries on distinct dates', () => {
+    const entries = [
+      entry('2026-06-01', 'complete'),
+      entry('2026-06-02', 'complete'),
+      entry('2026-06-03', 'skip'),
+    ]
+    const result = computeWorkoutCompletionRate('plan-1', entries, '2026-06-11')
+    expect(result.completedCount).toBe(2)
+    expect(result.skippedCount).toBe(1)
+    expect(result.workoutCompletionRate).toBe(67)
+  })
 })

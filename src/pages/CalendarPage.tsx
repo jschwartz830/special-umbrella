@@ -299,11 +299,19 @@ export function CalendarPage() {
     setActiveTrackedExercises(exercises)
     setActiveTrackedDurationMin(Math.round(meta.totalElapsedSeconds / 60) || null)
     setActiveWorkoutState('hidden')
+    // Resolve planDayIndex so handleOutcomeConfirm can pass a valid index to
+    // updateEntryAction even when the live history entry is a day_off (which
+    // stores planDayIndex: undefined). Without this, completing a historical
+    // tracker session on a day_off-marked date leaves the entry with
+    // planDayIndex: undefined on a 'complete' action, making it invisible to
+    // stats functions that filter on e.planDayIndex !== undefined.
+    const planDayIdx = plan.days.indexOf(activeWorkoutTarget.planDay)
     setOutcomeTarget({
       planId: plan.id,
       calendarDate: activeWorkoutTarget.calendarDate,
       planDay: activeWorkoutTarget.planDay,
       instanceId: activeWorkoutTarget.workoutInstanceId,
+      planDayIndex: planDayIdx >= 0 ? planDayIdx : undefined,
     })
   }
 

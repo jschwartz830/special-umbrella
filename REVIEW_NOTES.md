@@ -1,5 +1,76 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-08 (ninety-third pass) — branch `claude/serene-cori-f62mw0`
+
+---
+
+### Executive Summary
+
+1. **What changed**: Two targeted bug fixes with 2 new regression tests. No architectural changes, no new dependencies, no store schema changes. Codebase audited fresh for this pass.
+2. **Highest confidence**: Both fixes are small, additive, well-understood, and covered by tests. The `computeWorkoutCompletionRate` dedup mirrors a pattern used by 3 other stats functions. The `planDayIndex` fix closes a documented data-integrity gap with a minimal 3-line change.
+3. **Risk level**: Very low. No logic moved, no interfaces changed, no behavioral changes for the common case (no duplicate entries, no day_off → complete via historical tracker).
+4. **What to review first**: `CalendarPage.tsx` diff (8 lines) — the `plan.days.indexOf` approach is simple but relies on reference equality; confirm you agree it's safe in the active-tracker lifetime. `historyStats.ts` diff (12 lines) — confirm the dedup semantics (newest-createdAt wins) match your intent.
+
+---
+
+### Pass 93 Open Risk Table (cumulative)
+
+| ID | Severity | Area | Status |
+|----|----------|------|--------|
+| TEST-1 | High | storeSync.ts | Open — no unit tests; requires Supabase mock |
+| TEST-3 | High | ActiveWorkoutTracker.tsx | Open — requires @testing-library/react |
+| ARCH-1 | Debt | TodayPage.tsx | Ongoing — 1,138 lines, further decomposition planned |
+| AUDIT-1 | High | storeSync.ts beforeunload | Open — async flush may drop data on tab close |
+| AUDIT-2 | High | run-adaptation engine | Open — hitTarget false-negative when distance not logged |
+| AUDIT-3 | Medium | storeSync.ts syncOnLogin | Open — no conflict resolution on login |
+| AUDIT-4 | Medium | programParser.ts parseSlot | Open — non-idempotent YAML re-import |
+| AUDIT-5 | Low | expressionEval.ts | Open — silent errors mask YAML rule mistakes |
+| AUDIT-6 | Low | CalendarPage canDayOff | Open — tautology (always true); behavior may be intentional |
+
+---
+
+### Changes Completed This Pass
+
+#### BUG-DAYOFF-INDEX: CalendarPage `handleHistoricalActiveComplete` planDayIndex
+
+- **What changed**: Added `plan.days.indexOf(activeWorkoutTarget.planDay)` to derive and include `planDayIndex` in the outcome target when a historical tracker session completes.
+- **Why it matters**: Without this, completing a tracker session on a date marked Day Off produced a `complete` entry with `planDayIndex: undefined`, silently excluded from all stats functions that filter on `e.planDayIndex !== undefined`. This is the same class of bug as BUG-2 (documented in `historyStore.test.ts`), triggered via a different path.
+- **Classification**: Definitely keep.
+
+#### STATS-DEDUP: `computeWorkoutCompletionRate` deduplication
+
+- **What changed**: Entries are now deduplicated by `calendarDate` (newest-`createdAt` wins) before counting, matching the dedup contract of `computePlanProgress`, `computeRotationCycleProgress`, and `computeRotationPlanRemaining`.
+- **Why it matters**: Inconsistent dedup semantics between stats functions meant the completion rate could diverge from cycle-progress counts for the same plan when duplicate entries existed. Now all four functions see the same logical set of entries.
+- **Classification**: Definitely keep.
+
+---
+
+### Definitely Keep
+
+- BUG-DAYOFF-INDEX fix (closes data-integrity gap, 8 lines, no schema change)
+- STATS-DEDUP fix (consistency with rest of stats layer, 12 lines, 2 tests)
+
+### Recommendations Only (not implemented this pass)
+
+- **AUDIT-1** (`storeSync.ts beforeunload`): Replace async `pushStore()` in the `beforeunload` handler with a synchronous `navigator.sendBeacon` POST to prevent data loss on tab close. Medium effort, medium risk (sendBeacon payload limits, endpoint shape).
+- **AUDIT-2** (run adaptation `hitTarget`): Add a UI nudge when a run day has adaptive progression enabled but the outcome was logged without distance or `completedAsPlanned`. Could be a note on the outcome modal, a banner, or simply a console.warn escalated to a toast.
+- **AUDIT-3** (`syncOnLogin` no conflict resolution): Show a user prompt or last-write-wins timestamp comparison before overwriting local data on login. Requires product judgment on UX flow.
+- **AUDIT-4** (`parseSlot` non-idempotent): Derive slot IDs deterministically (e.g. `hash(planId + dayIdx + slotIdx)`) instead of calling `nanoid()` on each parse. Prevents slot-keyed data (outcomes, overrides) from becoming orphaned after a re-import.
+- **AUDIT-6** (`canDayOff` tautology): Clarify intent — if future Day Off should be allowed, replace with `const canDayOff = true` + comment; if it should be restricted to past/today, set `const canDayOff = isPast || isToday`.
+
+### Open Questions
+
+- Should `@testing-library/react` be added to test the growing library of presentational Today/Calendar components? There are now 13+ pure-presentational components with well-defined prop surfaces.
+- Is the AUDIT-2 run adaptation `hitTarget` false-negative a product issue or expected behavior? If users are not expected to fill in distance, the progression system should document that it only applies when they do.
+- For AUDIT-3, should local-vs-cloud conflict resolution show a user prompt, silently prefer the newer timestamp, or always prefer cloud?
+
+### Known Issues / Incomplete Work
+
+- BUG-2 (documented in `historyStore.test.ts`): `updateEntryAction` called without `planDayIndex` on a `day_off→complete` transition leaves `planDayIndex: undefined`. The CalendarPage fix this pass addresses one path; the general store-level contract still returns `undefined` when no index is supplied and the existing entry has none. The test documents this as expected current behavior.
+- `canDayOff` tautology in `DayDetailModal`: noted, not fixed — requires product decision.
+
+---
+
 ## 2026-08-07 (ninety-second pass) — branch `claude/serene-cori-9bci4x`
 
 ---
