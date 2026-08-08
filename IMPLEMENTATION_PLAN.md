@@ -1,5 +1,58 @@
 # Implementation Plan
 
+## Pass 93 — 2026-08-08 (branch `claude/serene-cori-f62mw0`)
+
+### Baseline
+
+- Branch started from `main` after PR #236 (pass 92) merged.
+- **1204 tests passing** across 35 test files at start of pass.
+- **1206 tests passing** at end of pass (+2 regression tests).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 93)
+
+Two-bug-fix pass — no structural or schema changes:
+
+1. **BUG-DAYOFF-INDEX**: `CalendarPage.handleHistoricalActiveComplete` — the outcome target was missing `planDayIndex`. When the live entry was a `day_off`, `handleOutcomeConfirm` would call `updateEntryAction` with no index, leaving the completed entry with `planDayIndex: undefined` and invisible to stats functions.
+2. **STATS-DEDUP**: `computeWorkoutCompletionRate` in `historyStats.ts` — added deduplication by `calendarDate` (newest-`createdAt` wins) to match the contract used by `computePlanProgress` and `computeRotationCycleProgress`.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-DAYOFF-INDEX | `57388c1` | `CalendarPage.tsx` | Historical tracker completion on a day_off-marked date now passes a valid `planDayIndex` to the outcome target, so `updateEntryAction` receives the correct index instead of `undefined`. |
+| STATS-DEDUP | `384820e` | `historyStats.ts`, `historyStats.test.ts` | `computeWorkoutCompletionRate` now deduplicates entries by `calendarDate` before counting, matching the dedup contract used by all other stats functions. |
+
+### Tests Added This Pass
+
+| File | Tests Added | Description |
+|---|---|---|
+| `src/lib/__tests__/historyStats.test.ts` | +2 | STATS-DEDUP regression: (1) duplicate entries for the same date count as one, newest wins; (2) distinct-date entries are unaffected by dedup. |
+
+### New Audit Findings Documented (not yet implemented)
+
+From a fresh full-codebase audit performed this pass:
+
+| # | Severity | Location | Summary |
+|---|---|---|---|
+| AUDIT-1 | High | `storeSync.ts` | `beforeunload` async flush may be dropped by browser before tab closes. `navigator.sendBeacon` would be safer. |
+| AUDIT-2 | High | `modules/run-adaptation/engine.ts` | `hitTarget` false-negative: users who don't log distance/completedAsPlanned never auto-progress even on `complete` entries. Needs UI nudge or fallback rule. |
+| AUDIT-3 | Medium | `storeSync.ts:syncOnLogin` | No conflict resolution on login — local-only changes are silently overwritten by cloud data. |
+| AUDIT-4 | Medium | `engine/programParser.ts:parseSlot` | Non-idempotent: re-parsing same YAML produces new `nanoid` slot IDs, breaking slot-keyed data after re-import. Deterministic IDs (hash of position) would fix this. |
+| AUDIT-5 | Low | `lib/expressionEval.ts` | Unknown tokens silently skipped, division by zero returns 0, parse fallback returns 0 — all mask progression-rule authoring errors. |
+| AUDIT-6 | Low | `CalendarPage.tsx:DayDetailModal` | `canDayOff = isPast \|\| isToday \|\| isFuture` is tautologically `true`. Current behavior (Day Off available on all dates incl. future) is presumably intentional; the tautology is dead code and should be simplified or documented. |
+
+### Prioritized Plan (for next pass)
+
+| Priority | Item |
+|----------|------|
+| P1 | Continue ARCH-1: TodayPage still at 1138 lines. Next extraction candidate: the "Secondary workout-management actions" button row (~25 lines, isPending + activeWorkoutState === 'hidden' guard) or the "Resolved actions" button row (~30 lines). Both have clear prop surfaces. |
+| P2 | AUDIT-2: Document or surface a UI nudge when run adaptation is enabled but outcome fields needed for progression are absent. A `console.warn` is not visible; a banner or field hint on the outcome modal would help. |
+| P3 | AUDIT-1: Replace the `beforeunload` async `pushStore()` call with a synchronous `navigator.sendBeacon` approach to prevent data loss on tab close. |
+| P4 | Add `@testing-library/react` to enable render-level tests for the growing library of pure presentational Today/Calendar components. |
+
+---
+
 ## Pass 92 — 2026-08-07 (branch `claude/serene-cori-9bci4x`)
 
 ### Baseline

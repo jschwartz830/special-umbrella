@@ -1,5 +1,42 @@
 # Test Results
 
+## Pass 93 — 2026-08-08 (branch `claude/serene-cori-f62mw0`)
+
+---
+
+### Baseline (before changes)
+
+- **35 test files, 1204 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Tests added
+
+| File | Count | Coverage |
+|---|---|---|
+| `src/lib/__tests__/historyStats.test.ts` | +2 | STATS-DEDUP regression: (1) duplicate entries for the same `calendarDate` are counted as one, with the newest `createdAt` winning; (2) entries on distinct dates are unaffected by the dedup path. |
+
+### Final results
+
+```
+Test Files  35 passed (35)
+     Tests  1206 passed (1206)
+  Start at  07:22:24
+  Duration  3.74s
+```
+
+No failures. +2 tests vs. baseline.
+
+### Still untested (significant gaps)
+
+| Module | Gap | Why deferred |
+|--------|-----|--------------|
+| `storeSync.ts` | Cloud sync, migration application, debounce, flush, beforeunload | Requires Supabase client mock (vi.mock) — infrastructure not yet in place |
+| `ActiveWorkoutTracker.tsx` | Draft persistence, rest timer, superset grouping | Requires `@testing-library/react` (not in devDeps) |
+| `CalendarPage.tsx handleHistoricalActiveComplete` | BUG-DAYOFF-INDEX path | JSX/interaction test; needs `@testing-library/react` to assert `planDayIndex` on the resulting store entry |
+| `TodayPRBanner`, `TodayCatchupModal`, `TodayPlanProgressModal`, `TodayCardioPromptModal`, `TodayUpcomingLogModal` | Render tests | Pure-presentational components with well-defined interfaces; would benefit from RTL render tests |
+
+---
+
 ## Pass 92 — 2026-08-07 (branch `claude/serene-cori-9bci4x`)
 
 ---
