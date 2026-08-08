@@ -423,6 +423,15 @@ export function ActiveWorkoutTracker({
   const hasVars = Object.keys(programVars).length > 0
   const evalCtx: EvalContext = { vars: programVars }
 
+  // Lock background scroll while the full-screen tracker (including focus view) is open —
+  // prevents the page behind it from scrolling when rapid taps land near the overlay edges.
+  useEffect(() => {
+    if (minimized) return
+    const original = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = original }
+  }, [minimized])
+
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
