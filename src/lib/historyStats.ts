@@ -293,12 +293,23 @@ export function computeWorkoutCompletionRate(
   entries: HistoryEntry[],
   today: string,
 ): WorkoutCompletionRate {
+  // Deduplicate by calendarDate — mirrors computePlanProgress so the counts
+  // stay consistent when the store contains duplicate entries (e.g. from a
+  // cloud-sync race or bad import). The newest createdAt wins.
+  const dateMap = new Map<string, HistoryEntry>()
+  for (const e of entries) {
+    if (e.planId !== planId || e.calendarDate > today) continue
+    const existing = dateMap.get(e.calendarDate)
+    if (!existing || e.createdAt > existing.createdAt) {
+      dateMap.set(e.calendarDate, e)
+    }
+  }
+
   let completedCount = 0
   let skippedCount = 0
   let dayOffCount = 0
 
-  for (const e of entries) {
-    if (e.planId !== planId || e.calendarDate > today) continue
+  for (const e of dateMap.values()) {
     if (e.action === 'complete') completedCount++
     else if (e.action === 'skip') skippedCount++
     else if (e.action === 'day_off') dayOffCount++
