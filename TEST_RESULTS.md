@@ -1,5 +1,49 @@
 # Test Results
 
+## Pass 94 — 2026-08-09 (branch `claude/serene-cori-b5993l`)
+
+---
+
+### Baseline (before changes)
+
+- **35 test files, 1213 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Tests Added
+
+| File | Count | Description |
+|------|-------|-------------|
+| `src/store/__tests__/historyStore.test.ts` | +1 | `removeRetroJumpForDate` with CalendarPage format (no Z): confirms `slice(0,10)` works for `"2026-01-15T12:00:00.000"` (no Z suffix) |
+| `src/store/__tests__/mobilityStore.test.ts` | +1 | `resumeCompletion` is a no-op when `exerciseIds` is empty — the empty-routine crash guard |
+| `src/lib/__tests__/expressionEval.test.ts` | +2 | (1) Tokenizer still evaluates usable tokens past unknown chars; (2) `console.warn` emitted in DEV mode with the offending character |
+
+### Final Results
+
+- **35 test files, 1216 tests — all passing**
+- 0 failures, 0 skipped
+- Duration: ~3.6s
+
+### Tests Reviewed (relevant to changes)
+
+| Suite | Status | Notes |
+|-------|--------|-------|
+| `historyStore.test.ts` — `removeRetroJumpForDate` | ✅ All 7 cases pass | Existing tests use UTC Z format; new test covers the CalendarPage local-time format |
+| `mobilityStore.test.ts` — `resumeCompletion` | ✅ All 7 cases pass | New test added for empty-array guard |
+| `expressionEval.test.ts` — tokenizer edge cases | ✅ All cases pass | New DEV-only warn tests use `vi.stubEnv`/`vi.spyOn` |
+| `planStore.test.ts` — `duplicatePlan` | ✅ Unchanged, still passing | Return value `''` on missing source still tested as current behavior |
+| `authStore.test.ts` | ⚠️ No test file exists | Auth store remains untested; `authError` field not covered by unit tests |
+
+### Important Areas Still Untested
+
+| Area | Gap |
+|------|-----|
+| `authStore.ts` | No test file. `signInWithGoogle`, `signOut`, `initialize`, and now `authError` are all untested. |
+| `TodayPage.tsx` / `CalendarPage.tsx` | No component/integration tests. Both pages have complex modal chains and state interactions. |
+| `storeSync.ts` | Test coverage was added in pass 81, but the `authError` propagation path from `authStore` is not covered. |
+| `programStore.ts` | No dedicated tests for `applyProgressionRule`. |
+
+---
+
 ## Pass 93 — 2026-08-08 (branch `claude/serene-cori-f62mw0`)
 
 ---

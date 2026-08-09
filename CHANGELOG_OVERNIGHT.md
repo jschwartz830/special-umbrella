@@ -2,6 +2,76 @@
 
 ---
 
+## Pass 94 — 2026-08-09 (branch `claude/serene-cori-b5993l`)
+
+### Fix: removeRetroJumpForDate UTC/local mismatch (BUG-UTC-JUMP)
+
+- **Commit**: `bfc0642`
+- **Files**: `src/store/historyStore.ts`
+- **Summary**: `removeRetroJumpForDate` compared the local-timezone rendering of a UTC ISO timestamp against a local calendar date string. For users in UTC-offset timezones who applied and then removed a jump near midnight, the UTC date would differ from their local date, causing the removal to silently fail and leaving a stale jump override in the store. Fixed with `o.appliedAt.slice(0, 10)` which safely extracts the date portion for both UTC and local-time ISO formats.
+- **Why it matters**: Silent stale jump overrides shift the rotation for all subsequent dates, creating a hard-to-diagnose mismatch between the user's expected schedule and what the app shows.
+- **Files changed**: `historyStore.ts` (−3 lines, +4 lines). Removed unused `date-fns` format import.
+- **Risks**: None. `slice(0, 10)` is safe for both `"YYYY-MM-DDT12:00:00.000"` and `"YYYY-MM-DDTHH:MM:SS.sssZ"` formats. All existing tests still pass.
+- **Rollback**: `git revert bfc0642`
+
+---
+
+### Fix: CalendarPage hadJump + handleHistoricalActiveComplete (BUG-CALENPAGE-JUMP)
+
+- **Commit**: `6922682`
+- **Files**: `src/pages/CalendarPage.tsx`
+- **Summary**: Two fixes in one commit.
+  1. `logForDate`'s `hadJump` check used the same UTC/local mismatch as BUG-UTC-JUMP. Fixed with `slice(0, 10)`.
+  2. `handleHistoricalActiveComplete` used `plan.days.indexOf(activeWorkoutTarget.planDay)` (reference equality). If the plan object was re-hydrated from Zustand between opening and completing the tracker, the reference no longer matched and `indexOf` returned -1. The history entry then received `planDayIndex: -1`, corrupting stats silently. Fixed with `findIndex(d => d.id === activeWorkoutTarget.planDay.id)` using the stable day ID.
+- **Why it matters**: Reference equality fails non-deterministically on Zustand re-hydration. Invalid planDayIndex corrupts stats invisibly.
+- **Risks**: Low. The day ID is always set (created by `makeDay` which always assigns `nanoid()`). The `findIndex` call is safe: returns -1 if not found (same outcome as before, but now explicit), and the existing `planDayIdx >= 0 ? planDayIdx : undefined` guard handles it correctly.
+- **Rollback**: `git revert 6922682`
+
+---
+
+### Fix: authStore silent error handling (BUG-AUTH-SILENT)
+
+- **Commit**: `785611a`
+- **Files**: `src/store/authStore.ts`
+- **Summary**: Both `signInWithGoogle` and `signOut` were fire-and-forget awaits. Auth failures (network errors, OAuth popup blocks, Supabase outages) produced unhandled promise rejections with no user-visible feedback. Added try/catch to both, stored errors in a new `authError: string | null` field, and clear the error on each new attempt.
+- **Why it matters**: Silent auth failures leave the user confused — the sign-in button "does nothing". With `authError` exposed, UI components can now surface the error.
+- **Risks**: Low. Additive change; no existing code reads `authError` yet, so no callers are broken. The new field defaults to `null`.
+- **Rollback**: `git revert 785611a`
+
+---
+
+### Fix: expressionEval silent tokenizer failures (BUG-EXPR-SILENT)
+
+- **Commit**: `4f847bc`
+- **Files**: `src/lib/expressionEval.ts`
+- **Summary**: Unknown characters in progression rule expressions (stray `@`, Unicode, typos like `+=/) were silently discarded, producing partial token streams that evaluate to 0 or NaN. Progressions could stall indefinitely without any visible error. Added `console.warn` in DEV mode with the offending character and the full expression string.
+- **Why it matters**: Malformed YAML progression expressions are authoring errors; silent failures make them impossible to diagnose during development.
+- **Risks**: None in production (guarded by `import.meta.env.DEV`). Development behavior changes: a new console.warn appears, which is the intended outcome.
+- **Rollback**: `git revert 4f847bc`
+
+---
+
+### Fix: mobilityStore empty exerciseIds crash guard (BUG-MOBILITY-EMPTY)
+
+- **Commit**: `3f4632f`
+- **Files**: `src/store/mobilityStore.ts`
+- **Summary**: `resumeCompletion` with `exerciseIds = []` computed `currentIdx = Math.max(0, -1) = 0`. Indexing into an empty array at position 0 returns `undefined`, which would crash the session UI. Added an early-return guard: `if (exerciseIds.length === 0) return s`. Also simplified the fallback: `Math.max(0, exerciseIds.length - 1)` is now just `exerciseIds.length - 1` since the empty-array case is handled by the guard.
+- **Why it matters**: An empty routine is reachable if a user removes all exercises from a routine that has a saved completion. The crash would be silent until the user tries to reopen the session.
+- **Risks**: None. The guard is a no-op for all non-empty arrays.
+- **Rollback**: `git revert 3f4632f`
+
+---
+
+### Tests: targeted tests for the five fixes
+
+- **Commit**: `a0f3745`
+- **Files**: `src/store/__tests__/historyStore.test.ts`, `src/store/__tests__/mobilityStore.test.ts`, `src/lib/__tests__/expressionEval.test.ts`
+- **Summary**: Added 3 tests total covering the CalendarPage local-time format in `removeRetroJumpForDate`, the empty-exerciseIds guard in `resumeCompletion`, and the DEV console.warn behavior in the expressionEval tokenizer.
+- **Risks**: None. Purely additive test additions.
+- **Rollback**: `git revert a0f3745`
+
+---
+
 ## Pass 93 — 2026-08-08 (branch `claude/serene-cori-f62mw0`)
 
 ### Fix: CalendarPage historical tracker — planDayIndex missing from outcomeTarget (BUG-DAYOFF-INDEX)

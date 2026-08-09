@@ -1,5 +1,91 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-09 (ninety-fourth pass) — branch `claude/serene-cori-b5993l`
+
+---
+
+### Executive Summary
+
+1. **What changed**: Five targeted bug fixes, three new tests. Full codebase audit via dedicated Explore subagent. No new dependencies, no schema changes, no architectural changes.
+2. **Highest confidence**: All five fixes are small (1–20 lines each), individually revertable, and address concrete correctness issues. BUG-UTC-JUMP and BUG-CALENPAGE-JUMP address silent data corruption for UTC-offset users. BUG-AUTH-SILENT addresses unhandled promise rejections on auth failure. BUG-EXPR-SILENT and BUG-MOBILITY-EMPTY are low-severity defensive guards.
+3. **What is risky**: Nothing in this pass. All changes are additive or minimal surgical edits in well-understood code paths.
+4. **What to review first**: `authStore.ts` (new `authError` field) — UI components can now optionally surface this error. Verify the sign-in button in your AuthGate UI still functions correctly; the behavior is unchanged unless `authError` is wired up.
+
+---
+
+### Biggest Issues Found (full audit)
+
+| Severity | ID | Location | Description |
+|----------|----|----------|-------------|
+| Medium-High | BUG-DAYOFF-INDEX | `historyStore.ts` / `CalendarPage.tsx` | `updateEntryAction` without a planDayIndex on `day_off → complete` transition leaves `planDayIndex: undefined`, making the entry invisible to per-exercise stats. Already documented in tests; needs caller-side fix. |
+| Medium | BUG-UTC-JUMP | `historyStore.ts` | `removeRetroJumpForDate` UTC/local mismatch — **FIXED** |
+| Medium | BUG-CALENPAGE-JUMP | `CalendarPage.tsx` | Reference equality `indexOf` + UTC mismatch — **FIXED** |
+| Medium | BUG-AUTH-SILENT | `authStore.ts` | Silent auth errors — **FIXED** |
+| Low-Med | BUG-EXPR-SILENT | `expressionEval.ts` | Silent tokenizer failures — **FIXED** |
+| Low | BUG-MOBILITY-EMPTY | `mobilityStore.ts` | Empty exerciseIds crash — **FIXED** |
+| Low | BUG-DUPLICATE-PLAN | `planStore.ts` | `duplicatePlan` returns `''` on missing source; callers don't check |
+| Low | AUDIT-ARCH-1 | `TodayPage.tsx` / `CalendarPage.tsx` | Both pages remain large (1148/1042 lines) — ongoing decomposition work |
+
+---
+
+### Improvements Completed
+
+| Change | Commit | Confidence |
+|--------|--------|------------|
+| `removeRetroJumpForDate` UTC/local fix | `bfc0642` | High |
+| CalendarPage `hadJump` + `findIndex` fix | `6922682` | High |
+| authStore try/catch + `authError` field | `785611a` | High |
+| expressionEval DEV console.warn | `4f847bc` | High |
+| mobilityStore empty exerciseIds guard | `3f4632f` | High |
+| 3 targeted tests | `a0f3745` | High |
+
+---
+
+### Definitely Keep
+
+- All five bug fixes — small, well-scoped, independently revertable.
+- All three new tests — directly cover the fixed behaviors.
+
+### Probably Keep But Tweak
+
+- `authStore.ts` `authError` field: the field is exposed in state but no UI component currently reads it. Wire it up in `AuthGate.tsx` or wherever sign-in feedback is shown to actually surface the error message to users. This pass adds the data; wiring it to the UI is the next step.
+
+### Do Not Keep
+
+- Nothing in this pass needs to be reverted.
+
+### Recommendations Only (not implemented)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| BUG-DAYOFF-INDEX | P1 | Fix `updateEntryAction` planDayIndex propagation. The test at `historyStore.test.ts:196` documents the expected behavior. CalendarPage needs to thread the planDayIndex through from the resolved day to `updateEntryAction`. |
+| AUDIT-F | P2 | Add `@deprecated` JSDoc on `WorkoutType` deprecated values (`weightlifting`, `long_run`, `recovery_run`, `rest`). Zero-risk annotation, prevents future misuse. |
+| BUG-DUPLICATE-PLAN | P3 | Change `duplicatePlan` return type to `string \| null` and add null checks at call sites. Currently returns `''` which could set `activePlanId: ''` if a caller calls `setActivePlan` with the result. |
+| AUDIT-A | P3 | `storeSync.ts` beforeunload async flush risk (documented in prior passes). |
+| AUDIT-C | P4 | YAML re-parse non-idempotent slot IDs — hash-based deterministic IDs for re-import stability. |
+| AUDIT-D | P4 | `workoutTypeBreakdown` only counts first slot per day — multi-slot days undercount mobility completions. |
+
+---
+
+### Open Questions
+
+1. Should `authError` be surfaced in the existing AuthGate UI, or is a toast notification more appropriate? The field is ready; only the UI wiring is missing.
+2. The `handleHistoricalActiveComplete` fix (using `findIndex` by ID) will return -1 if the `planDay` was removed from the plan between tracker-open and tracker-complete. Is there a desired UX for this edge case? Currently: returns -1, guard converts to `undefined`, stats exclude the entry — same as before the fix.
+
+---
+
+### Known Issues / Incomplete Work
+
+- `authError` is now stored in `authStore` but no UI component reads it yet. This is intentional for this pass — behavioral change is additive.
+- `BUG-DAYOFF-INDEX` remains unfixed. The test at `historyStore.test.ts:196` documents the bug and the TODO.
+- No component tests (no `@testing-library/react`). All 35 test files are pure-logic unit tests. This remains the largest single test coverage gap.
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-08-08 (ninety-third pass) — branch `claude/serene-cori-f62mw0`
 
 ---

@@ -241,12 +241,13 @@ export const useMobilityStore = create<MobilityState>()(
           if (s.activeSession?.date === date) return s
           const completion = s.completions[date]
           if (!completion) return s
+          if (exerciseIds.length === 0) return s
           const firstIncompleteIdx = exerciseIds.findIndex(id => !completion.completedExerciseIds.includes(id))
           return {
             activeSession: {
               date,
               exerciseIds,
-              currentIdx: firstIncompleteIdx === -1 ? Math.max(0, exerciseIds.length - 1) : firstIncompleteIdx,
+              currentIdx: firstIncompleteIdx === -1 ? exerciseIds.length - 1 : firstIncompleteIdx,
               currentSetIdx: 0,
               completedIds: completion.completedExerciseIds,
               completedSets: completion.completedSets ?? {},

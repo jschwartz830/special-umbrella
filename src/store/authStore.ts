@@ -6,6 +6,7 @@ interface AuthState {
   user: User | null
   session: Session | null
   loading: boolean
+  authError: string | null
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   initialize: () => Promise<() => void>
@@ -15,19 +16,31 @@ export const useAuthStore = create<AuthState>()((set) => ({
   user: null,
   session: null,
   loading: true,
+  authError: null,
 
   async signInWithGoogle() {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin + '/special-umbrella/',
-      },
-    })
+    set({ authError: null })
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/special-umbrella/',
+        },
+      })
+      if (error) set({ authError: error.message })
+    } catch (err) {
+      set({ authError: err instanceof Error ? err.message : 'Sign-in failed' })
+    }
   },
 
   async signOut() {
-    await supabase.auth.signOut()
-    set({ user: null, session: null })
+    set({ authError: null })
+    try {
+      await supabase.auth.signOut()
+      set({ user: null, session: null })
+    } catch (err) {
+      set({ authError: err instanceof Error ? err.message : 'Sign-out failed' })
+    }
   },
 
   async initialize() {

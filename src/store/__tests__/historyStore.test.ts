@@ -303,6 +303,14 @@ describe('removeRetroJumpForDate', () => {
     }).not.toThrow()
     expect(getState().overrides).toHaveLength(0)
   })
+
+  it('removes a jump stored in CalendarPage format (no Z suffix)', () => {
+    // CalendarPage stores appliedAt as "YYYY-MM-DDT12:00:00.000" without a Z.
+    // The fix uses slice(0, 10) which works regardless of timezone offset.
+    getState().addOverride(makeOverride('2026-01-15T12:00:00.000', 'jump', { targetDayIndex: 2 }))
+    getState().removeRetroJumpForDate('plan-1', '2026-01-15')
+    expect(getState().overrides).toHaveLength(0)
+  })
 })
 
 // ── removeEntry ───────────────────────────────────────────────────────────────
