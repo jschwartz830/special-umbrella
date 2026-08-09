@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { format } from 'date-fns'
 import type { HistoryEntry, OverrideEntry, ExtraWorkoutEntry, ActionType, OverrideType, WorkoutType } from '../types'
 import { nanoid } from '../lib/utils'
 
@@ -186,8 +185,10 @@ export const useHistoryStore = create<HistoryState>()(
         set(s => ({
           overrides: s.overrides.filter(o => {
             if (o.planId !== planId || o.type !== 'jump') return true
-            const ovLocalDate = format(new Date(o.appliedAt), 'yyyy-MM-dd')
-            return ovLocalDate !== calendarDate
+            // Retroactive jump overrides are written with appliedAt in the form
+            // "YYYY-MM-DDT12:00:00.000" (no Z), so slicing the first 10 chars
+            // is safe and avoids UTC-vs-local-timezone misattribution.
+            return o.appliedAt.slice(0, 10) !== calendarDate
           }),
         }))
       },
