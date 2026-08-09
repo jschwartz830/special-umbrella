@@ -138,7 +138,7 @@ export function CalendarPage() {
     // re-anchoring — shifting the rotation for all subsequent dates.
     const hadJump = overrides.some(o => {
       if (o.planId !== plan.id || o.type !== 'jump') return false
-      return format(new Date(o.appliedAt), 'yyyy-MM-dd') === rd.calendarDate
+      return o.appliedAt.slice(0, 10) === rd.calendarDate
     })
 
     removeRetroJumpForDate(plan.id, rd.calendarDate)
@@ -305,7 +305,7 @@ export function CalendarPage() {
     // tracker session on a day_off-marked date leaves the entry with
     // planDayIndex: undefined on a 'complete' action, making it invisible to
     // stats functions that filter on e.planDayIndex !== undefined.
-    const planDayIdx = plan.days.indexOf(activeWorkoutTarget.planDay)
+    const planDayIdx = plan.days.findIndex(d => d.id === activeWorkoutTarget.planDay.id)
     setOutcomeTarget({
       planId: plan.id,
       calendarDate: activeWorkoutTarget.calendarDate,
