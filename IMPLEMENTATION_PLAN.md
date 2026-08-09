@@ -1,5 +1,67 @@
 # Implementation Plan
 
+## Pass 94 — 2026-08-09 (branch `claude/serene-cori-b5993l`)
+
+### Baseline
+
+- Branch started from `main` after PR #238 (pass 93 background-scroll fix) merged.
+- **1213 tests passing** across 35 test files at start of pass.
+- **1216 tests passing** at end of pass (+3 targeted tests).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 94)
+
+Full-codebase audit pass. Six confirmed bugs identified via dedicated Explore subagent; five fixed this pass. Three targeted tests added. No new dependencies, no schema changes.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-UTC-JUMP | `bfc0642` | `historyStore.ts` | `removeRetroJumpForDate` used `format(new Date(o.appliedAt), 'yyyy-MM-dd')` which mixed UTC ISO parsing with local-timezone formatting. For users in UTC-offset timezones near midnight, this mis-attributed the jump to the wrong local date, causing the override to silently persist. Fixed with `o.appliedAt.slice(0, 10)`. Removed now-unused `date-fns` import. |
+| BUG-CALENPAGE-JUMP | `6922682` | `CalendarPage.tsx` | `hadJump` check in `logForDate` had the same UTC/local mismatch as BUG-UTC-JUMP. Fixed with `slice(0, 10)`. Also: `handleHistoricalActiveComplete` used `plan.days.indexOf(activeWorkoutTarget.planDay)` (reference equality), which returns -1 if the plan was re-hydrated from Zustand persistence between opening and completing the tracker. Replaced with `findIndex(d => d.id === planDay.id)` using the stable day ID. |
+| BUG-AUTH-SILENT | `785611a` | `authStore.ts` | `signInWithGoogle` and `signOut` were fire-and-forget awaits with no error handling. Network failures, popup blocks, or Supabase outages produced unhandled rejections with no user-visible feedback. Added try/catch with `authError` state field; errors are cleared on each new attempt. |
+| BUG-EXPR-SILENT | `4f847bc` | `expressionEval.ts` | Unknown characters in progression expressions were silently discarded, producing invisible 0/NaN results that stalled progressions without any indication. Added `console.warn` in DEV mode with the offending character and the full expression. |
+| BUG-MOBILITY-EMPTY | `3f4632f` | `mobilityStore.ts` | `resumeCompletion` with an empty `exerciseIds` array computed `Math.max(0, -1) = 0`, indexing into an empty array and returning `undefined`. Added an early-return guard for `exerciseIds.length === 0`. |
+
+### Bugs Documented But Not Fixed (require callers or architectural coordination)
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-DAYOFF-INDEX | `historyStore.ts` / `CalendarPage.tsx` | `updateEntryAction` without a caller-supplied `planDayIndex` when transitioning `day_off → complete` leaves `planDayIndex: undefined`. Previously documented (pass 80 test). Fix requires the call site to look up the rotation's current planDayIndex. |
+| BUG-DUPLICATE-PLAN-EMPTY | `planStore.ts` | `duplicatePlan` returns `''` on missing source; callers don't check. Low risk; fix is changing return type to `string \| null` and adding null checks at call sites. |
+
+### Tests Added This Pass
+
+| File | Tests Added | Description |
+|---|---|---|
+| `historyStore.test.ts` | +1 | `removeRetroJumpForDate` with CalendarPage format (no Z suffix) confirms `slice(0,10)` works for both UTC and local-time formats. |
+| `mobilityStore.test.ts` | +1 | `resumeCompletion` is a no-op when `exerciseIds` is empty. |
+| `expressionEval.test.ts` | +2 | Tokenizer emits `console.warn` in DEV on unknown chars; usable tokens still evaluated. |
+
+### Audit Findings Not Yet Implemented
+
+From the full-codebase audit this pass (via Explore subagent):
+
+| # | Severity | Location | Summary |
+|---|---|---|---|
+| AUDIT-A | Medium | `storeSync.ts` | `beforeunload` async flush risk (documented pass 78 AUDIT-1 as well) |
+| AUDIT-B | Medium | `storeSync.ts:syncOnLogin` | No conflict resolution on login — local changes can be overwritten |
+| AUDIT-C | Medium | `engine/programParser.ts:parseSlot` | Non-idempotent YAML re-parse generates new slot IDs each time, breaking slot-keyed data |
+| AUDIT-D | Low | `workoutTypeBreakdown` in historyStats | Only attributes first slot per multi-slot day, undercounting mobility/supplementary completions |
+| AUDIT-E | Low | `sessionExtrasRef` in TodayPage | Resets on component remount, breaking Undo after navigation |
+| AUDIT-F | Low | Deprecated `WorkoutType` values | No `@deprecated` JSDoc; new contributors may accidentally produce deprecated values |
+
+### Prioritized Plan (for next pass)
+
+| Priority | Item |
+|----------|------|
+| P1 | Fix `updateEntryAction` BUG-DAYOFF-INDEX: look up the rotation planDayIndex from the plan at the CalendarPage call site before calling updateEntryAction (existing test at historyStore.test.ts:196 documents the expected fix). |
+| P2 | Add `@deprecated` JSDoc on deprecated `WorkoutType` values (`weightlifting`, `long_run`, `recovery_run`, `rest`) — zero-risk annotation. |
+| P3 | Continue `TodayPage.tsx` decomposition (ARCH-1) — still at ~1148 lines after pass 93. |
+| P4 | AUDIT-C: deterministic slot IDs on YAML re-parse (hash of structural position). |
+
+---
+
 ## Pass 93 — 2026-08-08 (branch `claude/serene-cori-f62mw0`)
 
 ### Baseline
