@@ -74,7 +74,8 @@ function tokenize(src: string): Tok[] {
     if (c === '(') { toks.push({ type: 'lparen' }); i++; continue }
     if (c === ')') { toks.push({ type: 'rparen' }); i++; continue }
     if (c === ',') { toks.push({ type: 'comma' }); i++; continue }
-    i++ // skip unknown char
+    if (import.meta.env.DEV) console.warn(`[expressionEval] unknown character '${c}' in expression: ${src}`)
+    i++
   }
   toks.push({ type: 'eof' })
   return toks
