@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   evaluateExpression,
   evaluateCondition,
@@ -234,6 +234,29 @@ describe('evaluateExpression', () => {
 
     it('returns 0 for invalid syntax (parse error)', () => {
       expect(evaluateExpression('((unclosed', ctx())).toBe(0)
+    })
+
+    describe('unknown character tokenizer warning', () => {
+      beforeEach(() => {
+        vi.stubEnv('DEV', true)
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+      })
+      afterEach(() => {
+        vi.unstubAllEnvs()
+        vi.restoreAllMocks()
+      })
+
+      it('still evaluates the usable tokens when an unknown char is present', () => {
+        // "squat" is a valid var; the stray "@" is skipped after warning
+        expect(evaluateExpression('@squat', ctx({ squat: 135 }))).toBe(135)
+      })
+
+      it('emits a console.warn in DEV with the offending character', () => {
+        evaluateExpression('squat @= 5', ctx({ squat: 135 }))
+        expect(console.warn).toHaveBeenCalledWith(
+          expect.stringContaining('@'),
+        )
+      })
     })
   })
 })

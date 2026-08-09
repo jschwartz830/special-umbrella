@@ -697,6 +697,18 @@ describe('resumeCompletion', () => {
     useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
     expect(useMobilityStore.getState().completions['2026-07-01']).toEqual(completion)
   })
+
+  it('is a no-op when exerciseIds is empty (guard against empty-routine crash)', () => {
+    useMobilityStore.getState().logCompletion('2026-07-01', {
+      completedAt: '2026-07-01T08:00:00.000Z',
+      durationMin: 5,
+      completedExerciseIds: [],
+    })
+    // An empty routine would previously compute currentIdx = Math.max(0, -1) = 0,
+    // indexing into an empty array and returning undefined.
+    useMobilityStore.getState().resumeCompletion('2026-07-01', [])
+    expect(useMobilityStore.getState().activeSession).toBeNull()
+  })
 })
 
 // ── clearSession ──────────────────────────────────────────────────────────────
