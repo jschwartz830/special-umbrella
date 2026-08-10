@@ -1,5 +1,48 @@
 # Implementation Plan
 
+## Pass 95 — 2026-08-10 (branch `claude/serene-cori-awu2i9`)
+
+### Baseline
+
+- Branch started from `main` after PR #239 (pass 94 bug-fix batch) merged.
+- **1216 tests passing** across 35 test files at start of pass.
+- **1218 tests passing** at end of pass (+2 targeted tests).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 95)
+
+Targeted audit and consistency pass. One confirmed bug found and fixed in `getUpcomingDays` — future jump overrides were not being applied, causing the TodayPage upcoming list to show different workouts than CalendarPage for the same future dates. Two regression-covering tests added. No schema changes, no new dependencies.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| BUG-UPCOMING-OVERRIDE | `e63cd0c` | `rotationEngine.ts` | `getUpcomingDays` projected future dates purely positionally, ignoring any `jump`/`advance`/`go_back` overrides whose `appliedAt` falls on a future date. When a user edits a future calendar date (CalendarPage writes `appliedAt: "${date}T12:00:00.000"`), the upcoming list on TodayPage showed the wrong workout. Fixed by calling `applyOverridesForDate` inside the projection loop, mirroring `getResolvedDaysRange`. |
+
+### Bugs Documented But Not Fixed
+
+| ID | File | Summary |
+|---|---|---|
+| BUG-DAYOFF-INDEX | `historyStore.ts` / `CalendarPage.tsx` | `updateEntryAction` without caller-supplied `planDayIndex` when transitioning `day_off → complete` leaves `planDayIndex: undefined`. Fix requires call site to supply the current rotation index. |
+| BUG-OUTCOMESTORE-MIGRATE | `outcomeStore.ts` | Migration function is a no-op cast (`persisted as OutcomeState`). If the shape of OutcomeState changes in the future, stale persisted data will not be migrated and could produce runtime errors. Needs explicit field-level migration similar to historyStore. |
+| BUG-ALLENTRIES-SELECTOR | `TodayPage.tsx` | `useHistoryStore(s => s.entries)` subscribes to the full entries array. Any write (any plan, any date) re-renders TodayPage even if today's data didn't change. Scoping to `s.entries.filter(e => e.planId === activePlanId && e.calendarDate === today)` would cut re-renders substantially. |
+
+### Tests Added
+
+| Test | File | What it covers |
+|---|---|---|
+| `applies a future jump override so the upcoming list matches the calendar view` | `rotationEngine.test.ts` | Regression for BUG-UPCOMING-OVERRIDE: verifies a jump override on a future date shifts planDayIndex in the upcoming list |
+| `without a future jump override upcoming list is purely positional` | `rotationEngine.test.ts` | Baseline: no overrides → positional projection is correct |
+
+### Next Pass Priorities
+
+1. Fix BUG-OUTCOMESTORE-MIGRATE: add explicit field-level migration to `outcomeStore.ts`
+2. Fix BUG-ALLENTRIES-SELECTOR: scope the `entries` selector in TodayPage to reduce re-renders
+3. Fix BUG-DAYOFF-INDEX: pass `planDayIndex` from CalendarPage when transitioning `day_off → complete`
+4. Consider render-level tests for TodayPage (currently covered only by unit tests on the engine layer)
+
+---
+
 ## Pass 94 — 2026-08-09 (branch `claude/serene-cori-b5993l`)
 
 ### Baseline

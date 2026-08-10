@@ -1,5 +1,44 @@
 # Test Results
 
+## Pass 95 — 2026-08-10 (branch `claude/serene-cori-awu2i9`)
+
+---
+
+### Baseline (before changes)
+
+- **35 test files, 1216 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Tests Added
+
+| File | Count | Description |
+|------|-------|-------------|
+| `src/engine/__tests__/rotationEngine.test.ts` | +2 | (1) `getUpcomingDays` applies a future jump override so the upcoming list matches the calendar view — regression for BUG-UPCOMING-OVERRIDE; (2) baseline: no overrides → positional projection is correct and wraps at plan boundary |
+
+### Final Results
+
+- **35 test files, 1218 tests — all passing**
+- 0 failures, 0 skipped
+- Duration: ~3.6s
+
+### Tests Reviewed (relevant to changes)
+
+| Suite | Status | Notes |
+|-------|--------|-------|
+| `rotationEngine.test.ts` — `getUpcomingDays` | ✅ All cases pass including 2 new | New tests exercise the `applyOverridesForDate` call added in BUG-UPCOMING-OVERRIDE fix |
+| `rotationEngine.test.ts` — `getResolvedDaysRange` | ✅ Unchanged, still passing | Cross-check that fixing upcoming didn't break the calendar range function |
+| `rotationEngine.test.ts` — `computeCurrentDayIndex` | ✅ Unchanged | Foundational pointer arithmetic confirmed correct |
+
+### Important Areas Still Untested
+
+| Area | Gap |
+|------|-----|
+| `authStore.ts` | No test file. `signInWithGoogle`, `signOut`, `initialize`, and `authError` are all untested. |
+| `outcomeStore.ts` | Migration is a no-op cast — no test verifies shape compatibility on version upgrade. |
+| `TodayPage.tsx` / `CalendarPage.tsx` | Render-level tests absent. Business logic is covered by engine unit tests; integration coverage depends entirely on manual testing. |
+
+---
+
 ## Pass 94 — 2026-08-09 (branch `claude/serene-cori-b5993l`)
 
 ---

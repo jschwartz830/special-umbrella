@@ -2,6 +2,20 @@
 
 ---
 
+## Pass 95 — 2026-08-10 (branch `claude/serene-cori-awu2i9`)
+
+### Fix: getUpcomingDays future override handling (BUG-UPCOMING-OVERRIDE)
+
+- **Commit**: `e63cd0c`
+- **Files**: `src/engine/rotationEngine.ts`
+- **Summary**: `getUpcomingDays` projected upcoming workout days purely positionally, ignoring any overrides whose `appliedAt` falls on a future date. When a user edits a future calendar date, CalendarPage writes `addOverride({ ..., appliedAt: "${date}T12:00:00.000" })`. `getResolvedDaysRange` (the Calendar view) correctly applies those overrides, but `getUpcomingDays` (the TodayPage upcoming list) did not. This caused the two views to show different workouts for the same future dates. Fixed by calling `applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)` inside the projection loop, immediately before reading `plan.days[pointer]` — the same pattern `getResolvedDaysRange` already used.
+- **Why it matters**: Inconsistency between the Today upcoming list and Calendar creates user confusion — the upcoming card shows "Workout A" but the calendar shows "Workout B" on the same day.
+- **Files changed**: `rotationEngine.ts` (+5 lines in the `getUpcomingDays` loop). Comment explains the mirror.
+- **Risks**: None. The helper `applyOverridesForDate` is idempotent when no overrides match a date; positional behavior is unchanged when there are no future overrides. All 1218 tests pass.
+- **Rollback**: `git revert e63cd0c`
+
+---
+
 ## Pass 94 — 2026-08-09 (branch `claude/serene-cori-b5993l`)
 
 ### Fix: removeRetroJumpForDate UTC/local mismatch (BUG-UTC-JUMP)
