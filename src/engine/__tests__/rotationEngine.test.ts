@@ -491,6 +491,36 @@ describe('getUpcomingDays', () => {
     expect(result[2].calendarDate).toBe('2026-01-04')
     expect(result[2].planDayIndex).toBe(3)
   })
+
+  // ── Future jump overrides ─────────────────────────────────────────────────
+
+  it('applies a future jump override so the upcoming list matches the calendar view', () => {
+    // Regression test for the bug where getUpcomingDays did not apply overrides
+    // to future dates. CalendarPage can create a jump override with appliedAt on
+    // a future date (e.g. when the user retroactively assigns a different workout
+    // to an upcoming day). Without the fix, the upcoming list would show day 1
+    // while the calendar shows day 3 for that same date — a visible inconsistency.
+    const plan = makePlan(4)
+    // Jump override applied on Jan 4 (a future date relative to today Jan 1)
+    const overrides = [makeOverride('2026-01-04T12:00:00.000', 'jump', { targetDayIndex: 3 })]
+    // No past entries → pointer at 0 for today.
+    // After today's +1: day 1 for Jan 2, day 2 for Jan 3.
+    // On Jan 4 the jump fires: pointer jumps to day 3.
+    // Jan 5: back to incremental from 3 → day 0 (wraps).
+    const result = getUpcomingDays(plan, [], overrides, '2026-01-01', 5)
+    expect(result.find(r => r.calendarDate === '2026-01-02')?.planDayIndex).toBe(1)
+    expect(result.find(r => r.calendarDate === '2026-01-03')?.planDayIndex).toBe(2)
+    expect(result.find(r => r.calendarDate === '2026-01-04')?.planDayIndex).toBe(3) // jump applied
+    expect(result.find(r => r.calendarDate === '2026-01-05')?.planDayIndex).toBe(0) // wraps
+  })
+
+  it('without a future jump override upcoming list is purely positional', () => {
+    // Baseline for the above: same scenario but no override → pointer increments linearly.
+    const plan = makePlan(4)
+    const result = getUpcomingDays(plan, [], [], '2026-01-01', 5)
+    expect(result.find(r => r.calendarDate === '2026-01-04')?.planDayIndex).toBe(3)
+    expect(result.find(r => r.calendarDate === '2026-01-05')?.planDayIndex).toBe(0)
+  })
 })
 
 // ── isPlanExpired ─────────────────────────────────────────────────────────────
