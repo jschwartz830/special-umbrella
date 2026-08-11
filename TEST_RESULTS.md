@@ -1,5 +1,46 @@
 # Test Results
 
+## Pass 95 — 2026-08-11 (branch `claude/serene-cori-i4t5dr`)
+
+---
+
+### Baseline (before changes)
+
+- **35 test files, 1216 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Tests Added
+
+| File | Count | Description |
+|------|-------|-------------|
+| `src/store/__tests__/outcomeStore.test.ts` | +2 | `clearPlanOutcomes` ID-parser scoping: prefix-sibling isolation; primary + extra key removal |
+| `src/store/__tests__/outcomeStore.test.ts` | +1 | `logOutcomeWithProgression` error isolation: throwing slot-level rule does not abort outcome save |
+
+### Final Results
+
+- **35 test files, 1219 tests — all passing**
+- 0 failures, 0 skipped
+- Duration: ~4.4s
+- TypeScript: `tsc --noEmit` clean
+
+### Tests Reviewed (relevant to changes)
+
+| Suite | Status | Notes |
+|-------|--------|-------|
+| `outcomeStore.test.ts` — `clearPlanOutcomes` | ✅ All 5 cases pass (was 3) | New prefix-sibling and ID-parser tests added |
+| `outcomeStore.test.ts` — `logOutcomeWithProgression` | ✅ All 8 cases pass (was 7) | New error-isolation test for steps 3a/3b |
+| `historyStore.test.ts` — BUG-2 comment | ✅ No behavioral change | Comment updated to clarify call-site fix (commit `a317041`) |
+
+### Important Areas Still Untested
+
+| Area | Gap |
+|------|-----|
+| `authStore.ts` | No test file. `signInWithGoogle`, `signOut`, `initialize`, and `authError` are untested. |
+| `TodayPage.tsx` / `CalendarPage.tsx` | No component/integration tests. NEW-ADAPT-NOTE and NEW-MODAL-REMOUNT bugs (found this pass) could be caught by integration tests. |
+| `storeSync.ts` | Cloud sync paths untested; requires Supabase mock infrastructure. |
+
+---
+
 ## Pass 94 — 2026-08-09 (branch `claude/serene-cori-b5993l`)
 
 ---

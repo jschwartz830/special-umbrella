@@ -193,18 +193,18 @@ describe('updateEntryAction', () => {
     expect(getState().entries.find(e => e.planId === 'plan-2')!.action).toBe('complete')
   })
 
-  it('day_off → complete without planDayIndex leaves planDayIndex undefined (BUG-2)', () => {
-    // Callers MUST supply planDayIndex when changing away from day_off. If they
-    // don't (e.g. CalendarPage's openEditOutcome path for a pre-existing day_off
-    // entry), the resulting 'complete' entry has planDayIndex: undefined.
-    // Stats functions that filter on e.planDayIndex !== undefined will silently
-    // drop such entries. This test documents the current behaviour so a future
-    // fix can verify it in the same place.
+  it('day_off → complete without planDayIndex leaves planDayIndex undefined (BUG-2 store-level behaviour)', () => {
+    // The store-level updateEntryAction requires the caller to supply planDayIndex
+    // when transitioning away from day_off. CalendarPage (openEditOutcome) was
+    // fixed (commit a317041) to always derive planDayIndex from rd.planDayIndex
+    // as a fallback and thread it through outcomeTarget.planDayIndex, so this
+    // scenario should not occur in normal app flows. This test preserves the
+    // documented store-level behaviour: passing no planDayIndex leaves it undefined.
     getState().addEntry(makeEntry('2026-01-01', 'day_off'))
     getState().updateEntryAction('plan-1', '2026-01-01', 'complete') // no planDayIndex supplied
     const entry = getState().entries[0]
     expect(entry.action).toBe('complete')
-    expect(entry.planDayIndex).toBeUndefined() // ← BUG-2: should be a valid index
+    expect(entry.planDayIndex).toBeUndefined()
   })
 })
 

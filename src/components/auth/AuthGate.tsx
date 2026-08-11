@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function AuthGate({ children }: Props) {
-  const { user, loading, initialize, signInWithGoogle, signOut } = useAuthStore()
+  const { user, loading, initialize, signInWithGoogle, signOut, authError } = useAuthStore()
 
   useEffect(() => {
     let cleanup: (() => void) | undefined
@@ -67,6 +67,12 @@ export function AuthGate({ children }: Props) {
             <GoogleIcon />
             Continue with Google
           </button>
+
+          {authError && (
+            <p className="text-center text-sm text-red-400" role="alert">
+              {authError}
+            </p>
+          )}
 
           <p className="text-center text-xs text-gray-600">
             Your data is private and only accessible to you.
