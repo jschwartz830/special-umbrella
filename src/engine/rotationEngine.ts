@@ -189,6 +189,11 @@ export function getUpcomingDays(
 
   for (let i = 1; i <= count; i++) {
     const date = format(addDays(todayParsed, i), 'yyyy-MM-dd')
+    // Apply overrides for this date before reading planDay — mirrors
+    // getResolvedDaysRange so that a future jump override (e.g. created by a
+    // CalendarPage retroactive edit on a future date) shifts the upcoming list
+    // to match the calendar view.
+    pointer = applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)
     const entry = entryByDate.get(date)
     result.push({
       calendarDate: date,

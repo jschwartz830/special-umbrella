@@ -1,11 +1,27 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-10 (ninety-fifth pass) — branch `claude/serene-cori-awu2i9`
 ## 2026-08-11 (ninety-fifth pass) — branch `claude/serene-cori-i4t5dr`
 
 ---
 
 ### Executive Summary
 
+1. **What changed**: One targeted bug fix (`getUpcomingDays` future override handling), two new regression-covering tests. No schema changes, no new dependencies, no architectural changes.
+2. **Highest confidence**: The fix is a 5-line addition to a single loop in `rotationEngine.ts`, mirrors a pattern already present in `getResolvedDaysRange`, and is covered by two new targeted tests. Regression risk is very low.
+3. **What is risky**: Nothing in this pass. The helper `applyOverridesForDate` is idempotent — when no overrides match a date, it returns the pointer unchanged.
+4. **What to review first**: `rotationEngine.ts` lines 190–205 (`getUpcomingDays` projection loop). Verify the new `applyOverridesForDate` call sits in the right place: after computing the `date` string but before pushing to `result` and before the end-of-loop pointer advance.
+
+---
+
+### Biggest Issues Found (full audit)
+
+| Severity | ID | Location | Description |
+|----------|----|----------|-------------|
+| Medium | BUG-UPCOMING-OVERRIDE | `rotationEngine.ts` | `getUpcomingDays` ignored future overrides → Today upcoming list inconsistent with Calendar — **FIXED** |
+| Medium-High | BUG-DAYOFF-INDEX | `historyStore.ts` / `CalendarPage.tsx` | `day_off → complete` transition without planDayIndex leaves entry invisible to per-exercise stats. Already documented; needs caller-side fix. |
+| Low | BUG-OUTCOMESTORE-MIGRATE | `outcomeStore.ts` | Migration is a no-op cast — no field-level migration exists. Future shape changes will silently produce runtime errors on existing persisted data. |
+| Low | BUG-ALLENTRIES-SELECTOR | `TodayPage.tsx` | `useHistoryStore(s => s.entries)` subscribes to all entries; any write from any plan re-renders TodayPage. Should scope to current plan + today. |
 1. **What changed**: Four targeted fixes and 3 new tests. Full codebase re-audit via Explore subagent (fresh pass, independent of prior results). No new dependencies, no schema changes.
 2. **Highest confidence**: Auth error UI wiring (additive, zero behavioral change in happy path); `@deprecated` comments (zero-risk annotation); outcomeStore try/catch additions (defensive, mirrors existing step-2 pattern); `clearPlanOutcomes` ID-parser fix (functionally equivalent for all current key formats, more correct).
 3. **What is risky**: Nothing in this pass. All changes are either additive or defensive.
@@ -36,6 +52,19 @@ The P1 item carried from pass 94 (and prior passes) — `updateEntryAction` with
 
 ### Improvements Completed
 
+| Change | Commit | Confidence |
+|--------|--------|------------|
+| `getUpcomingDays` future override fix | `e63cd0c` | High |
+| 2 targeted regression tests | `e63cd0c` | High |
+
+---
+
+### Recommendations for Next Pass
+
+1. **BUG-OUTCOMESTORE-MIGRATE** — add explicit field-level migration (low effort, high future safety)
+2. **BUG-ALLENTRIES-SELECTOR** — scope the entries selector in TodayPage (medium effort, worthwhile perf win)
+3. **BUG-DAYOFF-INDEX** — pass `planDayIndex` from CalendarPage on `day_off → complete` transitions (medium effort, correctness fix for stats)
+4. **authStore tests** — add a unit test file covering `signInWithGoogle`, `signOut`, and the `authError` field introduced in pass 94
 | Change | Confidence |
 |--------|------------|
 | Wire `authError` to AuthGate sign-in UI | High |

@@ -1,5 +1,6 @@
 # Test Results
 
+## Pass 95 — 2026-08-10 (branch `claude/serene-cori-awu2i9`)
 ## Pass 95 — 2026-08-11 (branch `claude/serene-cori-i4t5dr`)
 
 ---
@@ -13,6 +14,13 @@
 
 | File | Count | Description |
 |------|-------|-------------|
+| `src/engine/__tests__/rotationEngine.test.ts` | +2 | (1) `getUpcomingDays` applies a future jump override so the upcoming list matches the calendar view — regression for BUG-UPCOMING-OVERRIDE; (2) baseline: no overrides → positional projection is correct and wraps at plan boundary |
+
+### Final Results
+
+- **35 test files, 1218 tests — all passing**
+- 0 failures, 0 skipped
+- Duration: ~3.6s
 | `src/store/__tests__/outcomeStore.test.ts` | +2 | `clearPlanOutcomes` ID-parser scoping: prefix-sibling isolation; primary + extra key removal |
 | `src/store/__tests__/outcomeStore.test.ts` | +1 | `logOutcomeWithProgression` error isolation: throwing slot-level rule does not abort outcome save |
 
@@ -27,6 +35,9 @@
 
 | Suite | Status | Notes |
 |-------|--------|-------|
+| `rotationEngine.test.ts` — `getUpcomingDays` | ✅ All cases pass including 2 new | New tests exercise the `applyOverridesForDate` call added in BUG-UPCOMING-OVERRIDE fix |
+| `rotationEngine.test.ts` — `getResolvedDaysRange` | ✅ Unchanged, still passing | Cross-check that fixing upcoming didn't break the calendar range function |
+| `rotationEngine.test.ts` — `computeCurrentDayIndex` | ✅ Unchanged | Foundational pointer arithmetic confirmed correct |
 | `outcomeStore.test.ts` — `clearPlanOutcomes` | ✅ All 5 cases pass (was 3) | New prefix-sibling and ID-parser tests added |
 | `outcomeStore.test.ts` — `logOutcomeWithProgression` | ✅ All 8 cases pass (was 7) | New error-isolation test for steps 3a/3b |
 | `historyStore.test.ts` — BUG-2 comment | ✅ No behavioral change | Comment updated to clarify call-site fix (commit `a317041`) |
@@ -35,6 +46,9 @@
 
 | Area | Gap |
 |------|-----|
+| `authStore.ts` | No test file. `signInWithGoogle`, `signOut`, `initialize`, and `authError` are all untested. |
+| `outcomeStore.ts` | Migration is a no-op cast — no test verifies shape compatibility on version upgrade. |
+| `TodayPage.tsx` / `CalendarPage.tsx` | Render-level tests absent. Business logic is covered by engine unit tests; integration coverage depends entirely on manual testing. |
 | `authStore.ts` | No test file. `signInWithGoogle`, `signOut`, `initialize`, and `authError` are untested. |
 | `TodayPage.tsx` / `CalendarPage.tsx` | No component/integration tests. NEW-ADAPT-NOTE and NEW-MODAL-REMOUNT bugs (found this pass) could be caught by integration tests. |
 | `storeSync.ts` | Cloud sync paths untested; requires Supabase mock infrastructure. |
