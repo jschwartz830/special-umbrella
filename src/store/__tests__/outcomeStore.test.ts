@@ -513,3 +513,58 @@ describe('moveOutcome', () => {
     ).toBeDefined()
   })
 })
+
+// ── clearPlanOutcomes: ID-parser scoping ──────────────────────────────────────
+
+describe('clearPlanOutcomes: ID-parser scoping', () => {
+  it('does not remove outcomes from a plan whose ID shares a prefix with the cleared plan', () => {
+    // 'p' is a prefix of 'p2' in the simplest sense; the key for 'p' is
+    // "p_2026-01-01" and for 'p2' is "p2_2026-01-01". The old prefix check
+    // "p_".startsWith("p2_") is false, but this test verifies the ID-parser
+    // path explicitly.
+    getState().setOutcome(makeOutcome('p', '2026-01-01'))
+    getState().setOutcome(makeOutcome('p2', '2026-01-01'))
+    getState().clearPlanOutcomes('p')
+    const keys = Object.keys(getState().outcomes)
+    expect(keys).toHaveLength(1)
+    expect(keys[0]).toBe('p2_2026-01-01')
+  })
+
+  it('removes all outcomes for the target plan including extra-workout keys', () => {
+    const primaryId = makeWorkoutInstanceId('plan-1', '2026-01-01')
+    const extraId = makeExtraWorkoutInstanceId('plan-1', '2026-01-01', 'ext-1')
+    getState().setOutcome({ ...makeOutcome('plan-1', '2026-01-01'), workoutInstanceId: primaryId })
+    getState().setOutcome({ ...makeOutcome('plan-1', '2026-01-01'), workoutInstanceId: extraId })
+    getState().setOutcome(makeOutcome('plan-2', '2026-01-01'))
+    getState().clearPlanOutcomes('plan-1')
+    const keys = Object.keys(getState().outcomes)
+    expect(keys).toHaveLength(1)
+    expect(keys[0]).toBe('plan-2_2026-01-01')
+  })
+})
+
+// ── logOutcomeWithProgression: try/catch in steps 3a and 3b ─────────────────
+
+describe('logOutcomeWithProgression: progression-rule error isolation', () => {
+  it('stores the outcome even when the slot-level progression rule throws', () => {
+    const planId = 'prog-plan'
+    // Give the plan non-empty program vars so the rule path is entered
+    useProgramStore.setState({ vars: { [planId]: { weight: 100 } } })
+
+    const slotWithBadRule = {
+      id: 'slot-1',
+      type: 'run' as const,
+      name: 'Run',
+      // applyProgressionRule will throw for a malformed rule
+      slotProgress: { condition: 'SYNTAX_ERROR!!', updates: '' },
+    } as unknown as import('../../types').WorkoutSlot
+
+    const outcome = makeOutcome(planId, '2026-06-01')
+    expect(() => {
+      getState().logOutcomeWithProgression(outcome, slotWithBadRule)
+    }).not.toThrow()
+
+    // Outcome must be persisted despite the rule failure
+    expect(getState().getOutcome(outcome.workoutInstanceId)).toBeDefined()
+  })
+})
