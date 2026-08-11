@@ -1,5 +1,57 @@
 # Implementation Plan
 
+## Pass 95 — 2026-08-11 (branch `claude/serene-cori-i4t5dr`)
+
+### Baseline
+
+- Branch started from `main` after PR #239 (pass 94) merged.
+- **1216 tests passing** across 35 test files at start of pass.
+- **1219 tests passing** at end of pass (+3 new tests).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 95)
+
+Focused improvement pass: 4 targeted fixes + 3 new tests. Full codebase re-audit via dedicated Explore subagent revealed 2 new medium-severity bugs (NEW-ADAPT-NOTE, NEW-MODAL-REMOUNT) deferred to next pass. BUG-DAYOFF-INDEX (P1 from pass 94) confirmed already fixed in the codebase (commit `a317041`, pass 80) — the P1 was stale in the documentation.
+
+### Bugs Fixed This Pass
+
+| # | File(s) | Summary |
+|---|---|---|
+| BUG-AUTH-UI | `AuthGate.tsx` | `authStore.authError` (added pass 94) was never surfaced in the sign-in UI. Added visible error message below the sign-in button. |
+| BUG-PROGRESSION-UNCAUGHT | `outcomeStore.ts` | `logOutcomeWithProgression` steps 3a/3b (slot-level and per-exercise YAML progression rules) lacked try/catch. A malformed rule would throw after the outcome was saved, potentially aborting the caller's history-entry write. Added individual try/catch matching step 2's pattern. |
+| BUG-OUTCOME-PREFIX | `outcomeStore.ts` | `clearPlanOutcomes` used `k.startsWith(planId + '_')`. Replaced with `parseWorkoutInstanceId(k)?.planId !== planId` (canonical ID parser). Functionally equivalent for current hex nanoid IDs, but more correct and handles future key formats. |
+| AUDIT-F | `types/index.ts` | Legacy `WorkoutType` values (`weightlifting`, `long_run`, `recovery_run`, `rest`) lacked `@deprecated` annotations. Added inline comments on each union member. |
+
+### Documentation Update
+
+- `historyStore.test.ts:196`: Updated comment to clarify that BUG-DAYOFF-INDEX is fixed at the CalendarPage call-site level (commit `a317041`, pass 80); the test documents the raw store behavior (calling `updateEntryAction` without an index still leaves it undefined), not a current app bug.
+
+### Tests Added This Pass
+
+| File | Tests Added | Description |
+|---|---|---|
+| `outcomeStore.test.ts` | +2 | `clearPlanOutcomes` ID-parser scoping: verifies prefix-sibling plans are not cross-contaminated; verifies both primary and extra-workout keys are removed. |
+| `outcomeStore.test.ts` | +1 | `logOutcomeWithProgression` error isolation: verifies a throwing slot-level progression rule does not abort the outcome save. |
+
+### New Bugs Found (from Explore subagent full-codebase audit)
+
+| ID | Severity | Location | Summary |
+|---|---|---|---|
+| NEW-ADAPT-NOTE | Medium | `TodayPage.tsx` | After a double-day advance, `todayResolved.planDay` points to the advanced-to day. The adaptation note logic reads slots from `todayResolved.planDay`, showing guidance for the next day rather than the day just completed. Correct reference is `plan.days[primaryPlanDayIndex]`. |
+| NEW-MODAL-REMOUNT | Medium | `CalendarPage.tsx` | `DayDetailModal` is defined as a function inside `CalendarPage`. React recreates its component identity on every `CalendarPage` render, causing full remounts that reset `selectedIdx` and `detailTarget` state. Fix: hoist to module level. |
+
+### Prioritized Plan (for next pass)
+
+| Priority | Item |
+|----------|------|
+| P1 | Fix NEW-ADAPT-NOTE: in TodayPage, replace `todayResolved.planDay` in adaptation note logic with `plan.days[primaryPlanDayIndex]`. |
+| P1 | Fix NEW-MODAL-REMOUNT: hoist `DayDetailModal` from inside `CalendarPage` to module scope, pass needed data as props. |
+| P2 | Fix BUG-DUPLICATE-PLAN: change `duplicatePlan` return type to `string \| null`, add null guards at call sites. |
+| P3 | AUDIT-C: deterministic slot IDs on YAML re-parse (hash of structural position). |
+| P3 | Continue TodayPage ARCH-1 decomposition (~1148 lines). |
+
+---
+
 ## Pass 94 — 2026-08-09 (branch `claude/serene-cori-b5993l`)
 
 ### Baseline
