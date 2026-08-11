@@ -4,12 +4,16 @@ export type WorkoutType =
   | 'weights'
   | 'run'
   | 'other'
+  // @deprecated migrated to 'weights' by planStore.migratePlanState
   | 'weightlifting'
+  // @deprecated migrated to 'run' (subtype:'long') by planStore.migratePlanState
   | 'long_run'
+  // @deprecated migrated to 'run' (subtype:'recovery') by planStore.migratePlanState
   | 'recovery_run'
   | 'swim'
   | 'yoga'
   | 'mobility'
+  // @deprecated migrated to 'other' (subtype:'rest') by planStore.migratePlanState
   | 'rest'
 
 export type ActionType = 'complete' | 'skip' | 'day_off'

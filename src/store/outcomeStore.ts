@@ -157,15 +157,25 @@ export const useOutcomeStore = create<OutcomeState>()(
         }
 
         // 3a. Slot-level progression (run slots)
+        // Wrapped in try/catch: a malformed YAML progression rule must never
+        // prevent the outcome from being persisted.
         if (slot.slotProgress) {
-          programStore.applyProgressionRule(planId, slot.slotProgress, ctxBase)
+          try {
+            programStore.applyProgressionRule(planId, slot.slotProgress, ctxBase)
+          } catch (err) {
+            console.error('[outcomeStore] slot-level progression rule failed (outcome already saved):', err)
+          }
         }
 
         // 3b. Per-exercise progression (weights slots)
         if (slot.exercises) {
           for (const ex of slot.exercises) {
             if (ex.progress) {
-              programStore.applyProgressionRule(planId, ex.progress, ctxBase)
+              try {
+                programStore.applyProgressionRule(planId, ex.progress, ctxBase)
+              } catch (err) {
+                console.error('[outcomeStore] exercise progression rule failed (outcome already saved):', err)
+              }
             }
           }
         }
@@ -194,10 +204,11 @@ export const useOutcomeStore = create<OutcomeState>()(
       },
 
       clearPlanOutcomes(planId) {
-        const prefix = planId + '_'
         set(s => ({
           outcomes: Object.fromEntries(
-            Object.entries(s.outcomes).filter(([k]) => !k.startsWith(prefix)),
+            Object.entries(s.outcomes).filter(
+              ([k]) => parseWorkoutInstanceId(k)?.planId !== planId,
+            ),
           ),
         }))
         useExerciseHistoryStore.getState().clearByPlanId(planId)

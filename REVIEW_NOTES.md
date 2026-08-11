@@ -1,6 +1,7 @@
 # Review Notes — Overnight Audit
 
 ## 2026-08-10 (ninety-fifth pass) — branch `claude/serene-cori-awu2i9`
+## 2026-08-11 (ninety-fifth pass) — branch `claude/serene-cori-i4t5dr`
 
 ---
 
@@ -21,6 +22,31 @@
 | Medium-High | BUG-DAYOFF-INDEX | `historyStore.ts` / `CalendarPage.tsx` | `day_off → complete` transition without planDayIndex leaves entry invisible to per-exercise stats. Already documented; needs caller-side fix. |
 | Low | BUG-OUTCOMESTORE-MIGRATE | `outcomeStore.ts` | Migration is a no-op cast — no field-level migration exists. Future shape changes will silently produce runtime errors on existing persisted data. |
 | Low | BUG-ALLENTRIES-SELECTOR | `TodayPage.tsx` | `useHistoryStore(s => s.entries)` subscribes to all entries; any write from any plan re-renders TodayPage. Should scope to current plan + today. |
+1. **What changed**: Four targeted fixes and 3 new tests. Full codebase re-audit via Explore subagent (fresh pass, independent of prior results). No new dependencies, no schema changes.
+2. **Highest confidence**: Auth error UI wiring (additive, zero behavioral change in happy path); `@deprecated` comments (zero-risk annotation); outcomeStore try/catch additions (defensive, mirrors existing step-2 pattern); `clearPlanOutcomes` ID-parser fix (functionally equivalent for all current key formats, more correct).
+3. **What is risky**: Nothing in this pass. All changes are either additive or defensive.
+4. **What to review first**: `AuthGate.tsx` — verify the error message appearance fits the existing UI. `outcomeStore.ts` — confirm the two new try/catch blocks log at the right level (console.error, no DEV guard, which is intentional for progression failures).
+
+---
+
+### BUG-DAYOFF-INDEX: confirmed fixed (documentation update)
+
+The P1 item carried from pass 94 (and prior passes) — `updateEntryAction` without `planDayIndex` on `day_off → complete` — was already fixed in CalendarPage commit `a317041` (pass 80). The fix threads `planDayIndex` through `outcomeTarget` in both `openEditOutcome` (via `rd.planDayIndex` fallback) and `handleOutcomeConfirm` (via `entry.planDayIndex ?? outcomeTarget.planDayIndex`). The `historyStore.test.ts:196` comment was updated this pass to clarify the fix is at the call-site level.
+
+---
+
+### Biggest Issues Found (full audit — new Explore pass)
+
+| Severity | ID | Location | Description |
+|----------|----|----------|-------------|
+| High | BUG-PROGRESSION-UNCAUGHT | `outcomeStore.ts` | Steps 3a/3b progression rules lacked try/catch — **FIXED this pass** |
+| Medium | BUG-AUTH-UI | `AuthGate.tsx` | `authError` not surfaced in sign-in UI — **FIXED this pass** |
+| Medium | AUDIT-F | `types/index.ts` | No `@deprecated` on legacy WorkoutType values — **FIXED this pass** |
+| Medium | BUG-OUTCOME-PREFIX | `outcomeStore.ts` | `clearPlanOutcomes` used string-prefix check instead of ID parser — **FIXED this pass** |
+| Medium | NEW-ADAPT-NOTE | `TodayPage.tsx` | Adaptation note after double-day advance reads `todayResolved.planDay` (the advanced-to day) instead of the day that was actually completed. Shows wrong or no adaptation guidance after double-day. |
+| Medium | NEW-MODAL-REMOUNT | `CalendarPage.tsx` | `DayDetailModal` is defined inline inside `CalendarPage`, causing React to remount it on every parent re-render, resetting `selectedIdx` and `detailTarget` state unexpectedly. |
+| Low | BUG-DUPLICATE-PLAN | `planStore.ts` | `duplicatePlan` returns `''` on missing source; callers don't guard |
+| Low | AUDIT-C | `programParser.ts` | Non-idempotent slot IDs on YAML re-parse (`nanoid()` per parse) |
 
 ---
 
@@ -39,6 +65,51 @@
 2. **BUG-ALLENTRIES-SELECTOR** — scope the entries selector in TodayPage (medium effort, worthwhile perf win)
 3. **BUG-DAYOFF-INDEX** — pass `planDayIndex` from CalendarPage on `day_off → complete` transitions (medium effort, correctness fix for stats)
 4. **authStore tests** — add a unit test file covering `signInWithGoogle`, `signOut`, and the `authError` field introduced in pass 94
+| Change | Confidence |
+|--------|------------|
+| Wire `authError` to AuthGate sign-in UI | High |
+| outcomeStore steps 3a/3b try/catch | High |
+| clearPlanOutcomes: ID parser instead of prefix | High |
+| `@deprecated` comments on legacy WorkoutType values | High |
+| historyStore.test.ts:196 comment clarified (BUG-DAYOFF-INDEX fixed) | High |
+| 3 new outcomeStore tests | High |
+
+---
+
+### Definitely Keep
+
+- All four fixes — small, well-scoped, independently revertable.
+- All three new tests — directly cover the changed behavior.
+
+### Probably Keep But Tweak
+
+- `outcomeStore.ts` progression try/catch: currently logs to `console.error` in all environments. Could be DEV-only like the tokenizer warning, but progression failures on malformed YAML are likely worth logging in production too. Left as-is.
+
+### Do Not Keep
+
+- Nothing in this pass needs to be reverted.
+
+### Recommendations Only (not implemented)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| NEW-ADAPT-NOTE | P1 | Fix TodayPage adaptation note to use `primaryPlanDay` (from `todayResolved.historyEntry?.planDayIndex ?? todayResolved.planDayIndex`) instead of `todayResolved.planDay` after double-day advance. Currently shows adaptation guidance for the next day's slot, not the day just completed. |
+| NEW-MODAL-REMOUNT | P1 | Hoist `DayDetailModal` from inside `CalendarPage` to module level (pass required state as props) to prevent unexpected remounts and state resets. |
+| BUG-DUPLICATE-PLAN | P3 | Change `duplicatePlan` return type to `string \| null` and add null checks at call sites. |
+| AUDIT-C | P4 | YAML re-parse non-idempotent slot IDs — hash-based deterministic IDs for re-import stability. |
+| AUDIT-D | P4 | `workoutTypeBreakdown` only counts first slot per day — multi-slot days undercount mobility completions. |
+
+---
+
+### Known Issues / Incomplete Work
+
+- `DayDetailModal` inline definition (NEW-MODAL-REMOUNT) — affects UX in CalendarPage when parent re-renders mid-interaction.
+- TodayPage adaptation note (NEW-ADAPT-NOTE) — shows wrong guidance after double-day advances.
+- No component tests (no `@testing-library/react`). All 35 test files are pure-logic unit tests.
+
+### Dependencies Added
+
+None.
 
 ---
 

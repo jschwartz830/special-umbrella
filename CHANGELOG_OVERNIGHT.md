@@ -13,6 +13,55 @@
 - **Files changed**: `rotationEngine.ts` (+5 lines in the `getUpcomingDays` loop). Comment explains the mirror.
 - **Risks**: None. The helper `applyOverridesForDate` is idempotent when no overrides match a date; positional behavior is unchanged when there are no future overrides. All 1218 tests pass.
 - **Rollback**: `git revert e63cd0c`
+## Pass 95 — 2026-08-11 (branch `claude/serene-cori-i4t5dr`)
+
+### Fix: Surface authError in AuthGate sign-in UI (BUG-AUTH-UI)
+
+- **Commit**: (this pass)
+- **Files**: `src/components/auth/AuthGate.tsx`
+- **Summary**: `authStore.authError` was added in pass 94 (BUG-AUTH-SILENT) but never wired to any UI component. Sign-in failures (OAuth popup blocks, network errors, Supabase outages) now show a visible red error message below the sign-in button. The `authError` field is already cleared on the next `signInWithGoogle` call, so the message disappears automatically when the user retries.
+- **Why it matters**: Without a visible error, users see the sign-in button do "nothing" on failure with no actionable feedback.
+- **Risks**: None. Purely additive; `authError` defaults to `null` (no message shown) in the happy path.
+- **Rollback**: `git revert <commit>`
+
+---
+
+### Fix: outcomeStore progression rules 3a/3b missing try/catch (BUG-PROGRESSION-UNCAUGHT)
+
+- **Commit**: (this pass)
+- **Files**: `src/store/outcomeStore.ts`
+- **Summary**: `logOutcomeWithProgression` step 2 (run-progression evaluation) was wrapped in try/catch, but steps 3a (slot-level YAML `slotProgress` rules) and 3b (per-exercise `exerciseProgress` rules) were not. A malformed YAML progression rule would throw at step 3a or 3b — after the outcome was already saved in step 1 — but the throw would propagate to the caller, potentially interrupting the history-entry write that follows in the page component. Added individual try/catch with `console.error` around each rule call, matching step 2's established pattern.
+- **Why it matters**: YAML-imported plans with syntax errors in progression rules would silently prevent outcomes from being fully logged, corrupting the workout log on those dates.
+- **Risks**: Low. All try/catch paths log the error to the console in all environments (no DEV guard — progression rule failures are always worth logging).
+- **Rollback**: `git revert <commit>`
+
+---
+
+### Fix: clearPlanOutcomes uses ID parser instead of string prefix (BUG-OUTCOME-PREFIX)
+
+- **Commit**: (this pass)
+- **Files**: `src/store/outcomeStore.ts`
+- **Summary**: `clearPlanOutcomes` previously filtered outcome keys using `k.startsWith(planId + '_')`. While the `'_'` separator makes this safe in practice for hex nanoid plan IDs (no underscores in nanoid output), it is an implicit constraint. Replaced with `parseWorkoutInstanceId(k)?.planId !== planId`, which uses the canonical ID parser and explicitly handles extra-workout IDs (`${planId}_${date}_extra_${id}`) as well.
+- **Why it matters**: Correctness and maintainability — the ID parser is the authoritative decoder and handles all key formats including extra-workout keys.
+- **Risks**: None. Both the old prefix path and the new parser path produce the same result for all current key formats. New tests verify the boundary behavior.
+- **Rollback**: `git revert <commit>`
+
+---
+
+### Fix: @deprecated comments on legacy WorkoutType values (AUDIT-F)
+
+- **Commit**: (this pass)
+- **Files**: `src/types/index.ts`
+- **Summary**: The four legacy `WorkoutType` values (`weightlifting`, `long_run`, `recovery_run`, `rest`) had no annotation to indicate they're deprecated. Added inline `// @deprecated` comments on each union member pointing to the migration target and the function that performs the migration (`planStore.migratePlanState`).
+- **Why it matters**: Contributors writing new code could accidentally produce deprecated values without any indication from the type system.
+- **Risks**: None. Comments only; no runtime or type-check behavior changes.
+
+---
+
+### Tests: 3 new tests (+3, 1219 total)
+
+- **`outcomeStore.test.ts`**: 2 new tests for `clearPlanOutcomes` — verifies that plans with overlapping ID prefixes are not cross-contaminated, and that both primary and extra-workout outcome keys are cleared for the target plan.
+- **`outcomeStore.test.ts`**: 1 new test for `logOutcomeWithProgression` — verifies that a throwing slot-level progression rule does not abort the outcome save (the stored outcome is still retrievable after the error).
 
 ---
 
