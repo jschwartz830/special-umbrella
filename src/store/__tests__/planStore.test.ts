@@ -212,7 +212,7 @@ describe('duplicatePlan', () => {
   it('creates a new plan with a different id', () => {
     const plan = makePlan('plan-1')
     usePlanStore.setState({ plans: { 'plan-1': plan } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
     expect(newId).not.toBe('plan-1')
     expect(newId.length).toBeGreaterThan(0)
     expect(getState().plans[newId]).toBeDefined()
@@ -221,21 +221,21 @@ describe('duplicatePlan', () => {
   it('preserves name with "(copy)" suffix', () => {
     const plan = makePlan('plan-1')
     usePlanStore.setState({ plans: { 'plan-1': plan } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
     expect(getState().plans[newId].name).toBe('Plan plan-1 (copy)')
   })
 
   it('sets copy status to inactive regardless of source status', () => {
     const plan = makePlan('plan-1', 'active')
     usePlanStore.setState({ plans: { 'plan-1': plan }, activePlanId: 'plan-1' })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
     expect(getState().plans[newId].status).toBe('inactive')
   })
 
   it('creates new ids for duplicated days and slots', () => {
     const plan = makePlan('plan-1')
     usePlanStore.setState({ plans: { 'plan-1': plan } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
     const origDay = plan.days[0]
     const copyDay = getState().plans[newId].days[0]
     expect(copyDay.id).not.toBe(origDay.id)
@@ -270,7 +270,7 @@ describe('duplicatePlan', () => {
       }],
     }
     usePlanStore.setState({ plans: { 'plan-1': planWithExercises } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
 
     const origSlot = getState().plans['plan-1'].days[0].slots[0]
     const copySlot = getState().plans[newId].days[0].slots[0]
@@ -296,7 +296,7 @@ describe('duplicatePlan', () => {
       }],
     }
     usePlanStore.setState({ plans: { 'plan-1': planWithSegments } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
 
     const origSlot = getState().plans['plan-1'].days[0].slots[0]
     const copySlot = getState().plans[newId].days[0].slots[0]
@@ -327,7 +327,7 @@ describe('duplicatePlan', () => {
       }],
     }
     usePlanStore.setState({ plans: { 'plan-1': planWithSetSpecs } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
 
     const origSets = (getState().plans['plan-1'].days[0].slots[0].exercises as import('../../types/program').ExerciseSpec[])[0].sets as import('../../types/program').SetSpec[]
     const copySets = (getState().plans[newId].days[0].slots[0].exercises as import('../../types/program').ExerciseSpec[])[0].sets as import('../../types/program').SetSpec[]
@@ -361,7 +361,7 @@ describe('duplicatePlan', () => {
       }],
     }
     usePlanStore.setState({ plans: { 'plan-1': planWithDrills } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
 
     const origDrills = getState().plans['plan-1'].days[0].slots[0].segments![0].drills!
     const copyDrills = getState().plans[newId].days[0].slots[0].segments![0].drills!
@@ -394,7 +394,7 @@ describe('duplicatePlan', () => {
       }],
     }
     usePlanStore.setState({ plans: { 'plan-1': planWithWarmupSets } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
 
     const origWarmupSets = (getState().plans['plan-1'].days[0].slots[0].warmup as import('../../types/program').ExerciseSpec[])[0].sets as import('../../types/program').SetSpec[]
     const copyWarmupSets = (getState().plans[newId].days[0].slots[0].warmup as import('../../types/program').ExerciseSpec[])[0].sets as import('../../types/program').SetSpec[]
@@ -409,7 +409,7 @@ describe('duplicatePlan', () => {
     // The key guarantee: it is NOT "My Plan (copy) (copy)".
     const plan: Plan = { ...makePlan('plan-1'), name: 'My Plan (copy)' }
     usePlanStore.setState({ plans: { 'plan-1': plan } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
     expect(getState().plans[newId].name).toBe('My Plan (copy 2)')
     expect(getState().plans[newId].name).not.toContain('(copy) (copy)')
   })
@@ -418,14 +418,14 @@ describe('duplicatePlan', () => {
     const plan: Plan = { ...makePlan('plan-1'), name: 'My Plan' }
     const existing: Plan = { ...makePlan('plan-2'), name: 'My Plan (copy)' }
     usePlanStore.setState({ plans: { 'plan-1': plan, 'plan-2': existing } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
     expect(getState().plans[newId].name).toBe('My Plan (copy 2)')
   })
 
   it('strips "(copy N)" suffix before appending to avoid further accumulation', () => {
     const plan: Plan = { ...makePlan('plan-1'), name: 'Workout A (copy 3)' }
     usePlanStore.setState({ plans: { 'plan-1': plan } })
-    const newId = getState().duplicatePlan('plan-1')
+    const newId = getState().duplicatePlan('plan-1')!
     // Base is "Workout A"; first available copy name is "Workout A (copy)"
     expect(getState().plans[newId].name).toBe('Workout A (copy)')
   })
