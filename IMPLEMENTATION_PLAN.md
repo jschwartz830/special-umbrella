@@ -1,5 +1,56 @@
 # Implementation Plan
 
+## Pass 96 — 2026-08-12 (branch `claude/serene-cori-4y0vy9`)
+
+### Baseline
+
+- Branch started from `main` after PR #241 (pass 95) merged.
+- **1221 tests passing** across 35 test files at start of pass.
+- **1225 tests passing** at end of pass (+4 new tests).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 96)
+
+Targeted fix pass: four confirmed bugs fixed, one dead code cleanup. No schema changes, no new dependencies, no architectural changes.
+
+The two highest-priority items from pass 95 (NEW-ADAPT-NOTE and NEW-MODAL-REMOUNT) were the focus of this pass. NEW-ADAPT-NOTE was fixed. NEW-MODAL-REMOUNT was verified as already resolved: `DayDetailModal` is defined at module level (after `CalendarPage`'s closing brace at line 544), not inside the function. The audit finding from pass 95 was incorrect — no change needed.
+
+A secondary instance of the same adaptation-note bug was found and fixed in the difficulty spacing warning computation on the same TodayPage lines.
+
+### Bugs Fixed This Pass
+
+| # | Commit | File(s) | Summary |
+|---|---|---|---|
+| NEW-ADAPT-NOTE | `0da3ccf` | `TodayPage.tsx` | Run adaptation note read slots from `todayResolved.planDay` (the advanced-to rotation day after a double-day advance) instead of `primaryPlanDay` (the day actually logged). Changed to `primaryPlanDay`. |
+| Spacing warning (same pattern) | `c613503` | `TodayPage.tsx` | `generateDifficultySpacingWarning` read today's difficulty from `todayResolved.planDay` for the same reason. Changed to `primaryPlanDay`. |
+| BUG-DUPLICATE-PLAN | `e1bc2ab` | `planStore.ts`, `PlansPage.tsx`, `planStore.test.ts` | `duplicatePlan` returned `''` on missing source; call site passed it to `navigate()` → invalid route `/plans//edit`. Return type changed to `string \| null`, return `null` on missing source, added null check at call site. |
+| BUG-OUTCOMESTORE-MIGRATE | `33ef380` | `outcomeStore.ts`, `outcomeStore.test.ts` | Migration was a no-op cast. Replaced with explicit `migrateOutcomeState` function (exported for testability) that provides field-level defaults, matching `historyStore` pattern. 4 new tests. |
+| AUDIT-6 | `8825644` | `CalendarPage.tsx` | `canDayOff = isPast \|\| isToday \|\| isFuture` is a tautology (always true). Simplified to `const canDayOff = true`; removed the 11-line dead code block guarded by `!canDayOff`. |
+
+### Bugs Verified Already Fixed (no change needed)
+
+| ID | Status |
+|----|--------|
+| NEW-MODAL-REMOUNT | `DayDetailModal` is at module scope (after CalendarPage's closing `}`), not inside the CalendarPage function. The audit finding from pass 95 was incorrect. No change required. |
+
+### Tests Added
+
+| Test | File | What it covers |
+|------|------|----------------|
+| `migrateOutcomeState` with null input | `outcomeStore.test.ts` | Empty defaults for missing fields |
+| `migrateOutcomeState` with empty object | `outcomeStore.test.ts` | Empty defaults for missing fields |
+| `migrateOutcomeState` preserves existing data | `outcomeStore.test.ts` | Round-trip fidelity |
+| `migrateOutcomeState` backfills missing progressionStates | `outcomeStore.test.ts` | Partial data handled |
+
+### Next Pass Priorities
+
+1. **BUG-ALLENTRIES-SELECTOR** (P2): `useHistoryStore(s => s.entries)` in TodayPage subscribes to all entries — any write from any plan triggers a re-render. Scope to active plan + global stats entries.
+2. **AUDIT-C** (P3): `programParser.ts` `parseSlot` generates new nanoid slot IDs on every YAML re-parse, breaking slot-keyed data on re-import. Deterministic IDs (hash of structural position) would fix this.
+3. **ActiveWorkoutTracker** render-level tests (P4): the largest untested component (~1800 lines).
+4. **TodayPage** render-level tests: the NEW-ADAPT-NOTE fix would benefit from a regression test that requires `@testing-library/react`.
+
+---
+
 ## Pass 95 — 2026-08-10 (branch `claude/serene-cori-awu2i9`)
 
 ### Baseline
