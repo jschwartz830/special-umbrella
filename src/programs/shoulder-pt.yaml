@@ -1,0 +1,96 @@
+schemaVersion: 1
+name: "Shoulder PT"
+description: >
+  Balanced shoulder rehabilitation routine. Complete the same prescribed work
+  on both sides for every unilateral exercise, even when only one shoulder is
+  being rehabilitated.
+
+duration:
+  type: rotations
+  value: 1
+
+days:
+  - label: "Shoulder PT"
+    slots:
+      - type: mobility
+        name: "Shoulder PT — Rotator Cuff & Scapular Control"
+        focus: upper
+        intent: recovery_mobility
+        durationMin: 35
+        notes: "Use a pain-free effort and complete unilateral work equally on the left and right sides."
+        mobilityExercises:
+          - id: lib-shoulder-iso-er
+            name: "Shoulder Isometric External Rotation"
+            sets:
+              - reps: 10
+              - reps: 10
+            notes: "10 reps per side. Hold every rep for 5 seconds; keep the elbow tucked at the side and bent 90°."
+
+          - id: lib-shoulder-iso-ir
+            name: "Shoulder Isometric Internal Rotation"
+            sets:
+              - reps: 10
+              - reps: 10
+            notes: "10 reps per side. Hold every rep for 5 seconds; keep the elbow tucked at the side and bent 90°."
+
+          - id: lib-shoulder-iso-er-elevated
+            name: "Shoulder Isometric External Rotation — Elevated"
+            sets:
+              - reps: 10
+              - reps: 10
+            notes: "10 reps per side. Hold every rep for 5 seconds with the arm at shoulder height and the elbow bent 90°."
+
+          - id: lib-upper-trap-stretch-seated
+            name: "Upper Trap Stretch — Seated"
+            sets:
+              - duration: 3m
+            notes: "Split the total time evenly between sides: three 30-second holds per side."
+
+          - id: lib-banded-wall-slide-w-to-y
+            name: "Banded Wall Slide (W to Y)"
+            sets:
+              - reps: 10
+              - reps: 10
+              - reps: 10
+
+          - id: lib-overhead-kb-carry
+            name: "Single-Arm Overhead Kettlebell Carry"
+            sets:
+              - reps: 10
+              - reps: 10
+            notes: "10 controlled steps per side. Keep the bell stacked overhead and complete equal work on both sides."
+
+          - id: lib-kb-arm-bar
+            name: "Bottoms-Up Kettlebell Arm Bar Roll"
+            sets:
+              - reps: 10
+              - reps: 10
+            notes: "10 reps per side. Move slowly, keep the arm vertical, and complete equal work on both sides."
+
+          - id: lib-lacrosse-ball-rotator-cuff
+            name: "Lacrosse Ball to Rotator Cuff"
+            sets:
+              - duration: 10m
+            notes: "Spend 5 minutes per side."
+
+          - id: lib-doorway-pec
+            name: "Doorway Pec Stretch"
+            sets:
+              - duration: 90s
+            notes: "Split the total time evenly between sides."
+
+          - id: lib-band-bilateral-horizontal-abduction
+            name: "Elastic Band Bilateral Horizontal Abduction"
+            sets:
+              - reps: 10
+              - reps: 10
+              - reps: 10
+            notes: "Move both arms together; keep the elbows straight and control the return."
+
+          - id: lib-band-bilateral-shoulder-er
+            name: "Elastic Band Shoulder External Rotation"
+            sets:
+              - reps: 10
+              - reps: 10
+              - reps: 10
+            notes: "Move both arms together; keep both elbows tucked at the sides throughout."
