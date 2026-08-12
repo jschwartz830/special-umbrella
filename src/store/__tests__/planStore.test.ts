@@ -250,9 +250,9 @@ describe('duplicatePlan', () => {
     expect(getState().plans['plan-1'].status).toBe('inactive')
   })
 
-  it('returns empty string for a nonexistent plan id', () => {
+  it('returns null for a nonexistent plan id', () => {
     const result = getState().duplicatePlan('does-not-exist')
-    expect(result).toBe('')
+    expect(result).toBeNull()
   })
 
   it('deep-clones exercises array so edits to one plan do not affect the other', () => {

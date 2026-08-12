@@ -11,7 +11,7 @@ interface PlanState {
 
   createPlan: (draft: Omit<Plan, 'id' | 'createdAt' | 'updatedAt'>) => string
   updatePlan: (id: string, patch: Partial<Omit<Plan, 'id' | 'createdAt'>>) => void
-  duplicatePlan: (id: string) => string
+  duplicatePlan: (id: string) => string | null
   archivePlan: (id: string) => void
   deletePlan: (id: string) => void
   setActivePlan: (id: string, opts?: { startDate?: string; startDayIndex?: number }) => void
@@ -94,7 +94,7 @@ export const usePlanStore = create<PlanState>()(
 
       duplicatePlan(id) {
         const source = get().plans[id]
-        if (!source) return ''
+        if (!source) return null
         const newId = nanoid()
         const now = new Date().toISOString()
         // Strip any existing " (copy)" or " (copy N)" suffix so repeated
