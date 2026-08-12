@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode, type UIEvent } from 'react'
 import gzclp5kTemplate from '../programs/gzclp-5k.yaml?raw'
 import upperLowerTemplate from '../programs/upper-lower-hybrid-12w.yaml?raw'
+import shoulderPtTemplate from '../programs/shoulder-pt.yaml?raw'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Upload, AlertCircle, CheckCircle, ChevronDown, ChevronRight, Dumbbell, Footprints, Maximize2, Minimize2 } from 'lucide-react'
 import { parseYamlProgram } from '../engine/programParser'
@@ -14,6 +15,7 @@ import type { ExerciseSpec, RunSegment } from '../types/program'
 const TEMPLATE_OPTIONS = [
   { id: 'gzclp-5k', label: 'GZCLP + 5K Build', yaml: gzclp5kTemplate },
   { id: 'upper-lower-12w', label: 'Upper/Lower Hybrid 12-Week', yaml: upperLowerTemplate },
+  { id: 'shoulder-pt', label: 'Shoulder PT', yaml: shoulderPtTemplate },
 ] as const
 
 // ── Preview components ────────────────────────────────────────────────────────
