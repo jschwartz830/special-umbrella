@@ -1,5 +1,33 @@
 # Test Results
 
+## Pass 96 — 2026-08-12 (branch `claude/serene-cori-4y0vy9`)
+
+### Baseline (before changes)
+
+- **35 test files, 1221 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Tests Added
+
+| File | Count | Description |
+|------|-------|-------------|
+| `src/store/__tests__/outcomeStore.test.ts` | +4 | `migrateOutcomeState` unit tests: (1) null persisted → empty defaults; (2) empty object → empty defaults; (3) existing data preserved; (4) partial data (only outcomes present) → progressionStates backfilled to `{}` |
+| `src/store/__tests__/planStore.test.ts` | +0 | Updated existing test: "returns empty string for nonexistent plan id" → "returns null for nonexistent plan id" to match the corrected return type |
+
+### Final Results
+
+- **35 test files, 1225 tests — all passing** (+4 net new tests)
+- TypeScript: clean throughout (no new types introduced; `string | null` return type for `duplicatePlan` required updating 1 test)
+
+### Tests Still Not Covered
+
+- `ActiveWorkoutTracker.tsx` (~1800+ lines) — no unit or render tests
+- `CardioWorkoutTracker.tsx` auto-advance timer path
+- `TodayPage.tsx` render-level tests — the double-day adaptation note fix (NEW-ADAPT-NOTE) is a render-path change with no unit test yet; requires `@testing-library/react`
+- `useToday.ts` midnight-advance timer
+
+---
+
 ## Pass 95 — 2026-08-10 (branch `claude/serene-cori-awu2i9`)
 ## Pass 95 — 2026-08-11 (branch `claude/serene-cori-i4t5dr`)
 

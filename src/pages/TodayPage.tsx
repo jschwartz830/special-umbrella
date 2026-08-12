@@ -263,8 +263,11 @@ export function TodayPage() {
   const primaryPlanDayIndex = todayResolved.historyEntry?.planDayIndex ?? todayResolved.planDayIndex
   const primaryPlanDay = plan.days[primaryPlanDayIndex] ?? todayResolved.planDay
 
-  // Resolve run adaptation note for today's workout
-  const todayRunSlot = todayResolved.planDay.slots.find(s => isRunType(s.type))
+  // Resolve run adaptation note for today's workout.
+  // Use primaryPlanDay (the day actually logged) rather than todayResolved.planDay
+  // which points to the advanced-to day after a double-day advance — showing guidance
+  // for the wrong workout in that case.
+  const todayRunSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
   const todayProgressionState = todayRunSlot?.runConfig?.progressionGroupId
     ? getProgressionState(todayRunSlot.runConfig.progressionGroupId)
     : null
@@ -272,11 +275,13 @@ export function TodayPage() {
     ? generateRunAdaptationNote(todayRunSlot, todayProgressionState)
     : null
 
-  // Difficulty spacing warning (today vs tomorrow) — suppressed when an extra workout is queued
+  // Difficulty spacing warning (today vs tomorrow) — suppressed when an extra workout is queued.
+  // Use primaryPlanDay so after a double-day advance the warning reflects the day actually
+  // logged, not the advanced-to rotation day.
   const extraIsNextInPlan = addFromPlanIdx !== null && addFromPlanIdx === upcoming[0]?.planDayIndex
   const tomorrowSlot = upcoming[extraIsNextInPlan ? 1 : 0]?.planDay?.slots[0]
   const spacingWarning = addFromPlanIdx === null && generateDifficultySpacingWarning(
-    todayResolved.planDay.slots[0]?.difficulty,
+    primaryPlanDay.slots[0]?.difficulty,
     tomorrowSlot?.difficulty,
   )
 

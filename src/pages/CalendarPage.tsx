@@ -590,9 +590,9 @@ function DayDetailModal({
   const isComplete = status === 'past_complete' || status === 'today_complete'
   const isSkipped = status === 'past_skip' || status === 'today_skip'
   const canLog = isPast || isToday
-  // Past dates can also be marked Day Off — mirrors TodayPage's catch-up flow
-  // which calls markDaysAsOff for unlogged past days.
-  const canDayOff = isPast || isToday || isFuture
+  // Day Off is available on all dates (past, today, and future pre-scheduling).
+  // The variable exists to make the intent explicit; it is always true.
+  const canDayOff = true
 
   const [detailTarget, setDetailTarget] = useState<
     | { kind: 'rotation' }
@@ -1019,18 +1019,6 @@ function DayDetailModal({
           </div>
         )}
 
-        {/* Future with no actions (shouldn't happen since canDayOff covers future) */}
-        {!hasEntry && !canLog && !canDayOff && (
-          <div className="space-y-1">
-            {resolved.planDay.slots.map(slot => (
-              <div key={slot.id} className="flex flex-wrap gap-3 text-xs text-slate-400">
-                {slot.targetDistance && <span>{slot.targetDistance} mi</span>}
-                {slot.targetPace && <span>{slot.targetPace} min/mi</span>}
-                {slot.targetTime && <span>{slot.targetTime} min</span>}
-              </div>
-            ))}
-          </div>
-        )}
 
         {historyEntry?.notes && (
           <p className="text-sm text-slate-400 italic">"{historyEntry.notes}"</p>

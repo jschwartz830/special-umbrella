@@ -1,5 +1,85 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-12 (ninety-sixth pass) — branch `claude/serene-cori-4y0vy9`
+
+---
+
+### Executive Summary
+
+1. **What changed**: Four confirmed bugs fixed + one dead code cleanup. NEW-ADAPT-NOTE (the P1 item from pass 95) is resolved. A sibling bug in the difficulty spacing warning was found and fixed in the same pass. BUG-DUPLICATE-PLAN (the P2 item from pass 95) is resolved. BUG-OUTCOMESTORE-MIGRATE (P1 from pass 95) is resolved. AUDIT-6 (dead code in CalendarPage) is resolved. 4 new migration tests added.
+2. **Highest confidence**: All five changes are small, isolated, and independently revertable. The migration fix (BUG-OUTCOMESTORE-MIGRATE) is purely additive for current users. The tautology cleanup (AUDIT-6) removes unreachable code without changing behaviour.
+3. **What is risky**: Nothing in this pass. NEW-ADAPT-NOTE is a 1-line fix to a well-understood code path.
+4. **What to review first**: `TodayPage.tsx` lines 266–285 — the two primaryPlanDay fixes (run slot lookup and spacing warning). Verify `primaryPlanDay` is the right reference (it is — defined two lines above as `plan.days[historyEntry?.planDayIndex ?? todayResolved.planDayIndex]`).
+
+---
+
+### NEW-MODAL-REMOUNT: verified not a bug
+
+The P1 item from pass 95 — `DayDetailModal` defined inside `CalendarPage` causing remounts — was re-examined this pass. `DayDetailModal` is defined at **module scope** (line 546), after `CalendarPage`'s closing `}` at line 544. React does NOT recreate its component identity on each CalendarPage render. The audit finding was incorrect. No change needed; no bug exists.
+
+---
+
+### Biggest Issues Found (full audit)
+
+| Severity | ID | Location | Description |
+|----------|----|----------|-------------|
+| Medium | NEW-ADAPT-NOTE | `TodayPage.tsx` | Run adaptation note used wrong plan day after double-day advance — **FIXED** |
+| Medium | Spacing warning (same pattern) | `TodayPage.tsx` | Difficulty spacing warning used wrong plan day after double-day advance — **FIXED** |
+| Medium | BUG-DUPLICATE-PLAN | `planStore.ts` / `PlansPage.tsx` | `duplicatePlan` returned `''` on missing source; call site navigated to invalid route — **FIXED** |
+| Low | BUG-OUTCOMESTORE-MIGRATE | `outcomeStore.ts` | Migration was a no-op cast — **FIXED** |
+| Low | AUDIT-6 | `CalendarPage.tsx` | `canDayOff` tautology with dead code block — **FIXED** |
+
+---
+
+### Improvements Completed
+
+| Change | Commit | Confidence |
+|--------|--------|------------|
+| `primaryPlanDay` for run adaptation note | `0da3ccf` | High |
+| `primaryPlanDay` for spacing warning | `c613503` | High |
+| `duplicatePlan` return null + call site guard | `e1bc2ab` | High |
+| `outcomeStore` explicit migration | `33ef380` | High |
+| `canDayOff` tautology + dead code removed | `8825644` | High |
+| 4 migration unit tests | `33ef380` | High |
+
+---
+
+### Definitely Keep
+
+- All five fixes — each is small, independently revertable, and addresses a documented bug.
+- All 4 new migration tests.
+
+### Do Not Keep
+
+- Nothing in this pass needs to be reverted.
+
+### Recommendations Only (not implemented)
+
+| ID | Priority | Description |
+|----|----------|-------------|
+| BUG-ALLENTRIES-SELECTOR | P2 | `useHistoryStore(s => s.entries)` in TodayPage subscribes to all entries; any write from any plan re-renders TodayPage. Scope to the active plan + global entries needed for stats. |
+| AUDIT-C | P3 | `programParser.ts:parseSlot` generates new `nanoid()` slot IDs on every YAML re-parse, breaking slot-keyed data. Hash-based deterministic IDs for re-import stability. |
+| ActiveWorkoutTracker tests | P4 | The largest untested component (~1800 lines). Would need `@testing-library/react` for render-level tests. |
+| TodayPage render-level tests | P4 | The NEW-ADAPT-NOTE fix is a render-path change with no regression test yet. Add `@testing-library/react` to enable these. |
+
+---
+
+### Open Questions
+
+- None added this pass.
+
+### Known Issues or Incomplete Work
+
+- BUG-ALLENTRIES-SELECTOR: performance optimization, not a correctness bug.
+- `ActiveWorkoutTracker.tsx` (~1800 lines) is still completely untested.
+- The NEW-ADAPT-NOTE and spacing warning fixes rely on `primaryPlanDay` being correctly set, which it is — but a render-level regression test would add confidence.
+
+### Dependencies Added
+
+None.
+
+---
+
 ## 2026-08-10 (ninety-fifth pass) — branch `claude/serene-cori-awu2i9`
 ## 2026-08-11 (ninety-fifth pass) — branch `claude/serene-cori-i4t5dr`
 

@@ -78,6 +78,16 @@ interface OutcomeState {
   removeProgressionStates: (groupIds: string[]) => void
 }
 
+/** @internal Exported only for unit testing. */
+export function migrateOutcomeState(persisted: unknown, _fromVersion: number): OutcomeState {
+  const s = (persisted ?? {}) as Partial<OutcomeState>
+  return {
+    ...s,
+    outcomes: s.outcomes ?? {},
+    progressionStates: s.progressionStates ?? {},
+  } as OutcomeState
+}
+
 export const useOutcomeStore = create<OutcomeState>()(
   persist(
     (set, get) => ({
@@ -256,7 +266,7 @@ export const useOutcomeStore = create<OutcomeState>()(
     {
       name: 'wpt_outcomes',
       version: 1,
-      migrate: (persisted: unknown) => persisted as OutcomeState,
+      migrate: migrateOutcomeState,
     },
   ),
 )

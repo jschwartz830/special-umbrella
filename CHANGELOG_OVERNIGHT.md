@@ -2,6 +2,64 @@
 
 ---
 
+## Pass 96 — 2026-08-12 (branch `claude/serene-cori-4y0vy9`)
+
+### Fix: Run adaptation note used wrong plan day after double-day advance (NEW-ADAPT-NOTE)
+
+- **Commit**: `0da3ccf`
+- **Files**: `src/pages/TodayPage.tsx`
+- **Summary**: `todayResolved.planDay` was used to find the run slot for the adaptation note. After a double-day advance, `todayResolved.planDay` points to the advanced-to rotation day (not what was logged). Changed to `primaryPlanDay`, which was already correctly computed on the preceding line by preferring `historyEntry.planDayIndex`. When today is pending (no history entry yet), `primaryPlanDay === todayResolved.planDay` so behaviour is unchanged.
+- **Why it matters**: After a double-day advance on a run day, the adaptation note either disappeared (weights day promoted to rotation) or showed guidance for a run not performed.
+- **Files changed**: `TodayPage.tsx` lines 266-270 (1 line changed, 3 comment lines added).
+- **Risks**: None. `primaryPlanDay` was already present and tested by the engine-level tests.
+- **Rollback**: `git revert 0da3ccf`
+
+---
+
+### Fix: Difficulty spacing warning also used wrong plan day after double-day advance
+
+- **Commit**: `c613503`
+- **Files**: `src/pages/TodayPage.tsx`
+- **Summary**: Same pattern as NEW-ADAPT-NOTE. `generateDifficultySpacingWarning` was reading today's difficulty from `todayResolved.planDay`. After a double-day advance where the logged day was Easy and the advanced-to day was Hard, the warning would say "Hard → tomorrow" instead of the correct "Easy → tomorrow". Changed to `primaryPlanDay`.
+- **Why it matters**: Incorrect difficulty context could confuse users about what they actually did today.
+- **Risks**: None. Identical fix pattern to NEW-ADAPT-NOTE.
+- **Rollback**: `git revert c613503`
+
+---
+
+### Fix: Return null from duplicatePlan on missing source; guard call site (BUG-DUPLICATE-PLAN)
+
+- **Commit**: `e1bc2ab`
+- **Files**: `src/store/planStore.ts`, `src/pages/PlansPage.tsx`, `src/store/__tests__/planStore.test.ts`
+- **Summary**: `duplicatePlan` returned `''` when the source plan was not found. The call site in `PlansPage.tsx` passed this directly to `navigate()`, producing `navigate('/plans//edit')` — an invalid route. Changed return type to `string | null`, return `null` on missing source, added `if (newId)` guard before navigating. Updated the existing test expectation.
+- **Why it matters**: Prevents navigating to a broken URL if a plan is somehow deleted between render and click.
+- **Risks**: Low. The empty-string case was defensive — in practice the plan is always in the list when the button renders.
+- **Rollback**: `git revert e1bc2ab`
+
+---
+
+### Fix: Add explicit field-level migration to outcomeStore (BUG-OUTCOMESTORE-MIGRATE)
+
+- **Commit**: `33ef380`
+- **Files**: `src/store/outcomeStore.ts`, `src/store/__tests__/outcomeStore.test.ts`
+- **Summary**: The `migrate` function was `(persisted) => persisted as OutcomeState` — a no-op cast. Any future schema change that adds a top-level field would silently produce `undefined` for existing users on upgrade. Replaced with an explicit `migrateOutcomeState(persisted, fromVersion)` function exported for testability, mirroring the pattern in `historyStore`. Added 4 migration unit tests.
+- **Why it matters**: Future-proofing. The current schema has `outcomes` and `progressionStates` as the only top-level data fields; any addition without a corresponding migration entry could produce subtle runtime errors.
+- **Risks**: None for existing users. Version is still 1 so the migration won't run for already-stored v1 data. The exported function enables clean unit testing.
+- **Rollback**: `git revert 33ef380`
+
+---
+
+### Fix: Simplify canDayOff tautology; remove unreachable dead code (AUDIT-6)
+
+- **Commit**: `8825644`
+- **Files**: `src/pages/CalendarPage.tsx`
+- **Summary**: `canDayOff = isPast || isToday || isFuture` is always `true` — every date is one of those three. The code had an existing comment acknowledging the block guarded by `!canLog && !canDayOff` "shouldn't happen". Simplified `canDayOff = true` with an explanatory comment; removed the 11-line dead code block.
+- **Why it matters**: Dead code with a comment saying "shouldn't happen" is confusing and makes readers wonder if they're missing a case.
+- **Risks**: None. The dead code block was never reachable and contained no behaviour.
+- **Rollback**: `git revert 8825644`
+
+---
+
 ## Pass 95 — 2026-08-10 (branch `claude/serene-cori-awu2i9`)
 
 ### Fix: getUpcomingDays future override handling (BUG-UPCOMING-OVERRIDE)

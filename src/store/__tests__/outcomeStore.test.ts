@@ -11,7 +11,7 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../outcomeStore'
+import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId, migrateOutcomeState } from '../outcomeStore'
 import { useExerciseHistoryStore } from '../exerciseHistoryStore'
 import { useProgramStore } from '../programStore'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
@@ -566,5 +566,38 @@ describe('logOutcomeWithProgression: progression-rule error isolation', () => {
 
     // Outcome must be persisted despite the rule failure
     expect(getState().getOutcome(outcome.workoutInstanceId)).toBeDefined()
+  })
+})
+
+// ── migrateOutcomeState ──────────────────────────────────────────────────────
+
+describe('migrateOutcomeState', () => {
+  it('returns empty objects for missing fields when persisted is null', () => {
+    const result = migrateOutcomeState(null, 0)
+    expect(result.outcomes).toEqual({})
+    expect(result.progressionStates).toEqual({})
+  })
+
+  it('returns empty objects for missing fields when persisted is an empty object', () => {
+    const result = migrateOutcomeState({}, 0)
+    expect(result.outcomes).toEqual({})
+    expect(result.progressionStates).toEqual({})
+  })
+
+  it('preserves existing outcomes and progressionStates from persisted data', () => {
+    const existing = {
+      outcomes: { 'plan-1_2026-01-01': { workoutInstanceId: 'plan-1_2026-01-01' } },
+      progressionStates: { 'group-1': { progressionGroupId: 'group-1' } },
+    }
+    const result = migrateOutcomeState(existing, 0)
+    expect(result.outcomes).toEqual(existing.outcomes)
+    expect(result.progressionStates).toEqual(existing.progressionStates)
+  })
+
+  it('backfills progressionStates to empty object if only outcomes are present', () => {
+    const persisted = { outcomes: { 'plan-1_2026-01-01': { workoutInstanceId: 'plan-1_2026-01-01' } } }
+    const result = migrateOutcomeState(persisted, 0)
+    expect(result.outcomes).toEqual(persisted.outcomes)
+    expect(result.progressionStates).toEqual({})
   })
 })

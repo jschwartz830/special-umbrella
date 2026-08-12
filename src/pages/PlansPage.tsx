@@ -115,7 +115,7 @@ function PlanCard({ plan, entries, today, onRequestActivate, onRequestDelete }: 
         <button
           onClick={() => {
             const newId = duplicatePlan(plan.id)
-            navigate(`/plans/${newId}/edit`)
+            if (newId) navigate(`/plans/${newId}/edit`)
           }}
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white text-xs font-medium transition-colors"
         >
