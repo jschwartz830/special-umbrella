@@ -263,8 +263,11 @@ export function TodayPage() {
   const primaryPlanDayIndex = todayResolved.historyEntry?.planDayIndex ?? todayResolved.planDayIndex
   const primaryPlanDay = plan.days[primaryPlanDayIndex] ?? todayResolved.planDay
 
-  // Resolve run adaptation note for today's workout
-  const todayRunSlot = todayResolved.planDay.slots.find(s => isRunType(s.type))
+  // Resolve run adaptation note for today's workout.
+  // Use primaryPlanDay (the day actually logged) rather than todayResolved.planDay
+  // which points to the advanced-to day after a double-day advance — showing guidance
+  // for the wrong workout in that case.
+  const todayRunSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
   const todayProgressionState = todayRunSlot?.runConfig?.progressionGroupId
     ? getProgressionState(todayRunSlot.runConfig.progressionGroupId)
     : null
