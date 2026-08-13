@@ -1,5 +1,34 @@
 # Test Results
 
+## Pass 97 — 2026-08-13 (branch `claude/serene-cori-3rn1fk`)
+
+### Baseline (before changes)
+
+- **35 test files, 1225 tests — all passing**
+- Runner: Vitest 4.x, node environment
+
+### Tests Added
+
+| File | Count | Description |
+|------|-------|-------------|
+| `src/store/__tests__/exerciseHistoryStore.test.ts` | +4 | `migrateExerciseHistoryState` unit tests: (1) null persisted → empty records; (2) empty object → empty records; (3) existing records preserved; (4) missing records field backfilled to `[]` |
+| `src/store/__tests__/programStore.test.ts` | +4 | `migrateProgramState` unit tests: (1) null persisted → empty vars; (2) empty object → empty vars; (3) existing vars preserved; (4) missing vars field backfilled to `{}` |
+| `src/store/__tests__/settingsStore.test.ts` | +5 | `migrateSettingsState` unit tests: (1) null persisted → correct defaults; (2) empty object → correct defaults; (3) existing values preserved; (4) missing focusMode backfilled to `false`; (5) missing autoAdvanceSegments backfilled to `true` |
+
+### Final Results
+
+- **35 test files, 1238 tests — all passing** (+13 net new tests)
+- TypeScript: clean throughout
+
+### Tests Still Not Covered
+
+- `ActiveWorkoutTracker.tsx` (~1800+ lines) — no unit or render tests
+- `CardioWorkoutTracker.tsx` auto-advance timer path
+- `TodayPage.tsx` render-level tests — the double-day adaptation note fix (NEW-ADAPT-NOTE) is a render-path change with no unit test yet; requires `@testing-library/react`
+- `useToday.ts` midnight-advance timer
+
+---
+
 ## Pass 96 — 2026-08-12 (branch `claude/serene-cori-4y0vy9`)
 
 ### Baseline (before changes)

@@ -1,5 +1,36 @@
 # Review Notes — Overnight Audit
 
+## 2026-08-13 (ninety-seventh pass) — branch `claude/serene-cori-3rn1fk`
+
+---
+
+### Executive Summary
+
+1. **What changed**: Three Zustand stores had their `migrate` functions replaced with explicit, field-default migrations — same pattern fix as BUG-OUTCOMESTORE-MIGRATE from pass 96. +13 migration unit tests added. No behaviour changes for existing users.
+2. **Highest confidence**: All changes are additive for current users (version stays at 1). The migration logic is now covered by unit tests. TypeScript clean throughout.
+3. **What is risky**: Nothing. These are pure future-proofing changes.
+4. **What to review first**: The three `migrateXState` functions and their test suites are the complete scope. They are independent of each other and independently revertable.
+
+---
+
+### Pattern Audit: Zustand `migrate` functions — all stores now compliant
+
+After pass 97, all six stores with `persist` middleware use an explicit, exported migration function:
+
+| Store | Migrate function | Tests |
+|---|---|---|
+| `historyStore` | `migrateHistoryState` | existing |
+| `planStore` | `migratePlanState` | existing |
+| `mobilityStore` | `migrateMobilityState` | existing |
+| `outcomeStore` | `migrateOutcomeState` | pass 96 |
+| `exerciseHistoryStore` | `migrateExerciseHistoryState` | **pass 97** |
+| `programStore` | `migrateProgramState` | **pass 97** |
+| `settingsStore` | `migrateSettingsState` | **pass 97** |
+
+No stores remain with no-op cast migrations.
+
+---
+
 ## 2026-08-12 (ninety-sixth pass) — branch `claude/serene-cori-4y0vy9`
 
 ---

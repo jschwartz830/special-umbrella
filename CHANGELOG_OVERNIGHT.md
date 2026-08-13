@@ -2,6 +2,23 @@
 
 ---
 
+## Pass 97 — 2026-08-13 (branch `claude/serene-cori-3rn1fk`)
+
+### Fix: Replace no-op cast migrations with explicit field-default migrations (3 stores)
+
+- **Commits**: `fc28ead` (source fixes), `2f47f9b` (test additions)
+- **Files**: `src/store/exerciseHistoryStore.ts`, `src/store/programStore.ts`, `src/store/settingsStore.ts` + their `__tests__` counterparts
+- **Summary**: All three stores used `(persisted) => persisted as XState` as their `migrate` function — identical to the BUG-OUTCOMESTORE-MIGRATE pattern fixed in pass 96. This pattern silently produces `undefined` for any field added in a schema bump if the user upgrades from old stored data. Replaced with named, exported `migrateXState` functions that apply `?? <default>` for each field individually, matching the established pattern from `outcomeStore`, `historyStore`, `planStore`, and `mobilityStore`.
+  - `exerciseHistoryStore`: `records ?? []`
+  - `programStore`: `vars ?? {}`
+  - `settingsStore`: `startDelaySeconds ?? 0`, `autoAdvanceSegments ?? true`, `focusMode ?? false`
+- **Why it matters**: `settingsStore` already has three fields — if a fourth is ever added with a version bump, existing users would silently get `undefined` instead of the new default. The same risk existed for the other two stores.
+- **Risks**: None for existing users. Version remains at 1 so the migration function only runs for data that has no version (first-time loads from localStorage). The existing behaviour is preserved exactly.
+- **Tests added**: +13 (4 for exerciseHistoryStore, 4 for programStore, 5 for settingsStore). Total: 1225 → 1238.
+- **Rollback**: `git revert fc28ead 2f47f9b`
+
+---
+
 ## Pass 96 — 2026-08-12 (branch `claude/serene-cori-4y0vy9`)
 
 ### Fix: Run adaptation note used wrong plan day after double-day advance (NEW-ADAPT-NOTE)
