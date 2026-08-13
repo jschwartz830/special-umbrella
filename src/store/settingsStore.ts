@@ -24,7 +24,18 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'wpt_settings',
       version: 1,
-      migrate: (persisted) => persisted as SettingsState,
+      migrate: migrateSettingsState,
     },
   ),
 )
+
+/** @internal Exported only for unit testing. */
+export function migrateSettingsState(persisted: unknown, _fromVersion: number): SettingsState {
+  const s = (persisted ?? {}) as Partial<SettingsState>
+  return {
+    ...s,
+    startDelaySeconds: s.startDelaySeconds ?? 0,
+    autoAdvanceSegments: s.autoAdvanceSegments ?? true,
+    focusMode: s.focusMode ?? false,
+  } as SettingsState
+}

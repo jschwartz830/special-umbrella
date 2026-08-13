@@ -91,7 +91,16 @@ export const useProgramStore = create<ProgramState>()(
     {
       name: 'wpt_program_vars',
       version: 1,
-      migrate: (persisted) => persisted as ProgramState,
+      migrate: migrateProgramState,
     },
   ),
 )
+
+/** @internal Exported only for unit testing. */
+export function migrateProgramState(persisted: unknown, _fromVersion: number): ProgramState {
+  const s = (persisted ?? {}) as Partial<ProgramState>
+  return {
+    ...s,
+    vars: s.vars ?? {},
+  } as ProgramState
+}

@@ -162,6 +162,15 @@ export const useExerciseHistoryStore = create<ExerciseHistoryState>()(
         return [...new Set(get().records.map(r => r.exerciseName))].sort()
       },
     }),
-    { name: 'wpt_exercise_history', version: 1, migrate: (persisted: unknown) => persisted as ExerciseHistoryState },
+    { name: 'wpt_exercise_history', version: 1, migrate: migrateExerciseHistoryState },
   ),
 )
+
+/** @internal Exported only for unit testing. */
+export function migrateExerciseHistoryState(persisted: unknown, _fromVersion: number): ExerciseHistoryState {
+  const s = (persisted ?? {}) as Partial<ExerciseHistoryState>
+  return {
+    ...s,
+    records: s.records ?? [],
+  } as ExerciseHistoryState
+}
