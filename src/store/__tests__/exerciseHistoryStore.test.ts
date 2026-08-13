@@ -11,7 +11,7 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { useExerciseHistoryStore } from '../exerciseHistoryStore'
+import { useExerciseHistoryStore, migrateExerciseHistoryState } from '../exerciseHistoryStore'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -433,5 +433,35 @@ describe('getAllExerciseNames', () => {
       makeOutcome('plan-B', '2026-01-02', [{ name: 'Squat', sets: [{ reps: 5, load: 140 }] }]),
     )
     expect(getState().getAllExerciseNames()).toEqual(['Squat'])
+  })
+})
+
+// ── migrateExerciseHistoryState ───────────────────────────────────────────────
+
+describe('migrateExerciseHistoryState', () => {
+  it('returns empty records array when persisted state is null', () => {
+    const result = migrateExerciseHistoryState(null, 0)
+    expect(result.records).toEqual([])
+  })
+
+  it('returns empty records array when persisted state is an empty object', () => {
+    const result = migrateExerciseHistoryState({}, 0)
+    expect(result.records).toEqual([])
+  })
+
+  it('preserves existing records', () => {
+    const record = { id: 'r1', exerciseName: 'Squat', calendarDate: '2026-01-01',
+      planId: 'p1', planName: null, workoutName: null,
+      workoutInstanceId: 'p1_2026-01-01', sets: [], totalVolume: null,
+      maxLoad: null, maxReps: null, createdAt: '2026-01-01T12:00:00Z' }
+    const result = migrateExerciseHistoryState({ records: [record] }, 0)
+    expect(result.records).toHaveLength(1)
+    expect(result.records[0].exerciseName).toBe('Squat')
+  })
+
+  it('backfills missing records field to empty array', () => {
+    const result = migrateExerciseHistoryState({ someOtherField: 42 }, 0)
+    expect(Array.isArray(result.records)).toBe(true)
+    expect(result.records).toHaveLength(0)
   })
 })

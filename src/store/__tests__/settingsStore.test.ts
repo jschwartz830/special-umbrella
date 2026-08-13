@@ -5,7 +5,7 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { useSettingsStore } from '../settingsStore'
+import { useSettingsStore, migrateSettingsState } from '../settingsStore'
 
 function resetStore() {
   useSettingsStore.setState({
@@ -92,5 +92,48 @@ describe('settingsStore', () => {
       useSettingsStore.getState().setFocusMode(false)
       expect(useSettingsStore.getState().focusMode).toBe(false)
     })
+  })
+})
+
+// ── migrateSettingsState ──────────────────────────────────────────────────────
+
+describe('migrateSettingsState', () => {
+  it('returns correct defaults when persisted state is null', () => {
+    const result = migrateSettingsState(null, 0)
+    expect(result.startDelaySeconds).toBe(0)
+    expect(result.autoAdvanceSegments).toBe(true)
+    expect(result.focusMode).toBe(false)
+  })
+
+  it('returns correct defaults when persisted state is an empty object', () => {
+    const result = migrateSettingsState({}, 0)
+    expect(result.startDelaySeconds).toBe(0)
+    expect(result.autoAdvanceSegments).toBe(true)
+    expect(result.focusMode).toBe(false)
+  })
+
+  it('preserves existing settings values', () => {
+    const result = migrateSettingsState({
+      startDelaySeconds: 10,
+      autoAdvanceSegments: false,
+      focusMode: true,
+    }, 0)
+    expect(result.startDelaySeconds).toBe(10)
+    expect(result.autoAdvanceSegments).toBe(false)
+    expect(result.focusMode).toBe(true)
+  })
+
+  it('backfills focusMode when missing (pre-v1 state without focusMode field)', () => {
+    const result = migrateSettingsState({
+      startDelaySeconds: 5,
+      autoAdvanceSegments: true,
+    }, 0)
+    expect(result.focusMode).toBe(false)
+    expect(result.startDelaySeconds).toBe(5)
+  })
+
+  it('backfills autoAdvanceSegments when missing', () => {
+    const result = migrateSettingsState({ startDelaySeconds: 0 }, 0)
+    expect(result.autoAdvanceSegments).toBe(true)
   })
 })
