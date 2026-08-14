@@ -12,7 +12,7 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { useProgramStore } from '../programStore'
+import { useProgramStore, migrateProgramState } from '../programStore'
 import type { ProgressionRule } from '../../types/program'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -294,5 +294,29 @@ describe('applyProgressionRule', () => {
       expect(getState().getVars('plan-1').squat).toBe(135)
       expect(getState().getVars('plan-1').bench).toBe(95)
     })
+  })
+})
+
+// ── migrateProgramState ───────────────────────────────────────────────────────
+
+describe('migrateProgramState', () => {
+  it('returns empty vars when persisted state is null', () => {
+    const result = migrateProgramState(null, 0)
+    expect(result.vars).toEqual({})
+  })
+
+  it('returns empty vars when persisted state is an empty object', () => {
+    const result = migrateProgramState({}, 0)
+    expect(result.vars).toEqual({})
+  })
+
+  it('preserves existing vars', () => {
+    const result = migrateProgramState({ vars: { 'plan-1': { squat: 135, bench: 95 } } }, 0)
+    expect(result.vars['plan-1']).toEqual({ squat: 135, bench: 95 })
+  })
+
+  it('backfills missing vars field to empty object', () => {
+    const result = migrateProgramState({ someOtherField: true }, 0)
+    expect(result.vars).toEqual({})
   })
 })

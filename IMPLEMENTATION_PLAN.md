@@ -1,5 +1,45 @@
 # Implementation Plan
 
+## Pass 97 — 2026-08-13 (branch `claude/serene-cori-3rn1fk`)
+
+### Baseline
+
+- Branch started from `main` after PR #242 (pass 96) merged.
+- **1225 tests passing** across 35 test files at start of pass.
+- **1238 tests passing** at end of pass (+13 new tests).
+- TypeScript: `tsc --noEmit` clean throughout.
+
+### Architecture Summary (pass 97)
+
+Targeted migration hardening pass. Three Zustand stores had a no-op cast migration identical to the BUG-OUTCOMESTORE-MIGRATE pattern fixed in pass 96. All three were upgraded to the codebase's established explicit-migration pattern. Each migration function is exported for testability and covered by unit tests.
+
+No new dependencies, no schema version bumps (version stays at 1), no behaviour changes for existing users.
+
+### Bugs Fixed This Pass
+
+| # | Commits | File(s) | Summary |
+|---|---|---|---|
+| BUG-EXERCISEHISTORY-MIGRATE | `fc28ead` | `exerciseHistoryStore.ts` | Migration was a no-op cast. Replaced with explicit `migrateExerciseHistoryState` function with `records ?? []` default. |
+| BUG-PROGRAM-MIGRATE | `fc28ead` | `programStore.ts` | Migration was a no-op cast. Replaced with explicit `migrateProgramState` function with `vars ?? {}` default. |
+| BUG-SETTINGS-MIGRATE | `fc28ead` | `settingsStore.ts` | Migration was a no-op cast. Replaced with explicit `migrateSettingsState` function with `startDelaySeconds ?? 0`, `autoAdvanceSegments ?? true`, `focusMode ?? false`. |
+
+### Tests Added
+
+| Test suite | Count | File |
+|---|---|---|
+| `migrateExerciseHistoryState` | +4 | `exerciseHistoryStore.test.ts` |
+| `migrateProgramState` | +4 | `programStore.test.ts` |
+| `migrateSettingsState` | +5 | `settingsStore.test.ts` |
+
+### Next Pass Priorities
+
+1. **BUG-ALLENTRIES-SELECTOR** (P2): `useHistoryStore(s => s.entries)` in TodayPage subscribes to all entries — any write from any plan triggers a re-render. Scope to active plan + global stats entries.
+2. **AUDIT-C** (P3): `programParser.ts` `parseSlot` generates new nanoid slot IDs on every YAML re-parse, breaking slot-keyed data on re-import. Deterministic IDs (hash of structural position) would fix this.
+3. **ActiveWorkoutTracker** render-level tests (P4): the largest untested component (~1800 lines).
+4. **TodayPage** render-level tests: the NEW-ADAPT-NOTE fix would benefit from a regression test that requires `@testing-library/react`.
+
+---
+
 ## Pass 96 — 2026-08-12 (branch `claude/serene-cori-4y0vy9`)
 
 ### Baseline
