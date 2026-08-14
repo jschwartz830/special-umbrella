@@ -13,6 +13,8 @@ interface TodayPlanProgressModalProps {
   loggedRate: number | null
   workoutCompletionRate: WorkoutCompletionRate
   consecutiveSkips: number
+  /** Average active workout sessions per week since plan start. null before any sessions exist. */
+  avgWorkoutsPerWeek: number | null
   onClose: () => void
 }
 
@@ -27,6 +29,7 @@ export function TodayPlanProgressModal({
   loggedRate,
   workoutCompletionRate,
   consecutiveSkips,
+  avgWorkoutsPerWeek,
   onClose,
 }: TodayPlanProgressModalProps) {
   return (
@@ -82,6 +85,12 @@ export function TodayPlanProgressModal({
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-sm text-slate-400">Completion rate</span>
               <span className="text-sm font-semibold text-white">{workoutCompletionRate.workoutCompletionRate}%</span>
+            </div>
+          )}
+          {avgWorkoutsPerWeek !== null && (
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm text-slate-400">Avg / week</span>
+              <span className="text-sm font-semibold text-white">{avgWorkoutsPerWeek}×</span>
             </div>
           )}
           {consecutiveSkips > 0 && (

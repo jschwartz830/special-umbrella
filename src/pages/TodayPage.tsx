@@ -29,7 +29,7 @@ import { completionStateToAction } from '../modules/workout-outcomes/types'
 import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../modules/recommendation/explanation'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek } from '../lib/historyStats'
 import type { WorkoutCompletionRate } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, WorkoutSlot } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../modules/workout-outcomes/types'
@@ -300,6 +300,7 @@ export function TodayPage() {
 
   const loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)
   const workoutCompletionRate: WorkoutCompletionRate = computeWorkoutCompletionRate(plan.id, planEntries, today)
+  const avgWorkoutsPerWeek = computeAverageWorkoutsPerWeek(plan.id, planEntries, planExtras, plan.startDate, today)
 
   const weekProgress = plan.duration.type === 'weeks'
     ? computePlanProgress(plan, planEntries, today)
@@ -1028,6 +1029,7 @@ export function TodayPage() {
           loggedRate={loggedRate}
           workoutCompletionRate={workoutCompletionRate}
           consecutiveSkips={consecutiveSkips}
+          avgWorkoutsPerWeek={avgWorkoutsPerWeek}
           onClose={() => setShowPlanProgressModal(false)}
         />
       )}
