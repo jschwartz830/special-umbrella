@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags, buildPRFlagsMap, computeWorkoutCompletionRate } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags, buildPRFlagsMap, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -2979,5 +2979,128 @@ describe('computeWorkoutCompletionRate', () => {
     expect(result.completedCount).toBe(2)
     expect(result.skippedCount).toBe(1)
     expect(result.workoutCompletionRate).toBe(67)
+  })
+})
+
+// ── computeAverageWorkoutsPerWeek ─────────────────────────────────────────────
+
+describe('computeAverageWorkoutsPerWeek', () => {
+  const TODAY = '2026-06-14' // a Saturday
+
+  it('returns null when plan has not started yet', () => {
+    expect(computeAverageWorkoutsPerWeek('plan-1', [], [], '2026-07-01', TODAY)).toBeNull()
+  })
+
+  it('returns null when there are no active sessions', () => {
+    // Only skips and day-offs — no active workouts
+    const entries = [
+      entry('2026-06-10', 'skip'),
+      entry('2026-06-11', 'day_off'),
+    ]
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-01', TODAY)).toBeNull()
+  })
+
+  it('returns 1.0 for a plan started today with one extra', () => {
+    // 1 day elapsed, 1 active session, denominator clamped to min 1 week
+    const extras = [extra(TODAY)]
+    expect(computeAverageWorkoutsPerWeek('plan-1', [], extras, TODAY, TODAY)).toBe(1.0)
+  })
+
+  it('returns 3.0 for exactly 3 workouts over 7 days', () => {
+    const entries = [
+      entry('2026-06-08', 'complete'),
+      entry('2026-06-10', 'complete'),
+      entry('2026-06-12', 'complete'),
+    ]
+    // 7 days elapsed (Jun 8 → Jun 14 inclusive) = exactly 1 week
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-08', TODAY)).toBe(3.0)
+  })
+
+  it('returns 1.5 for 3 workouts over 14 days', () => {
+    const entries = [
+      entry('2026-06-01', 'complete'),
+      entry('2026-06-05', 'complete'),
+      entry('2026-06-10', 'complete'),
+    ]
+    // 14 days elapsed (Jun 1 → Jun 14 inclusive) = 2 weeks
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-01', TODAY)).toBe(1.5)
+  })
+
+  it('counts extras alongside completed rotation entries', () => {
+    const entries = [entry('2026-06-10', 'complete')]
+    const es = [extra('2026-06-12')]
+    // 7 days, 2 active sessions
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, es, '2026-06-08', TODAY)).toBe(2.0)
+  })
+
+  it('excludes skip entries from the count', () => {
+    const entries = [
+      entry('2026-06-08', 'complete'),
+      entry('2026-06-09', 'skip'),  // skip should NOT count
+    ]
+    // 7 days, 1 active session (skip excluded)
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-08', TODAY)).toBe(1.0)
+  })
+
+  it('excludes day_off entries from the count', () => {
+    const entries = [
+      entry('2026-06-08', 'complete'),
+      entry('2026-06-09', 'day_off'),  // day_off should NOT count
+    ]
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-08', TODAY)).toBe(1.0)
+  })
+
+  it('excludes entries for a different plan', () => {
+    const entries = [
+      entry('2026-06-10', 'complete', 'plan-1'),
+      entry('2026-06-11', 'complete', 'plan-2'),  // different plan
+    ]
+    // Only plan-1's entry counts
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-08', TODAY)).toBe(1.0)
+  })
+
+  it('excludes entries after today', () => {
+    const entries = [
+      entry('2026-06-10', 'complete'),
+      entry('2026-06-20', 'complete'),  // future entry
+    ]
+    // Only the past entry counts
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-08', TODAY)).toBe(1.0)
+  })
+
+  it('deduplicates same-date complete entries to avoid inflating count', () => {
+    // Two "complete" entries for the same date — should only count once
+    const entries: HistoryEntry[] = [
+      { ...entry('2026-06-10', 'complete'), id: 'a', createdAt: '2026-06-10T08:00:00Z' },
+      { ...entry('2026-06-10', 'complete'), id: 'b', createdAt: '2026-06-10T12:00:00Z' },
+    ]
+    // 7 days elapsed, 1 unique date = 1 active session
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-08', TODAY)).toBe(1.0)
+  })
+
+  it('rounds result to one decimal place', () => {
+    const entries = [
+      entry('2026-06-01', 'complete'),
+      entry('2026-06-03', 'complete'),
+      entry('2026-06-05', 'complete'),
+      entry('2026-06-07', 'complete'),
+      entry('2026-06-09', 'complete'),
+    ]
+    // planStartDate = 2026-06-01, today = 2026-06-14 = 14 days inclusive = 2 weeks
+    // 5 sessions / 2 weeks = 2.5
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-01', TODAY)).toBe(2.5)
+  })
+
+  it('returns 7.0 when working out every day for one week', () => {
+    const entries = [
+      entry('2026-06-08', 'complete'),
+      entry('2026-06-09', 'complete'),
+      entry('2026-06-10', 'complete'),
+      entry('2026-06-11', 'complete'),
+      entry('2026-06-12', 'complete'),
+      entry('2026-06-13', 'complete'),
+      entry('2026-06-14', 'complete'),
+    ]
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-08', TODAY)).toBe(7.0)
   })
 })
