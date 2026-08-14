@@ -195,6 +195,12 @@ class Parser {
       return e
     }
 
+    // Unexpected token in primary position (e.g. a bare comma or rparen).
+    // Silently return 0 so the evaluator degrades gracefully rather than throwing,
+    // but warn in dev so YAML authors see the malformed expression.
+    if (import.meta.env.DEV) {
+      console.warn(`[expressionEval] unexpected token '${t.type}' in primary position`)
+    }
     return { k: 'num', v: 0 }
   }
 }
