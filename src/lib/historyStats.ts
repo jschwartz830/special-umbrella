@@ -1063,3 +1063,58 @@ export function findBestWeek(
     w.completed + w.extras > best.completed + best.extras ? w : best,
   )
 }
+
+// ── Average workouts per week ─────────────────────────────────────────────────
+
+/**
+ * Compute the average number of active workout sessions per week since the
+ * plan started. "Active" means completed rotation entries or any extra workout;
+ * skips and day-off entries are excluded because they don't represent training.
+ *
+ * - The denominator is the number of full + partial weeks elapsed from
+ *   `planStartDate` up to and including `today` (minimum 1, so a plan that
+ *   started today returns the day-0 count ÷ 1 rather than dividing by zero).
+ * - Completed dates are deduplicated by calendarDate, mirroring the
+ *   one-advancement-per-date rule used by `isPlanExpired` and
+ *   `computePlanProgress`.
+ * - Returns `null` when the plan has not started yet (`planStartDate > today`)
+ *   or both entries and extras arrays are empty (nothing to measure).
+ * - Result is rounded to one decimal place.
+ *
+ * @param planId        Plan to query.
+ * @param entries       All history entries (unfiltered).
+ * @param extras        All extra workout entries (unfiltered).
+ * @param planStartDate YYYY-MM-DD start date of the plan.
+ * @param today         YYYY-MM-DD reference date (inclusive upper bound).
+ */
+export function computeAverageWorkoutsPerWeek(
+  planId: string,
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  planStartDate: string,
+  today: string,
+): number | null {
+  if (planStartDate > today) return null
+
+  // Deduplicate complete entries by calendarDate — mirrors isPlanExpired/computePlanProgress.
+  const completedDates = new Set(
+    entries
+      .filter(e => e.planId === planId && e.calendarDate <= today && e.action === 'complete')
+      .map(e => e.calendarDate),
+  )
+  const extraCount = extras.filter(
+    e => e.planId === planId && e.calendarDate <= today,
+  ).length
+
+  const totalActive = completedDates.size + extraCount
+  if (totalActive === 0) return null
+
+  // Weeks elapsed: number of days from startDate to today (inclusive), divided
+  // by 7. A partial first week counts as a fractional week rather than zero,
+  // so a plan started 3 days ago with 3 workouts correctly returns 7.0
+  // (3 workouts / (3/7 weeks) = 7/week), not Infinity.
+  const daysElapsed = dateDiffDays(planStartDate, today) + 1 // +1: inclusive of today
+  const weeksElapsed = Math.max(1, daysElapsed / 7)
+
+  return Math.round((totalActive / weeksElapsed) * 10) / 10
+}
