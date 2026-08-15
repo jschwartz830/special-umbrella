@@ -72,12 +72,9 @@ export function buildProgressionRecommendation(
   return null
 }
 
-function allSetsHitTarget(
-  allSets: LoggedExerciseActual['sets'],
-  completedSets: LoggedExerciseActual['sets'],
-): boolean {
-  if (!allSets.every(s => s.completed === true)) return false
-  return completedSets.every(s => {
+function allSetsHitTarget(sets: LoggedExerciseActual['sets']): boolean {
+  return sets.every(s => {
+    if (!s.completed) return false
     if (typeof s.targetReps === 'number') {
       // Require actual reps to be recorded and meet the target.
       return s.actualReps != null && s.actualReps >= s.targetReps
@@ -113,7 +110,7 @@ function buildWeightsRecommendation(
   }
 
   if (mode === 'double') {
-    const allHit = allSetsHitTarget(allSets, completedSets)
+    const allHit = allSetsHitTarget(allSets)
     return {
       discipline: 'weights',
       mode,
@@ -125,7 +122,7 @@ function buildWeightsRecommendation(
   }
 
   if (mode === 'volume') {
-    const allHit = allSetsHitTarget(allSets, completedSets)
+    const allHit = allSetsHitTarget(allSets)
     return {
       discipline: 'weights',
       mode,

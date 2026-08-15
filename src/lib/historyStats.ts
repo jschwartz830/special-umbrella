@@ -35,12 +35,21 @@ export function computeHistoryStats(
   // create entries with calendarDate > today, which would otherwise inflate
   // the stats shown on the History page (same guard applied to longestStreak
   // in pass 42 and to last7/last30 via the inWindow predicate below).
-  const totalLogged =
-    entries.filter(e => e.calendarDate <= today).length +
-    extras.filter(e => e.calendarDate <= today).length
+  //
+  // Deduplicate rotation entries by (planId, calendarDate) — the store's addEntry
+  // prevents duplicates in normal usage, but a bad CSV import or unusual cloud-sync
+  // race can leave multiple entries for the same date. Counting raw array length
+  // would inflate totalLogged; deduplication mirrors the one-advancement-per-date
+  // invariant in the rotation engine.
+  const pastEntries = entries.filter(e => e.calendarDate <= today)
+  const uniqueEntryDates = new Set(pastEntries.map(e => `${e.planId}__${e.calendarDate}`))
+  const pastExtras = extras.filter(e => e.calendarDate <= today)
+  const totalLogged = uniqueEntryDates.size + pastExtras.length
   const totalCompleted =
-    entries.filter(e => e.action === 'complete' && e.calendarDate <= today).length +
-    extras.filter(e => e.calendarDate <= today).length
+    new Set(
+      pastEntries.filter(e => e.action === 'complete').map(e => `${e.planId}__${e.calendarDate}`),
+    ).size +
+    pastExtras.length
 
   const d7 = shiftDay(today, -6)   // window of 7 days inclusive of today
   const d30 = shiftDay(today, -29) // window of 30 days inclusive of today

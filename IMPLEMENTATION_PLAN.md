@@ -100,3 +100,37 @@ The store prevents duplicate `(planId, calendarDate)` entries via `addEntry`, bu
 ## Rationale for Sequencing
 
 Tests first — they validate existing behavior before any changes. The new stat function (`computeAverageWorkoutsPerWeek`) is purely additive and won't affect existing tests. The `parsePrimary` warning is additive and dev-only so it cannot break production behavior. Calendar week start and TodayPage refactor are left as recommendations because they require product decisions and broader UI changes.
+
+---
+
+## Additions — 2026-08-15
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `useToday`: add `visibilitychange` listener for device-wake edge case | Bug fix | `src/hooks/useToday.ts` |
+| 2 | `allSetsHitTarget`: simplify from two parameters to one | Refactor | `src/modules/workout-outcomes/progression.ts` |
+| 3 | `computeHistoryStats`: deduplicate rotation entries in `totalLogged` / `totalCompleted` | Defensive fix | `src/lib/historyStats.ts` |
+
+### Detail
+
+**1. `useToday` visibilitychange bug**
+The hook only used `setTimeout` for midnight refresh. If the device sleeps and the OS pauses or delays the timer, the app would show "yesterday" until something forced a re-render. Adding a `visibilitychange` listener that re-checks the date whenever the page becomes visible catches the device-wake edge case immediately. The `[today]` dep already re-schedules the `setTimeout` on each date change; the new listener just adds a second trigger.
+
+**2. `allSetsHitTarget` single-parameter refactor**
+The original signature `(allSets, completedSets)` ran the `completed` check over `allSets` and the `targetReps` check only over `completedSets`. This was semantically correct but redundant: any set that passes `s.completed` in the first loop would also appear in `completedSets` since `completedSets` was defined as `allSets.filter(s => s.completed)`. The refactor collapses both checks into a single `sets.every(s => { if (!s.completed) return false; ... })` predicate. All three call sites updated. No behaviour change.
+
+**3. `computeHistoryStats` deduplication**
+`totalLogged` was counting `entries.length` directly, assuming the store always enforces the one-entry-per-(planId, calendarDate) invariant. The store does enforce this on write, but `importEntries` and old persisted data could create duplicates in the array. The fix collapses `entries` to a `Set` keyed by `planId__calendarDate` before sizing — the same pattern used by `isPlanExpired` and `computePlanProgress`. `totalCompleted` receives the same treatment.
+
+### Status of previous items
+
+| P# | Item | Status |
+|---|---|---|
+| P1 (multi-statement tests) | Covered in 2026-08-14 pass (`expressionEval.test.ts` 79 tests) | Done |
+| P2 (`computeAverageWorkoutsPerWeek`) | Implemented 2026-08-14 | Done |
+| P3 (`parsePrimary` warning) | Implemented 2026-08-14 | Done |
+| P4 (`parseWorkoutInstanceId` doc) | Implemented 2026-08-14 | Done |
+| P5 (`totalLogged` dedup) | Implemented 2026-08-15 (change 3 above) | Done |
+| P6 (calendar week start) | Recommendation only — not implemented | Open |
