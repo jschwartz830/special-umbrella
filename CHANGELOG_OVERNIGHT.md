@@ -1,4 +1,65 @@
 # Overnight Changelog
+
+---
+
+## 2026-08-15
+
+### Change 1 — `fix(hooks): re-check date on visibilitychange to handle device wake from sleep`
+
+**Summary:** Added a `visibilitychange` event listener to `useToday` that calls `tick()` whenever the page becomes visible. The existing `setTimeout`-based midnight refresh remains, but was insufficient on its own: when a device sleeps and the OS pauses or delays the timer, the app would display "yesterday" until something forced a React re-render. The visibility listener catches the device-wake edge case immediately.
+
+**Why it matters:** TodayPage is a time-gated view — it resolves workouts by the current local date. Showing the wrong date (from a prior day) would display yesterday's workout as "today" and block the user from logging. This is a silent UX failure that only appears after leaving the device asleep past midnight.
+
+**Files changed:**
+- `src/hooks/useToday.ts` — added `handleVisibility` function and `visibilitychange` listener within the same `useEffect`; cleanup removes both the timer and the listener
+
+**Design decisions:**
+- The listener is registered inside the same `useEffect` as the `setTimeout` so a single cleanup removes both. No new `useEffect` needed.
+- The `[today]` dependency ensures both the timer and the listener are re-registered each time the date advances, so no stale closure issues.
+
+**Risks / tradeoffs:**
+- `visibilitychange` fires on every tab-switch/app-background even when the date hasn't changed. The `setToday` call is stable-by-value (React bails out when the new value equals the current), so the cost is just one `format(new Date(), 'yyyy-MM-dd')` call per visibility event — negligible.
+
+**Rollback:** Revert the `fix(hooks)` commit. The hook reverts to `setTimeout`-only behavior with no other changes.
+
+---
+
+### Change 2 — `refactor(progression): simplify allSetsHitTarget to single parameter`
+
+**Summary:** Simplified the private `allSetsHitTarget` function in `progression.ts` from two parameters (`allSets`, `completedSets`) to one (`sets`). The original split ran the `completed` flag check over `allSets` and the `targetReps` check only over the pre-filtered `completedSets`. Since `completedSets` was defined as `allSets.filter(s => s.completed)`, both checks could be expressed as a single `sets.every(s => { if (!s.completed) return false; ... })`. All three call sites updated.
+
+**Why it matters:** The two-parameter signature was confusing — both parameters referred to the same logical set at different filter stages. A reader might assume the parameters could differ independently (e.g. pass different arrays), but in practice they never did. The single-parameter version is easier to read, easier to test, and harder to misuse.
+
+**Files changed:**
+- `src/modules/workout-outcomes/progression.ts` — function signature reduced to 1 param, body rewritten as a single `every()` call, three call sites updated
+
+**Risks / tradeoffs:** No behaviour change. All three call sites previously passed `(allSets, completedSets)` where `completedSets = allSets.filter(s => s.completed)`. The unified `every` predicate is semantically equivalent.
+
+**Rollback:** Revert the `refactor(progression)` commit.
+
+---
+
+### Change 3 — `fix(historyStats): deduplicate rotation entries in totalLogged and totalCompleted`
+
+**Summary:** `computeHistoryStats` now collapses rotation `entries` to a `Set` keyed by `planId__calendarDate` before counting `totalLogged` and `totalCompleted`. Previously the function counted raw array length, relying on the store's write-time dedup invariant. That invariant holds under normal use but can be violated by `importEntries` on older persisted data. The fix makes the stats layer independently safe.
+
+**Why it matters:** If `totalLogged` or `totalCompleted` were inflated by duplicate entries, the Plan Progress modal would show a completion rate > 100% and plan expiry logic could fire prematurely. Making the stats layer deduplicate defensively mirrors the pattern already used by `isPlanExpired` and `computePlanProgress`.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — `totalLogged` and `totalCompleted` now use `Set`-based dedup
+
+**Design decisions:**
+- The key `planId__calendarDate` matches the existing convention used by `deduplicateByDate` in `historyStore.ts`.
+- `extras` are intentionally not deduplicated: extra workouts allow multiple per day by design (e.g. morning run + afternoon weights), so counting them by array length is correct.
+
+**Risks / tradeoffs:** Very low risk. The only observable change is that duplicate rotation entries (which shouldn't exist in healthy data) no longer inflate the count. Correct data produces identical output.
+
+**Rollback:** Revert the `fix(historyStats)` commit.
+
+---
+
+## 2026-08-14
+
 **Date:** 2026-08-14
 
 ---

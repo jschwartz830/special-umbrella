@@ -1,5 +1,32 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-08-14
+**Date:** 2026-08-15
+**Branch:** `claude/serene-cori-t6hvf0`
+
+---
+
+## Executive Summary (2026-08-15 pass)
+
+1. **What changed:** Three targeted fixes — a `useToday` device-wake bug, an `allSetsHitTarget` cleanup, and a defensive dedup in `computeHistoryStats`. No new dependencies, no new features, no test count change (all 1251 continue to pass).
+
+2. **Highest confidence:** `allSetsHitTarget` refactor — semantically equivalent single-`every()` rewrite, zero behaviour change, all related outcome tests green. `computeHistoryStats` dedup — mirrors the exact pattern used by `isPlanExpired` and `computePlanProgress` in the same file.
+
+3. **What is risky:** None of these changes are risky. The `visibilitychange` fix is the most "user-facing" but it only adds a second trigger for the same `tick()` call that already ran at midnight — React's value-stable `setState` ensures no extra renders when the date hasn't changed.
+
+4. **What to review first:** The `useToday` fix is worth a quick sanity check: leave the app open past midnight on a device that sleeps, wake it up, and confirm TodayPage shows the new date without a reload.
+
+---
+
+## Improvements Completed (2026-08-15)
+
+| # | Description | Commit |
+|---|---|---|
+| 1 | `useToday` visibilitychange device-wake fix | `3084146` |
+| 2 | `allSetsHitTarget` single-parameter refactor | `ea66d3e` |
+| 3 | `computeHistoryStats` totalLogged/totalCompleted dedup | `56255d0` |
+
+---
+
+## Previous Pass Notes (2026-08-14)
 **Branch:** `claude/serene-cori-gxsgmm`
 
 ---
