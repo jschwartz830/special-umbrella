@@ -134,7 +134,7 @@ function buildWeightsRecommendation(
   }
 
   // Single (and maintenance fallback)
-  const allHit = allSetsHitTarget(allSets, completedSets)
+  const allHit = allSetsHitTarget(allSets)
   return {
     discipline: 'weights',
     mode: 'single',
