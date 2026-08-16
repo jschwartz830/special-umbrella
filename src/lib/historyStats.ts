@@ -57,11 +57,14 @@ export function computeHistoryStats(
   const inWindow = (date: string, from: string) =>
     date >= from && date <= today
 
+  // Deduplicate rotation entries by planId__calendarDate — mirrors totalCompleted.
+  // A bad CSV import can create two entries for the same date within the window,
+  // which would inflate last7/last30 even though the user only trained once.
   const last7Completed =
-    entries.filter(e => e.action === 'complete' && inWindow(e.calendarDate, d7)).length +
+    new Set(entries.filter(e => e.action === 'complete' && inWindow(e.calendarDate, d7)).map(e => `${e.planId}__${e.calendarDate}`)).size +
     extras.filter(e => inWindow(e.calendarDate, d7)).length
   const last30Completed =
-    entries.filter(e => e.action === 'complete' && inWindow(e.calendarDate, d30)).length +
+    new Set(entries.filter(e => e.action === 'complete' && inWindow(e.calendarDate, d30)).map(e => `${e.planId}__${e.calendarDate}`)).size +
     extras.filter(e => inWindow(e.calendarDate, d30)).length
 
   const streakable = getStreakDatesSet(entries, extras)
