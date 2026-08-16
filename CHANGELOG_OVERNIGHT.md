@@ -2,6 +2,53 @@
 
 ---
 
+## 2026-08-16
+
+### Change 1 — `fix(calendar): preserve jump override when marking a jumped date as day_off`
+
+**Summary:** When a calendar date had a retro jump override and the user marked it as `day_off`, the code removed the jump override and then skipped re-adding it because of an `action !== 'day_off'` guard. This left the rotation pointer anchored at the wrong plan day index for all subsequent dates.
+
+**Why it matters:** The rotation engine uses jump overrides to resolve which plan day should be shown for a given calendar date. If the jump is lost on a `day_off` log, `computeCurrentDayIndex` advances from the pre-jump position instead of the jumped-to position, causing all subsequent days to show the wrong workout.
+
+**Root cause:** `logForDate` (CalendarPage.tsx:146) explicitly excluded `day_off` from the re-add path for the jump override: `if (action !== 'day_off' && (hadJump || ...))`. This was logically incorrect — a `day_off` action doesn't undo the user's intent to jump to a specific plan day.
+
+**Files changed:**
+- `src/pages/CalendarPage.tsx` — removed `action !== 'day_off'` exclusion from the jump-override re-add condition
+
+**Risks / tradeoffs:** Very low. The fix ensures that a `day_off` on a jumped date behaves identically to a `complete` or `skip` on a jumped date — it preserves the jump. No existing test exercises this path because the CalendarPage has no unit tests; manual verification is required.
+
+**Rollback:** Revert the `fix(calendar)` commit.
+
+---
+
+### Change 2 — `fix(historyStats): deduplicate last7/last30Completed by planId__calendarDate`
+
+**Summary:** `last7Completed` and `last30Completed` were counting raw array length, unlike `totalCompleted` which already deduplicates by `planId__calendarDate`. A CSV re-import or cloud-sync race producing two entries for the same date would inflate the 7-day and 30-day window counts while leaving `totalCompleted` correct.
+
+**Why it matters:** A user might see "7 workouts this week" when they only completed 4 if a re-import created duplicates. The inconsistency between `totalCompleted` (deduplicated) and `last7Completed` (not deduplicated) was confusing and incorrect.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — `last7Completed` and `last30Completed` now use `Set`-based dedup matching `totalCompleted`
+- `src/lib/__tests__/historyStats.test.ts` — 3 new tests confirming dedup behaviour
+
+**Rollback:** Revert the `fix(historyStats)` commit.
+
+---
+
+### Change 3 — `feat(expressionEval): warn in dev when YAML progression rule references unknown variable`
+
+**Summary:** Added a `console.warn` in development builds when `evalExpr` evaluates a `var` node whose name is not present in the evaluation context (`vars`). This surfaces YAML progression rule typos (e.g. `squatt` instead of `squat`) immediately during local development without any runtime behaviour change in production — unknown variables continue to evaluate to `0` as before.
+
+**Why it matters:** YAML progression rules that reference a misspelled variable silently return 0, making the rule appear to do nothing. The dev warning makes the error visible immediately without requiring the user to debug via breakpoints.
+
+**Files changed:**
+- `src/lib/expressionEval.ts` — added `console.warn` behind `import.meta.env.DEV` guard in `case 'var'`
+- `src/lib/__tests__/expressionEval.test.ts` — 5 new tests for the unknown-variable warning; also added 3 tests for the `parsePrimary` unexpected-token warning that was untested across the two prior passes
+
+**Rollback:** Revert the `feat(expressionEval)` commit.
+
+---
+
 ## 2026-08-15
 
 ### Change 1 — `fix(hooks): re-check date on visibilitychange to handle device wake from sleep`

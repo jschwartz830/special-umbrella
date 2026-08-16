@@ -2,6 +2,53 @@
 
 ---
 
+## 2026-08-16 Pass
+
+### Source Changes Validated
+
+| Change | Tests affected | Result |
+|---|---|---|
+| `progression.ts` TS2554 fix (stale extra arg) | All `progression` / `outcomeStore` tests | All passing |
+| `CalendarPage.tsx` jump-override day_off fix | No dedicated unit tests (UI component — manual) | N/A |
+| `historyStats.ts` last7/last30 dedup | 3 new tests added to `historyStats.test.ts` | All passing |
+| `expressionEval.ts` unknown-var dev warning | 5 new tests (var warning) + 3 new tests (parsePrimary warning) | All passing |
+
+### Tests Added
+
+#### `src/lib/__tests__/historyStats.test.ts` — 3 new tests
+
+| Test | Description |
+|---|---|
+| `last7Completed deduplicates complete entries for the same planId__calendarDate` | Two entries for same date count as 1 |
+| `last30Completed deduplicates complete entries for the same planId__calendarDate` | Same dedup for 30-day window |
+| `last7Completed counts distinct complete entries for different dates within the window` | Normal case still counts correctly |
+
+#### `src/lib/__tests__/expressionEval.test.ts` — 8 new tests
+
+`parsePrimary unexpected-token warning` describe block (3 tests):
+| Test | Description |
+|---|---|
+| `returns 0 when a bare comma appears in primary position` | Existing fallback-to-0 behaviour |
+| `emits a console.warn in DEV when an unexpected token is in primary position` | Warning fires in dev |
+| `does NOT warn in production (DEV not set)` | Silent in production |
+
+`unknown variable name evaluator warning` describe block (5 tests):
+| Test | Description |
+|---|---|
+| `returns 0 for an unknown variable (existing behaviour)` | Fallback unchanged |
+| `emits a console.warn in DEV when a variable name is not in ctx.vars` | Warning fires in dev |
+| `does NOT warn for known ctx.vars variables` | Known vars are silent |
+| `does NOT warn for built-in keywords (effort, all_reps, session_complete)` | Built-ins are silent |
+| `does NOT warn in production (DEV not set)` | Silent in production |
+
+### Result
+
+- **Test files:** 35
+- **Tests:** 1262 (1251 baseline + 11 new)
+- **Result:** All passing
+
+---
+
 ## 2026-08-15 Pass
 
 ### Source Changes Validated
