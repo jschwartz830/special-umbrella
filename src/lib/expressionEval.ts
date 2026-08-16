@@ -221,7 +221,12 @@ const FUNCS: Record<string, (...a: number[]) => number> = {
 function evalExpr(expr: Expr, vars: Record<string, number>): number {
   switch (expr.k) {
     case 'num': return expr.v
-    case 'var': return vars[expr.name] ?? 0
+    case 'var': {
+      if (import.meta.env.DEV && !(expr.name in vars)) {
+        console.warn(`[expressionEval] unknown variable '${expr.name}' — check for typos in YAML progression rules`)
+      }
+      return vars[expr.name] ?? 0
+    }
     case 'unary':
       if (expr.op === 'neg') return -evalExpr(expr.x, vars)
       if (expr.op === 'not') return evalExpr(expr.x, vars) === 0 ? 1 : 0

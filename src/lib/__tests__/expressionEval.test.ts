@@ -258,6 +258,73 @@ describe('evaluateExpression', () => {
         )
       })
     })
+
+    describe('parsePrimary unexpected-token warning', () => {
+      beforeEach(() => {
+        vi.stubEnv('DEV', true)
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+      })
+      afterEach(() => {
+        vi.unstubAllEnvs()
+        vi.restoreAllMocks()
+      })
+
+      it('returns 0 when a bare comma appears in primary position (e.g. inside a function call)', () => {
+        // min(,x) — comma before first arg hits parsePrimary before any expr is parsed
+        expect(evaluateExpression('min(,x)', ctx({ x: 5 }))).toBe(0)
+      })
+
+      it('emits a console.warn in DEV when an unexpected token is in primary position', () => {
+        evaluateExpression('min(,x)', ctx({ x: 5 }))
+        expect(console.warn).toHaveBeenCalledWith(
+          expect.stringContaining('unexpected token'),
+        )
+      })
+
+      it('does NOT warn in production (DEV not set)', () => {
+        vi.stubEnv('DEV', false)
+        evaluateExpression('min(,x)', ctx({ x: 5 }))
+        expect(console.warn).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('unknown variable name evaluator warning', () => {
+      beforeEach(() => {
+        vi.stubEnv('DEV', true)
+        vi.spyOn(console, 'warn').mockImplementation(() => {})
+      })
+      afterEach(() => {
+        vi.unstubAllEnvs()
+        vi.restoreAllMocks()
+      })
+
+      it('returns 0 for an unknown variable (existing behaviour)', () => {
+        expect(evaluateExpression('squatt', ctx({ squat: 135 }))).toBe(0)
+      })
+
+      it('emits a console.warn in DEV when a variable name is not in ctx.vars', () => {
+        evaluateExpression('squatt + 1', ctx({ squat: 135 }))
+        expect(console.warn).toHaveBeenCalledWith(
+          expect.stringContaining('squatt'),
+        )
+      })
+
+      it('does NOT warn for known ctx.vars variables', () => {
+        evaluateExpression('squat + 1', ctx({ squat: 135 }))
+        expect(console.warn).not.toHaveBeenCalled()
+      })
+
+      it('does NOT warn for built-in keywords (effort, all_reps, session_complete)', () => {
+        evaluateExpression('effort + all_reps + session_complete', ctx({}, { effort: 3, all_reps: true, session_complete: true }))
+        expect(console.warn).not.toHaveBeenCalled()
+      })
+
+      it('does NOT warn in production (DEV not set)', () => {
+        vi.stubEnv('DEV', false)
+        evaluateExpression('squatt', ctx({ squat: 135 }))
+        expect(console.warn).not.toHaveBeenCalled()
+      })
+    })
   })
 })
 
