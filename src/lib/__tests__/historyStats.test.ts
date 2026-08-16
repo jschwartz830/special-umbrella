@@ -289,6 +289,39 @@ describe('computeHistoryStats', () => {
     expect(s.totalLogged).toBe(2)
     expect(s.totalCompleted).toBe(1)
   })
+
+  // ── last7/last30Completed deduplication ────────────────────────────────────
+
+  it('last7Completed deduplicates complete entries for the same planId__calendarDate', () => {
+    // Two entries for the same date (e.g. from a CSV re-import) — should count as 1.
+    const entries = [
+      entry('2026-04-17', 'complete'),
+      { ...entry('2026-04-17', 'complete'), id: 'e2', createdAt: '2026-04-17T18:00:00Z' },
+      entry('2026-04-16', 'complete'),
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.last7Completed).toBe(2) // 4/17 and 4/16, not 3
+  })
+
+  it('last30Completed deduplicates complete entries for the same planId__calendarDate', () => {
+    const entries = [
+      entry('2026-04-17', 'complete'),
+      { ...entry('2026-04-17', 'complete'), id: 'e2', createdAt: '2026-04-17T18:00:00Z' },
+      entry('2026-03-20', 'complete'), // inside 30-day window
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.last30Completed).toBe(2) // 4/17 and 3/20, not 3
+  })
+
+  it('last7Completed counts distinct complete entries for different dates within the window', () => {
+    const entries = [
+      entry('2026-04-17', 'complete'),
+      entry('2026-04-16', 'complete'),
+      entry('2026-04-15', 'complete'),
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.last7Completed).toBe(3)
+  })
 })
 
 // ── computePlanProgress ───────────────────────────────────────────────────────

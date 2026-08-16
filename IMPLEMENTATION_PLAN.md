@@ -134,3 +134,36 @@ The original signature `(allSets, completedSets)` ran the `completed` check over
 | P4 (`parseWorkoutInstanceId` doc) | Implemented 2026-08-14 | Done |
 | P5 (`totalLogged` dedup) | Implemented 2026-08-15 (change 3 above) | Done |
 | P6 (calendar week start) | Recommendation only — not implemented | Open |
+
+---
+
+## Additions — 2026-08-16
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `CalendarPage`: preserve jump override when marking a jumped date as `day_off` | Bug fix | `src/pages/CalendarPage.tsx` |
+| 2 | `computeHistoryStats`: deduplicate `last7Completed` / `last30Completed` by `planId__calendarDate` | Defensive fix | `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts` |
+| 3 | `expressionEval`: warn in dev when YAML progression rule references unknown variable | DX improvement | `src/lib/expressionEval.ts`, `src/lib/__tests__/expressionEval.test.ts` |
+
+### Detail
+
+**1. CalendarPage jump-override day_off bug**
+`logForDate` guarded the jump re-add with `action !== 'day_off'`, so marking a previously-jumped date as day_off silently dropped the jump. The rotation engine would then advance from the pre-jump plan day index for all subsequent dates, causing every day after to show the wrong workout. Fix: remove the `action !== 'day_off'` exclusion.
+
+**2. `last7/last30Completed` dedup**
+`totalCompleted` already deduped by `planId__calendarDate` (added 2026-08-15), but the windowed counts did not. A re-imported CSV could inflate the 7-day and 30-day stats while leaving the all-time stat correct. Fix mirrors the `totalCompleted` pattern exactly.
+
+**3. Unknown-variable dev warning**
+Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silently evaluate to 0, making the rule appear to do nothing. A `console.warn` behind `import.meta.env.DEV` surfaces these immediately without any production behaviour change. Built-in variables (`effort`, `all_reps`, `session_complete`) are always in `vars` so they never trigger the warning.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| Calendar week start configurable | Recommendation only — requires settings infrastructure |
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of 1150-line component |
+| `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| Cloud sync conflict resolution | Out of scope |

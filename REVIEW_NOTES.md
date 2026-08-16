@@ -1,5 +1,33 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-08-15
+**Date:** 2026-08-16
+**Branch:** `claude/serene-cori-8em73i`
+
+---
+
+## Executive Summary (2026-08-16 pass)
+
+1. **What changed:** Three targeted fixes — a CalendarPage jump-override rotation bug, a `last7/last30Completed` dedup fix, and a dev-mode warning for unknown YAML variables. Also resolved a pre-existing TypeScript error (TS2554) in `progression.ts` from an incomplete 2026-08-15 refactor. Test count: 1251 → 1262 (+11 new tests).
+
+2. **Highest confidence:** The `last7/last30Completed` dedup fix — it's a one-line change mirroring the identical pattern used 4 lines earlier for `totalCompleted`. Three new tests cover the edge case. The `expressionEval` dev warning is dev-only with no production behaviour change.
+
+3. **What is risky:** The CalendarPage `logForDate` fix is the most subtle change. It restores a jump override during `day_off` logging that was previously dropped. The logic is correct (a day_off doesn't undo the jump target), but the CalendarPage has no unit tests — manual verification of the retroactive logging flow is needed.
+
+4. **What to review first:** Mark a previously-jumped calendar date as Day Off and confirm the next day still shows the jumped-to workout in sequence. Also confirm that marking a non-jumped date as Day Off still works correctly.
+
+---
+
+## Improvements Completed (2026-08-16)
+
+| # | Description | Commit |
+|---|---|---|
+| 0 | `fix(progression)`: remove stale extra arg from allSetsHitTarget call (TS2554) | `20854aa` |
+| 1 | `fix(calendar)`: preserve jump override when marking a jumped date as day_off | `9c50d73` |
+| 2 | `fix(historyStats)`: deduplicate last7/last30Completed by planId__calendarDate | `6ae59c0` |
+| 3 | `feat(expressionEval)`: warn in dev when YAML progression rule references unknown variable | `c1ac228` |
+
+---
+
+## Previous Pass Notes (2026-08-15)
 **Branch:** `claude/serene-cori-t6hvf0`
 
 ---
