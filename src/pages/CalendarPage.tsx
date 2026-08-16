@@ -143,7 +143,7 @@ export function CalendarPage() {
 
     removeRetroJumpForDate(plan.id, rd.calendarDate)
 
-    if (action !== 'day_off' && (hadJump || selectedPlanDayIdx !== rd.planDayIndex)) {
+    if (hadJump || selectedPlanDayIdx !== rd.planDayIndex) {
       addOverride({
         planId: plan.id,
         type: 'jump',
