@@ -513,9 +513,15 @@ export function computeWorkoutTypeBreakdown(
     durationSums.set(type, cur)
   }
 
-  // ── Rotation entries ──────────────────────────────────────────────────────
+  // ── Rotation entries (dedup by planId+date, newest createdAt wins) ──────────
+  const entryMap = new Map<string, HistoryEntry>()
   for (const e of entries) {
     if (!inRange(e.calendarDate)) continue
+    const key = `${e.planId}__${e.calendarDate}`
+    const existing = entryMap.get(key)
+    if (!existing || e.createdAt > existing.createdAt) entryMap.set(key, e)
+  }
+  for (const e of entryMap.values()) {
     if (e.action === 'day_off') continue
     if (e.planDayIndex === undefined || !planDaysById) continue
 
@@ -797,6 +803,37 @@ export function computePlanStreak(
   return streak
 }
 
+/**
+ * Compute the longest consecutive-day streak ever recorded for a single plan
+ * (or across all plans when `planId` is null).
+ *
+ * Uses the same streakable-date rules as `computePlanStreak` but walks the
+ * full sorted history rather than just backward from today.
+ *
+ * Returns 0 when there are no qualifying dates.
+ */
+export function computeLongestPlanStreak(
+  planId: string | null,
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  today: string,
+  additionalDates?: Set<string>,
+): number {
+  const streakable = getStreakDatesSet(entries, extras, planId, additionalDates)
+  const sortedDates = [...streakable].filter(d => d <= today).sort()
+  let longest = 0
+  let runLen = 0
+  for (let i = 0; i < sortedDates.length; i++) {
+    if (i === 0 || dateDiffDays(sortedDates[i - 1], sortedDates[i]) === 1) {
+      runLen++
+    } else {
+      runLen = 1
+    }
+    if (runLen > longest) longest = runLen
+  }
+  return longest
+}
+
 // ── Current streak date set ───────────────────────────────────────────────────
 
 /**
@@ -966,9 +1003,16 @@ export function computeWeeklyBreakdown(
     return weekMap.get(weekStart)!
   }
 
+  // Dedup rotation entries by calendarDate — multiple entries for the same date
+  // can exist in the store; keep only the newest (highest createdAt) per date.
+  const dateMap = new Map<string, HistoryEntry>()
   for (const e of entries) {
     if (e.planId !== planId) continue
     if (e.calendarDate < fromDate || e.calendarDate > toDate) continue
+    const existing = dateMap.get(e.calendarDate)
+    if (!existing || e.createdAt > existing.createdAt) dateMap.set(e.calendarDate, e)
+  }
+  for (const e of dateMap.values()) {
     const week = getOrCreate(isoWeekStart(e.calendarDate))
     if (e.action === 'complete') week.completed++
     else if (e.action === 'skip') week.skipped++

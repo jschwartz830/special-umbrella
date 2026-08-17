@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags, buildPRFlagsMap, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeLongestPlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags, buildPRFlagsMap, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -907,6 +907,39 @@ describe('computeWorkoutTypeBreakdown', () => {
     const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
     expect(result.weightlifting?.avgDurationMin).toBeNull()
   })
+
+  it('dedup: only the newest entry per (planId, date) is counted', () => {
+    // Older entry = complete, newer = skip → should count as 1 skip, not 1 complete + 1 skip
+    const entries: HistoryEntry[] = [
+      { ...makeEntry('2026-05-01', 'complete', 0), id: 'me-old', createdAt: '2026-05-01T08:00:00Z' },
+      { ...makeEntry('2026-05-01', 'skip',     0), id: 'me-new', createdAt: '2026-05-01T18:00:00Z' },
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.weightlifting?.completed).toBe(0)
+    expect(result.weightlifting?.skipped).toBe(1)
+  })
+
+  it('dedup: two complete entries for the same (planId, date) count as one completed', () => {
+    const entries: HistoryEntry[] = [
+      { ...makeEntry('2026-05-01', 'complete', 0), id: 'me-a', createdAt: '2026-05-01T06:00:00Z' },
+      { ...makeEntry('2026-05-01', 'complete', 0), id: 'me-b', createdAt: '2026-05-01T20:00:00Z' },
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.weightlifting?.completed).toBe(1)
+  })
+
+  it('dedup: different plans on the same date are NOT deduped against each other', () => {
+    // plan-1 and plan-2 each have a complete entry on the same date → 2 total completes
+    const entries: HistoryEntry[] = [
+      { ...makeEntry('2026-05-01', 'complete', 0, 'plan-1'), id: 'me-p1', createdAt: '2026-05-01T10:00:00Z' },
+      { ...makeEntry('2026-05-01', 'complete', 0, 'plan-2'), id: 'me-p2', createdAt: '2026-05-01T10:00:00Z' },
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.weightlifting?.completed).toBe(2)
+  })
 })
 
 // ── countPastUnloggedDays ─────────────────────────────────────────────────────
@@ -1470,6 +1503,169 @@ describe('computePlanStreak', () => {
     const withOmit = computePlanStreak('plan-1', entries, [], TODAY)
     expect(withEmpty).toBe(withOmit)
   })
+})
+
+// ── computeLongestPlanStreak ───────────────────────────────────────────────────
+
+describe('computeLongestPlanStreak', () => {
+  const TODAY = '2026-05-12'
+
+  function planEntry(
+    date: string,
+    action: HistoryEntry['action'],
+    planId = 'plan-1',
+  ): HistoryEntry {
+    return {
+      id: `lps-${planId}-${date}-${action}`,
+      planId,
+      calendarDate: date,
+      planDayIndex: action === 'day_off' ? undefined : 0,
+      action,
+      createdAt: `${date}T12:00:00Z`,
+    }
+  }
+
+  function planExtra(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+    return {
+      id: `lpe-${planId}-${date}`,
+      planId,
+      calendarDate: date,
+      workoutType: 'yoga',
+      workoutName: 'Yoga',
+      createdAt: `${date}T12:30:00Z`,
+    }
+  }
+
+  it('returns 0 with no entries', () => {
+    expect(computeLongestPlanStreak('plan-1', [], [], TODAY)).toBe(0)
+  })
+
+  it('returns 1 for a single qualifying date', () => {
+    const entries = [planEntry('2026-05-10', 'complete')]
+    expect(computeLongestPlanStreak('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('returns the length of a single consecutive run', () => {
+    const entries = [
+      planEntry('2026-05-08', 'complete'),
+      planEntry('2026-05-09', 'complete'),
+      planEntry('2026-05-10', 'complete'),
+    ]
+    expect(computeLongestPlanStreak('plan-1', entries, [], TODAY)).toBe(3)
+  })
+
+  it('returns the longer of two separate runs', () => {
+    // Run 1: May 1–3 (3 days); gap; Run 2: May 7–9 (3 days) — equal, returns 3.
+    // Now make run 1 longer: May 1–4 (4 days) vs May 7–9 (3 days)
+    const entries = [
+      planEntry('2026-05-01', 'complete'),
+      planEntry('2026-05-02', 'complete'),
+      planEntry('2026-05-03', 'complete'),
+      planEntry('2026-05-04', 'complete'),
+      // gap
+      planEntry('2026-05-07', 'complete'),
+      planEntry('2026-05-08', 'complete'),
+      planEntry('2026-05-09', 'complete'),
+    ]
+    expect(computeLongestPlanStreak('plan-1', entries, [], TODAY)).toBe(4)
+  })
+
+  it('a gap of 2 days splits a streak', () => {
+    const entries = [
+      planEntry('2026-05-01', 'complete'),
+      planEntry('2026-05-02', 'complete'),
+      // 2026-05-03 missing
+      planEntry('2026-05-04', 'complete'),
+    ]
+    expect(computeLongestPlanStreak('plan-1', entries, [], TODAY)).toBe(2)
+  })
+
+  it('day_off counts toward streak', () => {
+    const entries = [
+      planEntry('2026-05-08', 'complete'),
+      planEntry('2026-05-09', 'day_off'),
+      planEntry('2026-05-10', 'complete'),
+    ]
+    expect(computeLongestPlanStreak('plan-1', entries, [], TODAY)).toBe(3)
+  })
+
+  it('skip alone does NOT extend a streak', () => {
+    const entries = [
+      planEntry('2026-05-08', 'complete'),
+      planEntry('2026-05-09', 'skip'),
+      planEntry('2026-05-10', 'complete'),
+    ]
+    // May 9 is skip only → breaks streak; runs of 1+1
+    expect(computeLongestPlanStreak('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('extras count toward streak', () => {
+    const extras = [
+      planExtra('2026-05-08'),
+      planExtra('2026-05-09'),
+      planExtra('2026-05-10'),
+    ]
+    expect(computeLongestPlanStreak('plan-1', [], extras, TODAY)).toBe(3)
+  })
+
+  it('future dates are excluded', () => {
+    const entries = [
+      planEntry('2026-05-10', 'complete'),
+      planEntry('2026-05-11', 'complete'),
+      planEntry(TODAY, 'complete'),
+      planEntry('2026-05-13', 'complete'), // future
+      planEntry('2026-05-14', 'complete'), // future
+    ]
+    // Only up to today counts → longest is 3 (May 10–12)
+    expect(computeLongestPlanStreak('plan-1', entries, [], TODAY)).toBe(3)
+  })
+
+  it('ignores entries for other plans when planId is given', () => {
+    const entries = [
+      planEntry('2026-05-08', 'complete', 'plan-2'),
+      planEntry('2026-05-09', 'complete', 'plan-2'),
+      planEntry('2026-05-10', 'complete', 'plan-1'),
+    ]
+    expect(computeLongestPlanStreak('plan-1', entries, [], TODAY)).toBe(1)
+  })
+
+  it('planId null aggregates across all plans', () => {
+    const entries = [
+      planEntry('2026-05-08', 'complete', 'plan-1'),
+      planEntry('2026-05-09', 'complete', 'plan-2'),
+      planEntry('2026-05-10', 'complete', 'plan-1'),
+    ]
+    // With planId=null all three dates qualify → longest streak = 3
+    expect(computeLongestPlanStreak(null, entries, [], TODAY)).toBe(3)
+  })
+
+  it('longest streak >= current streak always', () => {
+    const entries = [
+      planEntry('2026-04-01', 'complete'),
+      planEntry('2026-04-02', 'complete'),
+      planEntry('2026-04-03', 'complete'),
+      planEntry('2026-04-04', 'complete'),
+      // gap
+      planEntry(TODAY, 'complete'),
+    ]
+    const current = computePlanStreak('plan-1', entries, [], TODAY)
+    const longest = computeLongestPlanStreak('plan-1', entries, [], TODAY)
+    expect(longest).toBeGreaterThanOrEqual(current)
+    expect(longest).toBe(4)
+    expect(current).toBe(1)
+  })
+
+  it('equals current streak when the active streak is the all-time best', () => {
+    const entries = [
+      planEntry('2026-05-10', 'complete'),
+      planEntry('2026-05-11', 'complete'),
+      planEntry(TODAY, 'complete'),
+    ]
+    const current = computePlanStreak('plan-1', entries, [], TODAY)
+    const longest = computeLongestPlanStreak('plan-1', entries, [], TODAY)
+    expect(longest).toBe(current)
+    expect(longest).toBe(3)
+  })
 
   it('additionalDates: future dates do not extend the streak', () => {
     // The backward walk from today can never reach a future date.
@@ -1755,6 +1951,30 @@ describe('computeWeeklyBreakdown', () => {
     const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-05', '2026-01-05')
     expect(result).toHaveLength(1)
     expect(result[0].completed).toBe(1)
+  })
+
+  it('dedup: only the newest entry per calendarDate is counted', () => {
+    // Two entries for the same date — newer one is 'skip', older is 'complete'
+    const entries: HistoryEntry[] = [
+      { ...weekEntry('2026-01-05', 'complete'), id: 'we-old', createdAt: '2026-01-05T08:00:00Z' },
+      { ...weekEntry('2026-01-05', 'skip'),    id: 'we-new', createdAt: '2026-01-05T18:00:00Z' },
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    expect(result[0].completed).toBe(0)
+    expect(result[0].skipped).toBe(1)
+    expect(result[0].totalLogged).toBe(1)
+  })
+
+  it('dedup: two complete entries for the same date count as one, not two', () => {
+    const entries: HistoryEntry[] = [
+      { ...weekEntry('2026-01-07', 'complete'), id: 'we-a', createdAt: '2026-01-07T06:00:00Z' },
+      { ...weekEntry('2026-01-07', 'complete'), id: 'we-b', createdAt: '2026-01-07T20:00:00Z' },
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    expect(result[0].completed).toBe(1)
+    expect(result[0].totalLogged).toBe(1)
   })
 })
 
