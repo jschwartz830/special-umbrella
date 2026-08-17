@@ -29,7 +29,7 @@ import { completionStateToAction } from '../modules/workout-outcomes/types'
 import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../modules/recommendation/explanation'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeLongestPlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek } from '../lib/historyStats'
 import type { WorkoutCompletionRate } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, WorkoutSlot } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../modules/workout-outcomes/types'
@@ -291,6 +291,10 @@ export function TodayPage() {
   // Same computation as earlyPlanStreak above (mobility dates included) — reuse it
   // rather than recomputing now that both use the same inputs.
   const planStreak = earlyPlanStreak
+  const longestPlanStreak = useMemo(
+    () => (plan ? computeLongestPlanStreak(null, allEntries, extraEntries, today, mobilityDateSet) : 0),
+    [plan, allEntries, extraEntries, today, mobilityDateSet],
+  )
   const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
 
   // Collect recent past days with no entry — used to show the stall nudge.
@@ -1022,6 +1026,7 @@ export function TodayPage() {
           totalCompleted={stats.totalCompleted}
           planCompletionPercent={planCompletionPercent}
           planStreak={planStreak}
+          longestPlanStreak={longestPlanStreak}
           weekProgress={weekProgress}
           cycleProgress={cycleProgress}
           planDurationType={plan.duration.type}

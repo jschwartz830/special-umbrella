@@ -6,6 +6,7 @@ interface TodayPlanProgressModalProps {
   totalCompleted: number
   planCompletionPercent: number
   planStreak: number
+  longestPlanStreak: number
   weekProgress: { completed: number; total: number } | null
   cycleProgress: RotationCycleProgress | null
   planDurationType: string
@@ -22,6 +23,7 @@ export function TodayPlanProgressModal({
   totalCompleted,
   planCompletionPercent,
   planStreak,
+  longestPlanStreak,
   weekProgress,
   cycleProgress,
   planDurationType,
@@ -51,6 +53,14 @@ export function TodayPlanProgressModal({
               🔥 {planStreak} day{planStreak === 1 ? '' : 's'}
             </span>
           </div>
+          {longestPlanStreak > 0 && (
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm text-slate-400">Longest streak</span>
+              <span className="text-sm font-semibold text-white">
+                🏆 {longestPlanStreak} day{longestPlanStreak === 1 ? '' : 's'}
+              </span>
+            </div>
+          )}
           {weekProgress && (
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-sm text-slate-400">Weeks elapsed</span>
