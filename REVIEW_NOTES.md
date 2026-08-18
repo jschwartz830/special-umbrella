@@ -1,5 +1,31 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-08-16
+**Date:** 2026-08-18
+**Branch:** `claude/serene-cori-5e9ub6`
+
+---
+
+## Executive Summary (2026-08-18 pass)
+
+1. **What changed:** Two targeted dedup fixes in `historyStats.ts` — `computeWeeklyBreakdown` and `computeWorkoutTypeBreakdown` now apply newest-`createdAt`-wins dedup on rotation entries, matching the existing pattern in five other stats functions. One defensive null-safety fix in `planStore.ts` guards `migratePlanState` against corrupted persisted state. Test count: 1262 → 1267 (+5 new tests).
+
+2. **Highest confidence:** The dedup fixes — they apply an identical pattern already proven by `computeWorkoutCompletionRate`, `computeHistoryStats`, and `computePlanProgress` in the same file. The logic is symmetric, the tests are direct, and the change only activates when duplicate entries exist (which is already prevented at the store layer).
+
+3. **What is risky:** Nothing in this pass is risky. The `planStore` null guard only activates on data that would otherwise throw — it has no effect on valid plans.
+
+4. **What to review first:** Run the app with a plan that has many history entries and verify the weekly breakdown chart and type breakdown still display correctly. Both functions now skip earlier duplicates (keeping newest), which is the same behavior as the completion-rate chart.
+
+---
+
+## Improvements Completed (2026-08-18)
+
+| # | Description | Commit |
+|---|---|---|
+| 1 | `fix(historyStats)`: deduplicate `computeWeeklyBreakdown` and `computeWorkoutTypeBreakdown` rotation entries (+5 tests) | `e7283cb` |
+| 2 | `fix(planStore)`: null-safety guard in `migratePlanState` for missing `days`/`slots` | `cf417ba` |
+
+---
+
+## Previous Pass Notes (2026-08-16)
 **Branch:** `claude/serene-cori-8em73i`
 
 ---

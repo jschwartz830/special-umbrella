@@ -2,6 +2,43 @@
 
 ---
 
+## 2026-08-18 Pass
+
+### Source Changes Validated
+
+| Change | Tests affected | Result |
+|---|---|---|
+| `historyStats.ts` `computeWeeklyBreakdown` dedup | 3 new tests added to `historyStats.test.ts` | All passing |
+| `historyStats.ts` `computeWorkoutTypeBreakdown` dedup | 2 new tests added to `historyStats.test.ts` | All passing |
+| `planStore.ts` `migratePlanState` null guard | Covered by existing planStore tests | All passing |
+
+### Tests Added
+
+#### `src/lib/__tests__/historyStats.test.ts` — 5 new tests
+
+`computeWeeklyBreakdown` dedup block (3 tests):
+
+| Test | Description |
+|---|---|
+| `deduplicates rotation entries for the same date — newest createdAt wins` | Two complete entries for same date count as 1 |
+| `deduplicates a newer skip over an older complete for the same date` | Newer action wins over older action |
+| `does not deduplicate entries on different dates` | Distinct dates are still counted independently |
+
+`computeWorkoutTypeBreakdown` dedup block (2 tests):
+
+| Test | Description |
+|---|---|
+| `deduplicates rotation entries by (planId, calendarDate) — newest createdAt wins` | Two complete entries for same date count as 1 |
+| `uses the newest rotation entry when older and newer disagree on action` | Newer skip wins over older complete |
+
+### Result
+
+- **Test files:** 35
+- **Tests:** 1267 (1262 baseline + 5 new)
+- **Result:** All passing
+
+---
+
 ## 2026-08-16 Pass
 
 ### Source Changes Validated
