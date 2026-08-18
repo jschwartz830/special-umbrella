@@ -907,6 +907,29 @@ describe('computeWorkoutTypeBreakdown', () => {
     const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
     expect(result.weightlifting?.avgDurationMin).toBeNull()
   })
+
+  it('deduplicates rotation entries by (planId, calendarDate) — newest createdAt wins', () => {
+    // Two 'complete' entries for the same date should count as one.
+    const days = daysMap([{ index: 0, type: 'run' }])
+    const entries: HistoryEntry[] = [
+      { ...makeEntry('2026-04-01', 'complete', 0), id: 'me-old', createdAt: '2026-04-01T08:00:00Z' },
+      { ...makeEntry('2026-04-01', 'complete', 0), id: 'me-new', createdAt: '2026-04-01T18:00:00Z' },
+    ]
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.run?.completed).toBe(1)
+  })
+
+  it('uses the newest rotation entry when older and newer disagree on action', () => {
+    // Older entry is 'complete', newer is 'skip' — should count as 1 skip, not 1 complete.
+    const days = daysMap([{ index: 0, type: 'run' }])
+    const entries: HistoryEntry[] = [
+      { ...makeEntry('2026-04-02', 'complete', 0), id: 'me-old', createdAt: '2026-04-02T08:00:00Z' },
+      { ...makeEntry('2026-04-02', 'skip',     0), id: 'me-new', createdAt: '2026-04-02T18:00:00Z' },
+    ]
+    const result = computeWorkoutTypeBreakdown(entries, [], {}, days)
+    expect(result.run?.completed).toBe(0)
+    expect(result.run?.skipped).toBe(1)
+  })
 })
 
 // ── countPastUnloggedDays ─────────────────────────────────────────────────────
@@ -1755,6 +1778,44 @@ describe('computeWeeklyBreakdown', () => {
     const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-05', '2026-01-05')
     expect(result).toHaveLength(1)
     expect(result[0].completed).toBe(1)
+  })
+
+  it('deduplicates rotation entries for the same date — newest createdAt wins', () => {
+    // Simulate a CSV re-import that added a second 'complete' entry for Jan 5.
+    const entries: HistoryEntry[] = [
+      { ...weekEntry('2026-01-05', 'complete'), id: 'we-old', createdAt: '2026-01-05T10:00:00Z' },
+      { ...weekEntry('2026-01-05', 'complete'), id: 'we-new', createdAt: '2026-01-05T14:00:00Z' },
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    // Should count only 1 completed, not 2.
+    expect(result[0].completed).toBe(1)
+    expect(result[0].totalLogged).toBe(1)
+  })
+
+  it('deduplicates a newer skip over an older complete for the same date', () => {
+    // User re-logged the same day as skip (newer), old entry was complete.
+    const entries: HistoryEntry[] = [
+      { ...weekEntry('2026-01-06', 'complete'), id: 'we-old', createdAt: '2026-01-06T08:00:00Z' },
+      { ...weekEntry('2026-01-06', 'skip'),     id: 'we-new', createdAt: '2026-01-06T16:00:00Z' },
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    expect(result[0].completed).toBe(0)
+    expect(result[0].skipped).toBe(1)
+    expect(result[0].totalLogged).toBe(1)
+  })
+
+  it('does not deduplicate entries on different dates', () => {
+    // Two distinct dates must both be counted.
+    const entries: HistoryEntry[] = [
+      { ...weekEntry('2026-01-05', 'complete'), id: 'we-a', createdAt: '2026-01-05T12:00:00Z' },
+      { ...weekEntry('2026-01-06', 'complete'), id: 'we-b', createdAt: '2026-01-06T12:00:00Z' },
+    ]
+    const result = computeWeeklyBreakdown('plan-1', entries, [], '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    expect(result[0].completed).toBe(2)
+    expect(result[0].totalLogged).toBe(2)
   })
 })
 

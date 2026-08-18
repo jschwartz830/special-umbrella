@@ -2,6 +2,55 @@
 
 ---
 
+## 2026-08-18
+
+### Change 1 — `fix(historyStats): deduplicate rotation entries in computeWeeklyBreakdown`
+
+**Summary:** `computeWeeklyBreakdown` iterated the raw entries array without deduplication. When a plan had duplicate entries for the same calendar date (CSV re-import or cloud-sync write race), weekly counts for `completed`, `skipped`, `dayOffs`, and `totalLogged` were inflated. Applied newest-`createdAt`-wins dedup — the same pattern used by `computeWorkoutCompletionRate`, `computeHistoryStats`, and `computePlanProgress`.
+
+**Why it matters:** The weekly breakdown chart and stats are the primary progress view for returning users. Inflated counts from import duplicates would make a week with 3 real workouts show as 6, with no visible indication of the data error.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — two-pass dedup in `computeWeeklyBreakdown` rotation loop
+- `src/lib/__tests__/historyStats.test.ts` — 3 new tests covering the duplicate-entry edge case
+
+**Risks / tradeoffs:** Zero risk. Dedup is already applied by every other function in the same file; this brings `computeWeeklyBreakdown` into alignment with the established pattern.
+
+**Rollback:** Revert the `fix(historyStats)` commit (`e7283cb`).
+
+---
+
+### Change 2 — `fix(historyStats): deduplicate rotation entries in computeWorkoutTypeBreakdown`
+
+**Summary:** `computeWorkoutTypeBreakdown` had the same raw-entries iteration bug. Duplicate entries for the same (planId, calendarDate) would inflate `completed` and `skipped` counts in the workout-type breakdown. Applied newest-`createdAt`-wins dedup on the rotation entries pass.
+
+**Why it matters:** The workout-type breakdown is used for the history analytics view. A user importing a plan twice would see double counts for every workout type, making their history appear twice as productive.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — two-pass dedup in `computeWorkoutTypeBreakdown` rotation loop
+- `src/lib/__tests__/historyStats.test.ts` — 2 new tests covering the duplicate-entry and action-conflict edge cases
+
+**Risks / tradeoffs:** Zero risk. Same dedup pattern as Change 1 above.
+
+**Rollback:** Revert the `fix(historyStats)` commit (`e7283cb`).
+
+---
+
+### Change 3 — `fix(planStore): guard migratePlanState against null/undefined days and slots`
+
+**Summary:** `migratePlanState` called `.map()` directly on `plan.days` and `day.slots` with no null check. Corrupted persisted state (e.g. a partial cloud hydration or a future import path that omits the `days` field) would throw a TypeError, crashing the store migration and rendering the app non-functional. Added `?? []` guards to both accesses.
+
+**Why it matters:** Store migration runs on every app load from persisted state. A crash here means the plan store fails to initialize, preventing the user from accessing their plans entirely.
+
+**Files changed:**
+- `src/store/planStore.ts` — `(plan.days ?? []).map(...)` and `(day.slots ?? []).map(...)` in `migratePlanState`
+
+**Risks / tradeoffs:** Zero risk. The guard only activates on data that would otherwise throw; valid persisted plans are unaffected.
+
+**Rollback:** Revert the `fix(planStore)` commit (`cf417ba`).
+
+---
+
 ## 2026-08-16
 
 ### Change 1 — `fix(calendar): preserve jump override when marking a jumped date as day_off`

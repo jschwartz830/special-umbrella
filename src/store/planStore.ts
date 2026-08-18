@@ -237,9 +237,9 @@ export function migratePlanState(persisted: unknown): PlanState {
       id,
       {
         ...plan,
-        days: plan.days.map(day => ({
+        days: (plan.days ?? []).map(day => ({
           ...day,
-          slots: day.slots.map(slot => migrateSlot(slot)),
+          slots: (day.slots ?? []).map(slot => migrateSlot(slot)),
         })),
       },
     ]),

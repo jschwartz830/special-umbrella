@@ -514,7 +514,17 @@ export function computeWorkoutTypeBreakdown(
   }
 
   // ── Rotation entries ──────────────────────────────────────────────────────
+  // Deduplicate by (planId, calendarDate) — mirrors computeWorkoutCompletionRate.
+  // Newest createdAt wins when duplicates exist from import or sync races.
+  const rotationByKey = new Map<string, HistoryEntry>()
   for (const e of entries) {
+    const key = `${e.planId}__${e.calendarDate}`
+    const existing = rotationByKey.get(key)
+    if (!existing || e.createdAt > existing.createdAt) {
+      rotationByKey.set(key, e)
+    }
+  }
+  for (const e of rotationByKey.values()) {
     if (!inRange(e.calendarDate)) continue
     if (e.action === 'day_off') continue
     if (e.planDayIndex === undefined || !planDaysById) continue
@@ -966,9 +976,19 @@ export function computeWeeklyBreakdown(
     return weekMap.get(weekStart)!
   }
 
+  // Deduplicate rotation entries by calendarDate — mirrors computeWorkoutCompletionRate.
+  // A bad CSV import or cloud-sync race can leave two entries for the same date; counting
+  // both would inflate weekly breakdown counts. Newest createdAt wins.
+  const rotationByDate = new Map<string, HistoryEntry>()
   for (const e of entries) {
     if (e.planId !== planId) continue
     if (e.calendarDate < fromDate || e.calendarDate > toDate) continue
+    const existing = rotationByDate.get(e.calendarDate)
+    if (!existing || e.createdAt > existing.createdAt) {
+      rotationByDate.set(e.calendarDate, e)
+    }
+  }
+  for (const e of rotationByDate.values()) {
     const week = getOrCreate(isoWeekStart(e.calendarDate))
     if (e.action === 'complete') week.completed++
     else if (e.action === 'skip') week.skipped++
