@@ -1,5 +1,32 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-08-18
+**Date:** 2026-08-19
+**Branch:** `claude/serene-cori-yi37e7`
+
+---
+
+## Executive Summary (2026-08-19 pass)
+
+1. **What changed:** One bug fix (`findPreviousSessionForPlanDay` no longer leaks future-dated entries as "Last session" data), one perf fix (`avgWorkoutsPerWeek` now memoized), and one additive feature ("Workouts remaining" surfaced in the Plan Progress modal for rotation plans). Test count: 1267 → 1268 (+1 new test for the bug fix).
+
+2. **Highest confidence:** The `findPreviousSessionForPlanDay` fix is a direct one-character change (`!==` → `<`) with a covering test and no side effects on the `buildLastSessionSummary` path. The `useMemo` wrap is an identical pattern to three adjacent calls in `TodayPage`. The "Workouts remaining" feature is purely additive — the function already existed, was already tested, and the new row is hidden when `rotationPlanRemaining` is null (i.e., for all weeks plans).
+
+3. **What is risky:** Nothing in this pass is risky. All three changes are either narrowly scoped fixes or purely additive.
+
+4. **What to review first:** Open the Plan Progress modal for an active rotation-duration plan and verify the "Workouts remaining" row appears with the correct count. Verify it is absent for a weeks-duration plan. Verify the Today view's "Last session" hint does not show future-dated data when entries with `calendarDate > today` exist (can be created via CSV import).
+
+---
+
+## Improvements Completed (2026-08-19)
+
+| # | Description | Commit |
+|---|---|---|
+| 1 | `fix(sessionSummary)`: exclude future-dated entries from `findPreviousSessionForPlanDay` (+1 test) | TBD |
+| 2 | `perf(TodayPage)`: memoize `computeAverageWorkoutsPerWeek` call | TBD |
+| 3 | `feat(TodayPlanProgressModal)`: surface "Workouts remaining" for rotation plans | TBD |
+
+---
+
+## Previous Pass Notes (2026-08-18)
 **Branch:** `claude/serene-cori-5e9ub6`
 
 ---

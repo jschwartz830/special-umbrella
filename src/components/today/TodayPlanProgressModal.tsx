@@ -15,6 +15,8 @@ interface TodayPlanProgressModalProps {
   consecutiveSkips: number
   /** Average active workout sessions per week since plan start. null before any sessions exist. */
   avgWorkoutsPerWeek: number | null
+  /** Workouts remaining in a rotation plan. null for weeks plans or before any data exists. */
+  rotationPlanRemaining: number | null
   onClose: () => void
 }
 
@@ -30,6 +32,7 @@ export function TodayPlanProgressModal({
   workoutCompletionRate,
   consecutiveSkips,
   avgWorkoutsPerWeek,
+  rotationPlanRemaining,
   onClose,
 }: TodayPlanProgressModalProps) {
   return (
@@ -72,6 +75,14 @@ export function TodayPlanProgressModal({
               <span className="text-sm text-slate-400">Plan length</span>
               <span className="text-sm font-semibold text-white">
                 {planDurationValue} rotation{planDurationValue === 1 ? '' : 's'}
+              </span>
+            </div>
+          )}
+          {rotationPlanRemaining !== null && (
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm text-slate-400">Workouts remaining</span>
+              <span className="text-sm font-semibold text-white">
+                {rotationPlanRemaining === 0 ? 'Done' : rotationPlanRemaining}
               </span>
             </div>
           )}

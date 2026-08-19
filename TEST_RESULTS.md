@@ -2,6 +2,34 @@
 
 ---
 
+## 2026-08-19 Pass
+
+### Source Changes Validated
+
+| Change | Tests affected | Result |
+|---|---|---|
+| `sessionSummary.ts` future-date exclusion fix | 1 new test added to `sessionSummary.test.ts` | All passing |
+| `TodayPage.tsx` `avgWorkoutsPerWeek` memoization | No behaviour change — covered by existing stats tests | All passing |
+| `TodayPlanProgressModal.tsx` + `TodayPage.tsx` rotation remaining | No dedicated unit test (UI component) | N/A — manual |
+
+### Tests Added
+
+#### `src/lib/__tests__/sessionSummary.test.ts` — 1 new test
+
+`findPreviousSessionForPlanDay` block:
+
+| Test | Description |
+|---|---|
+| `excludes future-dated entries (calendarDate > currentDate)` | A future-dated entry with matching planDayIndex is not returned as "Last session" |
+
+### Result
+
+- **Test files:** 35
+- **Tests:** 1268 (1267 baseline + 1 new)
+- **Result:** All passing
+
+---
+
 ## 2026-08-18 Pass
 
 ### Source Changes Validated

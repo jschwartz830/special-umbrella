@@ -167,3 +167,36 @@ Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silentl
 | `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
 | Cloud sync conflict resolution | Out of scope |
+
+---
+
+## Additions — 2026-08-19
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `findPreviousSessionForPlanDay`: exclude future-dated entries | Bug fix | `src/lib/sessionSummary.ts`, `src/lib/__tests__/sessionSummary.test.ts` |
+| 2 | `TodayPage`: wrap `computeAverageWorkoutsPerWeek` in `useMemo` | Perf fix | `src/pages/TodayPage.tsx` |
+| 3 | `TodayPlanProgressModal`: surface `computeRotationPlanRemaining` as "Workouts remaining" | Feature | `src/pages/TodayPage.tsx`, `src/components/today/TodayPlanProgressModal.tsx` |
+
+### Detail
+
+**1. `findPreviousSessionForPlanDay` future-date bug**
+`findPreviousSessionForPlanDay` filtered with `e.calendarDate !== currentDate`, which correctly excluded today but allowed future-dated entries through. A CSV import with an erroneously future-dated entry for the same `planDayIndex` would appear as the "Last session" data shown on the Today view. Fix: change the predicate to `e.calendarDate < currentDate` so all present and future dates are excluded. One test added covering the future-date case.
+
+**2. `avgWorkoutsPerWeek` useMemo**
+`computeAverageWorkoutsPerWeek` scans all history entries and extras for every render of `TodayPage`. Previous audit passes documented this as a recommendation (R3) but did not implement it. The fix wraps the call in `useMemo` with deps `[plan.id, planEntries, planExtras, plan.startDate, today]`, consistent with the memoization pattern used by the nearby `rotationLoggedCount` computation. No behaviour change.
+
+**3. "Workouts remaining" in Plan Progress modal**
+`computeRotationPlanRemaining` was implemented and tested in the stats layer but never surfaced in the UI. The Plan Progress modal (opened by tapping the ring on the Today view) now shows a "Workouts remaining" row for rotation-duration plans. Returns `'Done'` when the count reaches 0. No change for weeks-duration plans (prop is null, row is hidden). Implementation: compute in `TodayPage`, pass as `rotationPlanRemaining` prop to `TodayPlanProgressModal`.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| Calendar week start configurable | Recommendation only — requires settings infrastructure |
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1160-line component |
+| `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| Cloud sync conflict resolution | Out of scope |
