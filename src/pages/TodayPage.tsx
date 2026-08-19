@@ -29,7 +29,7 @@ import { completionStateToAction } from '../modules/workout-outcomes/types'
 import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../modules/recommendation/explanation'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek, computeRotationPlanRemaining } from '../lib/historyStats'
 import type { WorkoutCompletionRate } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, WorkoutSlot } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../modules/workout-outcomes/types'
@@ -300,7 +300,10 @@ export function TodayPage() {
 
   const loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)
   const workoutCompletionRate: WorkoutCompletionRate = computeWorkoutCompletionRate(plan.id, planEntries, today)
-  const avgWorkoutsPerWeek = computeAverageWorkoutsPerWeek(plan.id, planEntries, planExtras, plan.startDate, today)
+  const avgWorkoutsPerWeek = useMemo(
+    () => computeAverageWorkoutsPerWeek(plan.id, planEntries, planExtras, plan.startDate, today),
+    [plan.id, planEntries, planExtras, plan.startDate, today],
+  )
 
   const weekProgress = plan.duration.type === 'weeks'
     ? computePlanProgress(plan, planEntries, today)
@@ -321,6 +324,11 @@ export function TodayPage() {
   // Cycle progress for rotation-duration plans (null for weeks-duration plans)
   const cycleProgress = plan.duration.type === 'rotations'
     ? computeRotationCycleProgress(plan, planEntries, today)
+    : null
+
+  // Remaining workouts for rotation plans — shown in the Plan Progress modal
+  const rotationPlanRemaining = plan.duration.type === 'rotations'
+    ? computeRotationPlanRemaining(plan, planEntries, today)
     : null
 
   // Plan completion percentage for the ring visual
@@ -1030,6 +1038,7 @@ export function TodayPage() {
           workoutCompletionRate={workoutCompletionRate}
           consecutiveSkips={consecutiveSkips}
           avgWorkoutsPerWeek={avgWorkoutsPerWeek}
+          rotationPlanRemaining={rotationPlanRemaining}
           onClose={() => setShowPlanProgressModal(false)}
         />
       )}
