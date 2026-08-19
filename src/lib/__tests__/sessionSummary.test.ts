@@ -131,6 +131,21 @@ describe('findPreviousSessionForPlanDay', () => {
     expect(findPreviousSessionForPlanDay('p1', 0, '2026-05-02', entries, outcomes)).toBeNull()
   })
 
+  it('excludes future-dated entries (calendarDate > currentDate)', () => {
+    // A bad CSV import could create a future-dated entry for the same planDayIndex.
+    // It must not appear as "Last session" data.
+    const entries = [
+      entry('2026-05-10', 0),  // future — must be excluded
+      entry('2026-05-01', 0),  // past — should be returned
+    ]
+    const outcomes = {
+      'p1_2026-05-10': weightsOutcome('2026-05-10', 'Squat', 999),
+      'p1_2026-05-01': weightsOutcome('2026-05-01', 'Squat', 145),
+    }
+    const result = findPreviousSessionForPlanDay('p1', 0, '2026-05-05', entries, outcomes)
+    expect(result?.workoutInstanceId).toBe('p1_2026-05-01')
+  })
+
   it('falls back to earlier entry when the newest has no outcome', () => {
     const entries = [entry('2026-04-20', 0), entry('2026-04-27', 0)]
     const outcomes = {
