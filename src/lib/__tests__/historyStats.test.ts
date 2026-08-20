@@ -627,9 +627,9 @@ function makeOutcome(
 
 // planDaysById maps planDayIndex → { slots: [{ type }] }
 function daysMap(
-  entries: Array<{ index: number; type: 'weightlifting' | 'long_run' | 'yoga' | 'rest' }>,
-): Map<number, { slots: Array<{ type: 'weightlifting' | 'long_run' | 'yoga' | 'rest' }> }> {
-  const m = new Map<number, { slots: Array<{ type: 'weightlifting' | 'long_run' | 'yoga' | 'rest' }> }>()
+  entries: Array<{ index: number; type: WorkoutType }>,
+): Map<number, { slots: Array<{ type: WorkoutType }> }> {
+  const m = new Map<number, { slots: Array<{ type: WorkoutType }> }>()
   for (const { index, type } of entries) {
     m.set(index, { slots: [{ type }] })
   }

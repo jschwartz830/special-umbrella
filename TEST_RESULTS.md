@@ -2,6 +2,77 @@
 
 ---
 
+## 2026-08-20 Pass
+
+### Source Changes Validated
+
+| Change | Tests affected | Result |
+|---|---|---|
+| `historyStats.test.ts` `daysMap` type annotation fix | 0 new tests — fixes TS2322 compile errors | All passing |
+| `programParser.test.ts` parser coverage expansion | 20 new tests added | All passing |
+
+### Tests Added
+
+#### `src/engine/__tests__/programParser.test.ts` — 20 new tests
+
+`parseDurationSecs` block (4 tests):
+
+| Test | Description |
+|---|---|
+| `parses "45s" to 45 seconds` | String with "s" suffix |
+| `parses "1m" to 60 seconds` | String with "m" suffix |
+| `parses "1.5m" to 90 seconds (rounded)` | Fractional minutes, Math.round |
+| `parses a plain number as seconds` | Plain numeric value |
+
+`coerceWorkoutType` block (4 tests):
+
+| Test | Description |
+|---|---|
+| `maps "rest" to "other" (legacy alias)` | Legacy alias coercion |
+| `maps an unknown type to "other"` | Unknown type fallback |
+| `passes through a valid modern type unchanged` | weights/run/swim passthrough |
+| `passes through legacy types for backward compat` | weightlifting/long_run preserved |
+
+`parseYamlProgram — validation errors` block (7 tests):
+
+| Test | Description |
+|---|---|
+| `returns a YAML parse error for invalid YAML syntax` | Malformed YAML |
+| `returns an error when name is missing` | Required field validation |
+| `returns an error when duration is missing` | Required field validation |
+| `returns an error when days array is empty` | Non-empty days required |
+| `returns an error when a var is a non-numeric string` | Var type validation |
+| `accepts a numeric var without error` | Valid var passes |
+| `returns no errors for a minimal valid program` | Happy path |
+
+`validateYamlProgram` block (2 tests):
+
+| Test | Description |
+|---|---|
+| `returns empty array for a valid program` | Convenience wrapper — valid |
+| `returns error strings for an invalid program` | Convenience wrapper — invalid |
+
+`buildStructureDescription — weights slot` block (2 tests):
+
+| Test | Description |
+|---|---|
+| `summarises exercises as "Name N×reps" joined by ·` | Correct format |
+| `returns undefined for a slot with no exercises` | No exercises → undefined |
+
+`buildStructureDescription — run slot` block (1 test):
+
+| Test | Description |
+|---|---|
+| `summarises segments as "Type → Type" joined by →` | Warmup/Easy → arrow-joined |
+
+### Result
+
+- **Test files:** 35
+- **Tests:** 1288 (1268 baseline + 20 new)
+- **Result:** All passing
+
+---
+
 ## 2026-08-19 Pass
 
 ### Source Changes Validated

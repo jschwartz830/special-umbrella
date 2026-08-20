@@ -1,5 +1,31 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-08-19
+**Date:** 2026-08-20
+**Branch:** `claude/serene-cori-27v4nu`
+
+---
+
+## Executive Summary (2026-08-20 pass)
+
+1. **What changed:** Two quality fixes with no production code changes — (a) a TypeScript type annotation correction in `historyStats.test.ts` that was causing `TS2322` compile errors silently ignored by Vitest's esbuild transform, and (b) 20 new tests for `programParser.ts` paths that were completely uncovered (duration parsing, type coercion, validation errors, `validateYamlProgram`, and `buildStructureDescription`). Test count: 1268 → 1288 (+20 new tests).
+
+2. **Highest confidence:** The `daysMap` fix is a single type annotation update with no runtime effect. The programParser tests are pure additions exercising well-defined parser behaviors via inline YAML — each test is independently self-contained.
+
+3. **What is risky:** Nothing. Both changes are test-only; no production source files were modified.
+
+4. **What to review first:** Run `npx tsc --noEmit` and verify it exits cleanly (previously two TS2322 errors). Run `npx vitest run` and verify the new programParser describe blocks all pass — particularly the `buildStructureDescription` tests, which rely on the parser correctly assembling `structureDescription` from exercises/segments.
+
+---
+
+## Improvements Completed (2026-08-20)
+
+| # | Description | Commit |
+|---|---|---|
+| 1 | `fix(historyStats.test)`: correct `daysMap` type annotation to use `WorkoutType` | `0099f4e` |
+| 2 | `test(programParser)`: add 20 tests for untested parser paths | `0099f4e` |
+
+---
+
+## Previous Pass Notes (2026-08-19)
 **Branch:** `claude/serene-cori-yi37e7`
 
 ---

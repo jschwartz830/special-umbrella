@@ -2,6 +2,38 @@
 
 ---
 
+## 2026-08-20
+
+### Change 1 — `fix(historyStats.test): correct daysMap type annotation to use WorkoutType`
+
+**Summary:** The `daysMap` helper in `historyStats.test.ts` (used by `computeWorkoutTypeBreakdown` tests) had a hardcoded type union `'weightlifting' | 'long_run' | 'yoga' | 'rest'` that was never updated when `'run'` was added as a modern `WorkoutType`. Tests at lines 913 and 924 passed `type: 'run'` to `daysMap`, producing `TS2322` compile errors. Vitest's `esbuild` transform silently ignores TypeScript errors, so the tests passed at runtime but were type-incorrect. Fixed by updating the helper's parameter and return types to use the imported `WorkoutType` union.
+
+**Why it matters:** `npx tsc --noEmit` was failing silently — any developer running type-checking in CI would see two errors. The `daysMap` helper is used in the tests for one of the six stats functions that affects the workout-type breakdown chart.
+
+**Files changed:**
+- `src/lib/__tests__/historyStats.test.ts` — `daysMap` helper uses `WorkoutType` instead of hardcoded union
+
+**Risks / tradeoffs:** Zero risk. A type annotation change in a test helper only affects compile-time checking.
+
+**Rollback:** Revert the associated commit.
+
+---
+
+### Change 2 — `test(programParser): add 20 tests for untested parser paths`
+
+**Summary:** `programParser.test.ts` had only 6 tests, all targeting the `mobilityExercises` parsing path. Large portions of the parser — duration string parsing, workout type coercion, YAML validation errors, the `validateYamlProgram` convenience wrapper, and `buildStructureDescription` — were completely untested. Added 20 new tests across 6 new describe blocks exercising all of these paths via inline YAML strings (preserving the black-box testing style of the existing tests).
+
+**Why it matters:** `programParser.ts` is the entry point for YAML program import. Bugs in `coerceWorkoutType` would silently map valid types to `'other'`; bugs in `parseDurationSecs` would produce wrong rest/hold durations; bugs in validation would let malformed programs through without error. These paths were completely uncovered before this change.
+
+**Files changed:**
+- `src/engine/__tests__/programParser.test.ts` — 20 new tests; also adds `validateYamlProgram` to the import line
+
+**Risks / tradeoffs:** Zero risk. New tests only; no source changes.
+
+**Rollback:** Not applicable (tests only — no production code changed).
+
+---
+
 ## 2026-08-18
 
 ### Change 1 — `fix(historyStats): deduplicate rotation entries in computeWeeklyBreakdown`
