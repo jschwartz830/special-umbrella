@@ -50,6 +50,9 @@
 
 ### P1 — Missing test coverage for critical edge cases
 
+**`programParser.ts` — duration/coercion/description paths (resolved 2026-08-20):**
+All previously untested paths in `programParser.ts` are now covered: `parseDurationSecs`, `coerceWorkoutType`, validation error reporting, `validateYamlProgram`, and `buildStructureDescription`. 20 new tests added; test count 1268 → 1288.
+
 **`expressionEval.ts` — `evaluateUpdates` multi-statement path:**
 The `splitStatements` function uses parenthesis-depth tracking to avoid splitting `min(a, b)` on the inner comma. This is the correct algorithm, but the behavior is **untested**. A regression here would silently corrupt YAML-driven progression variables.
 
