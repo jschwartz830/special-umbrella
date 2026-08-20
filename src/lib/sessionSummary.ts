@@ -23,7 +23,7 @@ export function findPreviousSessionForPlanDay(
       e.planId === planId &&
       e.action === 'complete' &&
       e.planDayIndex === planDayIndex &&
-      e.calendarDate !== currentDate,
+      e.calendarDate < currentDate,
   )
   if (candidates.length === 0) return null
   candidates.sort((a, b) => b.calendarDate.localeCompare(a.calendarDate))
