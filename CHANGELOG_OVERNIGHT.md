@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-08-21
+
+### Change 1 — `perf(TodayPage): memoize computeLoggedRate and computeWorkoutCompletionRate`
+
+**Summary:** `computeLoggedRate` and `computeWorkoutCompletionRate` in `TodayPage.tsx` (lines 301-302) were called as plain expressions on every render. Both functions scan the full `planEntries` array (O(n)) and their results only change when `planEntries`, `plan.id`, `plan.startDate`, or `today` change — identical to the dependency set of `avgWorkoutsPerWeek`, which was memoized in the Aug 19 pass. Wrapped both calls in `useMemo` following the exact same pattern.
+
+**Why it matters:** On a plan with many history entries, every re-render of TodayPage triggers redundant O(n) passes over `planEntries`. TodayPage re-renders frequently (subscription updates, modal open/close, etc.). Memoizing prevents these passes unless the underlying data actually changes.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — `computeLoggedRate` and `computeWorkoutCompletionRate` wrapped in `useMemo`
+
+**Risks / tradeoffs:** Zero risk. Identical pattern to `avgWorkoutsPerWeek` memoization (Aug 19). The dependency arrays precisely match the function arguments, so cached values are always fresh.
+
+**Rollback:** Revert the associated commit.
+
+---
+
 ## 2026-08-20
 
 ### Change 1 — `fix(historyStats.test): correct daysMap type annotation to use WorkoutType`

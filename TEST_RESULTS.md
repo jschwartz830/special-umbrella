@@ -2,6 +2,24 @@
 
 ---
 
+## 2026-08-21 Pass
+
+### Source Changes Validated
+
+| Change | Tests affected | Result |
+|---|---|---|
+| `TodayPage.tsx` memoize `computeLoggedRate` and `computeWorkoutCompletionRate` | 0 new tests — pure perf change, no logic change | All 1288 passing |
+
+### Tests Added
+
+None. The Aug 21 pass applied a memoization change with no behavioral difference, so no new tests were needed. Existing tests continue to exercise the `computeLoggedRate` and `computeWorkoutCompletionRate` functions directly via `historyStats.test.ts`.
+
+### Baseline
+
+**1288 tests, 35 files, all passing** (unchanged from Aug 20 baseline).
+
+---
+
 ## 2026-08-20 Pass
 
 ### Source Changes Validated

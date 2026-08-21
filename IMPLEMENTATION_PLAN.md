@@ -203,3 +203,46 @@ Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silentl
 | `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
 | Cloud sync conflict resolution | Out of scope |
+
+---
+
+## Additions — 2026-08-20
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `historyStats.test`: correct `daysMap` type annotation to use `WorkoutType` | Type fix | `src/lib/__tests__/historyStats.test.ts` |
+| 2 | `programParser`: add 20 tests for untested parser paths | Tests | `src/engine/__tests__/programParser.test.ts` |
+
+### Detail
+
+**1. `daysMap` type annotation fix**
+The `daysMap` helper in `historyStats.test.ts` had a hardcoded union type that didn't include `'run'`. Tests at lines 913 and 924 passed `type: 'run'`, producing `TS2322` compile errors silently swallowed by Vitest's esbuild transform. Fixed by using the imported `WorkoutType` union.
+
+**2. `programParser` test coverage**
+`programParser.test.ts` had only 6 tests. Added 20 new tests covering: `parseDurationSecs`, `coerceWorkoutType`, validation error reporting, `validateYamlProgram`, and `buildStructureDescription`. Test count: 1268 → 1288.
+
+---
+
+## Additions — 2026-08-21
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `TodayPage`: memoize `computeLoggedRate` and `computeWorkoutCompletionRate` | Perf fix | `src/pages/TodayPage.tsx` |
+
+### Detail
+
+**1. Memoize `computeLoggedRate` and `computeWorkoutCompletionRate`**
+Both functions scan `planEntries` on every render of `TodayPage`. Wrapped both in `useMemo` with precise dependency arrays, following the identical pattern used for `avgWorkoutsPerWeek` (Aug 19 pass) and `rotationLoggedCount`.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| Calendar week start configurable | Recommendation only — requires settings infrastructure |
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
+| `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
