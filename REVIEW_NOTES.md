@@ -1,5 +1,50 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-08-20
+**Date:** 2026-08-22
+**Branch:** `claude/serene-cori-g0k8es`
+
+---
+
+## Executive Summary (2026-08-22 pass)
+
+1. **What changed:** 13 new tests covering previously-unexercised branches across three files — `programParser.test.ts` (+10 tests), `explanation.test.ts` (+2 tests), `previousSetsHelper.test.ts` (+2 tests) — and one test correction. No production source files were modified. Test count: 1288 → 1301 (+13).
+
+2. **Highest confidence:** All additions are test-only. Each test exercises a real code path with a concrete inline scenario and verifies observable output. No mocks, no globals patched.
+
+3. **What is risky:** Nothing. No production code was changed.
+
+4. **What to review first:** Run `npx vitest run` and verify all 1301 tests pass. The new `programParser` tests cover three previously-dark branches (`buildStructureDescription` set-array, reps-only, and run-slot no-segments) and document a subtlety: `buildStructureDescription` uses the raw YAML type string for display while `parseRunSegment` normalises unrecognised types to `'easy'`. The two new `explanation` tests pin the `reset` and null-lastResult switch branches in `buildAdaptationNote`. The two new `previousSetsHelper` tests confirm that extra-workout instance IDs (`planId_YYYY-MM-DD_extra_id`) are correctly included when from a prior date and correctly excluded when from the current date.
+
+---
+
+## Improvements Completed (2026-08-22)
+
+| # | Description |
+|---|---|
+| 1 | `test(programParser)`: cover `buildStructureDescription` set-array, reps-only, and run-no-segments branches |
+| 2 | `test(programParser)`: cover `parseRunSegment` unrecognised-type normalisation |
+| 3 | `test(programParser)`: cover `parseDurationSecs` zero/invalid/2m edge cases |
+| 4 | `test(programParser)`: cover `parseDay` no-label default |
+| 5 | `test(explanation)`: cover `reset` and null lastResult branches in `buildAdaptationNote` |
+| 6 | `test(previousSetsHelper)`: cover extra-workout instance ID inclusion and same-day exclusion |
+
+---
+
+## Previous Pass Notes (2026-08-21)
+**Branch:** `claude/serene-cori-g0k8es` (perf commit on main)
+
+---
+
+## Executive Summary (2026-08-21 pass)
+
+1. **What changed:** Memoized two O(n) stat calls in TodayPage — `computeLoggedRate` and `computeWorkoutCompletionRate` — using `useMemo` with the same dependency set as the adjacent `avgWorkoutsPerWeek` memo (added 2026-08-19). Updated overnight audit docs. No new tests.
+
+2. **Highest confidence:** The memoization is a direct copy of the established pattern in TodayPage. Both calls are pure functions whose output depends only on `plan.id`, `planEntries`, `plan.startDate`, and `today`.
+
+3. **What is risky:** Nothing. `useMemo` is transparent to React — same values in, same value out.
+
+---
+
+## Previous Pass Notes (2026-08-20)
 **Branch:** `claude/serene-cori-27v4nu`
 
 ---

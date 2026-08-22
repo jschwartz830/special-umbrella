@@ -2,6 +2,73 @@
 
 ---
 
+## 2026-08-22
+
+### Change 1 — `test(programParser): cover buildStructureDescription set-array, reps-only, and run-no-segments branches`
+
+**Summary:** Three branches in `buildStructureDescription` were not covered by any test: (a) when a weights exercise's `sets` field is an array (shows "N sets"), (b) when `sets` is absent but `reps` is set (shows "×N"), and (c) when a run slot has no segments (returns `undefined`). Added three tests documenting these exact paths.
+
+**Files changed:**
+- `src/engine/__tests__/programParser.test.ts` — 3 new tests in new describe blocks
+
+---
+
+### Change 2 — `test(programParser): cover parseRunSegment unrecognised-type normalisation`
+
+**Summary:** `parseRunSegment` falls back to `'easy'` when the YAML `type` string is not in `VALID_SEGMENT_TYPES`. This was untested. Added one test that also clarifies a subtle behaviour: `buildStructureDescription` uses the raw YAML type for display ("Sprint") while the parsed `RunSegment.type` is the normalised value ("easy").
+
+**Files changed:**
+- `src/engine/__tests__/programParser.test.ts` — 1 new test
+
+---
+
+### Change 3 — `test(programParser): cover parseDurationSecs zero/invalid/2m edge cases`
+
+**Summary:** `parseDurationSecs` returns `undefined` for zero and non-numeric inputs (the condition `n > 0` guards against both). These paths were untested. Added three tests covering a plain zero, an unparseable string, and a 2-minute duration string.
+
+**Files changed:**
+- `src/engine/__tests__/programParser.test.ts` — 3 new tests in a new describe block
+
+---
+
+### Change 4 — `test(programParser): cover parseDay no-label default`
+
+**Summary:** `parseDay` defaults the label to `'Workout Day'` when no label is provided in the YAML. This fallback was untested. Added one test with a labelless day.
+
+**Files changed:**
+- `src/engine/__tests__/programParser.test.ts` — 1 new test
+
+---
+
+### Change 5 — `test(explanation): cover reset and null lastResult branches in buildAdaptationNote`
+
+**Summary:** The `switch (state.lastResult)` in `buildAdaptationNote` has five branches: `progress`, `hold`, `regress`, `reset`, and `default`. The first three were tested; `reset` and `default` (triggered by `null`/`undefined` lastResult) were not. Added two tests covering these cases.
+
+**Files changed:**
+- `src/modules/recommendation/__tests__/explanation.test.ts` — 2 new tests
+
+---
+
+### Change 6 — `test(previousSetsHelper): cover extra-workout instance ID inclusion and same-day exclusion`
+
+**Summary:** `findPreviousSetsByExercise` uses `rest.startsWith(currentDate)` to exclude same-date outcomes, where `rest` is the portion of `workoutInstanceId` after the plan prefix. For extra-workout IDs (`planId_YYYY-MM-DD_extra_extraId`) this means prior-date extras are included and same-day extras are excluded — the correct behaviour. Added two tests that directly verify this, making the ID-format contract explicit and regression-proof.
+
+**Files changed:**
+- `src/lib/__tests__/previousSetsHelper.test.ts` — 2 new tests
+
+---
+
+## 2026-08-21
+
+### Change 1 — `perf(TodayPage): memoize computeLoggedRate and computeWorkoutCompletionRate`
+
+**Summary:** Two O(n) calls in `TodayPage` — `computeLoggedRate(plan.id, planEntries, plan.startDate, today)` and `computeWorkoutCompletionRate(plan.id, planEntries, plan.startDate, today)` — ran on every render without memoization. Both functions share the exact dependency set of the adjacent `avgWorkoutsPerWeek` call (memoized 2026-08-19). Wrapped both in `useMemo` with `[plan.id, planEntries, plan.startDate, today]` dep arrays.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — 2 memoized calls (previously bare function calls)
+
+---
+
 ## 2026-08-20
 
 ### Change 1 — `fix(historyStats.test): correct daysMap type annotation to use WorkoutType`
