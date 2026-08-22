@@ -84,4 +84,43 @@ describe('findPreviousSetsByExercise', () => {
     const result = findPreviousSetsByExercise('plan-1', TODAY, outcomes)
     expect(result).toEqual({})
   })
+
+  it('includes extra workout outcomes from a prior date (extra instanceId format)', () => {
+    // Extra workout IDs: planId_YYYY-MM-DD_extra_extraId
+    const extraOutcome: WorkoutOutcome = {
+      workoutInstanceId: 'plan-1_2026-05-20_extra_abc123',
+      completionState: 'completed',
+      perceivedEffort: null,
+      notes: null,
+      completedAt: null,
+      weightsActual: {
+        exercises: [
+          { exercise: 'Row', sets: [{ actualReps: 8, actualLoad: 95, completed: true }], progressionMode: null },
+        ],
+      },
+    } as unknown as WorkoutOutcome
+    const outcomes = { 'plan-1_2026-05-20_extra_abc123': extraOutcome }
+    const result = findPreviousSetsByExercise('plan-1', TODAY, outcomes)
+    expect(result['Row']).toHaveLength(1)
+    expect(result['Row'][0].actualLoad).toBe(95)
+  })
+
+  it('excludes extra workout outcomes on the current date (same-day extra)', () => {
+    // An extra workout on today's date should be excluded, not just regular workouts.
+    const sameDay: WorkoutOutcome = {
+      workoutInstanceId: `plan-1_${TODAY}_extra_xyz789`,
+      completionState: 'completed',
+      perceivedEffort: null,
+      notes: null,
+      completedAt: null,
+      weightsActual: {
+        exercises: [
+          { exercise: 'Curl', sets: [{ actualReps: 10, actualLoad: 35, completed: true }], progressionMode: null },
+        ],
+      },
+    } as unknown as WorkoutOutcome
+    const outcomes = { [`plan-1_${TODAY}_extra_xyz789`]: sameDay }
+    const result = findPreviousSetsByExercise('plan-1', TODAY, outcomes)
+    expect(result).toEqual({})
+  })
 })
