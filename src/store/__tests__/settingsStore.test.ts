@@ -12,6 +12,7 @@ function resetStore() {
     startDelaySeconds: 0,
     autoAdvanceSegments: true,
     focusMode: false,
+    weekStartsOn: 0,
   })
 }
 
@@ -93,6 +94,29 @@ describe('settingsStore', () => {
       expect(useSettingsStore.getState().focusMode).toBe(false)
     })
   })
+
+  describe('weekStartsOn', () => {
+    it('defaults to 0 (Sunday)', () => {
+      expect(useSettingsStore.getState().weekStartsOn).toBe(0)
+    })
+
+    it('setWeekStartsOn switches to Monday (1)', () => {
+      useSettingsStore.getState().setWeekStartsOn(1)
+      expect(useSettingsStore.getState().weekStartsOn).toBe(1)
+    })
+
+    it('setWeekStartsOn switches back to Sunday (0)', () => {
+      useSettingsStore.getState().setWeekStartsOn(1)
+      useSettingsStore.getState().setWeekStartsOn(0)
+      expect(useSettingsStore.getState().weekStartsOn).toBe(0)
+    })
+
+    it('setting the same value is idempotent', () => {
+      useSettingsStore.getState().setWeekStartsOn(1)
+      useSettingsStore.getState().setWeekStartsOn(1)
+      expect(useSettingsStore.getState().weekStartsOn).toBe(1)
+    })
+  })
 })
 
 // ── migrateSettingsState ──────────────────────────────────────────────────────
@@ -103,6 +127,7 @@ describe('migrateSettingsState', () => {
     expect(result.startDelaySeconds).toBe(0)
     expect(result.autoAdvanceSegments).toBe(true)
     expect(result.focusMode).toBe(false)
+    expect(result.weekStartsOn).toBe(0)
   })
 
   it('returns correct defaults when persisted state is an empty object', () => {
@@ -110,6 +135,7 @@ describe('migrateSettingsState', () => {
     expect(result.startDelaySeconds).toBe(0)
     expect(result.autoAdvanceSegments).toBe(true)
     expect(result.focusMode).toBe(false)
+    expect(result.weekStartsOn).toBe(0)
   })
 
   it('preserves existing settings values', () => {
@@ -117,10 +143,17 @@ describe('migrateSettingsState', () => {
       startDelaySeconds: 10,
       autoAdvanceSegments: false,
       focusMode: true,
+      weekStartsOn: 1,
     }, 0)
     expect(result.startDelaySeconds).toBe(10)
     expect(result.autoAdvanceSegments).toBe(false)
     expect(result.focusMode).toBe(true)
+    expect(result.weekStartsOn).toBe(1)
+  })
+
+  it('backfills weekStartsOn to 0 (Sunday) when missing from persisted state', () => {
+    const result = migrateSettingsState({ startDelaySeconds: 5, autoAdvanceSegments: true, focusMode: false }, 0)
+    expect(result.weekStartsOn).toBe(0)
   })
 
   it('backfills focusMode when missing (pre-v1 state without focusMode field)', () => {
