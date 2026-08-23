@@ -173,6 +173,34 @@ Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silentl
 
 ---
 
+## Additions — 2026-08-23
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `TodayPlanProgressModal`: surface `longestStreak` as "Best streak" | Feature | `src/components/today/TodayPlanProgressModal.tsx`, `src/pages/TodayPage.tsx` |
+| 2 | Calendar week start: configurable Sun/Mon setting | Feature | `src/store/settingsStore.ts`, `src/engine/calendarProjection.ts`, `src/pages/CalendarPage.tsx`, `src/pages/SettingsPage.tsx`, `src/store/__tests__/settingsStore.test.ts` |
+
+### Detail
+
+**1. Best streak in Plan Progress modal**
+`computeHistoryStats` already returned `longestStreak` (the all-time longest streak across all plans) but it was never surfaced in the UI. The Plan Progress modal now shows a "Best streak" row beneath the existing "Current streak" row, hidden when `longestStreak === 0`. Implementation: add `longestStreak: number` prop to `TodayPlanProgressModal`, pass `stats.longestStreak` from `TodayPage`.
+
+**2. Configurable calendar week start (P6 resolved)**
+`buildMonthGrid` previously hardcoded `weekStartsOn: 0` (Sunday). A `weekStartsOn: 0 | 1` preference was added to `settingsStore` with Sunday as the default (backward compatible), included in `migrateSettingsState`, threaded from `CalendarPage` into `buildMonthGrid`, and exposed as a Sunday/Monday button toggle in the Settings page. Five new tests cover the store action and migration.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
+| `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| Cloud sync conflict resolution | Out of scope |
+
+---
+
 ## Additions — 2026-08-19
 
 ### Changes implemented this pass

@@ -2,6 +2,43 @@
 
 ---
 
+## 2026-08-23
+
+### Change 1 — `feat(ui): surface longestStreak as "Best streak" in Plan Progress modal`
+
+**Summary:** `computeHistoryStats` already computed and returned `longestStreak` but the value was never displayed. Added a "Best streak" row to `TodayPlanProgressModal`, visible below the existing "Current streak" row when `longestStreak > 0`. Wired `stats.longestStreak` through `TodayPage` as a new required prop.
+
+**Why it matters:** Users who break a streak lose context on their personal best. Surfacing it alongside the current streak gives motivation and a historical baseline.
+
+**Files changed:**
+- `src/components/today/TodayPlanProgressModal.tsx` — new `longestStreak` prop, new conditional row
+- `src/pages/TodayPage.tsx` — `longestStreak={stats.longestStreak}` passed to modal
+
+**Risks / tradeoffs:** Zero risk. The value was already computed; this is display-only. The row is hidden when `longestStreak === 0`, so brand-new plans show nothing spurious.
+
+**Rollback:** Revert the associated commit (`9b45fcc`).
+
+---
+
+### Change 2 — `feat(settings): configurable calendar week start day (Sun/Mon)`
+
+**Summary:** `buildMonthGrid` previously hardcoded `weekStartsOn: 0` (Sunday). Added a `weekStartsOn: 0 | 1` field to `settingsStore`, backfilled in `migrateSettingsState` (defaults to 0 = Sunday, backward compatible), threaded from `CalendarPage` into `buildMonthGrid`, and exposed in the Settings page as a Sunday/Monday button toggle. Five new tests in `settingsStore.test.ts` cover the new action and migration behavior. Test count: 1288 → 1293.
+
+**Why it matters:** Monday-first weeks are the ISO standard and the default expectation for users outside North America. Without this setting, the calendar week grid is always Sunday-first, making it appear out of sync with device calendars that use Monday-first.
+
+**Files changed:**
+- `src/store/settingsStore.ts` — `weekStartsOn: 0 | 1` field + `setWeekStartsOn` setter + migration
+- `src/engine/calendarProjection.ts` — `buildMonthGrid` `weekStartsOn` parameter (default 0)
+- `src/pages/CalendarPage.tsx` — reads `weekStartsOn` from store, passes to `buildMonthGrid`, adds to `useMemo` deps
+- `src/pages/SettingsPage.tsx` — Sun/Mon button toggle in new "Calendar week start" section
+- `src/store/__tests__/settingsStore.test.ts` — 5 new tests (default, toggle to Mon, toggle back, idempotent, migration backfill)
+
+**Risks / tradeoffs:** Very low. Defaults to Sunday (0), so existing users see no change. The setting is persisted and migrated. The only behavioral change for existing users who switch to Monday-first is that the calendar grid shifts — which is exactly the expected outcome.
+
+**Rollback:** Revert the `feat(settings)` commit (`72358c0`).
+
+---
+
 ## 2026-08-20
 
 ### Change 1 — `fix(historyStats.test): correct daysMap type annotation to use WorkoutType`

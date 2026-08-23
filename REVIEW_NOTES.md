@@ -1,6 +1,36 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-08-20
+**Date:** 2026-08-23
+**Branch:** `claude/serene-cori-eyspm7`
+
+---
+
+## Executive Summary (2026-08-23 pass)
+
+1. **What changed:** Two additive features — (a) "Best streak" row in the Plan Progress modal (surfaces `longestStreak`, which was already computed but never displayed), and (b) configurable calendar week start day (Sun/Mon toggle in Settings, threaded through CalendarPage into `buildMonthGrid`). Test count: 1288 → 1293 (+5 new `settingsStore` tests).
+
+2. **Highest confidence:** The `longestStreak` surfacing — the value was already computed, tested, and correct; this is purely a display addition. The `weekStartsOn` setting — the change is backward-compatible (defaults to 0 = Sunday), the store migration backfills the default, and `buildMonthGrid` already accepted the parameter in its original signature contract.
+
+3. **What is risky:** Nothing in this pass is risky. Both changes are additive. The Settings toggle is the most user-visible change — if a user accidentally sets Monday, they can switch back immediately.
+
+4. **What to review first:** Open Settings and verify the "Calendar week start" Sun/Mon toggle appears and works. Switch to Monday, navigate to the calendar, and confirm the grid header shifts from Sun–Sat to Mon–Sun. Open the Plan Progress modal (via the ring on Today) and confirm a "Best streak" row appears when the all-time streak is greater than 0.
+
+---
+
+## Improvements Completed (2026-08-23)
+
+| # | Description | Commit |
+|---|---|---|
+| 1 | `feat(ui)`: surface `longestStreak` as "Best streak" in Plan Progress modal | `9b45fcc` |
+| 2 | `feat(settings)`: configurable calendar week start day (Sun/Mon) | `72358c0` |
+
+---
+
+## Previous Pass Notes (2026-08-20)
 **Branch:** `claude/serene-cori-27v4nu`
+
+---
+
+## Executive Summary (2026-08-20 pass)
 
 ---
 
