@@ -3,6 +3,7 @@
 ---
 
 ## 2026-08-23 Pass
+## 2026-08-24 Pass
 
 ### Source Changes Validated
 
@@ -39,6 +40,43 @@ Also updated existing `migrateSettingsState` tests to assert `weekStartsOn` in t
 - **Test files:** 35
 - **Tests:** 1293 (1288 baseline + 5 new)
 - **Result:** All passing
+| `findBestWeek` optional `today` future-date guard | 4 new tests added | All passing |
+| `HistoryPage` `computeWorkoutTypeBreakdown` dateRange clamp | 2 new tests added | All passing |
+
+### Tests Added
+
+#### `src/lib/__tests__/historyStats.test.ts` — 6 new tests
+
+`findBestWeek` block (4 tests):
+
+| Test | Description |
+|---|---|
+| `excludes future-dated entries when today is provided` | 2 real completed vs. 3 future completed → real week wins |
+| `excludes future-dated extras when today is provided` | Future extras don't add to the best-week extras count |
+| `returns null when the only entries are future-dated and today is provided` | Guard applied → no eligible weeks |
+| `includes future-dated entries when today is not provided (backwards compatible)` | Explicit regression test for the 3-arg call shape |
+
+`computeWorkoutTypeBreakdown` block (2 tests, appended to the existing dateRange group):
+
+| Test | Description |
+|---|---|
+| `excludes future-dated rotation entries when dateRange.to is set to today` | 2 past + 1 far-future `complete` → 2 counted |
+| `excludes future-dated extras when dateRange.to is set to today` | Past extra kept; future extra filtered |
+
+### Full Suite Run
+
+- Test files: **35 passed / 35** (unchanged; 6 new tests appended to the existing `historyStats.test.ts`).
+- Individual tests: **1294 passed / 1294** (up from 1288).
+- Duration: ~3.6s (identical range to prior pass).
+- `npx tsc --noEmit`: clean (no errors).
+
+### Coverage Gaps Still Open
+
+| Area | Gap | Priority |
+|---|---|---|
+| `countPlanDayCompletions` future-date guard | Function has no `today` upper bound. A future-dated `complete` for a plan day would count toward its historical "Session N" count. | Low — same class of defect as this pass's fixes; touchless in normal usage. |
+| `resumeCompletion` (mobilityStore) `firstIncompleteIdx === -1` fallback lands the user on the last (already complete) exercise. | Cursor lands on wrong exercise when the routine is already fully complete. | Low — UX edge case; requires product decision on what "resume already-done" should do. |
+| `formatPace(0)` behaviour | The dev fallback branch `> 0` in `buildLastSessionSummary` guards, but the raw formatter is untested for `0`. | Very low — no callers pass 0 today. |
 
 ---
 

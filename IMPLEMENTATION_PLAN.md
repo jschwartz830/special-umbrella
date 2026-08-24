@@ -231,3 +231,39 @@ Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silentl
 | `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
 | Cloud sync conflict resolution | Out of scope |
+
+---
+
+## Additions — 2026-08-24
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `findBestWeek`: exclude future-dated entries when `today` param is passed | Defensive fix | `src/lib/historyStats.ts`, `src/pages/HistoryPage.tsx`, `src/lib/__tests__/historyStats.test.ts` |
+| 2 | `HistoryPage`: clamp `computeWorkoutTypeBreakdown` dateRange to `today` | Defensive fix | `src/pages/HistoryPage.tsx`, `src/lib/__tests__/historyStats.test.ts` |
+
+### Detail
+
+**1. `findBestWeek` future-date guard**
+`findBestWeek` builds its aggregation window from the min/max
+`calendarDate` seen across the plan's entries + extras. A single future-
+dated `complete` (say, from a bad CSV import to `2099-06-01`) would push
+`toDate` all the way to 2099 and let a fake future week win the
+"best week" celebration slot. Fix: add an optional `today` parameter that
+filters out `calendarDate > today` before the window is derived. When
+omitted, the pre-guard behavior is retained (backwards-compatible;
+explicit regression test). `HistoryPage` now passes `today`.
+
+**2. `HistoryPage` type-breakdown range clamp**
+`computeWorkoutTypeBreakdown` already accepted an optional `dateRange`,
+but the `HistoryPage` caller wasn't using it. A future-dated `complete`
+entry from a bad CSV import would count in the History-page type-mix
+label. Passing `{ from: '0000-01-01', to: today }` uses the existing
+(already-tested) dateRange path to exclude future dates. Two new tests
+document the future-date behavior specifically.
+
+### Items still open / recommended only
+
+Same open items as the 2026-08-19 pass — none re-classified this pass.
+
