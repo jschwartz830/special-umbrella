@@ -298,8 +298,14 @@ export function TodayPage() {
   const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, plan.startDate, today)
   const olderUnloggedCount = Math.max(0, totalUnlogged - unloggedDates.length)
 
-  const loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)
-  const workoutCompletionRate: WorkoutCompletionRate = computeWorkoutCompletionRate(plan.id, planEntries, today)
+  const loggedRate = useMemo(
+    () => computeLoggedRate(plan.id, planEntries, plan.startDate, today),
+    [plan.id, planEntries, plan.startDate, today],
+  )
+  const workoutCompletionRate: WorkoutCompletionRate = useMemo(
+    () => computeWorkoutCompletionRate(plan.id, planEntries, today),
+    [plan.id, planEntries, today],
+  )
   const avgWorkoutsPerWeek = useMemo(
     () => computeAverageWorkoutsPerWeek(plan.id, planEntries, planExtras, plan.startDate, today),
     [plan.id, planEntries, planExtras, plan.startDate, today],

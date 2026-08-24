@@ -2,6 +2,7 @@
 
 ---
 
+## 2026-08-21 Pass
 ## 2026-08-23 Pass
 ## 2026-08-24 Pass
 
@@ -9,6 +10,15 @@
 
 | Change | Tests affected | Result |
 |---|---|---|
+| `TodayPage.tsx` memoize `computeLoggedRate` and `computeWorkoutCompletionRate` | 0 new tests — pure perf change, no logic change | All 1288 passing |
+
+### Tests Added
+
+None. The Aug 21 pass applied a memoization change with no behavioral difference, so no new tests were needed. Existing tests continue to exercise the `computeLoggedRate` and `computeWorkoutCompletionRate` functions directly via `historyStats.test.ts`.
+
+### Baseline
+
+**1288 tests, 35 files, all passing** (unchanged from Aug 20 baseline).
 | `TodayPlanProgressModal.tsx` + `TodayPage.tsx` `longestStreak` wiring | No dedicated unit test (UI component — manual) | N/A — manual |
 | `settingsStore.ts` `weekStartsOn` field + migration | 5 new tests added to `settingsStore.test.ts` | All passing |
 | `calendarProjection.ts` `weekStartsOn` parameter | Covered by existing `calendarProjection.test.ts` (parameter default = 0) | All passing |

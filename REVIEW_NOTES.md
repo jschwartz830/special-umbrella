@@ -1,4 +1,6 @@
 # Review Notes — Overnight Audit Pass
+**Date:** 2026-08-21
+**Branch:** `claude/serene-cori-5zm3g1`
 **Date:** 2026-08-22
 **Branch:** `claude/serene-cori-g0k8es`
 
@@ -36,6 +38,31 @@
 
 ## Executive Summary (2026-08-21 pass)
 
+1. **What changed:** One performance fix — `computeLoggedRate` and `computeWorkoutCompletionRate` in `TodayPage.tsx` are now wrapped in `useMemo`, preventing redundant O(n) scans of `planEntries` on every re-render. No production logic was altered, no tests were added (no untested edge cases identified in this pass). Test count: unchanged at 1288.
+
+2. **Highest confidence:** The change is the exact same `useMemo` pattern applied to `avgWorkoutsPerWeek` in the Aug 19 pass. The dependency arrays (`[plan.id, planEntries, plan.startDate, today]` and `[plan.id, planEntries, today]`) precisely match the function arguments, making stale-cache bugs impossible.
+
+3. **What is risky:** Nothing. Pure performance optimization with no behavioral change.
+
+4. **What to review:** Verify that `computeLoggedRate` and `computeWorkoutCompletionRate` in `TodayPage.tsx` are now wrapped in `useMemo` and that their dependency arrays are correct. Run `npx vitest run` to confirm all 1288 tests still pass.
+
+---
+
+## Improvements Completed (2026-08-21)
+
+| # | Description | Commit |
+|---|---|---|
+| 1 | `perf(TodayPage)`: memoize `computeLoggedRate` and `computeWorkoutCompletionRate` | TBD |
+
+---
+
+## Open Recommendations (carry-forward)
+
+| ID | Area | Description | Status |
+|---|---|---|---|
+| R1 | Calendar | Week-start configurable (Mon vs Sun) — requires settings infrastructure | Open |
+| R2 | TodayPage | Extract heavy state computation into a custom hook | Open |
+| R4 | `updateEntryDate` | Potential data-loss risk; no production callers currently | Open |
 1. **What changed:** Memoized two O(n) stat calls in TodayPage — `computeLoggedRate` and `computeWorkoutCompletionRate` — using `useMemo` with the same dependency set as the adjacent `avgWorkoutsPerWeek` memo (added 2026-08-19). Updated overnight audit docs. No new tests.
 
 2. **Highest confidence:** The memoization is a direct copy of the established pattern in TodayPage. Both calls are pure functions whose output depends only on `plan.id`, `planEntries`, `plan.startDate`, and `today`.
