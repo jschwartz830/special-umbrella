@@ -20,6 +20,8 @@ export type CalendarWeek = CalendarCell[]
 
 /**
  * Build a full month grid (6 weeks × 7 days) with resolved workout data.
+ *
+ * @param weekStartsOn 0 = Sunday (US default), 1 = Monday (ISO/international).
  */
 export function buildMonthGrid(
   year: number,
@@ -28,11 +30,12 @@ export function buildMonthGrid(
   entries: HistoryEntry[],
   overrides: OverrideEntry[],
   today: string,
+  weekStartsOn: 0 | 1 = 0,
 ): CalendarWeek[] {
   const monthStart = startOfMonth(new Date(year, month, 1))
   const monthEnd = endOfMonth(monthStart)
-  const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 })
-  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
+  const gridStart = startOfWeek(monthStart, { weekStartsOn })
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn })
 
   const allDays = eachDayOfInterval({ start: gridStart, end: gridEnd })
 

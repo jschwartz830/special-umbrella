@@ -2,12 +2,44 @@
 
 ---
 
+## 2026-08-23 Pass
 ## 2026-08-24 Pass
 
 ### Source Changes Validated
 
 | Change | Tests affected | Result |
 |---|---|---|
+| `TodayPlanProgressModal.tsx` + `TodayPage.tsx` `longestStreak` wiring | No dedicated unit test (UI component — manual) | N/A — manual |
+| `settingsStore.ts` `weekStartsOn` field + migration | 5 new tests added to `settingsStore.test.ts` | All passing |
+| `calendarProjection.ts` `weekStartsOn` parameter | Covered by existing `calendarProjection.test.ts` (parameter default = 0) | All passing |
+| `CalendarPage.tsx` + `SettingsPage.tsx` UI wiring | No dedicated unit test (React components — manual) | N/A — manual |
+
+### Tests Added
+
+#### `src/store/__tests__/settingsStore.test.ts` — 5 new tests
+
+`settingsStore > weekStartsOn` block (4 tests):
+
+| Test | Description |
+|---|---|
+| `defaults to 0 (Sunday)` | Initial value is 0 |
+| `setWeekStartsOn switches to Monday (1)` | Setting 1 persists |
+| `setWeekStartsOn switches back to Sunday (0)` | Toggle round-trip |
+| `setting the same value is idempotent` | Double-set is a no-op |
+
+`migrateSettingsState` updates (1 test):
+
+| Test | Description |
+|---|---|
+| `backfills weekStartsOn to 0 (Sunday) when missing from persisted state` | Migration default for pre-v2 state |
+
+Also updated existing `migrateSettingsState` tests to assert `weekStartsOn` in the null/empty/preserves cases.
+
+### Result
+
+- **Test files:** 35
+- **Tests:** 1293 (1288 baseline + 5 new)
+- **Result:** All passing
 | `findBestWeek` optional `today` future-date guard | 4 new tests added | All passing |
 | `HistoryPage` `computeWorkoutTypeBreakdown` dateRange clamp | 2 new tests added | All passing |
 
