@@ -364,3 +364,57 @@ The following test suites were reviewed during the audit and confirmed to cover 
 3. **`buildMonthGrid` in CalendarPage** — `calendarProjection.test.ts` covers the pure function, but the CalendarPage component itself (day-detail modal, retroactive logging flow) has no UI test.
 
 4. **`expressionEval.ts` — `parsePrimary` dev warning** — The new `console.warn` in `parsePrimary` is not directly tested (the tokenizer-level warning for unknown characters IS tested, but the parser-level fallback is not). Adding a test similar to the existing `unknown character tokenizer warning` describe block would complete coverage.
+
+---
+
+## 2026-08-22 Pass
+
+### Source Changes Validated
+
+| Change | Tests affected | Result |
+|---|---|---|
+| `programParser.test.ts` — `buildStructureDescription` branches | 5 new tests (set-array, reps-only, no-exercises, run-no-segments, unrecognised-type) | All passing |
+| `programParser.test.ts` — `parseDurationSecs` edge cases | 3 new tests (zero, invalid string, 2m) | All passing |
+| `programParser.test.ts` — `parseDay` label default | 1 new test | All passing |
+| `explanation.test.ts` — `buildAdaptationNote` switch branches | 2 new tests (reset, null lastResult) | All passing |
+| `previousSetsHelper.test.ts` — extra-workout instance IDs | 2 new tests (prior-date inclusion, same-day exclusion) | All passing |
+
+### Tests Added
+
+#### `src/engine/__tests__/programParser.test.ts` — 10 new tests
+
+`buildStructureDescription — run slot` additions:
+- `returns undefined for a run slot with no segments`
+- `normalises an unrecognised segment type to "easy" in the parsed segments array`
+
+`buildStructureDescription — weights set-array and reps-only` (new describe):
+- `shows "N sets" when exercises.sets is an array`
+- `shows "×N" when sets is absent but reps is set`
+- `shows exercise name with no set/rep annotation when both are absent`
+
+`parseDurationSecs — edge cases via mobilityExercises` (new describe):
+- `returns undefined for a plain numeric zero (not a valid duration)`
+- `returns undefined for a non-numeric string ("abc")`
+- `parses "2m" (no decimal) to 120 seconds`
+
+`parseYamlProgram — parseDay label default` (new describe):
+- `uses "Workout Day" when a day has no label field`
+
+#### `src/modules/recommendation/__tests__/explanation.test.ts` — 2 new tests
+
+In `generateRunAdaptationNote` describe:
+- `returns a "Reset" note when lastResult is reset`
+- `returns a "Targeting" note when lastResult is null (default branch)`
+
+#### `src/lib/__tests__/previousSetsHelper.test.ts` — 2 new tests
+
+In `findPreviousSetsByExercise` describe:
+- `includes extra workout outcomes from a prior date (extra instanceId format)`
+- `excludes extra workout outcomes on the current date (same-day extra)`
+
+### Summary
+
+- **Test count before:** 1288
+- **Test count after:** 1301 (+13)
+- **Test files changed:** 3
+- **Production source files changed:** 0

@@ -93,6 +93,24 @@ describe('generateRunAdaptationNote', () => {
     const state = makeState({ currentTargetDistanceMiles: 5, lastResult: 'hold' })
     expect(generateRunAdaptationNote(slot, state)).toBeNull()
   })
+
+  it('returns a "Reset" note when lastResult is reset', () => {
+    const slot = makeProgressionSlot({ targetDistanceMiles: 5 })
+    const state = makeState({ currentTargetDistanceMiles: 4, lastResult: 'reset' })
+    const note = generateRunAdaptationNote(slot, state)
+    expect(note).not.toBeNull()
+    expect(note).toContain('Reset')
+    expect(note).toContain('4')
+  })
+
+  it('returns a "Targeting" note when lastResult is null (default branch)', () => {
+    const slot = makeProgressionSlot({ targetDistanceMiles: 5 })
+    const state = makeState({ currentTargetDistanceMiles: 5.5, lastResult: null })
+    const note = generateRunAdaptationNote(slot, state)
+    expect(note).not.toBeNull()
+    expect(note).toContain('Targeting')
+    expect(note).toContain('5.5')
+  })
 })
 
 // ── generateDifficultySpacingWarning ──────────────────────────────────────────
