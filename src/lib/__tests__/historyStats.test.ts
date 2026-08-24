@@ -773,6 +773,33 @@ describe('computeWorkoutTypeBreakdown', () => {
     expect(result.yoga?.completed).toBe(1)
   })
 
+  it('excludes future-dated rotation entries when dateRange.to is set to today', () => {
+    // Defensive: HistoryPage passes { from: '0000-01-01', to: today } so a
+    // future-dated `complete` from a bad CSV import cannot inflate the
+    // type-mix label. Two past + one future → only 2 counted.
+    const entries = [
+      makeEntry('2026-04-01', 'complete', 0),
+      makeEntry('2026-04-05', 'complete', 0),
+      makeEntry('2099-06-01', 'complete', 0), // future — must be excluded
+    ]
+    const days = daysMap([{ index: 0, type: 'weightlifting' }])
+    const result = computeWorkoutTypeBreakdown(
+      entries, [], {}, days, { from: '0000-01-01', to: '2026-04-15' },
+    )
+    expect(result.weightlifting?.completed).toBe(2)
+  })
+
+  it('excludes future-dated extras when dateRange.to is set to today', () => {
+    const extras = [
+      makeExtra('2026-04-01', 'yoga', 'x1'),
+      makeExtra('2099-01-01', 'yoga', 'x2'), // future — must be excluded
+    ]
+    const result = computeWorkoutTypeBreakdown(
+      [], extras, {}, null, { from: '0000-01-01', to: '2026-04-15' },
+    )
+    expect(result.yoga?.completed).toBe(1)
+  })
+
   it('works with the production "weights" slot type (not just "weightlifting")', () => {
     // HistoryPage builds planDaysById from plan.days which use 'weights' in the UI.
     // Verify the function attributes entries correctly for that real-world type.
