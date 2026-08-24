@@ -1036,6 +1036,7 @@ export function TodayPage() {
           totalCompleted={stats.totalCompleted}
           planCompletionPercent={planCompletionPercent}
           planStreak={planStreak}
+          longestStreak={stats.longestStreak}
           weekProgress={weekProgress}
           cycleProgress={cycleProgress}
           planDurationType={plan.duration.type}

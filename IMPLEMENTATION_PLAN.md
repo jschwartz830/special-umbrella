@@ -173,6 +173,34 @@ Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silentl
 
 ---
 
+## Additions — 2026-08-23
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `TodayPlanProgressModal`: surface `longestStreak` as "Best streak" | Feature | `src/components/today/TodayPlanProgressModal.tsx`, `src/pages/TodayPage.tsx` |
+| 2 | Calendar week start: configurable Sun/Mon setting | Feature | `src/store/settingsStore.ts`, `src/engine/calendarProjection.ts`, `src/pages/CalendarPage.tsx`, `src/pages/SettingsPage.tsx`, `src/store/__tests__/settingsStore.test.ts` |
+
+### Detail
+
+**1. Best streak in Plan Progress modal**
+`computeHistoryStats` already returned `longestStreak` (the all-time longest streak across all plans) but it was never surfaced in the UI. The Plan Progress modal now shows a "Best streak" row beneath the existing "Current streak" row, hidden when `longestStreak === 0`. Implementation: add `longestStreak: number` prop to `TodayPlanProgressModal`, pass `stats.longestStreak` from `TodayPage`.
+
+**2. Configurable calendar week start (P6 resolved)**
+`buildMonthGrid` previously hardcoded `weekStartsOn: 0` (Sunday). A `weekStartsOn: 0 | 1` preference was added to `settingsStore` with Sunday as the default (backward compatible), included in `migrateSettingsState`, threaded from `CalendarPage` into `buildMonthGrid`, and exposed as a Sunday/Monday button toggle in the Settings page. Five new tests cover the store action and migration.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
+| `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| Cloud sync conflict resolution | Out of scope |
+
+---
+
 ## Additions — 2026-08-19
 
 ### Changes implemented this pass
@@ -207,6 +235,8 @@ Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silentl
 ---
 
 ## Additions — 2026-08-20
+## Additions — 2026-08-21
+## Additions — 2026-08-24
 
 ### Changes implemented this pass
 
@@ -237,6 +267,42 @@ The `daysMap` helper in `historyStats.test.ts` had a hardcoded union type that d
 
 **1. Memoize `computeLoggedRate` and `computeWorkoutCompletionRate`**
 Both functions scan `planEntries` on every render of `TodayPage`. Wrapped both in `useMemo` with precise dependency arrays, following the identical pattern used for `avgWorkoutsPerWeek` (Aug 19 pass) and `rotationLoggedCount`.
+| 1 | `TodayPage`: memoize `computeLoggedRate` and `computeWorkoutCompletionRate` | Perf fix | `src/pages/TodayPage.tsx` |
+
+### Detail
+
+**1. `computeLoggedRate` + `computeWorkoutCompletionRate` memoization**
+Both calls scan all `planEntries` (O(n)) on every render. The `avgWorkoutsPerWeek` memo (added 2026-08-19) uses the same four deps `[plan.id, planEntries, plan.startDate, today]`. Wrapping both calls in `useMemo` with the same dep array is a safe, direct application of the established pattern.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| Calendar week start configurable | Recommendation only — requires settings infrastructure |
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1160-line component |
+
+---
+
+## Additions — 2026-08-22
+
+### Changes implemented this pass (test-only)
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `programParser.test.ts`: 10 new tests covering `buildStructureDescription`, `parseRunSegment`, `parseDurationSecs`, `parseDay` | Coverage | `src/engine/__tests__/programParser.test.ts` |
+| 2 | `explanation.test.ts`: 2 new tests for `reset` and null `lastResult` branches in `buildAdaptationNote` | Coverage | `src/modules/recommendation/__tests__/explanation.test.ts` |
+| 3 | `previousSetsHelper.test.ts`: 2 new tests for extra-workout instance ID handling | Coverage | `src/lib/__tests__/previousSetsHelper.test.ts` |
+
+### Detail
+
+**1. `programParser` branch coverage**
+Three branches of `buildStructureDescription` for weights slots were completely dark: the set-array path (shows "N sets"), the reps-only path (shows "×N"), and the no-exercises path (returns `undefined`). Added tests for all three. A test also documents the raw-vs-parsed type discrepancy: `buildStructureDescription` uses the raw YAML `type` string in the display label while `parseRunSegment` normalises unknown types to `'easy'` — a subtlety that is easy to miss when reading the code. Additional coverage for `parseDurationSecs` (zero, invalid string, 2-minute string) and `parseDay` label default.
+
+**2. `buildAdaptationNote` untested switch branches**
+The `switch (state.lastResult)` in `buildAdaptationNote` has five branches. `reset` and `default` (triggered by `null`/`undefined`) were untested. Added two tests to close the gap.
+
+**3. `findPreviousSetsByExercise` extra-workout IDs**
+Extra workouts use IDs of the form `planId_YYYY-MM-DD_extra_extraId`. The function excludes same-date IDs via `rest.startsWith(currentDate)`. For an extra workout, `rest` is `YYYY-MM-DD_extra_extraId`, which correctly starts with the date prefix. Two tests now pin this contract explicitly.
 
 ### Items still open / recommended only
 
@@ -246,3 +312,31 @@ Both functions scan `planEntries` on every render of `TodayPage`. Wrapped both i
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
 | `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1160-line component |
+| 1 | `findBestWeek`: exclude future-dated entries when `today` param is passed | Defensive fix | `src/lib/historyStats.ts`, `src/pages/HistoryPage.tsx`, `src/lib/__tests__/historyStats.test.ts` |
+| 2 | `HistoryPage`: clamp `computeWorkoutTypeBreakdown` dateRange to `today` | Defensive fix | `src/pages/HistoryPage.tsx`, `src/lib/__tests__/historyStats.test.ts` |
+
+### Detail
+
+**1. `findBestWeek` future-date guard**
+`findBestWeek` builds its aggregation window from the min/max
+`calendarDate` seen across the plan's entries + extras. A single future-
+dated `complete` (say, from a bad CSV import to `2099-06-01`) would push
+`toDate` all the way to 2099 and let a fake future week win the
+"best week" celebration slot. Fix: add an optional `today` parameter that
+filters out `calendarDate > today` before the window is derived. When
+omitted, the pre-guard behavior is retained (backwards-compatible;
+explicit regression test). `HistoryPage` now passes `today`.
+
+**2. `HistoryPage` type-breakdown range clamp**
+`computeWorkoutTypeBreakdown` already accepted an optional `dateRange`,
+but the `HistoryPage` caller wasn't using it. A future-dated `complete`
+entry from a bad CSV import would count in the History-page type-mix
+label. Passing `{ from: '0000-01-01', to: today }` uses the existing
+(already-tested) dateRange path to exclude future dates. Two new tests
+document the future-date behavior specifically.
+
+### Items still open / recommended only
+
+Same open items as the 2026-08-19 pass — none re-classified this pass.
+

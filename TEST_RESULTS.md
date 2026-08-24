@@ -3,6 +3,8 @@
 ---
 
 ## 2026-08-21 Pass
+## 2026-08-23 Pass
+## 2026-08-24 Pass
 
 ### Source Changes Validated
 
@@ -17,6 +19,74 @@ None. The Aug 21 pass applied a memoization change with no behavioral difference
 ### Baseline
 
 **1288 tests, 35 files, all passing** (unchanged from Aug 20 baseline).
+| `TodayPlanProgressModal.tsx` + `TodayPage.tsx` `longestStreak` wiring | No dedicated unit test (UI component — manual) | N/A — manual |
+| `settingsStore.ts` `weekStartsOn` field + migration | 5 new tests added to `settingsStore.test.ts` | All passing |
+| `calendarProjection.ts` `weekStartsOn` parameter | Covered by existing `calendarProjection.test.ts` (parameter default = 0) | All passing |
+| `CalendarPage.tsx` + `SettingsPage.tsx` UI wiring | No dedicated unit test (React components — manual) | N/A — manual |
+
+### Tests Added
+
+#### `src/store/__tests__/settingsStore.test.ts` — 5 new tests
+
+`settingsStore > weekStartsOn` block (4 tests):
+
+| Test | Description |
+|---|---|
+| `defaults to 0 (Sunday)` | Initial value is 0 |
+| `setWeekStartsOn switches to Monday (1)` | Setting 1 persists |
+| `setWeekStartsOn switches back to Sunday (0)` | Toggle round-trip |
+| `setting the same value is idempotent` | Double-set is a no-op |
+
+`migrateSettingsState` updates (1 test):
+
+| Test | Description |
+|---|---|
+| `backfills weekStartsOn to 0 (Sunday) when missing from persisted state` | Migration default for pre-v2 state |
+
+Also updated existing `migrateSettingsState` tests to assert `weekStartsOn` in the null/empty/preserves cases.
+
+### Result
+
+- **Test files:** 35
+- **Tests:** 1293 (1288 baseline + 5 new)
+- **Result:** All passing
+| `findBestWeek` optional `today` future-date guard | 4 new tests added | All passing |
+| `HistoryPage` `computeWorkoutTypeBreakdown` dateRange clamp | 2 new tests added | All passing |
+
+### Tests Added
+
+#### `src/lib/__tests__/historyStats.test.ts` — 6 new tests
+
+`findBestWeek` block (4 tests):
+
+| Test | Description |
+|---|---|
+| `excludes future-dated entries when today is provided` | 2 real completed vs. 3 future completed → real week wins |
+| `excludes future-dated extras when today is provided` | Future extras don't add to the best-week extras count |
+| `returns null when the only entries are future-dated and today is provided` | Guard applied → no eligible weeks |
+| `includes future-dated entries when today is not provided (backwards compatible)` | Explicit regression test for the 3-arg call shape |
+
+`computeWorkoutTypeBreakdown` block (2 tests, appended to the existing dateRange group):
+
+| Test | Description |
+|---|---|
+| `excludes future-dated rotation entries when dateRange.to is set to today` | 2 past + 1 far-future `complete` → 2 counted |
+| `excludes future-dated extras when dateRange.to is set to today` | Past extra kept; future extra filtered |
+
+### Full Suite Run
+
+- Test files: **35 passed / 35** (unchanged; 6 new tests appended to the existing `historyStats.test.ts`).
+- Individual tests: **1294 passed / 1294** (up from 1288).
+- Duration: ~3.6s (identical range to prior pass).
+- `npx tsc --noEmit`: clean (no errors).
+
+### Coverage Gaps Still Open
+
+| Area | Gap | Priority |
+|---|---|---|
+| `countPlanDayCompletions` future-date guard | Function has no `today` upper bound. A future-dated `complete` for a plan day would count toward its historical "Session N" count. | Low — same class of defect as this pass's fixes; touchless in normal usage. |
+| `resumeCompletion` (mobilityStore) `firstIncompleteIdx === -1` fallback lands the user on the last (already complete) exercise. | Cursor lands on wrong exercise when the routine is already fully complete. | Low — UX edge case; requires product decision on what "resume already-done" should do. |
+| `formatPace(0)` behaviour | The dev fallback branch `> 0` in `buildLastSessionSummary` guards, but the raw formatter is untested for `0`. | Very low — no callers pass 0 today. |
 
 ---
 
@@ -304,3 +374,57 @@ The following test suites were reviewed during the audit and confirmed to cover 
 3. **`buildMonthGrid` in CalendarPage** — `calendarProjection.test.ts` covers the pure function, but the CalendarPage component itself (day-detail modal, retroactive logging flow) has no UI test.
 
 4. **`expressionEval.ts` — `parsePrimary` dev warning** — The new `console.warn` in `parsePrimary` is not directly tested (the tokenizer-level warning for unknown characters IS tested, but the parser-level fallback is not). Adding a test similar to the existing `unknown character tokenizer warning` describe block would complete coverage.
+
+---
+
+## 2026-08-22 Pass
+
+### Source Changes Validated
+
+| Change | Tests affected | Result |
+|---|---|---|
+| `programParser.test.ts` — `buildStructureDescription` branches | 5 new tests (set-array, reps-only, no-exercises, run-no-segments, unrecognised-type) | All passing |
+| `programParser.test.ts` — `parseDurationSecs` edge cases | 3 new tests (zero, invalid string, 2m) | All passing |
+| `programParser.test.ts` — `parseDay` label default | 1 new test | All passing |
+| `explanation.test.ts` — `buildAdaptationNote` switch branches | 2 new tests (reset, null lastResult) | All passing |
+| `previousSetsHelper.test.ts` — extra-workout instance IDs | 2 new tests (prior-date inclusion, same-day exclusion) | All passing |
+
+### Tests Added
+
+#### `src/engine/__tests__/programParser.test.ts` — 10 new tests
+
+`buildStructureDescription — run slot` additions:
+- `returns undefined for a run slot with no segments`
+- `normalises an unrecognised segment type to "easy" in the parsed segments array`
+
+`buildStructureDescription — weights set-array and reps-only` (new describe):
+- `shows "N sets" when exercises.sets is an array`
+- `shows "×N" when sets is absent but reps is set`
+- `shows exercise name with no set/rep annotation when both are absent`
+
+`parseDurationSecs — edge cases via mobilityExercises` (new describe):
+- `returns undefined for a plain numeric zero (not a valid duration)`
+- `returns undefined for a non-numeric string ("abc")`
+- `parses "2m" (no decimal) to 120 seconds`
+
+`parseYamlProgram — parseDay label default` (new describe):
+- `uses "Workout Day" when a day has no label field`
+
+#### `src/modules/recommendation/__tests__/explanation.test.ts` — 2 new tests
+
+In `generateRunAdaptationNote` describe:
+- `returns a "Reset" note when lastResult is reset`
+- `returns a "Targeting" note when lastResult is null (default branch)`
+
+#### `src/lib/__tests__/previousSetsHelper.test.ts` — 2 new tests
+
+In `findPreviousSetsByExercise` describe:
+- `includes extra workout outcomes from a prior date (extra instanceId format)`
+- `excludes extra workout outcomes on the current date (same-day extra)`
+
+### Summary
+
+- **Test count before:** 1288
+- **Test count after:** 1301 (+13)
+- **Test files changed:** 3
+- **Production source files changed:** 0

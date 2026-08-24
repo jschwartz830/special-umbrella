@@ -372,4 +372,167 @@ days:
     expect(slot.structureDescription).toContain('Easy')
     expect(slot.structureDescription).toContain('→')
   })
+
+  it('returns undefined for a run slot with no segments', () => {
+    const yaml = `
+schemaVersion: 1
+name: T
+duration:
+  type: weeks
+  value: 1
+days:
+  - label: D1
+    slots:
+      - type: run
+`
+    const slot = parseYamlProgram(yaml).plan.days[0].slots[0]
+    expect(slot.structureDescription).toBeUndefined()
+  })
+
+  it('normalises an unrecognised segment type to "easy" in the parsed segments array', () => {
+    // buildStructureDescription uses the raw YAML type for the display label, so the
+    // structureDescription will show "Sprint"; the parsed RunSegment.type is what gets
+    // coerced to 'easy' by parseRunSegment.
+    const yaml = `
+schemaVersion: 1
+name: T
+duration:
+  type: weeks
+  value: 1
+days:
+  - label: D1
+    slots:
+      - type: run
+        segments:
+          - type: sprint
+            distance: 0.25mi
+`
+    const slot = parseYamlProgram(yaml).plan.days[0].slots[0]
+    // Parsed segment type must be normalised to 'easy'
+    expect(slot.segments![0].type).toBe('easy')
+    // structureDescription is built from the raw YAML value, so it reflects the original name
+    expect(slot.structureDescription).toContain('Sprint')
+  })
+})
+
+// ── buildStructureDescription — weights set-array and reps-only branches ───────
+
+describe('buildStructureDescription — weights set-array and reps-only', () => {
+  it('shows "N sets" when exercises.sets is an array', () => {
+    const yaml = `
+schemaVersion: 1
+name: T
+duration:
+  type: weeks
+  value: 1
+days:
+  - label: D1
+    slots:
+      - type: weights
+        exercises:
+          - exercise: Squat
+            sets:
+              - reps: 5
+                load: "135 lb"
+              - reps: 5
+                load: "145 lb"
+              - reps: 3
+                load: "155 lb"
+`
+    const slot = parseYamlProgram(yaml).plan.days[0].slots[0]
+    expect(slot.structureDescription).toBe('Squat 3 sets')
+  })
+
+  it('shows "×N" when sets is absent but reps is set', () => {
+    const yaml = `
+schemaVersion: 1
+name: T
+duration:
+  type: weeks
+  value: 1
+days:
+  - label: D1
+    slots:
+      - type: weights
+        exercises:
+          - exercise: Pull-up
+            reps: 8
+`
+    const slot = parseYamlProgram(yaml).plan.days[0].slots[0]
+    expect(slot.structureDescription).toBe('Pull-up ×8')
+  })
+
+  it('shows exercise name with no set/rep annotation when both are absent', () => {
+    const yaml = `
+schemaVersion: 1
+name: T
+duration:
+  type: weeks
+  value: 1
+days:
+  - label: D1
+    slots:
+      - type: weights
+        exercises:
+          - exercise: Plank
+`
+    const slot = parseYamlProgram(yaml).plan.days[0].slots[0]
+    expect(slot.structureDescription).toBe('Plank')
+  })
+})
+
+// ── parseDurationSecs edge cases ──────────────────────────────────────────────
+
+describe('parseDurationSecs — edge cases via mobilityExercises', () => {
+  function parsedRestSec(rest: string | number): number | undefined {
+    const yaml = `
+schemaVersion: 1
+name: T
+duration:
+  type: weeks
+  value: 1
+days:
+  - label: D1
+    slots:
+      - type: mobility
+        mobilityExercises:
+          - name: Ex
+            rest: ${rest}
+            sets:
+              - duration: 30s
+`
+    const { plan } = parseYamlProgram(yaml)
+    return plan.days[0].slots[0].mobilityExercises![0].restSec
+  }
+
+  it('returns undefined for a plain numeric zero (not a valid duration)', () => {
+    expect(parsedRestSec(0)).toBeUndefined()
+  })
+
+  it('returns undefined for a non-numeric string ("abc")', () => {
+    expect(parsedRestSec('abc')).toBeUndefined()
+  })
+
+  it('parses "2m" (no decimal) to 120 seconds', () => {
+    expect(parsedRestSec('2m')).toBe(120)
+  })
+})
+
+// ── parseDay — label default ──────────────────────────────────────────────────
+
+describe('parseYamlProgram — parseDay label default', () => {
+  it('uses "Workout Day" when a day has no label field', () => {
+    const yaml = `
+schemaVersion: 1
+name: T
+duration:
+  type: weeks
+  value: 1
+days:
+  - slots:
+      - type: run
+`
+    const { plan } = parseYamlProgram(yaml)
+    expect(plan.days[0].label).toBe('Workout Day')
+  })
 })

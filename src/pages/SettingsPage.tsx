@@ -89,7 +89,7 @@ const DELAY_OPTIONS = [
 export function SettingsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
-  const { startDelaySeconds, setStartDelay, autoAdvanceSegments, setAutoAdvanceSegments } = useSettingsStore()
+  const { startDelaySeconds, setStartDelay, autoAdvanceSegments, setAutoAdvanceSegments, weekStartsOn, setWeekStartsOn } = useSettingsStore()
   const { user, signOut } = useAuthStore()
 
   const latestCommitDate =
@@ -183,6 +183,29 @@ export function SettingsPage() {
           >
             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${autoAdvanceSegments ? 'left-[22px]' : 'left-0.5'}`} />
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
+        <h2 className="font-medium">Calendar week start</h2>
+        <p className="text-sm text-slate-400">
+          Choose which day begins each week on the calendar.
+        </p>
+        <div className="flex gap-2">
+          {([{ label: 'Sunday', value: 0 }, { label: 'Monday', value: 1 }] as const).map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setWeekStartsOn(opt.value)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                weekStartsOn === opt.value
+                  ? 'bg-sky-500 border-sky-500 text-slate-950'
+                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </section>
 

@@ -1,6 +1,38 @@
 # Review Notes — Overnight Audit Pass
 **Date:** 2026-08-21
 **Branch:** `claude/serene-cori-5zm3g1`
+**Date:** 2026-08-22
+**Branch:** `claude/serene-cori-g0k8es`
+
+---
+
+## Executive Summary (2026-08-22 pass)
+
+1. **What changed:** 13 new tests covering previously-unexercised branches across three files — `programParser.test.ts` (+10 tests), `explanation.test.ts` (+2 tests), `previousSetsHelper.test.ts` (+2 tests) — and one test correction. No production source files were modified. Test count: 1288 → 1301 (+13).
+
+2. **Highest confidence:** All additions are test-only. Each test exercises a real code path with a concrete inline scenario and verifies observable output. No mocks, no globals patched.
+
+3. **What is risky:** Nothing. No production code was changed.
+
+4. **What to review first:** Run `npx vitest run` and verify all 1301 tests pass. The new `programParser` tests cover three previously-dark branches (`buildStructureDescription` set-array, reps-only, and run-slot no-segments) and document a subtlety: `buildStructureDescription` uses the raw YAML type string for display while `parseRunSegment` normalises unrecognised types to `'easy'`. The two new `explanation` tests pin the `reset` and null-lastResult switch branches in `buildAdaptationNote`. The two new `previousSetsHelper` tests confirm that extra-workout instance IDs (`planId_YYYY-MM-DD_extra_id`) are correctly included when from a prior date and correctly excluded when from the current date.
+
+---
+
+## Improvements Completed (2026-08-22)
+
+| # | Description |
+|---|---|
+| 1 | `test(programParser)`: cover `buildStructureDescription` set-array, reps-only, and run-no-segments branches |
+| 2 | `test(programParser)`: cover `parseRunSegment` unrecognised-type normalisation |
+| 3 | `test(programParser)`: cover `parseDurationSecs` zero/invalid/2m edge cases |
+| 4 | `test(programParser)`: cover `parseDay` no-label default |
+| 5 | `test(explanation)`: cover `reset` and null lastResult branches in `buildAdaptationNote` |
+| 6 | `test(previousSetsHelper)`: cover extra-workout instance ID inclusion and same-day exclusion |
+
+---
+
+## Previous Pass Notes (2026-08-21)
+**Branch:** `claude/serene-cori-g0k8es` (perf commit on main)
 
 ---
 
@@ -31,11 +63,88 @@
 | R1 | Calendar | Week-start configurable (Mon vs Sun) — requires settings infrastructure | Open |
 | R2 | TodayPage | Extract heavy state computation into a custom hook | Open |
 | R4 | `updateEntryDate` | Potential data-loss risk; no production callers currently | Open |
+1. **What changed:** Memoized two O(n) stat calls in TodayPage — `computeLoggedRate` and `computeWorkoutCompletionRate` — using `useMemo` with the same dependency set as the adjacent `avgWorkoutsPerWeek` memo (added 2026-08-19). Updated overnight audit docs. No new tests.
+
+2. **Highest confidence:** The memoization is a direct copy of the established pattern in TodayPage. Both calls are pure functions whose output depends only on `plan.id`, `planEntries`, `plan.startDate`, and `today`.
+
+3. **What is risky:** Nothing. `useMemo` is transparent to React — same values in, same value out.
+**Date:** 2026-08-23
+**Branch:** `claude/serene-cori-eyspm7`
+
+---
+
+## Executive Summary (2026-08-23 pass)
+
+1. **What changed:** Two additive features — (a) "Best streak" row in the Plan Progress modal (surfaces `longestStreak`, which was already computed but never displayed), and (b) configurable calendar week start day (Sun/Mon toggle in Settings, threaded through CalendarPage into `buildMonthGrid`). Test count: 1288 → 1293 (+5 new `settingsStore` tests).
+
+2. **Highest confidence:** The `longestStreak` surfacing — the value was already computed, tested, and correct; this is purely a display addition. The `weekStartsOn` setting — the change is backward-compatible (defaults to 0 = Sunday), the store migration backfills the default, and `buildMonthGrid` already accepted the parameter in its original signature contract.
+
+3. **What is risky:** Nothing in this pass is risky. Both changes are additive. The Settings toggle is the most user-visible change — if a user accidentally sets Monday, they can switch back immediately.
+
+4. **What to review first:** Open Settings and verify the "Calendar week start" Sun/Mon toggle appears and works. Switch to Monday, navigate to the calendar, and confirm the grid header shifts from Sun–Sat to Mon–Sun. Open the Plan Progress modal (via the ring on Today) and confirm a "Best streak" row appears when the all-time streak is greater than 0.
+
+---
+
+## Improvements Completed (2026-08-23)
+
+| # | Description | Commit |
+|---|---|---|
+| 1 | `feat(ui)`: surface `longestStreak` as "Best streak" in Plan Progress modal | `9b45fcc` |
+| 2 | `feat(settings)`: configurable calendar week start day (Sun/Mon) | `72358c0` |
+**Date:** 2026-08-24
+**Branch:** `claude/serene-cori-3haj5d`
+
+---
+
+## Executive Summary (2026-08-24 pass)
+
+1. **What changed:** Two symmetric defensive fixes preventing future-dated
+   entries (from a bad CSV import) from inflating History-page stats.
+   (a) `findBestWeek` now takes an optional `today` upper bound and
+   filters `entries`/`extras` above it before computing the best week.
+   (b) `HistoryPage` now passes `{ from: '0000-01-01', to: today }` as the
+   `dateRange` argument to `computeWorkoutTypeBreakdown` so the type-mix
+   label in the stats bar can't be pushed by a future `complete` entry.
+   Test count: 1288 → 1294 (+6 new tests).
+
+2. **Highest confidence:** Both fixes mirror the exact future-date guard
+   already established by `computeHistoryStats` (longestStreak, totalLogged,
+   last7Completed/last30Completed) and `computeWorkoutCompletionRate`. The
+   `findBestWeek` change is backwards-compatible — the `today` parameter is
+   optional and the pre-guard behavior is retained when omitted (covered
+   by a dedicated regression test). The `HistoryPage` change uses the
+   already-tested `dateRange` code path in `computeWorkoutTypeBreakdown`.
+
+3. **What is risky:** Nothing. Neither change alters the shape of returned
+   data. The `findBestWeek` signature change is additive; the `HistoryPage`
+   caller supplies an explicit upper bound rather than relying on implicit
+   inclusion of all past+future entries.
+
+4. **What to review first:** Import a CSV with a future-dated `complete`
+   entry (say `2099-06-01`) into a plan on the History page. Verify:
+   (a) the "Best week" celebration does NOT surface the future week and
+   instead points at the real best past week, and (b) the type-mix label
+   in the History stats bar does NOT include the future entry's count.
+   Then run `npx vitest run` and confirm 1294 tests pass, `npx tsc --noEmit`
+   is clean.
+
+---
+
+## Improvements Completed (2026-08-24)
+
+| # | Description | Commit |
+|---|---|---|
+| 1 | `fix(historyStats)`: exclude future-dated entries from `findBestWeek` via optional `today` param (+4 tests) | `16111b6` |
+| 2 | `fix(HistoryPage)`: clamp `typeBreakdown` dateRange to `today` (+2 tests) | `7378f2b` |
 
 ---
 
 ## Previous Pass Notes (2026-08-20)
 **Branch:** `claude/serene-cori-27v4nu`
+
+---
+
+## Executive Summary (2026-08-20 pass)
 
 ---
 

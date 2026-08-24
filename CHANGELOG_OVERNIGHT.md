@@ -2,6 +2,62 @@
 
 ---
 
+## 2026-08-22
+
+### Change 1 — `test(programParser): cover buildStructureDescription set-array, reps-only, and run-no-segments branches`
+
+**Summary:** Three branches in `buildStructureDescription` were not covered by any test: (a) when a weights exercise's `sets` field is an array (shows "N sets"), (b) when `sets` is absent but `reps` is set (shows "×N"), and (c) when a run slot has no segments (returns `undefined`). Added three tests documenting these exact paths.
+
+**Files changed:**
+- `src/engine/__tests__/programParser.test.ts` — 3 new tests in new describe blocks
+
+---
+
+### Change 2 — `test(programParser): cover parseRunSegment unrecognised-type normalisation`
+
+**Summary:** `parseRunSegment` falls back to `'easy'` when the YAML `type` string is not in `VALID_SEGMENT_TYPES`. This was untested. Added one test that also clarifies a subtle behaviour: `buildStructureDescription` uses the raw YAML type for display ("Sprint") while the parsed `RunSegment.type` is the normalised value ("easy").
+
+**Files changed:**
+- `src/engine/__tests__/programParser.test.ts` — 1 new test
+
+---
+
+### Change 3 — `test(programParser): cover parseDurationSecs zero/invalid/2m edge cases`
+
+**Summary:** `parseDurationSecs` returns `undefined` for zero and non-numeric inputs (the condition `n > 0` guards against both). These paths were untested. Added three tests covering a plain zero, an unparseable string, and a 2-minute duration string.
+
+**Files changed:**
+- `src/engine/__tests__/programParser.test.ts` — 3 new tests in a new describe block
+
+---
+
+### Change 4 — `test(programParser): cover parseDay no-label default`
+
+**Summary:** `parseDay` defaults the label to `'Workout Day'` when no label is provided in the YAML. This fallback was untested. Added one test with a labelless day.
+
+**Files changed:**
+- `src/engine/__tests__/programParser.test.ts` — 1 new test
+
+---
+
+### Change 5 — `test(explanation): cover reset and null lastResult branches in buildAdaptationNote`
+
+**Summary:** The `switch (state.lastResult)` in `buildAdaptationNote` has five branches: `progress`, `hold`, `regress`, `reset`, and `default`. The first three were tested; `reset` and `default` (triggered by `null`/`undefined` lastResult) were not. Added two tests covering these cases.
+
+**Files changed:**
+- `src/modules/recommendation/__tests__/explanation.test.ts` — 2 new tests
+
+---
+
+### Change 6 — `test(previousSetsHelper): cover extra-workout instance ID inclusion and same-day exclusion`
+
+**Summary:** `findPreviousSetsByExercise` uses `rest.startsWith(currentDate)` to exclude same-date outcomes, where `rest` is the portion of `workoutInstanceId` after the plan prefix. For extra-workout IDs (`planId_YYYY-MM-DD_extra_extraId`) this means prior-date extras are included and same-day extras are excluded — the correct behaviour. Added two tests that directly verify this, making the ID-format contract explicit and regression-proof.
+
+**Files changed:**
+- `src/lib/__tests__/previousSetsHelper.test.ts` — 2 new tests
+
+---
+
 ## 2026-08-21
 
 ### Change 1 — `perf(TodayPage): memoize computeLoggedRate and computeWorkoutCompletionRate`
@@ -16,6 +72,109 @@
 **Risks / tradeoffs:** Zero risk. Identical pattern to `avgWorkoutsPerWeek` memoization (Aug 19). The dependency arrays precisely match the function arguments, so cached values are always fresh.
 
 **Rollback:** Revert the associated commit.
+**Summary:** Two O(n) calls in `TodayPage` — `computeLoggedRate(plan.id, planEntries, plan.startDate, today)` and `computeWorkoutCompletionRate(plan.id, planEntries, plan.startDate, today)` — ran on every render without memoization. Both functions share the exact dependency set of the adjacent `avgWorkoutsPerWeek` call (memoized 2026-08-19). Wrapped both in `useMemo` with `[plan.id, planEntries, plan.startDate, today]` dep arrays.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — 2 memoized calls (previously bare function calls)
+## 2026-08-23
+
+### Change 1 — `feat(ui): surface longestStreak as "Best streak" in Plan Progress modal`
+
+**Summary:** `computeHistoryStats` already computed and returned `longestStreak` but the value was never displayed. Added a "Best streak" row to `TodayPlanProgressModal`, visible below the existing "Current streak" row when `longestStreak > 0`. Wired `stats.longestStreak` through `TodayPage` as a new required prop.
+
+**Why it matters:** Users who break a streak lose context on their personal best. Surfacing it alongside the current streak gives motivation and a historical baseline.
+
+**Files changed:**
+- `src/components/today/TodayPlanProgressModal.tsx` — new `longestStreak` prop, new conditional row
+- `src/pages/TodayPage.tsx` — `longestStreak={stats.longestStreak}` passed to modal
+
+**Risks / tradeoffs:** Zero risk. The value was already computed; this is display-only. The row is hidden when `longestStreak === 0`, so brand-new plans show nothing spurious.
+
+**Rollback:** Revert the associated commit (`9b45fcc`).
+
+---
+
+### Change 2 — `feat(settings): configurable calendar week start day (Sun/Mon)`
+
+**Summary:** `buildMonthGrid` previously hardcoded `weekStartsOn: 0` (Sunday). Added a `weekStartsOn: 0 | 1` field to `settingsStore`, backfilled in `migrateSettingsState` (defaults to 0 = Sunday, backward compatible), threaded from `CalendarPage` into `buildMonthGrid`, and exposed in the Settings page as a Sunday/Monday button toggle. Five new tests in `settingsStore.test.ts` cover the new action and migration behavior. Test count: 1288 → 1293.
+
+**Why it matters:** Monday-first weeks are the ISO standard and the default expectation for users outside North America. Without this setting, the calendar week grid is always Sunday-first, making it appear out of sync with device calendars that use Monday-first.
+
+**Files changed:**
+- `src/store/settingsStore.ts` — `weekStartsOn: 0 | 1` field + `setWeekStartsOn` setter + migration
+- `src/engine/calendarProjection.ts` — `buildMonthGrid` `weekStartsOn` parameter (default 0)
+- `src/pages/CalendarPage.tsx` — reads `weekStartsOn` from store, passes to `buildMonthGrid`, adds to `useMemo` deps
+- `src/pages/SettingsPage.tsx` — Sun/Mon button toggle in new "Calendar week start" section
+- `src/store/__tests__/settingsStore.test.ts` — 5 new tests (default, toggle to Mon, toggle back, idempotent, migration backfill)
+
+**Risks / tradeoffs:** Very low. Defaults to Sunday (0), so existing users see no change. The setting is persisted and migrated. The only behavioral change for existing users who switch to Monday-first is that the calendar grid shifts — which is exactly the expected outcome.
+
+**Rollback:** Revert the `feat(settings)` commit (`72358c0`).
+## 2026-08-24
+
+### Change 1 — `fix(historyStats): exclude future-dated entries from findBestWeek`
+
+**Summary:** `findBestWeek` builds its per-week aggregation window from the
+min/max `calendarDate` across the plan's entries and extras, then picks the
+week with the most active workouts (completed + extras). If a bad CSV import
+left a future-dated `complete` entry in the store, that entry (and any
+neighbors) would push a future week into the "best week" celebration slot,
+even though the user has not actually trained that week yet. Added an
+optional 4th parameter `today?: string` that filters `entries`/`extras` down
+to `calendarDate <= today` before the aggregation window is computed. When
+the parameter is omitted, existing 3-arg callers get the pre-guard
+behavior (backwards compatible; covered by an explicit test).
+
+**Why it matters:** Mirrors the same future-date guard already applied to
+`computeHistoryStats` (`longestStreak`, `totalLogged`,
+`last7Completed`/`last30Completed`) and `computeWorkoutCompletionRate`. The
+"Best week" section is one of the few celebration surfaces on the History
+page; showing a fake future week would make the entire stats card feel
+untrustworthy.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — new optional `today` parameter on `findBestWeek`; filters entries/extras above it before max-date computation.
+- `src/pages/HistoryPage.tsx` — passes `today` into the `findBestWeek` call.
+- `src/lib/__tests__/historyStats.test.ts` — 4 new tests: rotation-entry
+  guard, extras guard, all-future-plus-guard returns null, and an explicit
+  regression test confirming the pre-guard behavior when `today` is omitted.
+
+**Risks / tradeoffs:** Zero risk. Signature change is additive; the previous
+3-arg call shape is preserved by a regression test. Guard only activates
+when the `today` parameter is supplied.
+
+**Rollback:** Revert commit `16111b6`.
+
+---
+
+### Change 2 — `fix(HistoryPage): clamp typeBreakdown dateRange to today`
+
+**Summary:** `HistoryPage` was calling `computeWorkoutTypeBreakdown` with
+no `dateRange`, so future-dated `complete` entries (from a bad CSV import)
+would be attributed into the type-mix label in the stats bar. Now
+`HistoryPage` passes `{ from: '0000-01-01', to: today }` as the range so
+only past + today entries contribute. The underlying function is unchanged
+— the existing (already-tested) `dateRange` code path does the work.
+
+**Why it matters:** The type-mix label ("3 weights · 2 runs · 1 yoga …") is
+one of the first data points a returning user sees on the History page.
+Inflated counts from a stray future entry would look like genuine training
+that never happened. Mirrors the same defensive posture applied to
+`computeHistoryStats` and (in Change 1 above) `findBestWeek`.
+
+**Files changed:**
+- `src/pages/HistoryPage.tsx` — `computeWorkoutTypeBreakdown` call now
+  passes an explicit dateRange with `to: today`; the memo's dep array picks
+  up `today`.
+- `src/lib/__tests__/historyStats.test.ts` — 2 new tests confirming
+  future-dated rotation entries and future-dated extras are excluded when
+  `dateRange.to` is set to `today`.
+
+**Risks / tradeoffs:** Zero risk. The `dateRange` code path was already
+covered by existing tests; the new tests document the specific future-date
+use case. No signature change; no other caller affected.
+
+**Rollback:** Revert commit `7378f2b`.
 
 ---
 
