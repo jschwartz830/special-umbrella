@@ -1,5 +1,53 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-08-20
+**Date:** 2026-08-24
+**Branch:** `claude/serene-cori-3haj5d`
+
+---
+
+## Executive Summary (2026-08-24 pass)
+
+1. **What changed:** Two symmetric defensive fixes preventing future-dated
+   entries (from a bad CSV import) from inflating History-page stats.
+   (a) `findBestWeek` now takes an optional `today` upper bound and
+   filters `entries`/`extras` above it before computing the best week.
+   (b) `HistoryPage` now passes `{ from: '0000-01-01', to: today }` as the
+   `dateRange` argument to `computeWorkoutTypeBreakdown` so the type-mix
+   label in the stats bar can't be pushed by a future `complete` entry.
+   Test count: 1288 → 1294 (+6 new tests).
+
+2. **Highest confidence:** Both fixes mirror the exact future-date guard
+   already established by `computeHistoryStats` (longestStreak, totalLogged,
+   last7Completed/last30Completed) and `computeWorkoutCompletionRate`. The
+   `findBestWeek` change is backwards-compatible — the `today` parameter is
+   optional and the pre-guard behavior is retained when omitted (covered
+   by a dedicated regression test). The `HistoryPage` change uses the
+   already-tested `dateRange` code path in `computeWorkoutTypeBreakdown`.
+
+3. **What is risky:** Nothing. Neither change alters the shape of returned
+   data. The `findBestWeek` signature change is additive; the `HistoryPage`
+   caller supplies an explicit upper bound rather than relying on implicit
+   inclusion of all past+future entries.
+
+4. **What to review first:** Import a CSV with a future-dated `complete`
+   entry (say `2099-06-01`) into a plan on the History page. Verify:
+   (a) the "Best week" celebration does NOT surface the future week and
+   instead points at the real best past week, and (b) the type-mix label
+   in the History stats bar does NOT include the future entry's count.
+   Then run `npx vitest run` and confirm 1294 tests pass, `npx tsc --noEmit`
+   is clean.
+
+---
+
+## Improvements Completed (2026-08-24)
+
+| # | Description | Commit |
+|---|---|---|
+| 1 | `fix(historyStats)`: exclude future-dated entries from `findBestWeek` via optional `today` param (+4 tests) | `16111b6` |
+| 2 | `fix(HistoryPage)`: clamp `typeBreakdown` dateRange to `today` (+2 tests) | `7378f2b` |
+
+---
+
+## Previous Pass Notes (2026-08-20)
 **Branch:** `claude/serene-cori-27v4nu`
 
 ---
