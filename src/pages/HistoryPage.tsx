@@ -265,8 +265,8 @@ export function HistoryPage() {
   }, [filterPlanId, filteredEntries, filteredExtras, today])
 
   const bestWeek = useMemo(
-    () => (filterPlanId === 'all' ? null : findBestWeek(filterPlanId, filteredEntries, filteredExtras)),
-    [filterPlanId, filteredEntries, filteredExtras],
+    () => (filterPlanId === 'all' ? null : findBestWeek(filterPlanId, filteredEntries, filteredExtras, today)),
+    [filterPlanId, filteredEntries, filteredExtras, today],
   )
 
   function openEdit(entry: HistoryEntry) {

@@ -1071,14 +1071,24 @@ export function padWeekGaps(weeks: WeeklyBreakdown[]): WeeklyBreakdown[] {
  * @param planId  Plan to query.
  * @param entries All history entries (unfiltered; function filters by plan).
  * @param extras  All extra workout entries (unfiltered).
+ * @param today   Optional YYYY-MM-DD upper bound — when provided, entries and
+ *                extras with `calendarDate > today` are excluded so a bad CSV
+ *                import containing future-dated `complete` entries cannot
+ *                inflate a future "best week" (mirrors the future-date guard
+ *                in `computeHistoryStats`).
  */
 export function findBestWeek(
   planId: string,
   entries: HistoryEntry[],
   extras: ExtraWorkoutEntry[],
+  today?: string,
 ): WeeklyBreakdown | null {
-  const planEntries = entries.filter(e => e.planId === planId)
-  const planExtras = extras.filter(e => e.planId === planId)
+  const planEntries = entries.filter(
+    e => e.planId === planId && (today === undefined || e.calendarDate <= today),
+  )
+  const planExtras = extras.filter(
+    e => e.planId === planId && (today === undefined || e.calendarDate <= today),
+  )
   if (planEntries.length === 0 && planExtras.length === 0) return null
 
   const allDates = [

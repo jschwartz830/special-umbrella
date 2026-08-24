@@ -2658,6 +2658,53 @@ describe('findBestWeek', () => {
     expect(result!.weekStart).toBe('2026-01-05')
     expect(result!.completed).toBe(3)
   })
+
+  it('excludes future-dated entries when today is provided', () => {
+    // Past-week (real) has 2 completed; a future-dated week has 3 completed
+    // from a bad CSV import. Without the today guard the future week would win.
+    const entries = [
+      bwEntry('2026-01-05', 'complete'), // real: week of Jan 5, 2 completed
+      bwEntry('2026-01-06', 'complete'),
+      bwEntry('2026-06-01', 'complete'), // future: week of Jun 1, 3 completed
+      bwEntry('2026-06-02', 'complete'),
+      bwEntry('2026-06-03', 'complete'),
+    ]
+    const result = findBestWeek('plan-1', entries, [], '2026-01-20')
+    expect(result!.weekStart).toBe('2026-01-05')
+    expect(result!.completed).toBe(2)
+  })
+
+  it('excludes future-dated extras when today is provided', () => {
+    // A future-dated extra should not push a future week into "best" position.
+    const entries = [
+      bwEntry('2026-01-05', 'complete'), // real: 1 completed
+    ]
+    const extras = [
+      bwExtra('2026-06-01'), // future
+      bwExtra('2026-06-02'), // future
+    ]
+    const result = findBestWeek('plan-1', entries, extras, '2026-01-20')
+    expect(result!.weekStart).toBe('2026-01-05')
+    expect(result!.completed).toBe(1)
+    expect(result!.extras).toBe(0)
+  })
+
+  it('returns null when the only entries are future-dated and today is provided', () => {
+    const entries = [bwEntry('2099-06-01', 'complete')]
+    expect(findBestWeek('plan-1', entries, [], '2026-01-20')).toBeNull()
+  })
+
+  it('includes future-dated entries when today is not provided (backwards compatible)', () => {
+    // Explicit backwards-compat: existing 3-arg callers see the pre-guard behavior.
+    const entries = [
+      bwEntry('2026-01-05', 'complete'),
+      bwEntry('2099-06-01', 'complete'), // future
+      bwEntry('2099-06-02', 'complete'),
+    ]
+    const result = findBestWeek('plan-1', entries, [])
+    expect(result!.weekStart).toBe('2099-06-01')
+    expect(result!.completed).toBe(2)
+  })
 })
 
 // ── countTotalUnloggedDays ────────────────────────────────────────────────────
