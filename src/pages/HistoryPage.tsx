@@ -202,13 +202,23 @@ export function HistoryPage() {
   // For single-plan view: use computeWorkoutTypeBreakdown which gives completed/skipped
   // counts and avgEffort per type from outcome data. For 'all' plans, fall back to the
   // inline computation since there's no single planDaysById to pass.
+  //
+  // The `to: today` clamp is defensive: future-dated `complete` entries from a bad
+  // CSV import would otherwise inflate the type-mix label shown in the stats bar
+  // (mirrors the same guard applied to computeHistoryStats and findBestWeek).
   const typeBreakdown = useMemo((): WorkoutTypeBreakdown | null => {
     if (filterPlanId === 'all') return null
     const p = plans[filterPlanId]
     if (!p) return null
     const planDaysById = new Map(p.days.map((day, i) => [i, { slots: day.slots }]))
-    return computeWorkoutTypeBreakdown(filteredEntries, filteredExtras, outcomes, planDaysById)
-  }, [filterPlanId, filteredEntries, filteredExtras, outcomes, plans])
+    return computeWorkoutTypeBreakdown(
+      filteredEntries,
+      filteredExtras,
+      outcomes,
+      planDaysById,
+      { from: '0000-01-01', to: today },
+    )
+  }, [filterPlanId, filteredEntries, filteredExtras, outcomes, plans, today])
 
   // Fallback for 'all' plan view: count completed entries + all extras per type.
   const typeCountMapFallback = useMemo(() => {
@@ -265,8 +275,8 @@ export function HistoryPage() {
   }, [filterPlanId, filteredEntries, filteredExtras, today])
 
   const bestWeek = useMemo(
-    () => (filterPlanId === 'all' ? null : findBestWeek(filterPlanId, filteredEntries, filteredExtras)),
-    [filterPlanId, filteredEntries, filteredExtras],
+    () => (filterPlanId === 'all' ? null : findBestWeek(filterPlanId, filteredEntries, filteredExtras, today)),
+    [filterPlanId, filteredEntries, filteredExtras, today],
   )
 
   function openEdit(entry: HistoryEntry) {

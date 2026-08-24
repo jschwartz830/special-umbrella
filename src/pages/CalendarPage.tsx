@@ -18,6 +18,7 @@ import { format } from 'date-fns'
 import { useActivePlan } from '../hooks/useActivePlan'
 import { useToday } from '../hooks/useToday'
 import { useHistoryStore } from '../store/historyStore'
+import { useSettingsStore } from '../store/settingsStore'
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../store/outcomeStore'
 import { extractExtraId } from '../lib/workoutInstanceId'
 import { useMobilityStore, type MobilityCompletion, type MobilityExercise } from '../store/mobilityStore'
@@ -90,6 +91,7 @@ export function CalendarPage() {
   const mobilityCompletions = useMobilityStore(s => s.completions)
   const mobilityRoutine = useMobilityStore(s => s.routine)
   const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
+  const weekStartsOn = useSettingsStore(s => s.weekStartsOn)
   const outcomes = useOutcomeStore(s => s.outcomes)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
@@ -102,8 +104,8 @@ export function CalendarPage() {
   )
 
   const weeks = useMemo(
-    () => buildMonthGrid(year, month, plan, entries, overrides, today),
-    [year, month, plan, entries, overrides, today],
+    () => buildMonthGrid(year, month, plan, entries, overrides, today, weekStartsOn),
+    [year, month, plan, entries, overrides, today, weekStartsOn],
   )
 
   const streakDatesSet = useMemo(() => {
