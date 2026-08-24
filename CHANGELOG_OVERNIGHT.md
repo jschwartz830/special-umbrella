@@ -2,6 +2,74 @@
 
 ---
 
+## 2026-08-24
+
+### Change 1 — `fix(historyStats): exclude future-dated entries from findBestWeek`
+
+**Summary:** `findBestWeek` builds its per-week aggregation window from the
+min/max `calendarDate` across the plan's entries and extras, then picks the
+week with the most active workouts (completed + extras). If a bad CSV import
+left a future-dated `complete` entry in the store, that entry (and any
+neighbors) would push a future week into the "best week" celebration slot,
+even though the user has not actually trained that week yet. Added an
+optional 4th parameter `today?: string` that filters `entries`/`extras` down
+to `calendarDate <= today` before the aggregation window is computed. When
+the parameter is omitted, existing 3-arg callers get the pre-guard
+behavior (backwards compatible; covered by an explicit test).
+
+**Why it matters:** Mirrors the same future-date guard already applied to
+`computeHistoryStats` (`longestStreak`, `totalLogged`,
+`last7Completed`/`last30Completed`) and `computeWorkoutCompletionRate`. The
+"Best week" section is one of the few celebration surfaces on the History
+page; showing a fake future week would make the entire stats card feel
+untrustworthy.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — new optional `today` parameter on `findBestWeek`; filters entries/extras above it before max-date computation.
+- `src/pages/HistoryPage.tsx` — passes `today` into the `findBestWeek` call.
+- `src/lib/__tests__/historyStats.test.ts` — 4 new tests: rotation-entry
+  guard, extras guard, all-future-plus-guard returns null, and an explicit
+  regression test confirming the pre-guard behavior when `today` is omitted.
+
+**Risks / tradeoffs:** Zero risk. Signature change is additive; the previous
+3-arg call shape is preserved by a regression test. Guard only activates
+when the `today` parameter is supplied.
+
+**Rollback:** Revert commit `16111b6`.
+
+---
+
+### Change 2 — `fix(HistoryPage): clamp typeBreakdown dateRange to today`
+
+**Summary:** `HistoryPage` was calling `computeWorkoutTypeBreakdown` with
+no `dateRange`, so future-dated `complete` entries (from a bad CSV import)
+would be attributed into the type-mix label in the stats bar. Now
+`HistoryPage` passes `{ from: '0000-01-01', to: today }` as the range so
+only past + today entries contribute. The underlying function is unchanged
+— the existing (already-tested) `dateRange` code path does the work.
+
+**Why it matters:** The type-mix label ("3 weights · 2 runs · 1 yoga …") is
+one of the first data points a returning user sees on the History page.
+Inflated counts from a stray future entry would look like genuine training
+that never happened. Mirrors the same defensive posture applied to
+`computeHistoryStats` and (in Change 1 above) `findBestWeek`.
+
+**Files changed:**
+- `src/pages/HistoryPage.tsx` — `computeWorkoutTypeBreakdown` call now
+  passes an explicit dateRange with `to: today`; the memo's dep array picks
+  up `today`.
+- `src/lib/__tests__/historyStats.test.ts` — 2 new tests confirming
+  future-dated rotation entries and future-dated extras are excluded when
+  `dateRange.to` is set to `today`.
+
+**Risks / tradeoffs:** Zero risk. The `dateRange` code path was already
+covered by existing tests; the new tests document the specific future-date
+use case. No signature change; no other caller affected.
+
+**Rollback:** Revert commit `7378f2b`.
+
+---
+
 ## 2026-08-20
 
 ### Change 1 — `fix(historyStats.test): correct daysMap type annotation to use WorkoutType`
