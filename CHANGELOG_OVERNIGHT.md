@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-08-25
+
+### Change 1 — `test(mobilityLibrary): cover formatMobilityDuration, getLibraryExerciseById, mobilityExerciseName, and summarizeMobilitySets branches`
+
+**Summary:** Several exported helpers in `mobilityLibrary.ts` had significant branch gaps. Added 19 tests covering: all 3 `formatMobilityDuration` output shapes ("45s" / "2m" / "2m 15s"); `getLibraryExerciseById` found and not-found paths; all 3 fallback tiers of `mobilityExerciseName` (routine match → library fallback → raw id); and all 8 distinguishable output shapes of `summarizeMobilitySets` (single timed, single reps, single neither, multi-timed same, multi-timed different, multi-reps same, multi-reps different, mixed).
+
+**Files changed:**
+- `src/lib/__tests__/mobilityLibrary.test.ts` — 19 new tests in 4 new describe blocks
+
+**Risk:** None — tests only.
+
+---
+
+### Change 2 — `test(planStore): cover makeSlot for all workout types and migratePlanState for all slot-type migrations`
+
+**Summary:** `makeSlot` was only tested for `'weights'` and `'mobility'` types; all other types (run, recovery_run, swim, yoga, other) were unexercised. `migratePlanState` — which handles legacy persisted data for all existing users — was completely untested despite covering 4 slot-type migrations and 2 tag-promotion derivations. Added 15 tests: 6 covering `makeSlot` for all types, and 12 covering `migratePlanState` including null/missing input, all 4 migration paths (`weightlifting→weights` with name preservation, `long_run→run+subtype:long`, `recovery_run→run+subtype:recovery`, `rest→other+subtype:rest`), tag-derived `location` and `weightsFocusArea`, and no-op passthrough for already-migrated slots.
+
+**Files changed:**
+- `src/store/__tests__/planStore.test.ts` — 15 new tests in extended `makeSlot` describe and new `migratePlanState` describe block
+
+**Risk:** None — tests only.
+
+---
+
+### Change 3 — `test(calendarProjection): cover weekStartsOn: 1 (Monday-first grid)`
+
+**Summary:** `buildMonthGrid` supports a `weekStartsOn` parameter (0=Sunday default, 1=Monday), propagated from `settingsStore`. The Monday-first grid shape was untested despite being a user-facing setting. Added 4 tests verifying: first column of every week is Monday (getDay() === 1), last column is Sunday (getDay() === 0), all 31 days of January appear in the grid, and today is correctly flagged regardless of week orientation.
+
+**Files changed:**
+- `src/engine/__tests__/calendarProjection.test.ts` — 4 new tests in new `weekStartsOn: 1 (Monday)` describe block
+
+**Risk:** None — tests only.
+
+---
+
 ## 2026-08-22
 
 ### Change 1 — `test(programParser): cover buildStructureDescription set-array, reps-only, and run-no-segments branches`

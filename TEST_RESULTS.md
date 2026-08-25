@@ -2,6 +2,39 @@
 
 ---
 
+## 2026-08-25 Pass
+
+### Tests Added
+
+#### `src/lib/__tests__/mobilityLibrary.test.ts` — 19 new tests
+
+`formatMobilityDuration` (3 tests): seconds-only, minutes-only, minutes+seconds.
+
+`getLibraryExerciseById` (2 tests): found and not-found paths.
+
+`mobilityExerciseName` (3 tests): routine name wins, library fallback, raw-id fallback.
+
+`summarizeMobilitySets — format branches` (11 tests): all 8 distinguishable output shapes (single timed, single reps, single-neither, multi-timed-same, multi-timed-different, multi-reps-same, multi-reps-different, mixed); plus 2 empty-array checks.
+
+#### `src/store/__tests__/planStore.test.ts` — 15 new tests
+
+`makeSlot` additions (4 tests): run slot (targetDistance=8, subtype='long'), recovery_run slot (targetDistance=3, subtype='recovery'), swim slot (targetDuration=45), yoga slot (targetDuration=30), other slot (subtype='rest').
+
+`migratePlanState` (12 tests): null input, undefined input, missing plans field, weightlifting→weights (generic name), weightlifting with custom name (preserved), long_run→run+long, recovery_run→run+recovery, rest→other+rest, location derivation from all 4 tag values, weightsFocusArea derivation, already-migrated no-op, empty days array.
+
+#### `src/engine/__tests__/calendarProjection.test.ts` — 4 new tests (new describe block)
+
+`weekStartsOn: 1 (Monday)`: first column is Monday, last column is Sunday, all 31 Jan days present, today marked correctly.
+
+### Full Suite Result
+
+- **Test files:** 35
+- **Tests:** 1348 (1312 baseline + 36 new)
+- **Result:** All passing
+- **Duration:** ~3.7s
+
+---
+
 ## 2026-08-21 Pass
 ## 2026-08-23 Pass
 ## 2026-08-24 Pass

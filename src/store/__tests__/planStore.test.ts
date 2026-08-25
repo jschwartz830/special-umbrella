@@ -12,9 +12,9 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { usePlanStore, makeSlot } from '../planStore'
+import { usePlanStore, makeSlot, migratePlanState } from '../planStore'
 // eslint-disable-next-line import/first
-import type { Plan } from '../../types'
+import type { Plan, WorkoutSlot } from '../../types'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -447,9 +447,171 @@ describe('makeSlot', () => {
     expect(slot.name).toBe('Weights')
   })
 
+  it('creates a run slot with targetDistance and subtype long', () => {
+    const slot = makeSlot('run')
+    expect(slot.type).toBe('run')
+    expect(slot.name).toBe('Run')
+    expect(slot.targetDistance).toBe(8)
+    expect(slot.subtype).toBe('long')
+  })
+
+  it('creates a recovery_run slot with targetDistance 3 and subtype recovery', () => {
+    const slot = makeSlot('recovery_run')
+    expect(slot.type).toBe('recovery_run')
+    expect(slot.name).toBe('Run')
+    expect(slot.targetDistance).toBe(3)
+    expect(slot.subtype).toBe('recovery')
+  })
+
+  it('creates a swim slot with targetDuration 45', () => {
+    const slot = makeSlot('swim')
+    expect(slot.type).toBe('swim')
+    expect(slot.name).toBe('Swim')
+    expect(slot.targetDuration).toBe(45)
+  })
+
+  it('creates a yoga slot with targetDuration 30', () => {
+    const slot = makeSlot('yoga')
+    expect(slot.type).toBe('yoga')
+    expect(slot.name).toBe('Yoga')
+    expect(slot.targetDuration).toBe(30)
+  })
+
+  it('creates an other slot (default/unknown type) with subtype rest', () => {
+    const slot = makeSlot('other' as WorkoutSlot['type'])
+    expect(slot.name).toBe('Other')
+    expect(slot.subtype).toBe('rest')
+  })
+
   it('assigns a unique id to each slot', () => {
     const a = makeSlot('mobility')
     const b = makeSlot('mobility')
     expect(a.id).not.toBe(b.id)
+  })
+})
+
+// ── migratePlanState ──────────────────────────────────────────────────────────
+
+describe('migratePlanState', () => {
+  function makePersistedPlan(id: string, slots: Partial<WorkoutSlot>[]): object {
+    return {
+      plans: {
+        [id]: {
+          id,
+          name: 'Test',
+          status: 'inactive',
+          days: [{ id: 'd1', label: 'Day 1', slots }],
+          duration: { type: 'rotations', value: 4 },
+          startDate: '2026-01-01',
+          startDayIndex: 0,
+          createdAt: '2026-01-01T00:00:00Z',
+          updatedAt: '2026-01-01T00:00:00Z',
+        },
+      },
+      activePlanId: null,
+    }
+  }
+
+  it('returns empty state for null/undefined input', () => {
+    expect(migratePlanState(null)).toEqual({ plans: {}, activePlanId: null })
+    expect(migratePlanState(undefined)).toEqual({ plans: {}, activePlanId: null })
+  })
+
+  it('returns empty state when plans field is missing', () => {
+    expect(migratePlanState({ activePlanId: null })).toEqual({ plans: {}, activePlanId: null })
+  })
+
+  it('migrates weightlifting slot → weights and renames "Weightlifting" → "Weights"', () => {
+    const persisted = makePersistedPlan('p1', [{ id: 's1', type: 'weightlifting', name: 'Weightlifting', tags: [] }])
+    const result = migratePlanState(persisted)
+    const slot = result.plans['p1'].days[0].slots[0]
+    expect(slot.type).toBe('weights')
+    expect(slot.name).toBe('Weights')
+    expect(slot.tags).toBeUndefined()
+  })
+
+  it('migrates weightlifting slot with a custom name — keeps custom name', () => {
+    const persisted = makePersistedPlan('p1', [{ id: 's1', type: 'weightlifting', name: 'Push Day', tags: [] }])
+    const result = migratePlanState(persisted)
+    const slot = result.plans['p1'].days[0].slots[0]
+    expect(slot.type).toBe('weights')
+    expect(slot.name).toBe('Push Day')
+  })
+
+  it('migrates long_run slot → run with subtype long', () => {
+    const persisted = makePersistedPlan('p1', [{ id: 's1', type: 'long_run', name: 'Long Run', tags: [] }])
+    const result = migratePlanState(persisted)
+    const slot = result.plans['p1'].days[0].slots[0]
+    expect(slot.type).toBe('run')
+    expect(slot.subtype).toBe('long')
+    expect(slot.name).toBe('Run')
+    expect(slot.tags).toBeUndefined()
+  })
+
+  it('migrates recovery_run slot → run with subtype recovery', () => {
+    const persisted = makePersistedPlan('p1', [{ id: 's1', type: 'recovery_run', name: 'Recovery Run', tags: [] }])
+    const result = migratePlanState(persisted)
+    const slot = result.plans['p1'].days[0].slots[0]
+    expect(slot.type).toBe('run')
+    expect(slot.subtype).toBe('recovery')
+    expect(slot.name).toBe('Run')
+    expect(slot.tags).toBeUndefined()
+  })
+
+  it('migrates rest slot → other with subtype rest', () => {
+    const persisted = makePersistedPlan('p1', [{ id: 's1', type: 'rest', name: 'Rest Day', tags: [] }])
+    const result = migratePlanState(persisted)
+    const slot = result.plans['p1'].days[0].slots[0]
+    expect(slot.type).toBe('other')
+    expect(slot.subtype).toBe('rest')
+    expect(slot.name).toBe('Other')
+    expect(slot.tags).toBeUndefined()
+  })
+
+  it('derives location from tags (home, gym, indoor, outdoor)', () => {
+    const homeSlot = { id: 's1', type: 'weights', name: 'Weights', tags: ['home'] }
+    const gymSlot = { id: 's2', type: 'weights', name: 'Weights', tags: ['gym'] }
+    const indoorSlot = { id: 's3', type: 'weights', name: 'Weights', tags: ['indoor'] }
+    const outdoorSlot = { id: 's4', type: 'weights', name: 'Weights', tags: ['outdoor'] }
+
+    const persisted = {
+      plans: {
+        p1: { id: 'p1', name: 'T', status: 'inactive', days: [{ id: 'd1', label: 'D1', slots: [homeSlot, gymSlot, indoorSlot, outdoorSlot] }], duration: { type: 'rotations', value: 1 }, startDate: '2026-01-01', startDayIndex: 0, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+      },
+      activePlanId: null,
+    }
+    const result = migratePlanState(persisted)
+    const slots = result.plans['p1'].days[0].slots
+    expect(slots[0].location).toBe('home')
+    expect(slots[1].location).toBe('gym')
+    expect(slots[2].location).toBe('indoor')
+    expect(slots[3].location).toBe('outdoor')
+    expect(slots[0].tags).toBeUndefined()
+  })
+
+  it('derives weightsFocusArea from tags (upper, lower, full_body)', () => {
+    const persisted = makePersistedPlan('p1', [{ id: 's1', type: 'weightlifting', name: 'Lift', tags: ['upper'] }])
+    const result = migratePlanState(persisted)
+    const slot = result.plans['p1'].days[0].slots[0]
+    expect(slot.weightsFocusArea).toBe('upper')
+  })
+
+  it('leaves already-migrated slots unchanged', () => {
+    const persisted = makePersistedPlan('p1', [{ id: 's1', type: 'weights', name: 'Weights', tags: undefined }])
+    const result = migratePlanState(persisted)
+    const slot = result.plans['p1'].days[0].slots[0]
+    expect(slot.type).toBe('weights')
+    expect(slot.name).toBe('Weights')
+  })
+
+  it('handles plans with empty days array', () => {
+    const persisted = {
+      plans: {
+        p1: { id: 'p1', name: 'Empty', status: 'inactive', days: [], duration: { type: 'rotations', value: 1 }, startDate: '2026-01-01', startDayIndex: 0, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
+      },
+      activePlanId: null,
+    }
+    const result = migratePlanState(persisted)
+    expect(result.plans['p1'].days).toEqual([])
   })
 })
