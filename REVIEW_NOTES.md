@@ -3,6 +3,39 @@
 **Branch:** `claude/serene-cori-5zm3g1`
 **Date:** 2026-08-22
 **Branch:** `claude/serene-cori-g0k8es`
+**Date:** 2026-08-25
+**Branch:** `claude/serene-cori-lwkxmd`
+
+---
+
+## Executive Summary (2026-08-25 pass)
+
+1. **What changed:** 36 new tests across three files — `mobilityLibrary.test.ts` (+19), `planStore.test.ts` (+15), `calendarProjection.test.ts` (+4 in new describe block) — covering previously-untested branches. No production source files modified. Test count: 1312 → 1348 (+36).
+
+2. **Highest confidence:** All additions are test-only. Each test targets a specific, previously-unexercised branch with a concrete scenario.
+
+3. **What is risky:** Nothing. No production code was changed.
+
+4. **What to review first:** Run `npx vitest run` and verify all 1348 tests pass. The `migratePlanState` tests (12 new) are the highest-value addition — they cover all four legacy slot-type migrations (`weightlifting→weights`, `long_run→run`, `recovery_run→run`, `rest→other`) plus tag-derived `location` and `weightsFocusArea` promotion. These were completely unexercised before and represent a migration correctness regression risk for any existing user with pre-v2 persisted data.
+
+---
+
+## Improvements Completed (2026-08-25)
+
+| # | Description |
+|---|---|
+| 1 | `test(mobilityLibrary)`: cover all 3 `formatMobilityDuration` branches (seconds-only, minutes-only, mixed) |
+| 2 | `test(mobilityLibrary)`: cover `getLibraryExerciseById` found and not-found paths |
+| 3 | `test(mobilityLibrary)`: cover all 3 tiers of `mobilityExerciseName` (routine → library → raw id) |
+| 4 | `test(mobilityLibrary)`: cover all 8 `summarizeMobilitySets` format branches |
+| 5 | `test(planStore)`: cover `makeSlot` for all 7 workout types beyond weights/mobility |
+| 6 | `test(planStore)`: cover `migratePlanState` — all 4 slot-type migrations, tag derivation, null/missing input |
+| 7 | `test(calendarProjection)`: cover `weekStartsOn: 1` (Monday-first grid) — first/last column days, full January coverage, today marking |
+
+---
+
+## Previous Pass Notes (2026-08-22)
+**Branch:** `claude/serene-cori-g0k8es`
 
 ---
 

@@ -9,6 +9,9 @@ import {
   normalizeMobilityRoutine,
   summarizeMobilitySets,
   totalTimedSec,
+  formatMobilityDuration,
+  getLibraryExerciseById,
+  mobilityExerciseName,
 } from '../mobilityLibrary'
 
 describe('isBilateralExercise', () => {
@@ -70,6 +73,86 @@ describe('summarizeMobilitySets — malformed input', () => {
 
   it('returns an empty string for null sets', () => {
     expect(summarizeMobilitySets(null)).toBe('')
+  })
+})
+
+describe('formatMobilityDuration', () => {
+  it('returns seconds-only when under a minute', () => {
+    expect(formatMobilityDuration(45)).toBe('45s')
+    expect(formatMobilityDuration(0)).toBe('0s')
+  })
+
+  it('returns minutes-only when there are no remaining seconds', () => {
+    expect(formatMobilityDuration(60)).toBe('1m')
+    expect(formatMobilityDuration(120)).toBe('2m')
+  })
+
+  it('returns minutes and seconds when both are non-zero', () => {
+    expect(formatMobilityDuration(135)).toBe('2m 15s')
+    expect(formatMobilityDuration(61)).toBe('1m 1s')
+  })
+})
+
+describe('getLibraryExerciseById', () => {
+  it('returns the exercise when found', () => {
+    const ex = getLibraryExerciseById('lib-cat-cow')
+    expect(ex).toBeDefined()
+    expect(ex?.name).toBe('Cat-Cow')
+  })
+
+  it('returns undefined for an unknown id', () => {
+    expect(getLibraryExerciseById('not-a-real-id')).toBeUndefined()
+  })
+})
+
+describe('mobilityExerciseName', () => {
+  it('prefers the name from the routine (e.g. a renamed custom exercise)', () => {
+    const routine = [{ id: 'lib-cat-cow', name: 'My Cat Cow' }]
+    expect(mobilityExerciseName('lib-cat-cow', routine)).toBe('My Cat Cow')
+  })
+
+  it('falls back to the library name when the routine has no match', () => {
+    expect(mobilityExerciseName('lib-cat-cow', [])).toBe('Cat-Cow')
+  })
+
+  it('falls back to the raw id when neither the routine nor the library has a match', () => {
+    expect(mobilityExerciseName('custom-xyz-123', [])).toBe('custom-xyz-123')
+  })
+})
+
+describe('summarizeMobilitySets — format branches', () => {
+  it('single timed set returns formatted duration', () => {
+    expect(summarizeMobilitySets([{ durationSec: 45 }])).toBe('45s')
+    expect(summarizeMobilitySets([{ durationSec: 120 }])).toBe('2m')
+  })
+
+  it('single reps set returns "N reps"', () => {
+    expect(summarizeMobilitySets([{ reps: 10 }])).toBe('10 reps')
+  })
+
+  it('single set with neither timed nor reps returns "1 set"', () => {
+    expect(summarizeMobilitySets([{}])).toBe('1 set')
+  })
+
+  it('multiple timed sets with same duration returns "N sets · Xs hold"', () => {
+    expect(summarizeMobilitySets([{ durationSec: 30 }, { durationSec: 30 }, { durationSec: 30 }]))
+      .toBe('3 sets · 30s hold')
+  })
+
+  it('multiple timed sets with different durations returns just set count', () => {
+    expect(summarizeMobilitySets([{ durationSec: 30 }, { durationSec: 45 }])).toBe('2 sets')
+  })
+
+  it('multiple reps sets with same count returns "N sets × N reps"', () => {
+    expect(summarizeMobilitySets([{ reps: 10 }, { reps: 10 }, { reps: 10 }])).toBe('3 sets × 10 reps')
+  })
+
+  it('multiple reps sets with different counts returns just set count', () => {
+    expect(summarizeMobilitySets([{ reps: 8 }, { reps: 12 }])).toBe('2 sets')
+  })
+
+  it('mixed timed and reps sets returns just set count', () => {
+    expect(summarizeMobilitySets([{ durationSec: 30 }, { reps: 10 }])).toBe('2 sets')
   })
 })
 

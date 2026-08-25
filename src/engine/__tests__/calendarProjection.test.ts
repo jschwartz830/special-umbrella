@@ -434,4 +434,41 @@ describe('buildMonthGrid', () => {
     expect(cell.resolvedDay!.status).toBe('past_unlogged')
     expect(cell.resolvedDay!.historyEntry).toBeUndefined()
   })
+
+  describe('weekStartsOn: 1 (Monday)', () => {
+    it('first column of every week is Monday when weekStartsOn is 1', () => {
+      const plan = makePlan(4)
+      const weeks = buildMonthGrid(2026, 0, plan, [], [], '2026-01-15', 1)
+      for (const week of weeks) {
+        // date-fns returns Mon as day 1; verify by checking isoWeekday is not Sunday (0)
+        const firstDate = new Date(week[0].date + 'T00:00:00')
+        expect(firstDate.getDay()).toBe(1) // 1 = Monday
+      }
+    })
+
+    it('last column of every week is Sunday when weekStartsOn is 1', () => {
+      const plan = makePlan(4)
+      const weeks = buildMonthGrid(2026, 0, plan, [], [], '2026-01-15', 1)
+      for (const week of weeks) {
+        const lastDate = new Date(week[6].date + 'T00:00:00')
+        expect(lastDate.getDay()).toBe(0) // 0 = Sunday
+      }
+    })
+
+    it('still covers all 31 days of January', () => {
+      const plan = makePlan(4)
+      const weeks = buildMonthGrid(2026, 0, plan, [], [], '2026-01-15', 1)
+      const janCells = weeks.flat().filter(c => c.isCurrentMonth)
+      expect(janCells).toHaveLength(31)
+    })
+
+    it('marks today correctly regardless of weekStartsOn', () => {
+      const plan = makePlan(4)
+      const today = '2026-01-15'
+      const weeks = buildMonthGrid(2026, 0, plan, [], [], today, 1)
+      const todayCells = weeks.flat().filter(c => c.isToday)
+      expect(todayCells).toHaveLength(1)
+      expect(todayCells[0].date).toBe(today)
+    })
+  })
 })
