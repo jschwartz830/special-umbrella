@@ -5,6 +5,20 @@
 **Branch:** `claude/serene-cori-g0k8es`
 **Date:** 2026-08-25
 **Branch:** `claude/serene-cori-lwkxmd`
+**Date:** 2026-08-26
+**Branch:** `claude/serene-cori-a58c0l`
+
+---
+
+## Executive Summary (2026-08-26 pass)
+
+1. **What changed:** One production fix (`storeSync.ts`) and one new test (+1). The `wpt_settings` cloud migration was upgraded from an identity function to `migrateSettingsState`, matching the pattern already used for `wpt_history` and `wpt_mobility`. Test count: 1348 → 1349 (+1).
+
+2. **Why this matters:** Cloud data hydration via `syncOnLogin` bypasses Zustand's `persist` middleware migration hook, so new settings fields would be absent after login rather than defaulting correctly. The identity migration was a fragile implicit reliance on Zustand `setState`'s shallow merge; the explicit `migrateSettingsState` call is self-documenting and robust.
+
+3. **Highest confidence:** The `migrateSettingsState` function is already unit-tested and idempotent. The new test directly exercises the gap (old cloud data without `weekStartsOn` → should backfill to `0`).
+
+4. **Remaining open items (no change):** TodayPage extraction hook (risky refactor), `updateEntryDate` data-loss risk (no callers), cloud sync conflict resolution (out of scope).
 
 ---
 
