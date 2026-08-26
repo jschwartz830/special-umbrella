@@ -340,3 +340,29 @@ document the future-date behavior specifically.
 
 Same open items as the 2026-08-19 pass — none re-classified this pass.
 
+---
+
+## Additions — 2026-08-26
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `storeSync`: apply `migrateSettingsState` for `wpt_settings` cloud hydration | Defensive fix | `src/lib/storeSync.ts`, `src/lib/__tests__/storeSync.test.ts` |
+
+### Detail
+
+**1. `wpt_settings` cloud migration upgrade**
+
+Cloud data hydrated via `syncOnLogin` bypasses Zustand's `persist` middleware migration hook — the hook runs only on `localStorage` reads, not on direct `setState` calls. The `wpt_settings` entry was using `(data) => data` (identity), which meant any new settings field added after a user's last cloud push would silently be absent after login, relying on Zustand's shallow-merge defaults. This is fragile: the field exists only if the store's in-memory initialisation runs before the `setState` call. Changed to `(data) => migrateSettingsState(data, 0)`, matching the explicit approach already used for `wpt_history` (→ `migrateHistoryState`) and `wpt_mobility` (→ `migrateMobilityState`). A new test verifies that old cloud data missing `weekStartsOn` is backfilled to `0` (Sunday default).
+
+**Tests:** 1348 → 1349 (+1 new test in `storeSync.test.ts`)
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| Cloud sync conflict resolution | Out of scope |
+

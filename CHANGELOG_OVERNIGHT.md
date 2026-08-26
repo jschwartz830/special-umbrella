@@ -2,6 +2,22 @@
 
 ---
 
+## 2026-08-26
+
+### Change 1 — `fix(storeSync): apply migrateSettingsState for wpt_settings cloud hydration`
+
+**Summary:** Cloud data piped through `syncOnLogin` bypasses Zustand's `persist` middleware migration hook; only `localStorage` reads trigger it. The `wpt_settings` store was using an identity migration (`(data) => data`), meaning any new settings field added after a user's last cloud push would be silently absent after login—relying on Zustand's `setState` shallow merge to supply defaults from in-memory initialisation. This is fragile: if the store's initial state object is ever evaluated before the cloud hydration, the field exists; if not, it silently defaults to `undefined`. Switched the migration to `(data) => migrateSettingsState(data, 0)`, matching the explicit approach already used for `wpt_history` and `wpt_mobility`. Added a dedicated test that verifies old cloud data missing `weekStartsOn` is correctly backfilled to `0` (Sunday default).
+
+**Files changed:**
+- `src/lib/storeSync.ts` — import `migrateSettingsState`; update `wpt_settings` migrate fn
+- `src/lib/__tests__/storeSync.test.ts` — new test: `backfills weekStartsOn via migrateSettingsState when missing from old cloud data`
+
+**Tests:** 1348 → 1349 (+1)
+
+**Risk:** Minimal — the `migrateSettingsState` function is already unit-tested and idempotent; for already-complete cloud data it is a pure no-op.
+
+---
+
 ## 2026-08-25
 
 ### Change 1 — `test(mobilityLibrary): cover formatMobilityDuration, getLibraryExerciseById, mobilityExerciseName, and summarizeMobilitySets branches`
