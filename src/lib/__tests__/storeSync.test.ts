@@ -139,6 +139,28 @@ describe('syncOnLogin', () => {
     expect(useSettingsStore.getState().autoAdvanceSegments).toBe(true)
   })
 
+  it('backfills weekStartsOn via migrateSettingsState when missing from old cloud data', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    mockEq.mockResolvedValue({
+      data: [
+        {
+          store_name: 'wpt_settings',
+          // Simulates a cloud snapshot saved before weekStartsOn was added.
+          data: { startDelaySeconds: 10, autoAdvanceSegments: false, focusMode: true },
+        },
+      ],
+      error: null,
+    })
+
+    await syncOnLogin()
+
+    // migrateSettingsState must backfill weekStartsOn to its default (0 = Sunday).
+    expect(useSettingsStore.getState().weekStartsOn).toBe(0)
+    // Existing fields must pass through unchanged.
+    expect(useSettingsStore.getState().startDelaySeconds).toBe(10)
+    expect(useSettingsStore.getState().focusMode).toBe(true)
+  })
+
   it('applies the wpt_history migrate function to cloud data (extras without source)', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
     mockEq.mockResolvedValue({

@@ -5,7 +5,7 @@ import { usePlanStore, migratePlanState } from '../store/planStore'
 import { useProgramStore } from '../store/programStore'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { migrateMobilityState, useMobilityStore } from '../store/mobilityStore'
-import { useSettingsStore } from '../store/settingsStore'
+import { useSettingsStore, migrateSettingsState } from '../store/settingsStore'
 
 type AnyStore = {
   getState: () => Record<string, unknown>
@@ -61,8 +61,11 @@ const STORES: { name: string; store: AnyStore; migrate?: MigrateFn }[] = [
   {
     name: 'wpt_settings',
     store: useSettingsStore as unknown as AnyStore,
-    // Identity migration — placeholder so future schema changes have a home here.
-    migrate: (data) => data,
+    // Backfills any new settings fields that weren't present in older cloud
+    // snapshots. The persist middleware only runs migrate() on localStorage
+    // reads; direct setState (used here after cloud hydration) bypasses it,
+    // so we run the same migration explicitly.
+    migrate: (data) => migrateSettingsState(data, 0),
   },
 ]
 
