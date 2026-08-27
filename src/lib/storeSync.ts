@@ -1,9 +1,9 @@
 import { supabase } from './supabase'
 import { useHistoryStore, migrateHistoryState } from '../store/historyStore'
-import { useOutcomeStore } from '../store/outcomeStore'
+import { useOutcomeStore, migrateOutcomeState } from '../store/outcomeStore'
 import { usePlanStore, migratePlanState } from '../store/planStore'
-import { useProgramStore } from '../store/programStore'
-import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
+import { useProgramStore, migrateProgramState } from '../store/programStore'
+import { useExerciseHistoryStore, migrateExerciseHistoryState } from '../store/exerciseHistoryStore'
 import { migrateMobilityState, useMobilityStore } from '../store/mobilityStore'
 import { useSettingsStore, migrateSettingsState } from '../store/settingsStore'
 
@@ -28,8 +28,9 @@ const STORES: { name: string; store: AnyStore; migrate?: MigrateFn }[] = [
   {
     name: 'wpt_outcomes',
     store: useOutcomeStore as unknown as AnyStore,
-    // Identity migration — placeholder so future schema changes have a home here.
-    migrate: (data) => data,
+    // Backfills outcomes and progressionStates to their empty-object defaults
+    // when cloud data predates one of those fields being added to the schema.
+    migrate: (data) => migrateOutcomeState(data, 0),
   },
   {
     name: 'wpt_plans',
@@ -42,14 +43,16 @@ const STORES: { name: string; store: AnyStore; migrate?: MigrateFn }[] = [
   {
     name: 'wpt_program_vars',
     store: useProgramStore as unknown as AnyStore,
-    // Identity migration — placeholder so future schema changes have a home here.
-    migrate: (data) => data,
+    // Backfills vars to its empty-object default when cloud data predates the
+    // field or was saved by an older version before migrateProgramState existed.
+    migrate: (data) => migrateProgramState(data, 0),
   },
   {
     name: 'wpt_exercise_history',
     store: useExerciseHistoryStore as unknown as AnyStore,
-    // Identity migration — placeholder so future schema changes have a home here.
-    migrate: (data) => data,
+    // Backfills records to its empty-array default when cloud data predates the
+    // field or was saved by an older version before migrateExerciseHistoryState existed.
+    migrate: (data) => migrateExerciseHistoryState(data, 0),
   },
   {
     name: 'wpt_mobility',

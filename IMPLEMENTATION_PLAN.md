@@ -366,3 +366,35 @@ Cloud data hydrated via `syncOnLogin` bypasses Zustand's `persist` middleware mi
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
 | Cloud sync conflict resolution | Out of scope |
 
+---
+
+## Additions — 2026-08-27
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `storeSync`: apply proper migration functions for `wpt_outcomes`, `wpt_program_vars`, `wpt_exercise_history` cloud hydration | Defensive fix | `src/lib/storeSync.ts`, `src/lib/__tests__/storeSync.test.ts` |
+
+### Detail
+
+**1. `wpt_outcomes`, `wpt_program_vars`, `wpt_exercise_history` cloud migration upgrade**
+
+The Aug 26 pass fixed `wpt_settings` to use `migrateSettingsState` instead of the identity function. The same gap existed for three other stores that have exported migration functions: `migrateOutcomeState`, `migrateProgramState`, and `migrateExerciseHistoryState`. All three were wired with `(data) => data` in `storeSync.ts`'s STORES array, meaning:
+
+- `wpt_outcomes`: cloud data missing `progressionStates` would leave that field `undefined`, breaking any code that calls `getState().progressionStates[groupId]`.
+- `wpt_program_vars`: cloud data missing `vars` would leave it `undefined`, breaking `getVars` and `applyProgressionRule`.
+- `wpt_exercise_history`: cloud data missing `records` would leave it `undefined`, breaking any filter/map over the exercise record list.
+
+Fix: import and call the proper migration functions in the STORES array, matching the pattern established for `wpt_history`, `wpt_mobility`, and `wpt_settings`. Added three new tests that each simulate old cloud data missing the top-level field and verify that hydration via `syncOnLogin` backfills the default correctly.
+
+**Tests:** 1349 → 1352 (+3 new tests in `storeSync.test.ts`)
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| Cloud sync conflict resolution | Out of scope |
+

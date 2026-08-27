@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-08-27
+
+### Change 1 — `fix(storeSync): apply proper migration fns for wpt_outcomes, wpt_program_vars, wpt_exercise_history cloud hydration`
+
+**Summary:** The Aug 26 pass fixed `wpt_settings` to use `migrateSettingsState` instead of an identity migration in `storeSync.ts`. The same structural gap existed for three other stores that each export a proper migration function but were wired with `(data) => data` in the STORES array. Missing top-level fields in cloud snapshots would silently land as `undefined` in the live store instead of their correct empty defaults:
+
+- `wpt_outcomes.progressionStates` — `undefined` would crash any indexing into `progressionStates[groupId]` (used by `logOutcomeWithProgression` and `getProgressionState`)
+- `wpt_program_vars.vars` — `undefined` would crash `getVars`, which callers use as an empty-object guard
+- `wpt_exercise_history.records` — `undefined` would crash any `.filter()`/`.map()` over the records list
+
+Fixed all three by importing and calling `migrateOutcomeState`, `migrateProgramState`, and `migrateExerciseHistoryState` respectively, matching the explicit approach used for `wpt_history`, `wpt_mobility`, and `wpt_settings`. Added three new tests — one per store — each simulating an old cloud snapshot missing the top-level field and asserting the default is backfilled on `syncOnLogin`.
+
+**Files changed:**
+- `src/lib/storeSync.ts` — import `migrateOutcomeState`, `migrateProgramState`, `migrateExerciseHistoryState`; update three migrate fns
+- `src/lib/__tests__/storeSync.test.ts` — 3 new tests + import 3 new store references; 3 new beforeEach resets
+
+**Tests:** 1349 → 1352 (+3)
+
+**Risk:** Minimal — all three migration functions are already unit-tested, idempotent, and pure no-ops for already-complete cloud data. The only runtime change is that missing fields are now backfilled to their defaults rather than silently remaining `undefined`.
+
+---
+
 ## 2026-08-26
 
 ### Change 1 — `fix(storeSync): apply migrateSettingsState for wpt_settings cloud hydration`
