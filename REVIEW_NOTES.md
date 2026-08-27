@@ -7,6 +7,20 @@
 **Branch:** `claude/serene-cori-lwkxmd`
 **Date:** 2026-08-26
 **Branch:** `claude/serene-cori-a58c0l`
+**Date:** 2026-08-27
+**Branch:** `claude/serene-cori-h67b7b`
+
+---
+
+## Executive Summary (2026-08-27 pass)
+
+1. **What changed:** One production fix (`storeSync.ts`) and three new tests (+3). The `wpt_outcomes`, `wpt_program_vars`, and `wpt_exercise_history` cloud migrations were upgraded from identity functions to their respective proper migration functions (`migrateOutcomeState`, `migrateProgramState`, `migrateExerciseHistoryState`), completing the pattern established in the Aug 26 pass for `wpt_settings`. Test count: 1349 → 1352 (+3).
+
+2. **Why this matters:** Cloud data hydration via `syncOnLogin` bypasses Zustand `persist` middleware — the migration hook only runs on `localStorage` reads, not `setState`. With identity migrations, missing top-level fields (e.g., a `progressionStates` key absent from an old cloud snapshot) silently land as `undefined` in the live store. `wpt_outcomes.progressionStates`, `wpt_program_vars.vars`, and `wpt_exercise_history.records` being `undefined` would crash any code that iterates or indexes into them. The proper migration functions backfill each field to its correct empty default.
+
+3. **Highest confidence:** All three migration functions are already unit-tested and idempotent. The three new tests mirror the existing `weekStartsOn` backfill test pattern.
+
+4. **Remaining open items (no change):** TodayPage extraction hook (risky refactor), `updateEntryDate` data-loss risk (no callers), cloud sync conflict resolution (out of scope).
 
 ---
 
