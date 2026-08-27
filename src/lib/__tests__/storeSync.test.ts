@@ -38,6 +38,12 @@ import { usePlanStore } from '../../store/planStore'
 import { useMobilityStore } from '../../store/mobilityStore'
 // eslint-disable-next-line import/first
 import { useSettingsStore } from '../../store/settingsStore'
+// eslint-disable-next-line import/first
+import { useOutcomeStore } from '../../store/outcomeStore'
+// eslint-disable-next-line import/first
+import { useProgramStore } from '../../store/programStore'
+// eslint-disable-next-line import/first
+import { useExerciseHistoryStore } from '../../store/exerciseHistoryStore'
 
 function makeFakeWindow() {
   const listeners: Record<string, Array<() => void>> = {}
@@ -69,6 +75,9 @@ beforeEach(() => {
   useHistoryStore.setState({ entries: [], overrides: [], extraEntries: [] })
   usePlanStore.setState({ plans: {}, activePlanId: null })
   useMobilityStore.setState({ activeSession: null })
+  useOutcomeStore.setState({ outcomes: {}, progressionStates: {} })
+  useProgramStore.setState({ vars: {} })
+  useExerciseHistoryStore.setState({ records: [] })
 
   fakeWindow = makeFakeWindow()
   vi.stubGlobal('window', fakeWindow)
@@ -224,6 +233,65 @@ describe('syncOnLogin', () => {
     await syncOnLogin()
 
     expect(usePlanStore.getState().plans).toEqual({})
+  })
+
+  it('backfills progressionStates via migrateOutcomeState when missing from old cloud data', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    mockEq.mockResolvedValue({
+      data: [
+        {
+          store_name: 'wpt_outcomes',
+          // Simulates a cloud snapshot saved before progressionStates was added.
+          data: { outcomes: { 'plan-1_2026-01-01': { workoutInstanceId: 'plan-1_2026-01-01' } } },
+        },
+      ],
+      error: null,
+    })
+
+    await syncOnLogin()
+
+    // migrateOutcomeState must backfill progressionStates to its empty-object default.
+    expect(useOutcomeStore.getState().progressionStates).toEqual({})
+    // Existing outcomes must pass through unchanged.
+    expect(useOutcomeStore.getState().outcomes['plan-1_2026-01-01']).toBeDefined()
+  })
+
+  it('backfills vars via migrateProgramState when missing from old cloud data', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    mockEq.mockResolvedValue({
+      data: [
+        {
+          store_name: 'wpt_program_vars',
+          // Simulates a cloud snapshot saved before the vars field existed.
+          data: {},
+        },
+      ],
+      error: null,
+    })
+
+    await syncOnLogin()
+
+    // migrateProgramState must backfill vars to its empty-object default.
+    expect(useProgramStore.getState().vars).toEqual({})
+  })
+
+  it('backfills records via migrateExerciseHistoryState when missing from old cloud data', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    mockEq.mockResolvedValue({
+      data: [
+        {
+          store_name: 'wpt_exercise_history',
+          // Simulates a cloud snapshot saved before the records field existed.
+          data: {},
+        },
+      ],
+      error: null,
+    })
+
+    await syncOnLogin()
+
+    // migrateExerciseHistoryState must backfill records to its empty-array default.
+    expect(useExerciseHistoryStore.getState().records).toEqual([])
   })
 })
 
