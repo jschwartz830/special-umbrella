@@ -293,6 +293,40 @@ describe('syncOnLogin', () => {
     // migrateExerciseHistoryState must backfill records to its empty-array default.
     expect(useExerciseHistoryStore.getState().records).toEqual([])
   })
+
+  it('logs console.error when syncOnLogin fetch fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    mockEq.mockResolvedValue({ data: null, error: { message: 'timeout' } })
+
+    await syncOnLogin()
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[storeSync] syncOnLogin fetch failed:',
+      'timeout',
+    )
+    errorSpy.mockRestore()
+  })
+
+  it('logs console.error when pushStore upsert fails (first-ever login push path)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    // Empty cloud rows → first-ever login → pushStore is called for each store.
+    mockEq.mockResolvedValue({ data: [], error: null })
+    // Make every upsert fail.
+    mockUpsert.mockResolvedValue({ error: { message: 'write failed' } })
+
+    await syncOnLogin()
+
+    // At least one pushStore call should have logged the error.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[storeSync] pushStore failed for'),
+      expect.any(String),
+      ':',
+      'write failed',
+    )
+    errorSpy.mockRestore()
+  })
 })
 
 describe('subscribeStores', () => {
