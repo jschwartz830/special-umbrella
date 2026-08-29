@@ -395,7 +395,6 @@ export function TodayPage() {
     if (!primarySlot) return null
     if (isRunType(primarySlot.type)) return estimateRunDurationMin(primarySlot, planProgramVars)
     if (primarySlot.targetTime != null) return primarySlot.targetTime
-    if ((primarySlot.exercises?.length ?? 0) > 0) return null
     return null
   })()
 
