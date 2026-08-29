@@ -1,3 +1,42 @@
+# Test Results — 2026-08-29
+
+## Summary
+
+| Metric | Value |
+|---|---|
+| Test files | 35 |
+| Tests before this pass | 1352 |
+| Tests added this pass | 4 |
+| Tests after this pass | 1356 |
+| Failures | 0 |
+| TypeScript errors | 0 |
+
+## Command
+
+```
+npx vitest run
+```
+
+## Output (final lines)
+
+```
+Test Files  35 passed (35)
+     Tests  1356 passed (1356)
+  Start at  04:21:04
+  Duration  2.90s (transform 1.52s, setup 0ms, import 2.99s, tests 550ms, environment 3ms)
+```
+
+## New Tests Added This Pass
+
+| File | Test description |
+|---|---|
+| `historyStats.test.ts` | `computeWeeklyBreakdown` — excludes extras for a different plan (plan isolation) |
+| `historyStats.test.ts` | `computeWeeklyBreakdown` — counts multiple extras on the same date as separate contributions (no dedup) |
+| `storeSync.test.ts` | `syncOnLogin` — logs console.error when fetch fails |
+| `storeSync.test.ts` | `syncOnLogin` — logs console.error when pushStore upsert fails (first-ever login push path) |
+
+---
+
 # Test Results — 2026-08-27
 
 ## Summary

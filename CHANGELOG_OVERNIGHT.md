@@ -2,6 +2,51 @@
 
 ---
 
+## 2026-08-29
+
+### Change 1 — `fix(TodayPage): remove dead branch in estimatedDurationMin`
+
+**Summary:** The `estimatedDurationMin` IIFE in `TodayPage.tsx` contained a guard `if ((primarySlot.exercises?.length ?? 0) > 0) return null` immediately before the closing `return null`. Both arms returned `null`, making the condition unreachable — it could never produce a non-null value. Removed the dead branch.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — 1 line deleted
+
+**Tests:** 1352 → 1352 (no change — no test covers this IIFE directly; the branch was unreachable)
+
+**Risk:** Zero — both branches returned the same value. The only observable effect is cleaner code.
+
+---
+
+### Change 2 — `test(historyStats): cover extras plan-isolation and non-dedup in computeWeeklyBreakdown`
+
+**Summary:** `computeWeeklyBreakdown` has two distinct contracts for extras that had no dedicated tests:
+1. Extras for a different `planId` are skipped (`if (e.planId !== planId) continue`).
+2. Extras are intentionally NOT deduplicated by `calendarDate` (unlike rotation entries, which keep only the newest per date). Multiple extras on the same date each count independently.
+
+Added two targeted tests to make both contracts explicit and regression-proof.
+
+**Files changed:**
+- `src/lib/__tests__/historyStats.test.ts` — +20 lines (2 new tests)
+
+**Tests:** 1352 → 1354 (+2)
+
+**Risk:** None — test-only change.
+
+---
+
+### Change 3 — `test(storeSync): cover console.error paths for fetch and pushStore failures`
+
+**Summary:** `storeSync.ts` has two `console.error` call sites: one on fetch failure in `syncOnLogin` (line 111) and one on upsert failure in `pushStore` (line 96). Existing tests exercised the side-effect of each failure (e.g. "stops after fetch error without pushing") but never asserted that the error was actually logged. Added two spy-based tests — one per call site — so a removed or reworded error log becomes an immediate test failure.
+
+**Files changed:**
+- `src/lib/__tests__/storeSync.test.ts` — +34 lines (2 new tests)
+
+**Tests:** 1354 → 1356 (+2)
+
+**Risk:** None — test-only change.
+
+---
+
 ## 2026-08-27
 
 ### Change 1 — `fix(storeSync): apply proper migration fns for wpt_outcomes, wpt_program_vars, wpt_exercise_history cloud hydration`

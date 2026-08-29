@@ -368,6 +368,45 @@ Cloud data hydrated via `syncOnLogin` bypasses Zustand's `persist` middleware mi
 
 ---
 
+## Additions — 2026-08-29
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `TodayPage`: remove dead branch in `estimatedDurationMin` | Dead-code removal | `src/pages/TodayPage.tsx` |
+| 2 | `historyStats` tests: extras plan-isolation + non-dedup contracts for `computeWeeklyBreakdown` | Test coverage | `src/lib/__tests__/historyStats.test.ts` |
+| 3 | `storeSync` tests: cover `console.error` paths for fetch and pushStore failures | Test coverage | `src/lib/__tests__/storeSync.test.ts` |
+
+### Detail
+
+**1. Dead branch in `estimatedDurationMin` (`TodayPage.tsx`)**
+
+The IIFE at ~line 395 contained `if ((primarySlot.exercises?.length ?? 0) > 0) return null` immediately before the closing `return null`. Both arms returned `null`; the condition added no value and was never true in any meaningful way (non-null would only be reachable if exercises existed AND `isRunType` and `targetTime` were both false, but the result is still null). Removed.
+
+**2. `computeWeeklyBreakdown` extras contracts (`historyStats.test.ts`)**
+
+Two untested behaviours:
+- The `if (e.planId !== planId) continue` guard for extras had no test. Added: an extra with a different planId should produce an empty result.
+- Extras are intentionally not deduplicated by date (unlike rotation entries). Added: two extras on the same date should produce `extras: 2, totalLogged: 2`.
+
+**3. `console.error` spy tests (`storeSync.test.ts`)**
+
+The two `console.error` call sites in `storeSync.ts` (fetch-failure path at line 111, pushStore upsert-failure path at line 96) were exercised only by side-effect (e.g. "does not push after fetch error") and never asserted on directly. Two new spy-based tests assert the exact log messages so a silently removed log becomes a test failure.
+
+**Tests:** 1352 → 1356 (+4)
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| Cloud sync conflict resolution | Out of scope |
+| `beforeunload` async data-loss risk (`subscribeStores`) | Out of scope — requires `navigator.sendBeacon` or fetch keepalive |
+
+---
+
 ## Additions — 2026-08-27
 
 ### Changes implemented this pass

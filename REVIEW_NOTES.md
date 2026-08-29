@@ -9,6 +9,22 @@
 **Branch:** `claude/serene-cori-a58c0l`
 **Date:** 2026-08-27
 **Branch:** `claude/serene-cori-h67b7b`
+**Date:** 2026-08-29
+**Branch:** `claude/admiring-noether-x2ug4u`
+
+---
+
+## Executive Summary (2026-08-29 pass)
+
+1. **What changed:** One production dead-code removal (`TodayPage.tsx`) and four new tests (+4). Test count: 1352 → 1356.
+
+2. **Production change — `estimatedDurationMin` dead branch (`TodayPage.tsx`):** The IIFE had a `if ((primarySlot.exercises?.length ?? 0) > 0) return null` guard immediately before the closing `return null`. Both arms returned `null`, so the guard was unreachable. Removed. Zero behavioral impact.
+
+3. **Test changes:**
+   - `computeWeeklyBreakdown` in `historyStats.test.ts`: Added plan-isolation test (extras with the wrong `planId` are skipped) and non-deduplication test (multiple extras on the same date each count individually, unlike rotation entries). Both contracts were untested despite being codified in the implementation.
+   - `storeSync.test.ts`: Added two spy-based tests asserting that `console.error` is called with the correct message on fetch failure and on pushStore upsert failure. Both call sites existed but were asserted on only indirectly by side-effect tests.
+
+4. **Remaining open items (no change):** TodayPage extraction hook (risky refactor), `updateEntryDate` data-loss risk (no callers), cloud sync conflict resolution (out of scope), `beforeunload` async data-loss risk for `subscribeStores` (requires `navigator.sendBeacon` or fetch keepalive — out of scope).
 
 ---
 
