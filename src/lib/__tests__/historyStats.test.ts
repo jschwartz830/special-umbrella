@@ -1755,6 +1755,26 @@ describe('computeWeeklyBreakdown', () => {
     expect(result[0].extras).toBe(1)
   })
 
+  it('excludes extras for a different plan (plan isolation for extras)', () => {
+    // Rotation entries are filtered by planId — this test verifies extras are too.
+    const extras = [weekExtra('2026-01-07', 'other-plan')]
+    const result = computeWeeklyBreakdown('plan-1', [], extras, '2026-01-01', '2026-01-31')
+    expect(result).toEqual([])
+  })
+
+  it('counts multiple extras on the same date as separate contributions (no dedup)', () => {
+    // Unlike rotation entries, extras are intentionally not deduplicated:
+    // a user can log both a morning run and an afternoon weights session as extras.
+    const extras = [
+      weekExtra('2026-01-05', 'plan-1'),
+      { ...weekExtra('2026-01-05', 'plan-1'), id: 'wx-second' },
+    ]
+    const result = computeWeeklyBreakdown('plan-1', [], extras, '2026-01-01', '2026-01-31')
+    expect(result).toHaveLength(1)
+    expect(result[0].extras).toBe(2)
+    expect(result[0].totalLogged).toBe(2)
+  })
+
   it('returns weeks sorted by weekStart ascending', () => {
     const entries = [
       weekEntry('2026-01-19', 'complete'), // later week first in array
