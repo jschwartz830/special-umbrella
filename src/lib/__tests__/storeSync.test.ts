@@ -141,11 +141,15 @@ describe('syncOnLogin', () => {
 
     await syncOnLogin()
 
-    // No local rows existed, so this is the hydrate branch, not the
-    // first-login push branch — nothing should be pushed back up.
-    expect(mockUpsert).not.toHaveBeenCalled()
+    // The cloud row is hydrated into the settings store.
     expect(useSettingsStore.getState().startDelaySeconds).toBe(30)
     expect(useSettingsStore.getState().autoAdvanceSegments).toBe(true)
+    // wpt_settings came from cloud — it must not be pushed back up.
+    const pushedStoreNames = mockUpsert.mock.calls.map(([arg]) => arg.store_name)
+    expect(pushedStoreNames).not.toContain('wpt_settings')
+    // The 6 stores absent from the cloud snapshot are backfilled by syncOnLogin.
+    expect(pushedStoreNames).toContain('wpt_history')
+    expect(pushedStoreNames).toContain('wpt_plans')
   })
 
   it('backfills weekStartsOn via migrateSettingsState when missing from old cloud data', async () => {
@@ -273,6 +277,30 @@ describe('syncOnLogin', () => {
 
     // migrateProgramState must backfill vars to its empty-object default.
     expect(useProgramStore.getState().vars).toEqual({})
+  })
+
+  it('pushes stores with no cloud row after hydrating from partial cloud data', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    // Cloud only has wpt_history — the other 6 stores have no cloud row yet.
+    mockEq.mockResolvedValue({
+      data: [
+        { store_name: 'wpt_history', data: { entries: [], overrides: [], extraEntries: [] } },
+      ],
+      error: null,
+    })
+
+    await syncOnLogin()
+
+    const pushedStoreNames = mockUpsert.mock.calls.map(([arg]) => arg.store_name)
+    // Stores absent from cloud must be pushed so they eventually reach the cloud.
+    expect(pushedStoreNames).toContain('wpt_plans')
+    expect(pushedStoreNames).toContain('wpt_settings')
+    expect(pushedStoreNames).toContain('wpt_outcomes')
+    expect(pushedStoreNames).toContain('wpt_program_vars')
+    expect(pushedStoreNames).toContain('wpt_exercise_history')
+    expect(pushedStoreNames).toContain('wpt_mobility')
+    // The one store that was in the cloud must NOT be pushed back up.
+    expect(pushedStoreNames).not.toContain('wpt_history')
   })
 
   it('backfills records via migrateExerciseHistoryState when missing from old cloud data', async () => {

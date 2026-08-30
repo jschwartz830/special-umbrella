@@ -126,6 +126,7 @@ export async function syncOnLogin(): Promise<void> {
   // Apply store-specific migrations before setState so that cloud data stored
   // by an older app version is normalised to the current schema — the persist
   // middleware only runs migrate() on localStorage reads, not direct setState.
+  const cloudStoreNames = new Set(rows.map(r => r.store_name))
   for (const row of rows) {
     const entry = STORES.find(s => s.name === row.store_name)
     if (entry && row.data && typeof row.data === 'object') {
@@ -134,6 +135,19 @@ export async function syncOnLogin(): Promise<void> {
         : row.data as Record<string, unknown>
       entry.store.setState(migratedData as Record<string, unknown>)
     }
+  }
+
+  // Push any stores that have no cloud row yet — e.g. a new store added to
+  // STORES after the user's first backup. Without this, those stores stay
+  // localStorage-only until the user happens to change them and the debounced
+  // subscribeStores push fires.
+  const missingStores = STORES.filter(({ name }) => !cloudStoreNames.has(name))
+  if (missingStores.length > 0) {
+    await Promise.all(
+      missingStores.map(({ name, store }) =>
+        pushStore(name, serializeState(store.getState())),
+      ),
+    )
   }
 }
 
