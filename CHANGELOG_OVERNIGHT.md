@@ -2,6 +2,26 @@
 
 ---
 
+## 2026-08-30
+
+### Change 1 — `fix(storeSync): push stores missing from partial cloud snapshots on login`
+
+**Summary:** `syncOnLogin` had a partial-coverage gap: when `rows.length > 0` (cloud data exists), it only hydrated stores that had a cloud row. Stores added to the `STORES` array after the user's first backup — or any store whose initial cloud write was skipped for any reason — would silently remain localStorage-only indefinitely. They would only ever reach Supabase if the user happened to change them, triggering the debounced `subscribeStores` push.
+
+Fixed by computing the set of store names present in the cloud response and, after hydrating, immediately pushing any stores absent from that set. This is additive and a pure no-op for users whose cloud already contains all stores.
+
+The existing test `'hydrates a store from cloud data when rows exist (cloud wins)'` was also updated to reflect the new behaviour: when the cloud snapshot is partial, the missing stores are pushed (the old assertion `expect(mockUpsert).not.toHaveBeenCalled()` was incorrect for the partial-snapshot case). A dedicated new test `'pushes stores with no cloud row after hydrating from partial cloud data'` verifies the exact backfill path.
+
+**Files changed:**
+- `src/lib/storeSync.ts` — after hydration loop, collect `cloudStoreNames`; push all `STORES` entries not in that set
+- `src/lib/__tests__/storeSync.test.ts` — 1 new test; 1 updated assertion in existing cloud-wins test
+
+**Tests:** 1352 → 1353 (+1)
+
+**Risk:** Minimal — the fix only adds pushes that were previously missing. Existing cloud data is never overwritten (hydration runs first, and only non-cloud stores are pushed). Idempotent: if all stores are already in cloud, `missingStores` is empty and no extra pushes fire.
+
+---
+
 ## 2026-08-27
 
 ### Change 1 — `fix(storeSync): apply proper migration fns for wpt_outcomes, wpt_program_vars, wpt_exercise_history cloud hydration`

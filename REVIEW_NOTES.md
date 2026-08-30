@@ -9,6 +9,20 @@
 **Branch:** `claude/serene-cori-a58c0l`
 **Date:** 2026-08-27
 **Branch:** `claude/serene-cori-h67b7b`
+**Date:** 2026-08-30
+**Branch:** `claude/admiring-noether-4hz3gt`
+
+---
+
+## Executive Summary (2026-08-30 pass)
+
+1. **What changed:** One production fix (`storeSync.ts`) and one new test, plus one updated test assertion (+1 net). `syncOnLogin` now pushes stores that have no cloud row after hydrating from a partial cloud snapshot. Test count: 1352 → 1353 (+1).
+
+2. **Why this matters:** Any store added to the `STORES` array after a user's first backup would never reach Supabase unless the user actively changed that store's data (triggering the 1500ms debounced push). This is a silent data-loss risk: on a new device login, the store would be empty because neither sync path ever wrote it. The fix adds a targeted post-hydration pass that pushes the gap stores immediately.
+
+3. **Highest confidence:** The fix is additive and idempotent — when all stores are already in cloud, `missingStores` is empty and no extra pushes fire. The new test verifies both the positive (6 missing stores are pushed) and negative (the hydrated store is not redundantly pushed) cases.
+
+4. **Remaining open items (no change):** TodayPage extraction hook (risky refactor), `updateEntryDate` data-loss risk (no callers), cloud sync conflict resolution (out of scope).
 
 ---
 
