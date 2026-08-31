@@ -398,3 +398,31 @@ Fix: import and call the proper migration functions in the STORES array, matchin
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
 | Cloud sync conflict resolution | Out of scope |
 
+---
+
+## Additions — 2026-08-31
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `exerciseHistoryStore`: document `moveByWorkoutInstance` fallback when `newId` has no parseable date | Test coverage | `src/store/__tests__/exerciseHistoryStore.test.ts` |
+
+### Detail
+
+**1. `moveByWorkoutInstance` unparseable-newId edge case**
+
+`moveByWorkoutInstance` calls `parseWorkoutInstanceId(newId)` and uses the optional spread `...(newDate ? { calendarDate: newDate } : {})` so that if parsing fails, `calendarDate` is left unchanged. This is defensive-correct (no panic, no corrupted date), but the branch was untested. Added a test that passes `'malformed-no-date'` as `newId` and asserts that `workoutInstanceId` is updated while `calendarDate` retains its prior value. This documents the contract and prevents a future refactor from silently breaking the graceful-fallback behaviour.
+
+Full audit of all remaining source files (`run-adaptation/engine.ts`, `workout-outcomes/progression.ts`, `previousSetsHelper.ts`, `estimateRunDuration.ts`, `planDayUtils.ts`, all store tests, storeSync) found no additional bugs or coverage gaps beyond this edge case.
+
+**Tests:** 1352 → 1353 (+1 new test in `exerciseHistoryStore.test.ts`)
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| Cloud sync conflict resolution | Out of scope |
+

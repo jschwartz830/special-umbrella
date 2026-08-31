@@ -9,6 +9,20 @@
 **Branch:** `claude/serene-cori-a58c0l`
 **Date:** 2026-08-27
 **Branch:** `claude/serene-cori-h67b7b`
+**Date:** 2026-08-31
+**Branch:** `claude/admiring-noether-yjpppa`
+
+---
+
+## Executive Summary (2026-08-31 pass)
+
+1. **What changed:** One new test (+1). Added a `moveByWorkoutInstance` edge-case test to `exerciseHistoryStore.test.ts` documenting the fallback when `newId` cannot be parsed: `workoutInstanceId` is updated but `calendarDate` stays unchanged (no panic). Zero production source files modified. Test count: 1352 → 1353 (+1).
+
+2. **Codebase health:** After a complete re-audit across all major source files (`exerciseHistoryStore.ts`, `run-adaptation/engine.ts`, `workout-outcomes/progression.test.ts`, `previousSetsHelper.ts`, `estimateRunDuration.ts`, `planDayUtils.ts`, `storeSync.ts`), no new bugs or coverage gaps were found beyond the edge case addressed above. The codebase is mature and well-tested.
+
+3. **What is risky:** Nothing. No production code was changed.
+
+4. **Remaining open items (no change):** TodayPage extraction hook (risky refactor, recommendation only), `updateEntryDate` data-loss risk (no callers in current surface, recommendation only), cloud sync conflict resolution (out of scope).
 
 ---
 

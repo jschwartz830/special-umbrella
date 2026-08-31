@@ -2,6 +2,21 @@
 
 ---
 
+## 2026-08-31
+
+### Change 1 — `test(exerciseHistoryStore): document moveByWorkoutInstance fallback for unparseable newId`
+
+**Summary:** The `moveByWorkoutInstance` action in `exerciseHistoryStore.ts` calls `parseWorkoutInstanceId(newId)` to extract the embedded `YYYY-MM-DD`. If parsing fails (no date in `newId`), `newDate` is `undefined` and the spread `...(newDate ? { calendarDate: newDate } : {})` is a no-op — the record's `calendarDate` stays at its old value while `workoutInstanceId` is updated to `newId`. This is defensive-correct behaviour (no panic, no inconsistent date), but it was previously undocumented and untested. The new test pins this fallback so any future refactor that accidentally makes the store panic or stomp the old date will fail visibly.
+
+**Files changed:**
+- `src/store/__tests__/exerciseHistoryStore.test.ts` — 1 new test in `moveByWorkoutInstance` describe block
+
+**Tests:** 1352 → 1353 (+1)
+
+**Risk:** Test-only change. Zero production code modified.
+
+---
+
 ## 2026-08-27
 
 ### Change 1 — `fix(storeSync): apply proper migration fns for wpt_outcomes, wpt_program_vars, wpt_exercise_history cloud hydration`
