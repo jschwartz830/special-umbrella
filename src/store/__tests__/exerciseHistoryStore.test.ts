@@ -320,6 +320,21 @@ describe('moveByWorkoutInstance', () => {
     getState().moveByWorkoutInstance('plan-1_2099-01-01', 'plan-1_2099-01-05')
     expect(getState().records[0].workoutInstanceId).toBe('plan-1_2026-01-01') // unchanged
   })
+
+  it('updates workoutInstanceId but leaves calendarDate unchanged when newId contains no parseable date', () => {
+    // If parseWorkoutInstanceId cannot find a YYYY-MM-DD in newId, newDate is
+    // undefined and the spread `...(newDate ? { calendarDate: newDate } : {})` is
+    // a no-op — workoutInstanceId is updated but calendarDate keeps its old value.
+    // This documents the fallback behaviour rather than silently breaking callers.
+    const outcome = makeOutcome('plan-1', '2026-01-01', [
+      { name: 'Squat', sets: [{ reps: 5, load: 135 }] },
+    ])
+    getState().upsertFromOutcome(outcome)
+    getState().moveByWorkoutInstance('plan-1_2026-01-01', 'malformed-no-date')
+    const rec = getState().records[0]
+    expect(rec.workoutInstanceId).toBe('malformed-no-date')
+    expect(rec.calendarDate).toBe('2026-01-01') // date unchanged — no panic
+  })
 })
 
 // ── clearByPlanId ─────────────────────────────────────────────────────────────
