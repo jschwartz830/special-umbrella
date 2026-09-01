@@ -287,15 +287,27 @@ export function TodayPage() {
 
   // Stats for the compact habit row — global (all plans), same reasoning as
   // earlyPlanStreak above: a completed workout counts regardless of active plan.
-  const stats = computeHistoryStats(allEntries, extraEntries, today)
+  const stats = useMemo(
+    () => computeHistoryStats(allEntries, extraEntries, today),
+    [allEntries, extraEntries, today],
+  )
   // Same computation as earlyPlanStreak above (mobility dates included) — reuse it
   // rather than recomputing now that both use the same inputs.
   const planStreak = earlyPlanStreak
-  const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
+  const consecutiveSkips = useMemo(
+    () => computeConsecutiveSkips(plan.id, planEntries, planExtras, today),
+    [plan.id, planEntries, planExtras, today],
+  )
 
   // Collect recent past days with no entry — used to show the stall nudge.
-  const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today, 14)
-  const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, plan.startDate, today)
+  const unloggedDates = useMemo(
+    () => getUnloggedPastDates(plan.id, planEntries, plan.startDate, today, 14),
+    [plan.id, planEntries, plan.startDate, today],
+  )
+  const totalUnlogged = useMemo(
+    () => countTotalUnloggedDays(plan.id, planEntries, plan.startDate, today),
+    [plan.id, planEntries, plan.startDate, today],
+  )
   const olderUnloggedCount = Math.max(0, totalUnlogged - unloggedDates.length)
 
   const loggedRate = useMemo(
