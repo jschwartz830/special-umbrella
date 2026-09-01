@@ -37,9 +37,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
     set({ authError: null })
     try {
       await supabase.auth.signOut()
-      set({ user: null, session: null })
     } catch (err) {
       set({ authError: err instanceof Error ? err.message : 'Sign-out failed' })
+    } finally {
+      // Always clear local auth state — the local session token is invalidated
+      // whether or not the server-side revocation call succeeded.
+      set({ user: null, session: null })
     }
   },
 
