@@ -17,13 +17,21 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 const mockGetUser = vi.fn()
+const mockGetSession = vi.fn()
+const mockOnAuthStateChange = vi.fn()
 const mockUpsert = vi.fn()
 const mockEq = vi.fn()
 const mockFrom = vi.fn()
 
 vi.mock('../supabase', () => ({
+  SUPABASE_URL: 'https://test.supabase.co',
+  SUPABASE_ANON_KEY: 'test-anon-key',
   supabase: {
-    auth: { getUser: (...args: unknown[]) => mockGetUser(...args) },
+    auth: {
+      getUser: (...args: unknown[]) => mockGetUser(...args),
+      getSession: (...args: unknown[]) => mockGetSession(...args),
+      onAuthStateChange: (...args: unknown[]) => mockOnAuthStateChange(...args),
+    },
     from: (...args: unknown[]) => mockFrom(...args),
   },
 }))
@@ -62,13 +70,18 @@ function makeFakeWindow() {
 
 let fakeWindow: ReturnType<typeof makeFakeWindow>
 
+const mockFetch = vi.fn().mockResolvedValue({ ok: true })
+
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubGlobal('fetch', mockFetch)
   mockFrom.mockImplementation(() => ({
     upsert: mockUpsert,
     select: () => ({ eq: mockEq }),
   }))
   mockUpsert.mockResolvedValue({ error: null })
+  mockGetSession.mockResolvedValue({ data: { session: null } })
+  mockOnAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } })
 
   // Reset only the fields these tests touch — the stores are real global
   // singletons shared across the whole file.
@@ -325,24 +338,43 @@ describe('subscribeStores', () => {
     unsubscribe()
   })
 
-  it('flushes a pending debounced write immediately on beforeunload', async () => {
+  it('flushes a pending debounced write via keepalive fetch on beforeunload', async () => {
     vi.useFakeTimers()
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    let unsubscribe: (() => void) | undefined
+    try {
+      // Seed a session so the beforeunload handler has credentials to send.
+      const mockSession = { user: { id: 'u1' }, access_token: 'tok123' }
+      mockGetSession.mockResolvedValue({ data: { session: mockSession } })
+      mockOnAuthStateChange.mockImplementation((cb: (e: string, s: typeof mockSession) => void) => {
+        cb('SIGNED_IN', mockSession)
+        return { data: { subscription: { unsubscribe: vi.fn() } } }
+      })
 
-    const unsubscribe = subscribeStores()
-    useHistoryStore.setState({ entries: [] })
-    // Push has not fired yet — well inside the 1500ms debounce window.
-    fakeWindow.fire('beforeunload')
-    await vi.advanceTimersByTimeAsync(0)
+      unsubscribe = subscribeStores()
+      // Flush microtasks so the getSession() promise resolves before we proceed.
+      await Promise.resolve()
+      await Promise.resolve()
 
-    const historyPushes = mockUpsert.mock.calls.filter(([arg]) => arg.store_name === 'wpt_history')
-    expect(historyPushes).toHaveLength(1)
+      useHistoryStore.setState({ entries: [] })
+      // Push has not fired yet — well inside the 1500ms debounce window.
+      fakeWindow.fire('beforeunload')
 
-    // The debounced timer must not also fire and double-push.
-    await vi.advanceTimersByTimeAsync(2000)
-    expect(mockUpsert.mock.calls.filter(([arg]) => arg.store_name === 'wpt_history')).toHaveLength(1)
+      // beforeunload uses keepalive fetch, not the Supabase client's upsert.
+      const historyFetches = mockFetch.mock.calls.filter(
+        ([, opts]) => (opts as RequestInit)?.body && JSON.parse((opts as RequestInit).body as string).store_name === 'wpt_history',
+      )
+      expect(historyFetches).toHaveLength(1)
+      expect((historyFetches[0][1] as RequestInit).keepalive).toBe(true)
 
-    unsubscribe()
+      // The debounced timer must not also fire and double-push.
+      await vi.advanceTimersByTimeAsync(2000)
+      const historyFetchesAfter = mockFetch.mock.calls.filter(
+        ([, opts]) => (opts as RequestInit)?.body && JSON.parse((opts as RequestInit).body as string).store_name === 'wpt_history',
+      )
+      expect(historyFetchesAfter).toHaveLength(1)
+    } finally {
+      unsubscribe?.()
+    }
   })
 
   it('cancels pending debounced writes on unsubscribe without pushing', async () => {
@@ -363,5 +395,26 @@ describe('subscribeStores', () => {
 
     // A second fire after unsubscribe should be a no-op (no listeners left).
     expect(() => fakeWindow.fire('beforeunload')).not.toThrow()
+  })
+
+  it('skips beforeunload keepalive fetch when there is no cached session', async () => {
+    vi.useFakeTimers()
+    let unsubscribe: (() => void) | undefined
+    try {
+      // getSession resolves with no session — beforeunload handler must be a no-op.
+      mockGetSession.mockResolvedValue({ data: { session: null } })
+
+      unsubscribe = subscribeStores()
+      // Flush microtasks so the getSession() promise resolves before we proceed.
+      await Promise.resolve()
+      await Promise.resolve()
+
+      useHistoryStore.setState({ entries: [] })
+      fakeWindow.fire('beforeunload')
+
+      expect(mockFetch).not.toHaveBeenCalled()
+    } finally {
+      unsubscribe?.()
+    }
   })
 })

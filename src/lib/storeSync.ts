@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase'
 import { useHistoryStore, migrateHistoryState } from '../store/historyStore'
 import { useOutcomeStore, migrateOutcomeState } from '../store/outcomeStore'
 import { usePlanStore, migratePlanState } from '../store/planStore'
@@ -143,6 +143,23 @@ export function subscribeStores(): () => void {
   // Track pending debounced timeouts so we can flush them on page unload.
   const pendingByStore = new Map<string, ReturnType<typeof setTimeout>>()
 
+  // Cache the current user's credentials for use in the synchronous
+  // beforeunload handler. The Supabase client's fetch wrapper doesn't support
+  // keepalive, so we need direct fetch() calls with the raw token. We prime
+  // from the current session and keep it updated via onAuthStateChange.
+  let cachedUserId: string | null = null
+  let cachedAccessToken: string | null = null
+
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    cachedUserId = session?.user?.id ?? null
+    cachedAccessToken = session?.access_token ?? null
+  })
+
+  const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    cachedUserId = session?.user?.id ?? null
+    cachedAccessToken = session?.access_token ?? null
+  })
+
   for (const { name, store } of STORES) {
     const unsub = store.subscribe((state) => {
       const prev = pendingByStore.get(name)
@@ -160,13 +177,33 @@ export function subscribeStores(): () => void {
   }
 
   // Flush any pending debounced writes immediately before the page is torn
-  // down. Without this, a tab closed within 1.5s of a change loses that
-  // write entirely — the debounced setTimeout never fires.
+  // down. The async pushStore() path is cancelled by the browser during
+  // page teardown, so we use fetch() with keepalive:true directly against
+  // the Supabase REST API instead — browsers guarantee keepalive requests
+  // survive tab close for payloads under 64 KB.
   function handleBeforeUnload() {
+    if (!cachedUserId || !cachedAccessToken) return
     for (const [timeoutStoreName, timeoutId] of pendingByStore.entries()) {
       clearTimeout(timeoutId)
       const entry = STORES.find(s => s.name === timeoutStoreName)
-      if (entry) pushStore(timeoutStoreName, serializeState(entry.store.getState()))
+      if (!entry) continue
+      const data = serializeState(entry.store.getState())
+      void fetch(`${SUPABASE_URL}/rest/v1/workout_user_store_data`, {
+        method: 'POST',
+        keepalive: true,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${cachedAccessToken}`,
+          'apikey': SUPABASE_ANON_KEY,
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify({
+          user_id: cachedUserId,
+          store_name: timeoutStoreName,
+          data,
+          updated_at: new Date().toISOString(),
+        }),
+      })
     }
     pendingByStore.clear()
   }
@@ -175,6 +212,7 @@ export function subscribeStores(): () => void {
 
   return () => {
     unsubscribers.forEach(u => u())
+    authSubscription.unsubscribe()
     window.removeEventListener('beforeunload', handleBeforeUnload)
     pendingByStore.forEach(id => clearTimeout(id))
     pendingByStore.clear()
