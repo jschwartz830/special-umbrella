@@ -1,38 +1,53 @@
-# Test Results — 2026-08-27
+# Test Results — Overnight Audit (2026-09-01)
 
-## Summary
+## Tests Reviewed
 
-| Metric | Value |
-|---|---|
-| Test files | 35 |
-| Tests before this pass | 1349 |
-| Tests added this pass | 3 |
-| Tests after this pass | 1352 |
-| Failures | 0 |
-| TypeScript errors | 0 |
+| File | Description | Count |
+|------|-------------|-------|
+| `src/engine/__tests__/rotationEngine.test.ts` | Core rotation scheduling, expiry, overrides | 50+ |
+| `src/store/__tests__/planDeleteCleanup.test.ts` | Plan delete cascade integration test | ~10 |
+| `src/store/__tests__/mobilityStore.test.ts` | Mobility store migrations and session lifecycle | ~100 |
+| `src/lib/__tests__/storeSync.test.ts` | Cloud sync: syncOnLogin, subscribeStores, beforeunload | 18 |
+| All other test files | historyStore, outcomeStore, historyStats, etc. | 1175+ |
 
-## Command
+---
 
-```
-npx vitest run
-```
+## Tests Added / Updated
 
-## Output (final lines)
+### `src/lib/__tests__/storeSync.test.ts`
+
+**Updated mock:** Added `SUPABASE_URL`, `SUPABASE_ANON_KEY` exports, `supabase.auth.getSession`, and `supabase.auth.onAuthStateChange` to the module mock. Added `mockFetch` stub.
+
+**Updated test:** "flushes a pending debounced write immediately on beforeunload" → "flushes a pending debounced write via keepalive fetch on beforeunload"
+- Previous: verified `mockUpsert` was called once (via Supabase client)
+- Updated: verifies `fetch()` is called with `keepalive: true` against the REST endpoint body
+- Also verifies the timer is cleared so no double-push occurs via the debounce path
+
+**New test:** "skips beforeunload keepalive fetch when there is no cached session"
+- Verifies that `handleBeforeUnload` is a no-op when there is no authenticated session (no credentials to send)
+
+---
+
+## Results
 
 ```
 Test Files  35 passed (35)
-     Tests  1352 passed (1352)
-  Start at  07:17:11
-  Duration  4.44s (transform 2.34s, setup 0ms, import 4.60s, tests 913ms, environment 5ms)
+     Tests  1353 passed (1353)
+  Start at  04:25:58
+  Duration  4.52s
 ```
 
-## New Tests Added This Pass
+All tests pass. TypeScript build (`tsc --noEmit`) clean.
 
-**File:** `src/lib/__tests__/storeSync.test.ts`
+---
 
-**Tests:**
-1. `backfills progressionStates via migrateOutcomeState when missing from old cloud data` — verifies that when `syncOnLogin` hydrates `wpt_outcomes` from a cloud snapshot missing `progressionStates`, the field is backfilled to `{}`.
-2. `backfills vars via migrateProgramState when missing from old cloud data` — verifies that when `syncOnLogin` hydrates `wpt_program_vars` from a cloud snapshot missing `vars`, the field is backfilled to `{}`.
-3. `backfills records via migrateExerciseHistoryState when missing from old cloud data` — verifies that when `syncOnLogin` hydrates `wpt_exercise_history` from a cloud snapshot missing `records`, the field is backfilled to `[]`.
+## Important Areas Still Untested
 
-**What they cover:** All three directly exercise the storeSync.ts changes for this pass — the three stores that previously used identity migrations now use their proper migration functions.
+| Area | Risk | Notes |
+|------|------|-------|
+| CalendarPage — cross-month extras | Medium | The `planDayIndex: undefined` bug path has no test. A test would require mocking `buildMonthGrid` to search a prior month's grid. |
+| TodayPage — backdating collision | Medium | The silent no-op when `destEntry` exists has no test. TodayPage has no test file at all; its complexity makes it a testing gap. |
+| storeSync keepalive body size limit | Low | No test verifies behavior when a store blob exceeds 64 KB. |
+| `removeRetroJumpForDate` timezone edge | Low | The Z-suffix timezone edge case for retroactive jumps is untested (requires testing with UTC- offset dates). |
+| `expressionEval` unknown variable in production | Low | `DEV` guard suppresses the warning in tests. |
+| ProgramImportPage YAML validation | Medium | No tests for malformed YAML import — would require rendering the component with bad input. |
