@@ -27,6 +27,7 @@ export default function App() {
         <Route path="plans/import" element={<ProgramImportPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="mobility" element={<MobilityPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
     </AuthGate>
