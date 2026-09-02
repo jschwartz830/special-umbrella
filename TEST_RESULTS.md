@@ -1,13 +1,13 @@
-# Test Results — 2026-08-27
+# Test Results — 2026-09-02
 
 ## Summary
 
 | Metric | Value |
 |---|---|
 | Test files | 35 |
-| Tests before this pass | 1349 |
-| Tests added this pass | 3 |
-| Tests after this pass | 1352 |
+| Tests before this pass | 1352 |
+| Tests added this pass | 4 |
+| Tests after this pass | 1356 |
 | Failures | 0 |
 | TypeScript errors | 0 |
 
@@ -21,18 +21,19 @@ npx vitest run
 
 ```
 Test Files  35 passed (35)
-     Tests  1352 passed (1352)
-  Start at  07:17:11
-  Duration  4.44s (transform 2.34s, setup 0ms, import 4.60s, tests 913ms, environment 5ms)
+     Tests  1356 passed (1356)
+  Start at  04:19:34
+  Duration  4.44s (transform 2.33s, setup 0ms, import 4.71s, tests 926ms, environment 4ms)
 ```
 
 ## New Tests Added This Pass
 
-**File:** `src/lib/__tests__/storeSync.test.ts`
+**File:** `src/modules/run-adaptation/__tests__/engine.test.ts`
 
 **Tests:**
-1. `backfills progressionStates via migrateOutcomeState when missing from old cloud data` — verifies that when `syncOnLogin` hydrates `wpt_outcomes` from a cloud snapshot missing `progressionStates`, the field is backfilled to `{}`.
-2. `backfills vars via migrateProgramState when missing from old cloud data` — verifies that when `syncOnLogin` hydrates `wpt_program_vars` from a cloud snapshot missing `vars`, the field is backfilled to `{}`.
-3. `backfills records via migrateExerciseHistoryState when missing from old cloud data` — verifies that when `syncOnLogin` hydrates `wpt_exercise_history` from a cloud snapshot missing `records`, the field is backfilled to `[]`.
+1. `adaptation note uses "Holding" wording for hold result` — verifies `resolveWorkoutDisplayTarget` returns an adaptation note containing "Holding" when `lastResult` is `'hold'` and the progression distance differs from the template.
+2. `adaptation note uses "Stepped back" wording for regress result` — verifies the "Stepped back" wording when `lastResult` is `'regress'`.
+3. `adaptation note uses "Reset" wording for reset result` — verifies the "Reset" wording when `lastResult` is `'reset'`.
+4. `adaptation note uses "Targeting" wording for unknown result` — verifies the default-branch fallback "Targeting" wording when `lastResult` is an unrecognised value (cast to `never` to simulate a future-added case).
 
-**What they cover:** All three directly exercise the storeSync.ts changes for this pass — the three stores that previously used identity migrations now use their proper migration functions.
+**What they cover:** The `buildAdaptationNote` switch statement's 'hold', 'regress', 'reset', and default branches via the `resolveWorkoutDisplayTarget` call path. These branches were previously covered only via `explanation.test.ts` (a different call path through `generateRunAdaptationNote`); these tests ensure the selector itself correctly propagates all adaptation note variants to its caller.

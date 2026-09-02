@@ -226,6 +226,9 @@ export const useOutcomeStore = create<OutcomeState>()(
 
       importOutcomes(incoming) {
         if (incoming.length === 0) return
+        // Last-writer-wins per workoutInstanceId. Unlike historyStore.importEntries
+        // (which compares createdAt), outcomes are keyed by instanceId and do not
+        // carry a reliable timestamp for ordering — the instanceId IS the identity.
         set(s => {
           const next = { ...s.outcomes }
           for (const o of incoming) next[o.workoutInstanceId] = o
