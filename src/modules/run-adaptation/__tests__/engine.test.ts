@@ -421,4 +421,37 @@ describe('resolveWorkoutDisplayTarget', () => {
     expect(result.isFromProgression).toBe(false) // distance unchanged → no indicator
     expect(result.adaptationNote).toBeNull()     // no note either
   })
+
+  it('adaptation note uses "Holding" wording for hold result', () => {
+    const slot = makeSlot({ targetDistanceMiles: 5 })
+    const state = makeState({ currentTargetDistanceMiles: 5.5, lastResult: 'hold' })
+    const result = resolveWorkoutDisplayTarget(slot, state)
+    expect(result.adaptationNote).toContain('Holding')
+    expect(result.adaptationNote).toContain('5.5')
+  })
+
+  it('adaptation note uses "Stepped back" wording for regress result', () => {
+    const slot = makeSlot({ targetDistanceMiles: 5 })
+    const state = makeState({ currentTargetDistanceMiles: 4.5, lastResult: 'regress' })
+    const result = resolveWorkoutDisplayTarget(slot, state)
+    expect(result.adaptationNote).toContain('Stepped back')
+    expect(result.adaptationNote).toContain('4.5')
+  })
+
+  it('adaptation note uses "Reset" wording for reset result', () => {
+    const slot = makeSlot({ targetDistanceMiles: 5 })
+    const state = makeState({ currentTargetDistanceMiles: 4, lastResult: 'reset' })
+    const result = resolveWorkoutDisplayTarget(slot, state)
+    expect(result.adaptationNote).toContain('Reset')
+    expect(result.adaptationNote).toContain('4')
+  })
+
+  it('adaptation note uses "Targeting" wording for unknown result', () => {
+    const slot = makeSlot({ targetDistanceMiles: 5 })
+    // lastResult intentionally set to an unrecognised value to hit the default branch
+    const state = makeState({ currentTargetDistanceMiles: 5.5, lastResult: 'unknown_future_value' as never })
+    const result = resolveWorkoutDisplayTarget(slot, state)
+    expect(result.adaptationNote).toContain('Targeting')
+    expect(result.adaptationNote).toContain('5.5')
+  })
 })
