@@ -229,7 +229,7 @@ export function makeDay(label?: string): PlanDay {
 }
 
 /** @internal Exported only for cloud-hydration migration in storeSync. */
-export function migratePlanState(persisted: unknown): PlanState {
+export function migratePlanState(persisted: unknown, _fromVersion?: number): PlanState {
   const state = persisted as PlanState
   if (!state || !state.plans) return { plans: {}, activePlanId: null } as PlanState
   const plans = Object.fromEntries(
