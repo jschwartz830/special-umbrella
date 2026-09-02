@@ -398,3 +398,35 @@ Fix: import and call the proper migration functions in the STORES array, matchin
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
 | Cloud sync conflict resolution | Out of scope |
 
+---
+
+## Additions — 2026-09-02
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `planStore.migratePlanState`: add optional `_fromVersion` parameter for signature consistency | Refactor | `src/store/planStore.ts` |
+| 2 | `outcomeStore.importOutcomes`: document last-writer-wins semantics vs `historyStore.importEntries` | Docs | `src/store/outcomeStore.ts` |
+| 3 | `engine.test.ts`: cover hold/regress/reset/default branches of `buildAdaptationNote` via `resolveWorkoutDisplayTarget` | Tests | `src/modules/run-adaptation/__tests__/engine.test.ts` |
+
+### Detail
+
+**1. `migratePlanState` signature consistency**
+All other store migration functions follow the signature `(persisted: unknown, fromVersion: number): StoreState`. `migratePlanState` was the only exception, accepting only `persisted`. This discrepancy made the function stand out from the pattern without reason. Added `_fromVersion?: number` (optional, intentionally unused) to align with the established convention. Existing callers are unaffected.
+
+**2. `importOutcomes` last-writer-wins documentation**
+`importOutcomes` silently overwrites existing outcomes in array order, while `historyStore.importEntries` explicitly deduplicates by `createdAt` (newest wins). This inconsistency was undocumented. Added an inline comment in `importOutcomes` explaining that outcomes are keyed by instanceId (the identity IS the key), and that a reliable ordering timestamp is unavailable for outcomes — making last-writer-wins the pragmatic choice. Cross-references `historyStore.importEntries` so the difference is discoverable.
+
+**3. `resolveWorkoutDisplayTarget` adaptation note branch coverage**
+`buildAdaptationNote`'s 'hold', 'regress', 'reset', and default switch branches were tested via `explanation.test.ts` but not directly through the `resolveWorkoutDisplayTarget` path in `engine.test.ts`. Added 4 tests that exercise each remaining branch via the selector, including a cast-to-`never` unrecognised `lastResult` string to pin the default-branch fallback. Test count: 1352 → 1356 (+4).
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1180-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — no production callers found |
+| `beforeunload` async Supabase flush | Recommendation only — `navigator.sendBeacon` would be more reliable, but format compatibility is unverified |
+| Cloud sync conflict resolution | Out of scope |
+

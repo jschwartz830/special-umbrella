@@ -9,6 +9,20 @@
 **Branch:** `claude/serene-cori-a58c0l`
 **Date:** 2026-08-27
 **Branch:** `claude/serene-cori-h67b7b`
+**Date:** 2026-09-02
+**Branch:** `claude/admiring-noether-khylj8`
+
+---
+
+## Executive Summary (2026-09-02 pass)
+
+1. **What changed:** Two low-risk housekeeping improvements to production code and four new tests. `migratePlanState` received the optional `_fromVersion` parameter it was missing (signature parity with all other migration functions). `importOutcomes` received an explanatory inline comment documenting its last-writer-wins behavior and how it differs from `historyStore.importEntries`. Four new tests in `engine.test.ts` cover the 'hold', 'regress', 'reset', and default branches of `buildAdaptationNote` via the `resolveWorkoutDisplayTarget` call path. Test count: 1352 → 1356 (+4).
+
+2. **Why this matters:** The `migratePlanState` signature inconsistency was a low-grade maintenance hazard — any future contributor adding version-conditional migration logic had no signal that the second parameter was needed. The `importOutcomes` documentation closes an audit finding from the previous pass: the function's last-writer-wins behavior contrasts with `historyStore.importEntries`'s newest-createdAt semantics, and was undocumented. The new tests eliminate the last incomplete coverage path in `resolveWorkoutDisplayTarget` for the adaptation note feature.
+
+3. **Highest confidence:** All three changes are additive and non-breaking. The signature change is backward-compatible (optional parameter). The comment is documentation-only. The tests all pass.
+
+4. **Remaining open items (no change):** TodayPage extraction hook (risky refactor), `updateEntryDate` data-loss risk (no callers), `beforeunload` async Supabase flush (needs format compatibility check before implementing), cloud sync conflict resolution (out of scope).
 
 ---
 

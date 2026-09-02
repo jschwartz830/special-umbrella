@@ -2,6 +2,47 @@
 
 ---
 
+## 2026-09-02
+
+### Change 1 — `refactor(planStore): add optional _fromVersion parameter to migratePlanState for signature consistency`
+
+**Summary:** `migratePlanState` was the only store migration function without a `_fromVersion` parameter. All other store migrations (`migrateHistoryState`, `migrateOutcomeState`, `migrateProgramState`, `migrateExerciseHistoryState`, `migrateMobilityState`, `migrateSettingsState`) accept `(persisted, fromVersion)` following Zustand's migration contract. The missing parameter was harmless since `migratePlanState` doesn't use version-conditional logic, but the inconsistency made the function stand out and created a risk that a future contributor would add versioned migration branches using the wrong function signature. Added `_fromVersion?: number` (optional, prefixed with `_` to signal it is intentionally unused at this time). The call sites in `planStore.ts` and `storeSync.ts` are unchanged since neither passes `fromVersion`.
+
+**Files changed:**
+- `src/store/planStore.ts` — add `_fromVersion?: number` parameter to `migratePlanState`
+
+**Tests:** 1352 (no change — signature is backward-compatible)
+
+**Risk:** None — the parameter is optional and unused; existing callers continue to work without modification.
+
+---
+
+### Change 2 — `docs(outcomeStore): document importOutcomes last-writer-wins semantics`
+
+**Summary:** `importOutcomes` uses last-writer-wins (by array order) for duplicate `workoutInstanceId` values, unlike `historyStore.importEntries` which compares `createdAt` and keeps the newest. This inconsistency was undocumented, making it unclear whether the behavior was intentional. Added an inline comment explaining the rationale: outcomes are keyed by instanceId (the identity IS the key), and outcomes do not carry a reliable timestamp for ordering the way history entries do. The comment also cross-references `historyStore.importEntries` so future contributors are aware of the difference.
+
+**Files changed:**
+- `src/store/outcomeStore.ts` — add explanatory comment to `importOutcomes`
+
+**Tests:** 1352 (no change — documentation only)
+
+**Risk:** None — comment only, no behavior change.
+
+---
+
+### Change 3 — `test(run-adaptation): cover hold/regress/reset/default branches of buildAdaptationNote via resolveWorkoutDisplayTarget`
+
+**Summary:** `buildAdaptationNote`'s switch branches ('hold', 'regress', 'reset', default) were covered via `explanation.test.ts` (Aug 22 pass) but not through the `resolveWorkoutDisplayTarget` call path in `engine.test.ts`. Added 4 targeted tests in `engine.test.ts` that exercise each remaining branch by calling `resolveWorkoutDisplayTarget` with the appropriate `lastResult` value and asserting the expected wording appears in the returned `adaptationNote`. The 'default' branch is exercised with a cast-to-`never` unrecognised `lastResult` string, simulating a future-added value falling through to the fallback. Test count: 1352 → 1356 (+4).
+
+**Files changed:**
+- `src/modules/run-adaptation/__tests__/engine.test.ts` — 4 new tests in the `resolveWorkoutDisplayTarget` describe block
+
+**Tests:** 1352 → 1356 (+4)
+
+**Risk:** None — tests only.
+
+---
+
 ## 2026-08-27
 
 ### Change 1 — `fix(storeSync): apply proper migration fns for wpt_outcomes, wpt_program_vars, wpt_exercise_history cloud hydration`
