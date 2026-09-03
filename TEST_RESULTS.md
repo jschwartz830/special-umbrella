@@ -1,13 +1,13 @@
-# Test Results — 2026-09-02
+# Test Results — 2026-09-03
 
 ## Summary
 
 | Metric | Value |
 |---|---|
 | Test files | 35 |
-| Tests before this pass | 1352 |
-| Tests added this pass | 4 |
-| Tests after this pass | 1356 |
+| Tests before this pass | 1356 |
+| Tests added this pass | 5 |
+| Tests after this pass | 1361 |
 | Failures | 0 |
 | TypeScript errors | 0 |
 
@@ -21,19 +21,21 @@ npx vitest run
 
 ```
 Test Files  35 passed (35)
-     Tests  1356 passed (1356)
-  Start at  04:19:34
-  Duration  4.44s (transform 2.33s, setup 0ms, import 4.71s, tests 926ms, environment 4ms)
+     Tests  1361 passed (1361)
+  Start at  04:21:10
+  Duration  2.96s (transform 1.56s, setup 0ms, import 3.02s, tests 600ms, environment 3ms)
 ```
 
 ## New Tests Added This Pass
 
-**File:** `src/modules/run-adaptation/__tests__/engine.test.ts`
+| File | Test | Why |
+|---|---|---|
+| `shareWorkout.test.ts` | `includes segment duration when present` | `seg.duration` branch in the segment formatter was uncovered — all prior tests used distance/pace segments |
+| `shareWorkout.test.ts` | `shows ? for sets when sets field is undefined` | `typeof ex.sets === 'number'` + `Array.isArray` both false → `'?'` fallback was untested |
+| `shareWorkout.test.ts` | `shows ? for reps when reps field is undefined` | `ex.reps != null` false → `'?'` fallback was untested |
+| `shareWorkout.test.ts` | `falls through to targets branch when exercises array is empty` | `exercises: []` is truthy but length zero — neither exercises nor segments branch fires |
+| `progressionMode.test.ts` | `returns single when progressionType is empty string and hasProgressRule is true` | `!''` true but `!true` false — undefined early-return skipped; falls through all explicit checks to `'single'` |
 
-**Tests:**
-1. `adaptation note uses "Holding" wording for hold result` — verifies `resolveWorkoutDisplayTarget` returns an adaptation note containing "Holding" when `lastResult` is `'hold'` and the progression distance differs from the template.
-2. `adaptation note uses "Stepped back" wording for regress result` — verifies the "Stepped back" wording when `lastResult` is `'regress'`.
-3. `adaptation note uses "Reset" wording for reset result` — verifies the "Reset" wording when `lastResult` is `'reset'`.
-4. `adaptation note uses "Targeting" wording for unknown result` — verifies the default-branch fallback "Targeting" wording when `lastResult` is an unrecognised value (cast to `never` to simulate a future-added case).
+## Coverage Notes
 
-**What they cover:** The `buildAdaptationNote` switch statement's 'hold', 'regress', 'reset', and default branches via the `resolveWorkoutDisplayTarget` call path. These branches were previously covered only via `explanation.test.ts` (a different call path through `generateRunAdaptationNote`); these tests ensure the selector itself correctly propagates all adaptation note variants to its caller.
+All 35 test files pass; no files were removed or renamed. The five new tests are purely additive. No existing tests were modified.

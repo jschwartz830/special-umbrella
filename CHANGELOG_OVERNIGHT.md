@@ -2,6 +2,48 @@
 
 ---
 
+## 2026-09-03
+
+### Change 1 — `test(shareWorkout): cover segment duration, ? fallbacks, and empty-exercises branch`
+
+**Summary:** Four previously-untested branches in `formatWorkoutForClipboard` and its inner `formatExerciseSpec` helper are now exercised:
+
+1. **Segment duration** — `seg.duration` is conditionally appended only when present. The existing structured-run tests use segments with `distance` and `pace` but none with `duration` alone. New test passes a timed-interval segment (`duration: '2min'`) and asserts it appears in the output.
+2. **`?` fallback for sets** — when `sets` is `undefined`, `formatExerciseSpec` falls through to `'?'`. No test existed for this branch.
+3. **`?` fallback for reps** — when `reps` is `undefined` / `null`, the function substitutes `'?'`. No test existed for this branch.
+4. **Empty exercises array → targets branch** — `exercises: []` is truthy but has zero length, so the exercises conditional fails and the function falls through to the targets/notes branch. No test existed for this path.
+
+Test count: 1356 → 1361 (+5 across both test files, including the progressionMode change below).
+
+**Files changed:**
+- `src/lib/__tests__/shareWorkout.test.ts` — 4 new tests
+
+**Risk:** None — tests only.
+
+---
+
+### Change 2 — `test(progressionMode): cover empty-string progressionType with hasProgressRule=true`
+
+**Summary:** `deriveProgressionMode('', true)` was untested. An empty-string `progressionType` is falsy, so `!progressionType` is `true`; but `hasProgressRule=true` means `!hasProgressRule` is `false`, so the `undefined` early-return does not fire. The function then falls through all explicit type checks and returns `'single'`. This edge case (a YAML exercise entry whose `progressionType` is empty but that has a progress rule) is a real scenario for partially-configured exercises. Test added with a clarifying comment.
+
+**Files changed:**
+- `src/modules/workout-outcomes/__tests__/progressionMode.test.ts` — 1 new test
+
+**Risk:** None — test only.
+
+---
+
+### Change 3 — `docs(storeSync): document async limitation of beforeunload flush`
+
+**Summary:** The `handleBeforeUnload` function dispatches `pushStore` (an async Supabase fetch) without being able to await it, because `beforeunload` handlers must be synchronous. This has been an open audit item since the 2026-09-02 pass ("needs format compatibility check"). Added a multi-line comment explaining: (a) why it cannot be awaited, (b) what the browser actually does with the in-flight fetch, and (c) what a future fix would look like (`navigator.sendBeacon`). No behavior change.
+
+**Files changed:**
+- `src/lib/storeSync.ts` — inline comment block
+
+**Risk:** None — documentation only.
+
+---
+
 ## 2026-09-02
 
 ### Change 1 — `refactor(planStore): add optional _fromVersion parameter to migratePlanState for signature consistency`

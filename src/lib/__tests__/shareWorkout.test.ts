@@ -160,4 +160,57 @@ describe('formatWorkoutForClipboard', () => {
     expect(result).toContain('Evening Lift (weights)')
     expect(result).toContain('• Deadlift: 3x5')
   })
+
+  it('includes segment duration when present', () => {
+    // The seg.duration branch of the segment formatter is only reached when
+    // a segment has a duration but no distance (e.g. a timed warm-up or cool-down).
+    const planDay: PlanDay = {
+      id: 'd', label: 'Intervals', slots: [{
+        id: 's', type: 'run', name: 'Timed Intervals',
+        segments: [{ type: 'interval', name: 'Work', duration: '2min' }],
+      }],
+    }
+    const result = formatWorkoutForClipboard(planDay, 'Plan', 'Jun 19')
+    expect(result).toContain('• Work 2min')
+  })
+
+  it('shows ? for sets when sets field is undefined', () => {
+    // formatExerciseSpec: `typeof ex.sets === 'number'` is false, Array.isArray is
+    // false for undefined → falls through to the '?' fallback.
+    const planDay: PlanDay = {
+      id: 'd', label: 'Day', slots: [{
+        id: 's', type: 'weights', name: 'Press',
+        exercises: [{ exercise: 'Overhead Press', reps: 8 }],
+      }],
+    }
+    const result = formatWorkoutForClipboard(planDay, 'Plan', 'Jun 19')
+    expect(result).toContain('• Overhead Press: ?x8')
+  })
+
+  it('shows ? for reps when reps field is undefined', () => {
+    // formatExerciseSpec: `ex.reps != null` is false when reps is undefined → '?'
+    const planDay: PlanDay = {
+      id: 'd', label: 'Day', slots: [{
+        id: 's', type: 'weights', name: 'Curl',
+        exercises: [{ exercise: 'Bicep Curl', sets: 3 }],
+      }],
+    }
+    const result = formatWorkoutForClipboard(planDay, 'Plan', 'Jun 19')
+    expect(result).toContain('• Bicep Curl: 3x?')
+  })
+
+  it('falls through to targets branch when exercises array is empty', () => {
+    // exercises: [] satisfies the truthiness check but length === 0, so neither
+    // the exercises branch nor (if absent) the segments branch fires — targets branch runs.
+    const planDay: PlanDay = {
+      id: 'd', label: 'Run', slots: [{
+        id: 's', type: 'run', name: 'Easy Run',
+        exercises: [],
+        targetDistance: 6,
+      }],
+    }
+    const result = formatWorkoutForClipboard(planDay, 'Plan', 'Jun 19')
+    expect(result).toContain('6 mi')
+    expect(result).not.toContain('•')
+  })
 })
