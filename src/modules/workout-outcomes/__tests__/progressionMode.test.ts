@@ -38,4 +38,11 @@ describe('deriveProgressionMode', () => {
     // progressionType takes precedence; hasProgressRule just prevents the undefined early-return
     expect(deriveProgressionMode('double', true)).toBe('double')
   })
+
+  it('returns single when progressionType is empty string and hasProgressRule is true', () => {
+    // Empty string is falsy so `!progressionType` is true, but `!hasProgressRule` is false,
+    // so the undefined early-return does not fire. The explicit checks (double, triple,
+    // step_loading) all fail for '', so the function falls through to return 'single'.
+    expect(deriveProgressionMode('', true)).toBe('single')
+  })
 })

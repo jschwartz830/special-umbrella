@@ -11,6 +11,20 @@
 **Branch:** `claude/serene-cori-h67b7b`
 **Date:** 2026-09-02
 **Branch:** `claude/admiring-noether-khylj8`
+**Date:** 2026-09-03
+**Branch:** `claude/admiring-noether-es2l78`
+
+---
+
+## Executive Summary (2026-09-03 pass)
+
+1. **What changed:** Five new tests across two test files (+5) and one documentation-only comment in a production file. `shareWorkout.test.ts` gained four tests covering previously-untested branches: segment-duration formatting, `?`-fallback for undefined `sets`, `?`-fallback for undefined `reps`, and the empty-exercises-array path. `progressionMode.test.ts` gained one test for the edge case `deriveProgressionMode('', true)` — empty-string `progressionType` with `hasProgressRule=true` bypasses the undefined early-return and falls through to `'single'`. `storeSync.ts` gained an inline comment block documenting the known async limitation of the `beforeunload` flush (`pushStore` cannot be awaited) and what a future fix would look like. Test count: 1356 → 1361 (+5).
+
+2. **Why this matters:** The four `shareWorkout` branches are all reachable from real YAML-defined workout programs: a timed segment with no distance, an exercise spec where `sets` or `reps` is absent from the YAML, and a slot whose exercises key is explicitly `[]`. Each was an invisible regression risk. The `progressionMode` edge case documents a partially-configured exercise state that's representable in the store. The `storeSync` comment closes a multi-pass open item: the async limitation was known but unrecorded, making it easy for a future contributor to attempt an await-based fix that cannot work.
+
+3. **Highest confidence:** All five changes are either test-only or documentation-only. No production logic was altered.
+
+4. **Remaining open items:** TodayPage extraction hook (risky refactor), `updateEntryDate` data-loss risk (no callers), cloud sync conflict resolution (out of scope). The `beforeunload` async limitation is now documented; the `navigator.sendBeacon` upgrade path is recorded in the comment for future work.
 
 ---
 

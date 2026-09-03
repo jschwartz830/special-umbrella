@@ -3,6 +3,18 @@
 
 ---
 
+## 2026-09-03 Pass Changes
+
+| # | Type | Description |
+|---|---|---|
+| 1 | test | `shareWorkout.test.ts` — 4 new tests covering segment-duration, `?`-fallback for sets, `?`-fallback for reps, and empty-exercises-array branches in `formatWorkoutForClipboard` |
+| 2 | test | `progressionMode.test.ts` — 1 new test for `deriveProgressionMode('', true)` → `'single'` edge case |
+| 3 | docs | `storeSync.ts` — inline comment documenting async limitation of `handleBeforeUnload` flush and `navigator.sendBeacon` upgrade path |
+
+Test count before: 1356. Test count after: 1361 (+5).
+
+---
+
 ## Architecture Summary
 
 **Stack:** React 18 + TypeScript + Zustand + Vite, deployed to GitHub Pages as a PWA.

@@ -162,6 +162,14 @@ export function subscribeStores(): () => void {
   // Flush any pending debounced writes immediately before the page is torn
   // down. Without this, a tab closed within 1.5s of a change loses that
   // write entirely — the debounced setTimeout never fires.
+  //
+  // Known limitation: pushStore is async (Supabase fetch) and cannot be
+  // awaited here because beforeunload handlers must be synchronous. The
+  // fetch is dispatched and the browser may cancel it if teardown is too
+  // fast. Most browsers keep in-flight fetch requests alive for a short
+  // time after navigation, but there is no guarantee. A future improvement
+  // would use navigator.sendBeacon for fire-and-forget durability, which
+  // requires matching the Supabase REST API format for the beacon body.
   function handleBeforeUnload() {
     for (const [timeoutStoreName, timeoutId] of pendingByStore.entries()) {
       clearTimeout(timeoutId)
