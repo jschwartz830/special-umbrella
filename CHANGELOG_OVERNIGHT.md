@@ -2,6 +2,34 @@
 
 ---
 
+## 2026-09-04
+
+### Change 1 — `test(historyStats): verify complete entries from another plan do not break consecutive-skip streak`
+
+**Summary:** `computeConsecutiveSkips` correctly filters entries by `planId` using `if (e.planId !== planId) continue`, so complete entries from an unrelated plan must not be added to `breakDates`. Existing plan-isolation tests covered (a) plan-B skip treated as a gap and (b) plan-B extras not breaking the streak, but left a gap: plan-B `complete` entries (which add to `breakDates` for plan-B) were not verified to be silently dropped for plan-A. Without this filter a `complete` entry from plan-B on the same date as a plan-A `skip` would cause the streak scan to stop one day early, reporting 1 instead of 2. The new test exercises exactly this case. Test count: 1356 → 1357 (+1).
+
+**Files changed:**
+- `src/lib/__tests__/historyStats.test.ts` — 1 new test at end of `computeConsecutiveSkips` describe block
+
+**Tests:** 1356 → 1357 (+1)
+
+**Risk:** None — test only.
+
+---
+
+### Change 2 — `docs(IMPLEMENTATION_PLAN): correct updateEntryDate caller status`
+
+**Summary:** The IMPLEMENTATION_PLAN incorrectly listed `updateEntryDate`'s open item as "no production callers found." The function is called in CalendarPage.tsx (line 240), HistoryPage.tsx (lines 308 and 381), and TodayPage.tsx (line 503). The collision-delete behavior (deleting an existing entry at the target date when moving) is intentional — it maintains the one-entry-per-(planId, calendarDate) invariant. Updated all rows in the open-items tables to reflect the correct caller list and note that the behavior is intentional.
+
+**Files changed:**
+- `IMPLEMENTATION_PLAN.md` — corrected 7 open-item table rows
+
+**Tests:** 1357 (no change — documentation only)
+
+**Risk:** None — documentation only.
+
+---
+
 ## 2026-09-02
 
 ### Change 1 — `refactor(planStore): add optional _fromVersion parameter to migratePlanState for signature consistency`

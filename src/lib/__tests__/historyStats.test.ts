@@ -2147,6 +2147,17 @@ describe('computeConsecutiveSkips', () => {
     const extras = [csExtra('2026-05-08', 'plan-2')] // different plan — irrelevant
     expect(computeConsecutiveSkips('plan-1', entries, extras, TODAY)).toBe(2)
   })
+
+  it('complete entries from a different plan do not break the streak', () => {
+    // plan-2 complete on the same date must NOT add that date to breakDates
+    // for plan-1; without plan isolation the streak would stop at 1 instead of 2.
+    const entries = [
+      skipEntry('2026-05-09', 'plan-1'),
+      skipEntry('2026-05-08', 'plan-1'),
+      completeEntryCs('2026-05-08', 'plan-2'),
+    ]
+    expect(computeConsecutiveSkips('plan-1', entries, [], TODAY)).toBe(2)
+  })
 })
 
 // ── computeLoggedRate ─────────────────────────────────────────────────────────
