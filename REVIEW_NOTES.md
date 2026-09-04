@@ -11,6 +11,20 @@
 **Branch:** `claude/serene-cori-h67b7b`
 **Date:** 2026-09-02
 **Branch:** `claude/admiring-noether-khylj8`
+**Date:** 2026-09-04
+**Branch:** `claude/admiring-noether-dy7xa1`
+
+---
+
+## Executive Summary (2026-09-04 pass)
+
+1. **What changed:** One new test and two documentation corrections. A missing plan-isolation test was added to `computeConsecutiveSkips`: a `complete` entry from plan-B on the same date as a plan-A `skip` must not add that date to plan-A's `breakDates`. Existing tests covered plan-B skips-as-gaps and plan-B extras being ignored, but left this `complete`-coincidence case uncovered — the gap was now closed. The IMPLEMENTATION_PLAN was corrected to note that `updateEntryDate` has active production callers (CalendarPage, HistoryPage, TodayPage) and that its collision-delete behavior is intentional. Test count: 1356 → 1357 (+1).
+
+2. **Why this matters:** Without the new test, a future refactor of `computeConsecutiveSkips` that accidentally dropped the `planId` filter on `breakDates` construction would not be caught. The IMPLEMENTATION_PLAN correction ensures future audit passes do not waste effort searching for callers that already exist.
+
+3. **Highest confidence:** One test addition, two documentation-only corrections. No behavior change.
+
+4. **Remaining open items (no change):** TodayPage extraction hook (risky refactor), `beforeunload` async Supabase flush (needs product decision), cloud sync conflict resolution (out of scope). `updateEntryDate` data-loss note corrected — collision-delete is intentional and callers exist.
 
 ---
 
@@ -22,7 +36,7 @@
 
 3. **Highest confidence:** All three changes are additive and non-breaking. The signature change is backward-compatible (optional parameter). The comment is documentation-only. The tests all pass.
 
-4. **Remaining open items (no change):** TodayPage extraction hook (risky refactor), `updateEntryDate` data-loss risk (no callers), `beforeunload` async Supabase flush (needs format compatibility check before implementing), cloud sync conflict resolution (out of scope).
+4. **Remaining open items (no change):** TodayPage extraction hook (risky refactor), `updateEntryDate` data-loss risk (callers exist in CalendarPage/HistoryPage/TodayPage; collision-delete is intentional), `beforeunload` async Supabase flush (needs format compatibility check before implementing), cloud sync conflict resolution (out of scope).
 
 ---
 

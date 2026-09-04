@@ -1,13 +1,13 @@
-# Test Results — 2026-09-02
+# Test Results — 2026-09-04
 
 ## Summary
 
 | Metric | Value |
 |---|---|
 | Test files | 35 |
-| Tests before this pass | 1352 |
-| Tests added this pass | 4 |
-| Tests after this pass | 1356 |
+| Tests before this pass | 1356 |
+| Tests added this pass | 1 |
+| Tests after this pass | 1357 |
 | Failures | 0 |
 | TypeScript errors | 0 |
 
@@ -21,19 +21,16 @@ npx vitest run
 
 ```
 Test Files  35 passed (35)
-     Tests  1356 passed (1356)
-  Start at  04:19:34
-  Duration  4.44s (transform 2.33s, setup 0ms, import 4.71s, tests 926ms, environment 4ms)
+     Tests  1357 passed (1357)
+  Start at  04:19:57
+  Duration  4.23s (transform 2.34s, setup 0ms, import 4.53s, tests 875ms, environment 4ms)
 ```
 
 ## New Tests Added This Pass
 
-**File:** `src/modules/run-adaptation/__tests__/engine.test.ts`
+**File:** `src/lib/__tests__/historyStats.test.ts`
 
 **Tests:**
-1. `adaptation note uses "Holding" wording for hold result` — verifies `resolveWorkoutDisplayTarget` returns an adaptation note containing "Holding" when `lastResult` is `'hold'` and the progression distance differs from the template.
-2. `adaptation note uses "Stepped back" wording for regress result` — verifies the "Stepped back" wording when `lastResult` is `'regress'`.
-3. `adaptation note uses "Reset" wording for reset result` — verifies the "Reset" wording when `lastResult` is `'reset'`.
-4. `adaptation note uses "Targeting" wording for unknown result` — verifies the default-branch fallback "Targeting" wording when `lastResult` is an unrecognised value (cast to `never` to simulate a future-added case).
+1. `complete entries from a different plan do not break the streak` — verifies that a `complete` entry for plan-B on a date where plan-A has a `skip` entry does not add that date to plan-A's `breakDates`, so the skip streak correctly counts 2 instead of stopping at 1.
 
-**What they cover:** The `buildAdaptationNote` switch statement's 'hold', 'regress', 'reset', and default branches via the `resolveWorkoutDisplayTarget` call path. These branches were previously covered only via `explanation.test.ts` (a different call path through `generateRunAdaptationNote`); these tests ensure the selector itself correctly propagates all adaptation note variants to its caller.
+**What they cover:** The plan-isolation guard in `computeConsecutiveSkips` (`if (e.planId !== planId) continue`) for the specific case where a cross-plan `complete` entry coincides with a same-plan `skip` entry. Prior tests verified plan-B `skip` entries were treated as gaps and plan-B extras were ignored, but left the `complete`-coincidence case uncovered.

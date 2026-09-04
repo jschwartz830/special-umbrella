@@ -168,7 +168,7 @@ Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silentl
 | Calendar week start configurable | Recommendation only — requires settings infrastructure |
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of 1150-line component |
 | `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
 | Cloud sync conflict resolution | Out of scope |
 
 ---
@@ -196,7 +196,7 @@ Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silentl
 |---|---|
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
 | `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
 | Cloud sync conflict resolution | Out of scope |
 
 ---
@@ -229,7 +229,7 @@ Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silentl
 | Calendar week start configurable | Recommendation only — requires settings infrastructure |
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1160-line component |
 | `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
 | Cloud sync conflict resolution | Out of scope |
 
 ---
@@ -311,7 +311,7 @@ Extra workouts use IDs of the form `planId_YYYY-MM-DD_extra_extraId`. The functi
 | Calendar week start configurable | Recommendation only — requires settings infrastructure |
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
 | `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1160-line component |
 | 1 | `findBestWeek`: exclude future-dated entries when `today` param is passed | Defensive fix | `src/lib/historyStats.ts`, `src/pages/HistoryPage.tsx`, `src/lib/__tests__/historyStats.test.ts` |
 | 2 | `HistoryPage`: clamp `computeWorkoutTypeBreakdown` dateRange to `today` | Defensive fix | `src/pages/HistoryPage.tsx`, `src/lib/__tests__/historyStats.test.ts` |
@@ -363,7 +363,7 @@ Cloud data hydrated via `syncOnLogin` bypasses Zustand's `persist` middleware mi
 | Item | Status |
 |---|---|
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
 | Cloud sync conflict resolution | Out of scope |
 
 ---
@@ -395,7 +395,7 @@ Fix: import and call the proper migration functions in the STORES array, matchin
 | Item | Status |
 |---|---|
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — audit found no production callers |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
 | Cloud sync conflict resolution | Out of scope |
 
 ---
@@ -426,7 +426,7 @@ All other store migration functions follow the signature `(persisted: unknown, f
 | Item | Status |
 |---|---|
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1180-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — no production callers found |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
 | `beforeunload` async Supabase flush | Recommendation only — `navigator.sendBeacon` would be more reliable, but format compatibility is unverified |
 | Cloud sync conflict resolution | Out of scope |
 
