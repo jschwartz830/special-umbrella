@@ -157,6 +157,7 @@ export const EXERCISE_LIBRARY: ExerciseLibraryItem[] = [
   { name: 'Knees to Elbows, Bodyweight', type: ['core'], target: ['abs'], synergist: ['hamstrings', 'quadriceps', 'glutes'] },
   { name: 'Lat Pulldown, Cable', type: ['upper', 'pull'], target: ['back'], synergist: ['biceps', 'forearms', 'shoulders'] },
   { name: 'Lat Pulldown, Leverage Machine', type: ['upper', 'pull'], target: ['back'], synergist: ['biceps', 'forearms', 'shoulders'] },
+  { name: 'Lat Pulldown Single Arm, Cable', type: ['upper', 'pull'], target: ['back'], synergist: ['biceps', 'forearms', 'shoulders'] },
   { name: 'Lateral Raise, Cable', type: ['upper', 'push'], target: ['shoulders'], synergist: ['chest', 'back'] },
   { name: 'Lateral Raise, Dumbbell', type: ['upper', 'push'], target: ['shoulders'], synergist: ['chest', 'back'] },
   { name: 'Lateral Raise, Band', type: ['upper', 'push'], target: ['shoulders'], synergist: ['chest', 'back'] },

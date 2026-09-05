@@ -144,6 +144,61 @@ function parseInputNumber(v: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/**
+ * Numeric text input that buffers what the user is typing separately from the
+ * parsed number. A plain controlled `<input value={n ?? ''}>` reformats on every
+ * keystroke, which strips a trailing "." (or "0") the instant it's typed and makes
+ * it impossible to enter decimals like "12.5" character by character.
+ */
+function NumberTextField({
+  value,
+  onChange,
+  onFocusField,
+  onBlurField,
+  inputMode,
+  placeholder,
+  className,
+}: {
+  value: number | null
+  onChange: (v: number | null) => void
+  onFocusField?: () => void
+  onBlurField?: () => void
+  inputMode: 'numeric' | 'decimal'
+  placeholder?: string
+  className?: string
+}) {
+  const [text, setText] = useState(value != null ? String(value) : '')
+  const editingRef = useRef(false)
+
+  useEffect(() => {
+    if (!editingRef.current) setText(value != null ? String(value) : '')
+  }, [value])
+
+  return (
+    <input
+      type="text"
+      inputMode={inputMode}
+      value={text}
+      onChange={e => {
+        setText(e.target.value)
+        onChange(parseInputNumber(e.target.value))
+      }}
+      onFocus={e => {
+        editingRef.current = true
+        onFocusField?.()
+        e.target.select()
+      }}
+      onBlur={() => {
+        editingRef.current = false
+        setText(value != null ? String(value) : '')
+        onBlurField?.()
+      }}
+      placeholder={placeholder}
+      className={className}
+    />
+  )
+}
+
 interface TimerColProps {
   label: string
   value: string
@@ -425,11 +480,29 @@ export function ActiveWorkoutTracker({
 
   // Lock background scroll while the full-screen tracker (including focus view) is open —
   // prevents the page behind it from scrolling when rapid taps land near the overlay edges.
+  // Pinning body position (not just overflow) also stops mobile browsers from panning the
+  // whole page to "reveal" a focused reps/weight field once the on-screen keyboard opens —
+  // the keyboard toolbar already tracks the visual viewport to sit above the keyboard instead.
   useEffect(() => {
     if (minimized) return
-    const original = document.body.style.overflow
+    const scrollY = window.scrollY
+    const original = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+    }
     document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = original }
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.width = '100%'
+    return () => {
+      document.body.style.overflow = original.overflow
+      document.body.style.position = original.position
+      document.body.style.top = original.top
+      document.body.style.width = original.width
+      window.scrollTo(0, scrollY)
+    }
   }, [minimized])
 
   useEffect(() => {
@@ -1659,12 +1732,10 @@ export function ActiveWorkoutTracker({
                     onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualReps: Math.max(0, (curSet.actualReps ?? 0) - repStep) })}
                     className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
                   >−</button>
-                  <input
-                    type="text"
+                  <NumberTextField
                     inputMode="numeric"
-                    value={curSet.actualReps ?? ''}
-                    onChange={e => updateSet(cur.exIdx, cur.setIdx, { actualReps: parseInputNumber(e.target.value) })}
-                    onFocus={e => e.target.select()}
+                    value={curSet.actualReps}
+                    onChange={v => updateSet(cur.exIdx, cur.setIdx, { actualReps: v })}
                     placeholder={String(curSet.targetReps ?? (curSet.isTimed ? 'secs' : 'reps'))}
                     className="flex-1 min-w-0 bg-transparent text-2xl font-bold text-white text-center focus:outline-none"
                   />
@@ -1681,12 +1752,10 @@ export function ActiveWorkoutTracker({
                     onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualLoad: Math.max(0, (curSet.actualLoad ?? 0) - 5) })}
                     className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
                   >−</button>
-                  <input
-                    type="text"
+                  <NumberTextField
                     inputMode="decimal"
-                    value={curSet.actualLoad ?? ''}
-                    onChange={e => updateSet(cur.exIdx, cur.setIdx, { actualLoad: parseInputNumber(e.target.value) })}
-                    onFocus={e => e.target.select()}
+                    value={curSet.actualLoad}
+                    onChange={v => updateSet(cur.exIdx, cur.setIdx, { actualLoad: v })}
                     placeholder={
                       curSet.resolvedLoadLbs != null && curSet.resolvedLoadLbs > 0
                         ? String(curSet.resolvedLoadLbs)
@@ -1971,27 +2040,21 @@ export function ActiveWorkoutTracker({
                     <span className="col-span-3 text-center text-slate-500 text-[10px]">
                       {previousSetDisplay(ex, setIdx)}
                     </span>
-                    <input
-                      type="text"
+                    <NumberTextField
                       inputMode="numeric"
-                      value={s.actualReps ?? ''}
-                      onChange={e => updateSet(exIdx, setIdx, {
-                        actualReps: parseInputNumber(e.target.value),
-                      })}
-                      onFocus={e => { handleFieldFocus(exIdx, setIdx, 'reps'); e.target.select() }}
-                      onBlur={handleFieldBlur}
+                      value={s.actualReps}
+                      onChange={v => updateSet(exIdx, setIdx, { actualReps: v })}
+                      onFocusField={() => handleFieldFocus(exIdx, setIdx, 'reps')}
+                      onBlurField={handleFieldBlur}
                       placeholder={String(s.targetReps ?? (s.isTimed ? 'secs' : 'reps'))}
                       className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
                     />
-                    <input
-                      type="text"
+                    <NumberTextField
                       inputMode="decimal"
-                      value={s.actualLoad ?? ''}
-                      onChange={e => updateSet(exIdx, setIdx, {
-                        actualLoad: parseInputNumber(e.target.value),
-                      })}
-                      onFocus={e => { handleFieldFocus(exIdx, setIdx, 'weight'); e.target.select() }}
-                      onBlur={handleFieldBlur}
+                      value={s.actualLoad}
+                      onChange={v => updateSet(exIdx, setIdx, { actualLoad: v })}
+                      onFocusField={() => handleFieldFocus(exIdx, setIdx, 'weight')}
+                      onBlurField={handleFieldBlur}
                       placeholder={
                         s.resolvedLoadLbs != null && s.resolvedLoadLbs > 0
                           ? String(s.resolvedLoadLbs)
