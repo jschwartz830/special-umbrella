@@ -9,6 +9,8 @@ export interface HistoryStats {
   last30Completed: number
   currentStreak: number
   longestStreak: number
+  /** YYYY-MM-DD of the first day of the current streak, or null when streak is 0. */
+  currentStreakStartDate: string | null
 }
 
 /**
@@ -90,7 +92,11 @@ export function computeHistoryStats(
     if (runLen > longestStreak) longestStreak = runLen
   }
 
-  return { totalLogged, totalCompleted, last7Completed, last30Completed, currentStreak, longestStreak }
+  // The start date of the current streak: today shifted back (streak - 1) days.
+  // null when there is no streak (currentStreak === 0).
+  const currentStreakStartDate = currentStreak > 0 ? shiftDay(today, -(currentStreak - 1)) : null
+
+  return { totalLogged, totalCompleted, last7Completed, last30Completed, currentStreak, longestStreak, currentStreakStartDate }
 }
 
 // ── Plan progress ─────────────────────────────────────────────────────────────
