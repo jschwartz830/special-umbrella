@@ -319,6 +319,27 @@ describe('applyRunProgressionDecision', () => {
     expect(result.lastResult).toBe('hold')
     expect(result.currentTargetDistanceMiles).toBe(5)
   })
+
+  it('writes regress state with stepped-back distance and correct lastResult', () => {
+    const result = applyRunProgressionDecision(
+      'plan1_2026-06-01',
+      'long-run',
+      { action: 'regress', nextTargetDistanceMiles: 4.5, reason: 'high_effort' },
+      makeState({ currentTargetDistanceMiles: 5 }),
+    )
+    expect(result.lastResult).toBe('regress')
+    expect(result.currentTargetDistanceMiles).toBe(4.5)
+    expect(result.lastCompletedWorkoutInstanceId).toBe('plan1_2026-06-01')
+  })
+
+  it('returns minimal placeholder for action = none when previousState is null', () => {
+    // No prior state: this is the first time we see this group on a non-eligible slot.
+    // The function should return a stub with progressionGroupId but no distance.
+    const result = applyRunProgressionDecision('id', 'long-run', { action: 'none', reason: 'not_progression_eligible' }, null)
+    expect(result.progressionGroupId).toBe('long-run')
+    expect(result.currentTargetDistanceMiles).toBeUndefined()
+    expect(result.lastResult).toBeUndefined()
+  })
 })
 
 // ── Derived pace calculation ──────────────────────────────────────────────────
