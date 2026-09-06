@@ -45,15 +45,17 @@ export function findPreviousSessionForPlanDay(
  * > 0; otherwise derived from distance + duration when both are available.
  * A stored value of 0 is treated as bad data and triggers derivation.
  *
- * Pass `maxLoadByExercise` (a map of exercise name → all-time max load in lb)
- * to enable personal-best detection. When the displayed load equals the map's
- * value, " · PB" is appended.
+ * Pass `prFlagsMap` (keyed by workoutInstanceId, from `buildPRFlagsMap`) to
+ * enable personal-best detection. When the session set a load PR, " · PB" is
+ * appended. This uses strict-greater-than semantics against sessions strictly
+ * before the displayed session's date, matching the PR badge logic in the
+ * history view.
  *
  * Returns null when the outcome has no data worth surfacing.
  */
 export function buildLastSessionSummary(
   outcome: WorkoutOutcome,
-  maxLoadByExercise?: Record<string, number>,
+  prFlagsMap?: Map<string, { hasLoadPR: boolean; hasRepsPR: boolean }> | null,
 ): string | null {
   // Weights: first exercise with at least one actual set
   const ex = outcome.weightsActual?.exercises?.find(
@@ -62,7 +64,7 @@ export function buildLastSessionSummary(
   if (ex) {
     const activeSets = ex.sets.filter(s => s.actualReps != null || s.actualLoad != null)
     if (activeSets.length > 0) {
-      // Use heaviest set for display and PB comparison; fall back to first active set
+      // Use heaviest set for display; fall back to first active set
       const setsWithLoad = activeSets.filter(s => s.actualLoad != null)
       const s = setsWithLoad.length > 0
         ? setsWithLoad.reduce((best, cur) => (cur.actualLoad! > best.actualLoad! ? cur : best))
@@ -75,10 +77,12 @@ export function buildLastSessionSummary(
       const reps = s.actualReps ?? s.targetReps ?? null
       const repsStr = reps != null ? `×${reps}` : ' sets'
       const load = s.actualLoad != null ? `@ ${s.actualLoad} lb` : ''
+      // Use prFlagsMap for PR detection — it uses strict-greater-than against
+      // sessions strictly before this session's date, so a repeated load does
+      // NOT show PB (only the first time a load was set does).
       const isPB =
-        maxLoadByExercise != null &&
-        s.actualLoad != null &&
-        maxLoadByExercise[ex.exercise] === s.actualLoad
+        prFlagsMap != null &&
+        (prFlagsMap.get(outcome.workoutInstanceId)?.hasLoadPR ?? false)
       const activeExerciseCount = (outcome.weightsActual?.exercises ?? []).filter(
         e => e.sets.some(s2 => s2.actualReps != null || s2.actualLoad != null),
       ).length
