@@ -42,7 +42,35 @@ describe('computeHistoryStats', () => {
       last30Completed: 0,
       currentStreak: 0,
       longestStreak: 0,
+      currentStreakStartDate: null,
     })
+  })
+
+  // ── currentStreakStartDate ─────────────────────────────────────────────────
+
+  it('currentStreakStartDate is null when streak is 0', () => {
+    const entries = [entry('2026-04-16', 'complete')]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.currentStreak).toBe(0)
+    expect(s.currentStreakStartDate).toBeNull()
+  })
+
+  it('currentStreakStartDate equals today when streak is 1', () => {
+    const entries = [entry('2026-04-17', 'complete')]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.currentStreak).toBe(1)
+    expect(s.currentStreakStartDate).toBe('2026-04-17')
+  })
+
+  it('currentStreakStartDate is (streak - 1) days before today', () => {
+    const entries = [
+      entry('2026-04-15', 'complete'),
+      entry('2026-04-16', 'complete'),
+      entry('2026-04-17', 'complete'),
+    ]
+    const s = computeHistoryStats(entries, [], '2026-04-17')
+    expect(s.currentStreak).toBe(3)
+    expect(s.currentStreakStartDate).toBe('2026-04-15')
   })
 
   it('counts totals and completed separately (rotation only)', () => {

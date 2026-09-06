@@ -2,6 +2,35 @@
 
 ---
 
+## 2026-09-05
+
+### Change 1 — `test(run-adaptation): cover regress and none/null paths in applyRunProgressionDecision`
+
+**Summary:** Two code paths in `applyRunProgressionDecision` (src/modules/run-adaptation/engine.ts) were untested: `action === 'regress'` (returns full state with stepped-back distance and `lastResult: 'regress'`) and `action === 'none'` when `previousState` is `null` (returns a minimal placeholder). Both paths are meaningfully different from the tested `advance` and `hold` cases. Added two tests to the existing `applyRunProgressionDecision` describe block.
+
+**Files changed:**
+- `src/modules/run-adaptation/__tests__/engine.test.ts` — 2 new tests
+
+**Tests:** 1357 → 1359 (+2)
+
+**Risk:** None — test only.
+
+---
+
+### Change 2 — `feat(historyStats): expose currentStreakStartDate in HistoryStats`
+
+**Summary:** `HistoryStats.currentStreak` tells callers how long the streak is, but not when it started. Any UI that wants to display "streak since YYYY-MM-DD" had to re-derive that date by calling the low-level `shiftDay` helper — a leaky abstraction. Added `currentStreakStartDate: string | null` to the `HistoryStats` interface and computed it in `computeHistoryStats` as `shiftDay(today, -(currentStreak - 1))` (null when streak is 0). Logic: a streak of 1 started today, a streak of N started N-1 days ago. The `shiftDay` helper was already in scope. Also updated `historyStats.test.ts`: added `currentStreakStartDate: null` to the existing empty-inputs `toEqual` check, and added three new focused tests (null when streak 0, equals today for streak 1, correct date for streak 3).
+
+**Files changed:**
+- `src/lib/historyStats.ts` — `HistoryStats` interface (new field) + `computeHistoryStats` return value
+- `src/lib/__tests__/historyStats.test.ts` — 1 updated `toEqual` check + 3 new tests
+
+**Tests:** 1359 → 1362 (+3)
+
+**Risk:** Low. `currentStreakStartDate` is a new field; no existing consumers read it yet, so there are no regressions. The computation reuses the already-tested `shiftDay` helper.
+
+---
+
 ## 2026-09-04
 
 ### Change 1 — `test(historyStats): verify complete entries from another plan do not break consecutive-skip streak`
