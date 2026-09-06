@@ -29,7 +29,7 @@ import { completionStateToAction } from '../modules/workout-outcomes/types'
 import { generateRunAdaptationNote, generateDifficultySpacingWarning } from '../modules/recommendation/explanation'
 import { isRunType } from '../modules/workout-metadata/types'
 import { isPlanExpired } from '../engine/rotationEngine'
-import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek, computeRotationPlanRemaining } from '../lib/historyStats'
+import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek, computeRotationPlanRemaining, buildPRFlagsMap } from '../lib/historyStats'
 import type { WorkoutCompletionRate } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, WorkoutSlot } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../modules/workout-outcomes/types'
@@ -117,7 +117,7 @@ export function TodayPage() {
     [plan, today, allOutcomes],
   )
 
-  // Build all-time max load per exercise for PB detection in the session hint.
+  // Build all-time max load per exercise for post-workout PR banner detection.
   const exerciseRecords = useExerciseHistoryStore(s => s.records)
   const maxLoadByExercise = useMemo(() => {
     const map: Record<string, number> = {}
@@ -130,6 +130,11 @@ export function TodayPage() {
     }
     return map
   }, [exerciseRecords])
+
+  // Pre-computed PR flags per workout instance — uses strict-greater-than against
+  // prior sessions, so "Last session" hints show "· PB" only when the session
+  // actually set an all-time record, not every time the load matches the max.
+  const prFlagsMap = useMemo(() => buildPRFlagsMap(exerciseRecords), [exerciseRecords])
 
   // Memoize plan-scoped extras so internal useMemos only re-run when needed.
   const activePlanId = plan?.id ?? null
@@ -348,7 +353,7 @@ export function TodayPage() {
   const prevSessionOutcome = isPending
     ? findPreviousSessionForPlanDay(plan.id, primaryPlanDayIndex, today, planEntries, allOutcomes)
     : null
-  const lastSessionSummary = prevSessionOutcome ? buildLastSessionSummary(prevSessionOutcome, maxLoadByExercise) : null
+  const lastSessionSummary = prevSessionOutcome ? buildLastSessionSummary(prevSessionOutcome, prFlagsMap) : null
 
   const prevSessionDate = prevSessionOutcome
     ? parseWorkoutInstanceId(prevSessionOutcome.workoutInstanceId)?.calendarDate ?? null
@@ -377,10 +382,10 @@ export function TodayPage() {
     return Object.fromEntries(
       upcoming.map(rd => {
         const outcome = findPreviousSessionForPlanDay(plan.id, rd.planDayIndex, today, planEntries, allOutcomes)
-        return [rd.calendarDate, outcome ? buildLastSessionSummary(outcome, maxLoadByExercise) : null]
+        return [rd.calendarDate, outcome ? buildLastSessionSummary(outcome, prFlagsMap) : null]
       }),
     )
-  }, [plan, upcoming, today, planEntries, allOutcomes, maxLoadByExercise])
+  }, [plan, upcoming, today, planEntries, allOutcomes, prFlagsMap])
 
   // Exercise count and meta for the compact workout card
   const primarySlot = primaryPlanDay.slots[0]
