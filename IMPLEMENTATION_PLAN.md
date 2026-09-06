@@ -430,3 +430,29 @@ All other store migration functions follow the signature `(persisted: unknown, f
 | `beforeunload` async Supabase flush | Recommendation only — `navigator.sendBeacon` would be more reliable, but format compatibility is unverified |
 | Cloud sync conflict resolution | Out of scope |
 
+
+## Additions — 2026-09-06
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `buildLastSessionSummary`: replace equality-based PB check with strict-greater-than `prFlagsMap` | Bug fix | `src/lib/sessionSummary.ts`, `src/pages/TodayPage.tsx`, `src/lib/__tests__/sessionSummary.test.ts` |
+
+### Detail
+
+**1. `buildLastSessionSummary` PB detection bug fix**
+The "Last session" hint on TodayPage pending cards showed "· PB" whenever the displayed session's heaviest load equalled the all-time maximum — an equality check that marked every repeat performance at the same weight as a personal best. The fix replaces `maxLoadByExercise[ex.exercise] === s.actualLoad` with `prFlagsMap.get(outcome.workoutInstanceId)?.hasLoadPR`, using the existing `buildPRFlagsMap` function which applies strict-greater-than against records strictly before the session's date. Repeated loads no longer show the PB badge; only genuine first-time records do.
+
+Five existing PB tests in `sessionSummary.test.ts` were rewritten to use `ExerciseSessionRecord` fixtures with `buildPRFlagsMap`, explicitly verifying both the positive case (prior record < new load → PB shown) and the negative case (prior record = new load → no PB).
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — `navigator.sendBeacon` would be more reliable, but format compatibility is unverified |
+| Cloud sync conflict resolution | Out of scope |
+| Integration test for TodayPage "Last session" PB hint | New recommendation — unit coverage exists; full rendering path untested |
+

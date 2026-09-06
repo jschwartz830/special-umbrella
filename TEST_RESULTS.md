@@ -34,3 +34,34 @@ Test Files  35 passed (35)
 1. `complete entries from a different plan do not break the streak` — verifies that a `complete` entry for plan-B on a date where plan-A has a `skip` entry does not add that date to plan-A's `breakDates`, so the skip streak correctly counts 2 instead of stopping at 1.
 
 **What they cover:** The plan-isolation guard in `computeConsecutiveSkips` (`if (e.planId !== planId) continue`) for the specific case where a cross-plan `complete` entry coincides with a same-plan `skip` entry. Prior tests verified plan-B `skip` entries were treated as gaps and plan-B extras were ignored, but left the `complete`-coincidence case uncovered.
+
+---
+
+# Test Results — 2026-09-06
+
+## Summary
+
+| Metric | Value |
+|---|---|
+| Test files | 35 |
+| Tests before this pass | 1357 |
+| Tests added this pass | 0 (5 existing PB tests rewritten) |
+| Tests after this pass | 1357 |
+| Failures | 0 |
+| TypeScript errors | 0 |
+
+## Command
+
+```
+npx vitest run
+```
+
+## Output (final lines)
+
+```
+Test Files  35 passed (35)
+     Tests  1357 passed (1357)
+  Start at  04:18:05
+  Duration  3.26s
+```
+

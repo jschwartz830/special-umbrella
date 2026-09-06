@@ -585,3 +585,26 @@ use case. No signature change; no other caller affected.
 **Risks / tradeoffs:** Documentation-only change. No runtime impact.
 
 **Rollback:** Revert the `docs(workoutInstanceId)` commit.
+
+---
+
+## 2026-09-06
+
+### Change 1 — `fix(sessionSummary): use strict-greater-than prFlagsMap for "Last session" PB badge`
+
+**Summary:** `buildLastSessionSummary` previously checked PB via `maxLoadByExercise[ex.exercise] === s.actualLoad` — an equality test against the all-time max including the session being displayed. This caused every session at the current all-time max load to show "· PB", even on the 5th or 10th repeat at that weight. The fix replaces this with `prFlagsMap` (from `buildPRFlagsMap` in `historyStats.ts`), which uses strict-greater-than comparison against records strictly before the session's date. "· PB" now appears only when the session genuinely exceeded all prior loads for that exercise.
+
+`maxLoadByExercise` is retained in `TodayPage` for the post-workout PR banner (a separate, correct use case).
+
+**Root cause:** The `buildPRFlagsMap` function already existed with correct semantics; `buildLastSessionSummary` was not yet using it.
+
+**Files changed:**
+- `src/lib/sessionSummary.ts` — changed parameter from `maxLoadByExercise?: Record<string, number>` to `prFlagsMap?: Map<string, { hasLoadPR: boolean; hasRepsPR: boolean }> | null`; updated PB detection to use `prFlagsMap.get(outcome.workoutInstanceId)?.hasLoadPR`
+- `src/pages/TodayPage.tsx` — added `buildPRFlagsMap` import; added `prFlagsMap` useMemo; updated both `buildLastSessionSummary` call sites
+- `src/lib/__tests__/sessionSummary.test.ts` — rewrote 5 PB tests to use `buildPRFlagsMap` with `ExerciseSessionRecord` fixtures; verified strict-greater-than semantics (repeated load → no PB)
+
+**Tests:** 1357 (unchanged count — rewrote 5 existing PB tests, no new tests added)
+
+**Risk:** Very low — isolated to the "Last session" hint display only; no data is modified.
+
+---

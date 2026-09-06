@@ -486,3 +486,25 @@ The expression DSL supported by `expressionEval.ts` is powerful but undocumented
 ## Dependencies Added
 
 None.
+
+---
+
+**Date:** 2026-09-06
+**Branch:** `claude/admiring-noether-fmdtq6`
+
+---
+
+## Executive Summary (2026-09-06 pass)
+
+Single targeted bug fix: `buildLastSessionSummary` was applying the PB badge ("· PB") to any session that matched the all-time maximum load, including repeated sessions at the same weight. The correct behaviour — badge only when the session strictly exceeded all prior loads — was already implemented in `buildPRFlagsMap` but not wired to the summary formatter.
+
+**Changes this pass:**
+
+| # | Type | Description |
+|---|---|---|
+| 1 | Bug fix | Replace equality-based PB check in `buildLastSessionSummary` with strict-greater-than `prFlagsMap` |
+
+**Codebase health:** Good. All 1357 tests pass. No TypeScript errors. No regressions.
+
+**Recommendation:** Consider a dedicated integration test that checks the full TodayPage "Last session" hint renders correctly with a real prFlagsMap fixture — currently coverage is at the unit level only.
+
