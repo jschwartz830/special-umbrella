@@ -2,6 +2,21 @@
 
 ---
 
+## 2026-09-07
+
+### Change 1 — `test(sessionSummary): document zero-distance run/swim behavior in buildLastSessionSummary`
+
+**Summary:** `buildLastSessionSummary` formats run and swim distances using a `!= null` guard, so `actualDistanceMiles=0` and `actualDistanceMeters=0` are treated as present and produce "0 mi" / "0 m" in the output. The pace-derivation sub-expressions already guard against division-by-zero via `distance > 0`, so no pace appears alongside zero-distance strings. No test pinned this behavior. Added two tests to explicitly document and lock in the current output for both zero-distance cases.
+
+**Files changed:**
+- `src/lib/__tests__/sessionSummary.test.ts` — 2 new tests appended to the `buildLastSessionSummary` describe block
+
+**Tests:** 1362 → 1364 (+2)
+
+**Risk:** None — test only.
+
+---
+
 ## 2026-09-05
 
 ### Change 1 — `test(run-adaptation): cover regress and none/null paths in applyRunProgressionDecision`

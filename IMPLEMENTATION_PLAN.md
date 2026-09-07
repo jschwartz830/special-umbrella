@@ -456,3 +456,33 @@ Five existing PB tests in `sessionSummary.test.ts` were rewritten to use `Exerci
 | Cloud sync conflict resolution | Out of scope |
 | Integration test for TodayPage "Last session" PB hint | New recommendation — unit coverage exists; full rendering path untested |
 
+
+
+## Additions — 2026-09-07
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `buildLastSessionSummary`: add tests for zero-distance run/swim bad-data edge cases | Test coverage | `src/lib/__tests__/sessionSummary.test.ts` |
+
+### Detail
+
+**1. Zero-distance edge case tests in `buildLastSessionSummary`**
+Audit revealed that `buildLastSessionSummary` displays "0 mi" when `actualDistanceMiles === 0` and "0 m" when `actualDistanceMeters === 0` — values that are treated as present (not null) by the existing `!= null` guard but represent bad data. The pace derivation sub-expressions already guard against division-by-zero via `distance > 0`, so no pace appears alongside the zero distance string. No existing test pinned this behavior.
+
+Added two tests:
+- Run: `actualDistanceMiles=0, actualDurationMin=30` → `"Last: 0 mi · 30 min"` (no pace, since derivation guards > 0)
+- Swim: `actualDistanceMeters=0, actualDurationMin=20` → `"Last: 0 m · 20 min"` (same guard)
+
+These lock in the current behavior and will catch any accidental regression or future intentional change (e.g. filtering zero distances). Test count: 1362 → 1364 (+2).
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — `navigator.sendBeacon` would be more reliable, but format compatibility is unverified |
+| Cloud sync conflict resolution | Out of scope |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage added for run/swim zero-distance paths; full rendering path still untested |
