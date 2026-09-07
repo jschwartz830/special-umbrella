@@ -916,4 +916,35 @@ describe('buildLastSessionSummary', () => {
     // 1 exercise done (has at least one completed set), 1 set completed (not 2)
     expect(buildLastSessionSummary(outcome)).toBe('Last: 1 exercise · 1 set · 5 min')
   })
+
+  it('shows "0 mi" for run with actualDistanceMiles=0 (zero-distance bad data); no pace derived', () => {
+    // actualDistanceMiles=0 is treated as present (not null) so "0 mi" appears, but pace
+    // derivation already guards against distance > 0 so no pace is shown.
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: 30,
+      notes: null,
+      runActual: { actualDistanceMiles: 0, actualDurationMin: 30 },
+      swimActual: null,
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 0 mi · 30 min')
+  })
+
+  it('shows "0 m" for swim with actualDistanceMeters=0 (zero-distance bad data); no pace derived', () => {
+    // Same guard: swim pace derivation also requires distance > 0, so no pace is shown.
+    const outcome: WorkoutOutcome = {
+      workoutInstanceId: 'p1_2026-05-01',
+      completionState: 'completed',
+      completedAt: '2026-05-01T07:00:00Z',
+      perceivedEffort: null,
+      durationActualMin: 20,
+      notes: null,
+      runActual: null,
+      swimActual: { actualDistanceMeters: 0, actualDurationMin: 20 },
+    }
+    expect(buildLastSessionSummary(outcome)).toBe('Last: 0 m · 20 min')
+  })
 })
