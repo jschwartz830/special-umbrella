@@ -48,6 +48,29 @@ function weightsOutcome(date: string, exercise: string, load: number, reps = 8, 
   }
 }
 
+function sessionRecord(
+  exerciseName: string,
+  calendarDate: string,
+  maxLoad: number | null,
+  maxReps: number | null,
+  planId = 'p1',
+): ExerciseSessionRecord {
+  return {
+    id: `${planId}_${calendarDate}_${exerciseName}`,
+    exerciseName,
+    calendarDate,
+    planId,
+    planName: null,
+    workoutName: null,
+    workoutInstanceId: `${planId}_${calendarDate}`,
+    sets: [],
+    totalVolume: null,
+    maxLoad,
+    maxReps,
+    createdAt: `${calendarDate}T12:00:00Z`,
+  }
+}
+
 function runOutcome(date: string, distanceMiles: number, durationMin: number, planId = 'p1'): WorkoutOutcome {
   return {
     workoutInstanceId: `${planId}_${date}`,
@@ -207,26 +230,8 @@ describe('buildLastSessionSummary', () => {
     // Session at 225 lb; only prior record is 185 lb — strict-greater-than → PB
     const outcome = weightsOutcome('2026-05-01', 'Squat', 225)
     const records: ExerciseSessionRecord[] = [
-      {
-        workoutInstanceId: 'p1_2026-04-01',
-        exerciseName: 'Squat',
-        calendarDate: '2026-04-01',
-        maxLoad: 185,
-        maxReps: 8,
-        planId: 'p1',
-        planName: null,
-        workoutName: null,
-      },
-      {
-        workoutInstanceId: 'p1_2026-05-01',
-        exerciseName: 'Squat',
-        calendarDate: '2026-05-01',
-        maxLoad: 225,
-        maxReps: 8,
-        planId: 'p1',
-        planName: null,
-        workoutName: null,
-      },
+      sessionRecord('Squat', '2026-04-01', 185, 8),
+      sessionRecord('Squat', '2026-05-01', 225, 8),
     ]
     const prFlagsMap = buildPRFlagsMap(records)
     expect(buildLastSessionSummary(outcome, prFlagsMap)).toBe('Last: 3×8 @ 225 lb Squat · PB')
@@ -236,26 +241,8 @@ describe('buildLastSessionSummary', () => {
     // Session at 225 lb; prior record also 225 lb — no strict-greater-than → no PB
     const outcome = weightsOutcome('2026-05-02', 'Squat', 225)
     const records: ExerciseSessionRecord[] = [
-      {
-        workoutInstanceId: 'p1_2026-05-01',
-        exerciseName: 'Squat',
-        calendarDate: '2026-05-01',
-        maxLoad: 225,
-        maxReps: 8,
-        planId: 'p1',
-        planName: null,
-        workoutName: null,
-      },
-      {
-        workoutInstanceId: 'p1_2026-05-02',
-        exerciseName: 'Squat',
-        calendarDate: '2026-05-02',
-        maxLoad: 225,
-        maxReps: 8,
-        planId: 'p1',
-        planName: null,
-        workoutName: null,
-      },
+      sessionRecord('Squat', '2026-05-01', 225, 8),
+      sessionRecord('Squat', '2026-05-02', 225, 8),
     ]
     const prFlagsMap = buildPRFlagsMap(records)
     expect(buildLastSessionSummary(outcome, prFlagsMap)).toBe('Last: 3×8 @ 225 lb Squat')
@@ -618,26 +605,8 @@ describe('buildLastSessionSummary', () => {
     }
     // 185 is the new max; prior record was 135 — prFlagsMap marks this instance as a load PR
     const records: ExerciseSessionRecord[] = [
-      {
-        workoutInstanceId: 'p1_2026-04-01',
-        exerciseName: 'Bench Press',
-        calendarDate: '2026-04-01',
-        maxLoad: 135,
-        maxReps: 10,
-        planId: 'p1',
-        planName: null,
-        workoutName: null,
-      },
-      {
-        workoutInstanceId: 'p1_2026-05-01',
-        exerciseName: 'Bench Press',
-        calendarDate: '2026-05-01',
-        maxLoad: 185,
-        maxReps: 8,
-        planId: 'p1',
-        planName: null,
-        workoutName: null,
-      },
+      sessionRecord('Bench Press', '2026-04-01', 135, 10),
+      sessionRecord('Bench Press', '2026-05-01', 185, 8),
     ]
     const prFlagsMap = buildPRFlagsMap(records)
     expect(buildLastSessionSummary(outcome, prFlagsMap)).toBe('Last: 2×8 @ 185 lb Bench Press · PB')
