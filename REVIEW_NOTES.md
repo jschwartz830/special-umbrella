@@ -1,38 +1,31 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-09-07
+**Date:** 2026-09-08
 
 ---
 
 ## Executive Summary
 
-The codebase is in excellent shape. All 1362 tests passed before this pass; this pass added 2 more (total: 1364). No bugs were found. The audit covered all major modules: rotation engine, history store, outcome store, session summary, history stats, and calendar projection. Test coverage is comprehensive across every exported function.
+The codebase is in excellent shape. All 1364 tests pass. No bugs were found this pass. The audit covered HistoryPage.tsx (stats computation calls, weekly breakdown, best-week, type breakdown, PR flags map), TodayPage.tsx (previous session lookup, previous weights outcome, previous sets by exercise), and `previousSetsHelper.ts`. All functions verified clean and well-tested.
 
 ---
 
 ## Audit Scope
 
 Modules reviewed this pass:
-- `src/engine/rotationEngine.ts` — pointer advancement, override application, status assignment
-- `src/engine/calendarProjection.ts` — month grid builder, `buildMonthGrid` with `weekStartsOn`
-- `src/store/historyStore.ts` — `migrateHistoryState`, `addEntry`, `removeRetroJumpForDate`
-- `src/store/outcomeStore.ts` — `logOutcomeWithProgression`, `migrateOutcomeState`, `deferred` completionState handling
-- `src/lib/historyStats.ts` — `buildPRFlagsMap`, `computeCurrentStreakDates`, `computeConsecutiveSkips`, `findBestWeek`, `computeAverageWorkoutsPerWeek`
-- `src/lib/sessionSummary.ts` — `findPreviousSessionForPlanDay`, `buildLastSessionSummary`
-- `src/lib/__tests__/sessionSummary.test.ts` — test completeness review
+- `src/pages/HistoryPage.tsx` (lines 100–280) — stats computation calls, weekly breakdown, type breakdown, PR flags
+- `src/pages/TodayPage.tsx` (lines 1–120) — previous session / previous weights / previous sets lookup paths
+- `src/lib/previousSetsHelper.ts` — `findPreviousSetsByExercise` implementation and existing tests
 
 ---
 
 ## Findings
 
 ### Confirmed good
-- All migration functions (`migrateHistoryState`, `migrateOutcomeState`, `migratePlanState`) have dedicated unit test suites.
-- `buildLastSessionSummary` PB detection uses strict-greater-than semantics (fixed Sep 6); well-tested.
-- `computeCurrentStreakDates`, `getStreakDatesSet`, and `computeConsecutiveSkips` all have plan-isolation and edge-case coverage.
-- `calendarProjection.test.ts` covers all status values, pointer advancement, overrides, `historyEntry` attachment, and `weekStartsOn` variants.
-- `deferred` completionState correctly maps to `session_complete=false` in YAML progression rules; tested in `outcomeStore.test.ts`.
+- `HistoryPage.tsx`: `computeWeeklyBreakdown` receives `today` as `toDate`, correctly excluding future-dated entries. `findBestWeek` also receives the `today` guard. `computeWorkoutTypeBreakdown` passes `{ from: '0000-01-01', to: today }`. `typeCountMapFallback` for "all plans" view counts `complete` entries only (skips and day_offs excluded). All consistent with previous audits.
+- `TodayPage.tsx`: `findPreviousWeightsOutcome` iterates outcomes, filters to plan prefix, skips current-date and instances without weights data, and picks best by `outcomeSortKey`. `findPreviousSessionForPlanDay` and `buildLastSessionSummary` called correctly with `prFlagsMap`. Both invocations (for today's primary day and for upcoming-day previews) pass `today` correctly.
+- `previousSetsHelper.ts`: `findPreviousSetsByExercise` sorts outcomes by `outcomeSortKey` descending and returns the most-recent sets per exercise. The `excludeInstanceId` parameter correctly skips the outcome currently being edited. Eight test cases (empty, missing weights, same-date exclusion, excludeInstanceId, multiple exercises) all cover the behavioral contract.
 
-### Edge case documented (this pass)
-- `buildLastSessionSummary` for `actualDistanceMiles=0` and `actualDistanceMeters=0`: the current code displays "0 mi" / "0 m" (non-null guard treats zero as present data). Pace derivation correctly guards against division-by-zero via `distance > 0`, so no pace is shown. Two tests added to lock in and document this behavior.
+### No new edge cases or bugs found this pass.
 
 ---
 
@@ -51,7 +44,6 @@ Modules reviewed this pass:
 
 | Suite | Before | After | Delta |
 |---|---|---|---|
-| `sessionSummary.test.ts` | 53 | 55 | +2 |
-| All suites | 1362 | 1364 | +2 |
+| All suites | 1364 | 1364 | 0 |
 
-All tests pass.
+All 1364 tests pass across 35 files. No new tests added this pass (no new code paths found to cover).
