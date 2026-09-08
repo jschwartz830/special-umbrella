@@ -458,6 +458,29 @@ Five existing PB tests in `sessionSummary.test.ts` were rewritten to use `Exerci
 
 
 
+## Additions — 2026-09-08
+
+### Changes implemented this pass
+
+No code changes. Audit confirmed the codebase remains clean.
+
+### Scope reviewed
+
+- `src/pages/HistoryPage.tsx` (lines 100–280) — `computeWeeklyBreakdown`, `findBestWeek`, `computeWorkoutTypeBreakdown`, `buildPRFlagsMap` all called with correct guards; `typeCountMapFallback` fallback path for "all plans" view verified correct.
+- `src/pages/TodayPage.tsx` (lines 1–120) — `findPreviousWeightsOutcome`, `findPreviousSessionForPlanDay`, `buildLastSessionSummary` all invoked correctly; `primaryPlanDayIndex` guard confirmed.
+- `src/lib/previousSetsHelper.ts` — `findPreviousSetsByExercise`: excludes current-date outcomes and optional `excludeInstanceId`; sorted by `outcomeSortKey` (most-recent first). Tests confirmed in `previousSetsHelper.test.ts`.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers rely on delete-on-collision behavior |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
 ## Additions — 2026-09-07
 
 ### Changes implemented this pass

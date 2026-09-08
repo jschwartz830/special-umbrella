@@ -2,6 +2,20 @@
 
 ---
 
+## 2026-09-08
+
+### Audit pass — no code changes
+
+**Summary:** Full audit pass covering `HistoryPage.tsx` (stats calls, weekly breakdown, type breakdown, PR flags map), `TodayPage.tsx` (previous session/weights/sets lookup), and `previousSetsHelper.ts`. All functions verified correct and well-tested. No new bugs, edge cases, or untested paths found.
+
+**Files changed:** `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md` (documentation only)
+
+**Tests:** 1364 (no change)
+
+**Risk:** None — documentation only.
+
+---
+
 ## 2026-09-07
 
 ### Change 1 — `test(sessionSummary): document zero-distance run/swim behavior in buildLastSessionSummary`
