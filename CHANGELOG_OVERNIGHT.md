@@ -2,6 +2,20 @@
 
 ---
 
+## 2026-09-09
+
+### Audit pass — no code changes
+
+**Summary:** Full audit pass covering `outcomeStore.ts` (`logOutcomeWithProgression` error-resilience, `importOutcomes` semantics, `migrateOutcomeState`), `progression.ts` (`buildProgressionRecommendation`, `allSetsHitTarget`), `progressionMode.ts` (`deriveProgressionMode`), and `engine.ts` (`evaluateRunProgression`, `applyRunProgressionDecision`). All logic confirmed correct and well-tested. No new bugs, edge cases, or untested paths found.
+
+**Files changed:** `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` (documentation only)
+
+**Tests:** 1364 (no change)
+
+**Risk:** None — documentation only.
+
+---
+
 ## 2026-09-08
 
 ### Audit pass — no code changes
