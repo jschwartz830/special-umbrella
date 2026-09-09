@@ -509,3 +509,27 @@ These lock in the current behavior and will catch any accidental regression or f
 | `beforeunload` async Supabase flush | Recommendation only — `navigator.sendBeacon` would be more reliable, but format compatibility is unverified |
 | Cloud sync conflict resolution | Out of scope |
 | Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage added for run/swim zero-distance paths; full rendering path still untested |
+
+---
+
+## Additions — 2026-09-09
+
+### Changes implemented this pass
+
+No code changes. Audit confirmed the codebase remains clean and all prior gaps are resolved.
+
+### Scope reviewed
+
+- `src/store/outcomeStore.ts` — `logOutcomeWithProgression` error-resilience confirmed: all three progression paths (recommendation build, run progression engine, YAML program rules) are individually wrapped in `try/catch` so a bug in any path cannot prevent the outcome from being saved. `importOutcomes` last-writer-wins semantics documented (2026-09-02 pass). `migrateOutcomeState` backfills `outcomes: {}` and `progressionStates: {}` correctly.
+- `src/modules/workout-outcomes/progression.ts` — `buildProgressionRecommendation` correctly handles weights/run/swim slot types. `allSetsHitTarget` (single-parameter refactor, 2026-08-15) correctly returns false for non-completed sets and checks `actualReps >= targetReps` for numeric targets. String and absent targets pass on completion alone (correct for AMRAP and rep-range targets).
+- `src/modules/workout-outcomes/progressionMode.ts` — `deriveProgressionMode` maps `double`/`dynamic_double` → `'double'`, `triple` → `'volume'`, `step_loading` → `'maintenance'`, fallback → `'single'`. Returns `undefined` when neither `progressionType` nor `hasProgressRule` is set (correct opt-in behavior).
+- `src/modules/run-adaptation/engine.ts` — `evaluateRunProgression` and `applyRunProgressionDecision` fully tested including regress/none/null paths (2026-09-05). Logic correctly resolves target from progression state → runConfig → null. 95% threshold for "hit target" is appropriate (allows minor GPS drift). Baseline floor on regress prevents regressing below the original template distance.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
