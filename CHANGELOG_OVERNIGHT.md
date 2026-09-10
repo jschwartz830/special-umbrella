@@ -2,6 +2,34 @@
 
 ---
 
+## 2026-09-10
+
+### Change 1 — `fix(progression): add explicit maintenance mode case to buildWeightsRecommendation`
+
+**Summary:** `buildWeightsRecommendation` had no explicit branch for `progressionMode === 'maintenance'`. When `step_loading` exercises are logged, `deriveProgressionMode` maps them to `progressionMode: 'maintenance'`, but the recommendation function fell through to the single-mode fallback, returning `mode: 'single'` and "Single progression: add 2.5-5 lb" notes — incorrect for step loading. Added an explicit `maintenance` case before the single fallback, returning `mode: 'maintenance'` with step-loading-appropriate notes ("Step loading: all sets completed — add load at next checkpoint." / "Step loading: hold load and complete all target reps before advancing."). The `ProgressionRecommendation` type already includes `'maintenance'` as a valid mode; no type changes needed.
+
+**Files changed:**
+- `src/modules/workout-outcomes/progression.ts` — explicit `maintenance` branch added
+
+**Tests:** 1364 → 1364 (no change for this commit; test coverage added in Change 2)
+
+**Risk:** Low — fills a missing branch that was producing wrong output. No type changes; existing callers handle all mode values.
+
+---
+
+### Change 2 — `test(progression): add maintenance mode coverage`
+
+**Summary:** Three new tests in `progression.test.ts` cover the behavior fixed in Change 1: `progress` returns `mode: 'maintenance'` with step-loading notes when all sets hit target; `hold` returns `mode: 'maintenance'` with hold notes when sets are incomplete; `regress` fires at effort >= 5 same as other modes.
+
+**Files changed:**
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` — 3 new tests in new describe block
+
+**Tests:** 1364 → 1367 (+3)
+
+**Risk:** None — test only.
+
+---
+
 ## 2026-09-09
 
 ### Audit pass — no code changes

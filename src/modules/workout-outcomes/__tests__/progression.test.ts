@@ -351,6 +351,72 @@ describe('buildProgressionRecommendation — weights: volume mode', () => {
   })
 })
 
+// ── Weights: maintenance mode ─────────────────────────────────────────────────
+
+describe('buildProgressionRecommendation — weights: maintenance mode', () => {
+  it('returns progress with maintenance mode note when all sets hit target', () => {
+    // step_loading exercises derive progressionMode: 'maintenance' via deriveProgressionMode.
+    // Before the fix, this fell through to the single-mode branch and returned
+    // mode: 'single' with "Single progression: add 2.5-5 lb" notes — wrong for step loading.
+    const result = buildProgressionRecommendation(
+      makeSlot('weights'),
+      makeOutcome({
+        perceivedEffort: 3,
+        weightsActual: {
+          exercises: [{
+            exercise: 'Squat',
+            progressionMode: 'maintenance',
+            sets: [completedSet(), completedSet(), completedSet()],
+          }],
+        },
+      }),
+    )
+    expect(result?.action).toBe('progress')
+    expect(result?.mode).toBe('maintenance')
+    expect(result?.discipline).toBe('weights')
+    expect(result?.note).toMatch(/step loading/i)
+    expect(result?.note).toMatch(/add load/i)
+  })
+
+  it('returns hold with maintenance mode note when not all sets completed', () => {
+    const result = buildProgressionRecommendation(
+      makeSlot('weights'),
+      makeOutcome({
+        perceivedEffort: 3,
+        weightsActual: {
+          exercises: [{
+            exercise: 'Squat',
+            progressionMode: 'maintenance',
+            sets: [completedSet(), completedSet(), incompleteSet()],
+          }],
+        },
+      }),
+    )
+    expect(result?.action).toBe('hold')
+    expect(result?.mode).toBe('maintenance')
+    expect(result?.note).toMatch(/step loading/i)
+    expect(result?.note).toMatch(/complete all target reps/i)
+  })
+
+  it('returns regress when effort is 5 (same threshold as other modes)', () => {
+    const result = buildProgressionRecommendation(
+      makeSlot('weights'),
+      makeOutcome({
+        perceivedEffort: 5,
+        weightsActual: {
+          exercises: [{
+            exercise: 'Deadlift',
+            progressionMode: 'maintenance',
+            sets: [completedSet(), completedSet()],
+          }],
+        },
+      }),
+    )
+    expect(result?.action).toBe('regress')
+    expect(result?.note).toMatch(/load reduction/i)
+  })
+})
+
 // ── Weights: legacy 'weightlifting' type ─────────────────────────────────────
 
 describe('buildProgressionRecommendation — legacy weightlifting slot type', () => {
