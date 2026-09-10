@@ -533,3 +533,29 @@ No code changes. Audit confirmed the codebase remains clean and all prior gaps a
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
 | `beforeunload` async Supabase flush | Recommendation only — product decision needed |
 | Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
+## Additions — 2026-09-10
+
+### Changes implemented this pass
+
+**Bug fix: `buildWeightsRecommendation` — missing `maintenance` mode branch**
+- `src/modules/workout-outcomes/progression.ts` — Added explicit `if (mode === 'maintenance')` branch before the single-mode fallback. Without it, `step_loading` exercises (which `deriveProgressionMode` maps to `progressionMode: 'maintenance'`) fell through to the single branch and returned `mode: 'single'` with "Single progression: add 2.5-5 lb" notes — wrong for step loading. Fix returns `mode: 'maintenance'` with step-loading-appropriate advisory notes.
+- `src/modules/workout-outcomes/__tests__/progression.test.ts` — 3 new tests in `'buildProgressionRecommendation — weights: maintenance mode'` describe block. Covers progress (all sets hit target), hold (incomplete sets), and regress (effort >= 5).
+- Tests: 1364 → 1367 (+3)
+
+### Scope reviewed
+
+- `src/modules/workout-outcomes/progression.ts` — Full review of all branches in `buildWeightsRecommendation`. Bug found in the mode-dispatch section (missing maintenance case). All other branches confirmed correct.
+- `src/modules/workout-outcomes/progressionMode.ts` — Cross-referenced to confirm `step_loading` → `'maintenance'` mapping is the upstream source of `progressionMode: 'maintenance'` on exercises.
+- `src/modules/workout-outcomes/types.ts` — Confirmed `ProgressionRecommendation.mode` already includes `'maintenance'` as a valid member; no type changes needed.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
