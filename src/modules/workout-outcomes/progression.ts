@@ -133,7 +133,19 @@ function buildWeightsRecommendation(
     }
   }
 
-  // Single (and maintenance fallback)
+  if (mode === 'maintenance') {
+    const allHit = allSetsHitTarget(allSets)
+    return {
+      discipline: 'weights',
+      mode,
+      action: allHit ? 'progress' : 'hold',
+      note: allHit
+        ? 'Step loading: all sets completed — add load at next checkpoint.'
+        : 'Step loading: hold load and complete all target reps before advancing.',
+    }
+  }
+
+  // Single (default)
   const allHit = allSetsHitTarget(allSets)
   return {
     discipline: 'weights',
