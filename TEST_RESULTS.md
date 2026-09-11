@@ -1,5 +1,5 @@
 # Test Results — Overnight Audit Pass
-**Date:** 2026-09-09
+**Date:** 2026-09-11
 
 ---
 
@@ -31,3 +31,4 @@ All 1364 tests pass. No new tests added this pass — no new code paths were fou
 - `computeConsecutiveSkips` plan-isolation tested — complete entries from another plan do not break the streak count.
 - `currentStreakStartDate` tested: null for streak=0, today for streak=1, correct historical date for streak=3.
 - Zero-distance run/swim edge cases in `buildLastSessionSummary` tested and locked in.
+- `planDeleteCleanup` integration test covers all six cascade steps across all five stores (history, outcome, program, exerciseHistory, plan).

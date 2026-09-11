@@ -533,3 +533,25 @@ No code changes. Audit confirmed the codebase remains clean and all prior gaps a
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
 | `beforeunload` async Supabase flush | Recommendation only — product decision needed |
 | Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
+## 2026-09-11 Additions
+
+### Audit pass — no code changes
+
+### Scope reviewed
+
+- `src/store/historyStore.ts` — Entry deduplication semantics confirmed: `addEntry` deduplicates by `(planId, calendarDate)` (newest wins); `importEntries` uses `deduplicateByDate` (createdAt-based, last-write wins within a batch); `importExtraEntries` deduplicates by `id` (correct — multiple extras can share a date); `markDaysAsOff` scoped to `planId`; `updateEntryDate` delete-on-collision intentional; `migrateHistoryState` v0→v1 backfill correct.
+- `src/store/outcomeStore.ts` — Full re-review. `logOutcomeWithProgression` per-path `try/catch` confirmed. `syncExerciseHistory` cross-store `getState()` pattern correct. `moveOutcome` atomic key swap + cascade correct. `importOutcomes` last-writer-wins semantics correct. `clearPlanOutcomes` filters via `parseWorkoutInstanceId` (handles both regular and extra IDs). `migrateOutcomeState` backfills both `outcomes` and `progressionStates`.
+- `src/store/programStore.ts` — `initVars` idempotent (only sets missing keys). `applyProgressionRule` wraps eval paths in `try/catch`, logs with full context, returns `{}` on error. `migrateProgramState` backfills `vars: {}`.
+- `src/store/__tests__/planDeleteCleanup.test.ts` — Integration cascade-delete test confirmed: covers all six cascade steps (clearPlanHistory, clearPlanOutcomes, clearPlanVars, clearByPlanId, removeProgressionStates, deletePlan), plan-isolation across all five stores, activePlanId null-out, extra-workout cascade, no-op cases.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |

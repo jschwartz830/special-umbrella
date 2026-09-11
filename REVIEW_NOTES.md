@@ -1,21 +1,21 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-09-09
+**Date:** 2026-09-11
 
 ---
 
 ## Executive Summary
 
-The codebase is in excellent shape. All 1364 tests pass. No bugs were found this pass. The audit covered the full outcome/progression pipeline: `outcomeStore.ts`, `progression.ts`, `progressionMode.ts`, and `run-adaptation/engine.ts`. All logic verified correct, error-resilient, and well-tested. All prior audit gaps remain resolved.
+The codebase is in excellent shape. All 1364 tests pass. No bugs were found this pass. The audit covered the history/outcome/program store pipeline: `historyStore.ts`, `outcomeStore.ts`, `programStore.ts`, and the `planDeleteCleanup` integration test suite. All logic verified correct, error-resilient, and well-tested. All prior audit gaps remain resolved.
 
 ---
 
 ## Audit Scope
 
 Modules reviewed this pass:
-- `src/store/outcomeStore.ts` — `logOutcomeWithProgression`, `importOutcomes`, `migrateOutcomeState`, `syncExerciseHistory`
-- `src/modules/workout-outcomes/progression.ts` — `buildProgressionRecommendation`, `allSetsHitTarget`
-- `src/modules/workout-outcomes/progressionMode.ts` — `deriveProgressionMode`
-- `src/modules/run-adaptation/engine.ts` — `evaluateRunProgression`, `applyRunProgressionDecision`
+- `src/store/historyStore.ts` — entry deduplication, `importEntries`, `importExtraEntries`, `markDaysAsOff`, `updateEntryDate`, `migrateHistoryState`
+- `src/store/outcomeStore.ts` — `logOutcomeWithProgression`, `syncExerciseHistory`, `moveOutcome`, `importOutcomes`, `removeOutcome`, `clearPlanOutcomes`, `migrateOutcomeState`
+- `src/store/programStore.ts` — `initVars`, `getVars`, `setVars`, `clearPlanVars`, `applyProgressionRule`, `migrateProgramState`
+- `src/store/__tests__/planDeleteCleanup.test.ts` — integration cascade-delete coverage
 
 ---
 
@@ -23,17 +23,33 @@ Modules reviewed this pass:
 
 ### Confirmed good
 
-- **`logOutcomeWithProgression` error-resilience:** All three progression paths (recommendation build via `buildProgressionRecommendation`, run progression engine via `evaluateRunProgression`, YAML program rules via `programStore.applyProgressionRule`) are individually wrapped in `try/catch`. A bug in any single path cannot prevent the outcome from being persisted or the log modal from closing. This is the correct defensive design.
+- **`historyStore.ts` entry deduplication:** `addEntry` filters by `(planId, calendarDate)` before inserting, so only one entry per workout-date pair exists per plan. `deduplicateByDate` (used in `importEntries`) sorts by `createdAt` ascending and uses a `Map` — last-write wins on same-date pairs within a batch. Both paths correctly isolate by `planId`.
 
-- **`buildProgressionRecommendation`:** Handles weights (with `single`/`double`/`volume`/`maintenance` modes), run, and swim slot types. Returns `null` for unsupported types (mobility, other). For weights, only generates a recommendation when `progressionMode` is explicitly set — correct opt-in gate. `allSetsHitTarget` correctly returns `false` for non-completed sets and applies `actualReps >= targetReps` for numeric targets; string targets (rep ranges, AMRAP) pass on completion alone — correct for those target types.
+- **`historyStore.ts` importExtraEntries:** Deduplicates by `id`, not by `(planId, calendarDate)` — correct because multiple extras can share a date. Re-imports are safe (idempotent by `id`).
 
-- **`deriveProgressionMode`:** Returns `undefined` when neither `progressionType` nor `hasProgressRule` is set (correct opt-in gate — exercises not configured for progression produce no recommendation). All four mappings (`double`/`dynamic_double` → `'double'`, `triple` → `'volume'`, `step_loading` → `'maintenance'`, fallback → `'single'`) are correct and tested.
+- **`historyStore.ts` markDaysAsOff:** Builds a `Set` of target dates, filters out existing entries for `(planId, date)` pairs in that set, then appends the new `day_off` entries. Correctly scoped to the given `planId`.
 
-- **`evaluateRunProgression`:** 95% threshold for "hit target" (`actualDistance >= targetDistance * 0.95`) is appropriate — allows minor GPS/rounding drift without blocking progression. Baseline floor on regress (`Math.max(roundMiles(targetDistance - step), baseline)`) correctly prevents regressing below the plan's original template distance. `roundMiles` (2 decimal places) prevents floating-point noise from accumulating across multiple progression steps.
+- **`historyStore.ts` updateEntryDate:** Moves the target entry to `newDate`, then removes any pre-existing entry on `(planId, newDate)` — intentional delete-on-collision behavior relied upon by CalendarPage, HistoryPage, and TodayPage callers.
 
-- **`applyRunProgressionDecision`:** `action: 'none'` path correctly returns the previous state unchanged (or a minimal placeholder when `previousState` is null). All other actions produce a fully populated `RunProgressionState`. Tested for regress and none/null paths (2026-09-05 pass).
+- **`historyStore.ts` migrateHistoryState:** Backfills `source: 'history'` for extras missing the `source` field (v0→v1 migration). Correctly uses `e.source === undefined` as the guard.
 
-- **`migrateOutcomeState`:** Backfills `outcomes: {}` and `progressionStates: {}` for old cloud data. Cloud hydration via `syncOnLogin` now calls `migrateOutcomeState` (2026-08-27 fix), so missing `progressionStates` in old snapshots cannot produce `undefined` crashes.
+- **`outcomeStore.ts` logOutcomeWithProgression:** All three progression paths (recommendation build, run progression engine, YAML program rules) are individually wrapped in `try/catch`. A bug in any single path cannot prevent the outcome from being persisted or the log modal from closing. Per-exercise YAML progression iterates `slot.exercises` with per-exercise `try/catch`. Correct defensive design.
+
+- **`outcomeStore.ts` syncExerciseHistory:** Resolves `planName` and `workoutName` by cross-referencing `planStore` and `historyStore` via `getState()` — correct cross-store pattern. Returns early if no `weightsActual.exercises` or if `parseWorkoutInstanceId` fails.
+
+- **`outcomeStore.ts` moveOutcome:** Atomically removes the old key, inserts under the new key with updated `workoutInstanceId` field, and calls `exerciseHistoryStore.moveByWorkoutInstance`. Correctly handles the case where `oldInstanceId` doesn't exist (no-op via `if (!existing) return s`).
+
+- **`outcomeStore.ts` importOutcomes:** Last-writer-wins per `workoutInstanceId` (correct for outcomes, which use `workoutInstanceId` as identity rather than a reliable timestamp). Calls `syncExerciseHistory` for each imported outcome to carry `planName`/`workoutName` context.
+
+- **`outcomeStore.ts` clearPlanOutcomes:** Uses `parseWorkoutInstanceId` to filter by `planId` — correctly handles both regular (`planId_date`) and extra (`planId_date_extra_extraId`) instance IDs. Cascades to `exerciseHistoryStore.clearByPlanId`.
+
+- **`programStore.ts` applyProgressionRule:** Wraps `evaluateCondition`/`evaluateUpdates` in `try/catch`, logs the error with full context, returns `{}` on failure. Correct defensive design — a malformed YAML rule cannot crash the outcome log flow.
+
+- **`programStore.ts` initVars:** Idempotent — only sets vars that don't already exist (`!(k in merged)`). Safe to call on re-activation.
+
+- **`programStore.ts` migrateProgramState:** Backfills `vars: {}` for old snapshots missing the field. Correct.
+
+- **`planDeleteCleanup` integration test:** Covers all six cascade steps: `clearPlanHistory`, `clearPlanOutcomes`, `clearPlanVars`, `clearByPlanId` (exerciseHistory), `removeProgressionStates`, and `deletePlan`. Tests verify plan B is untouched after plan A deletion across all stores. Also covers: activePlanId null-out, extra-workout cascade, program vars (no-op for non-YAML plans), progression states (no-op for empty groupIds).
 
 ### No new edge cases or bugs found this pass.
 
