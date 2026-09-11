@@ -2,6 +2,20 @@
 
 ---
 
+## 2026-09-11
+
+### Audit pass — no code changes
+
+**Summary:** Full audit pass covering `historyStore.ts` (entry deduplication, `importEntries`, `importExtraEntries`, `markDaysAsOff`, `updateEntryDate`, `migrateHistoryState`), `outcomeStore.ts` (full re-review: `logOutcomeWithProgression`, `moveOutcome`, `importOutcomes`, `removeOutcome`, `clearPlanOutcomes`, `migrateOutcomeState`, `syncExerciseHistory`), `programStore.ts` (`initVars`, `getVars`, `setVars`, `clearPlanVars`, `applyProgressionRule`, `migrateProgramState`), and the `planDeleteCleanup` integration test suite. All logic confirmed correct and well-tested. No new bugs, edge cases, or untested paths found.
+
+**Files changed:** `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` (documentation only)
+
+**Tests:** 1364 (no change)
+
+**Risk:** None — documentation only.
+
+---
+
 ## 2026-09-09
 
 ### Audit pass — no code changes
