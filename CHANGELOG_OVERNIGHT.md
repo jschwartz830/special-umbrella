@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-09-12
+
+### Test coverage improvement + open-item correction
+
+**Summary:** Audit pass covering `shareWorkout.ts` (branch coverage), `storeSync.ts` (`handleBeforeUnload` implementation status), and `IMPLEMENTATION_PLAN.md` open-item accuracy. One untested branch found and covered: `formatExerciseSpec` `'?'` fallback when `ex.sets` is undefined. One stale open item corrected: `beforeunload` async flush was listed as "Recommendation only — not implemented" but has been implemented and tested in `storeSync.ts` since a prior pass.
+
+**Files changed:**
+- `src/lib/__tests__/shareWorkout.test.ts` — +1 test for `formatExerciseSpec` undefined-sets fallback
+- `IMPLEMENTATION_PLAN.md` — 2026-09-12 additions section; corrected `beforeunload` open-item status
+- `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` — documentation
+
+**Tests:** 1364 → 1365 (+1)
+
+**Risk:** None — one additive test; no production code changes.
+
+---
+
 ## 2026-09-11
 
 ### Audit pass — no code changes

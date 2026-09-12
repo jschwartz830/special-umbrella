@@ -553,5 +553,36 @@ No code changes. Audit confirmed the codebase remains clean and all prior gaps a
 |---|---|
 | `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
-| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| `beforeunload` async Supabase flush | Implemented (async best-effort via `handleBeforeUnload` in `storeSync.ts`; `navigator.sendBeacon` alternative remains open for stronger guarantees) |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
+## Additions — 2026-09-12
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `shareWorkout.test.ts`: add test for `formatExerciseSpec` `'?'` fallback when `sets` is undefined | Test coverage | `src/lib/__tests__/shareWorkout.test.ts` |
+
+### Detail
+
+**1. `formatExerciseSpec` undefined-sets fallback test**
+`formatExerciseSpec` (in `shareWorkout.ts`) computes the set count as:
+```ts
+const sets = typeof ex.sets === 'number' ? ex.sets : (Array.isArray(ex.sets) ? ex.sets.length : '?')
+```
+The `'?'` branch fires when `ex.sets` is `undefined`, `null`, or any other non-number, non-array value. This path had no test. YAML-imported programs use typed `ExerciseSpec` objects and always supply `sets`, but a partially-formed spec from a custom plan builder state mismatch or future API change could reach this branch silently. Added one test: `sets: undefined as unknown as number` → output contains `'• Squat: ?x5'`. Test count: 1364 → 1365 (+1).
+
+**2. Open-item correction: `beforeunload` async Supabase flush**
+Prior passes listed this as "Recommendation only — product decision needed." Audit of `storeSync.ts` confirms that `handleBeforeUnload` IS implemented: on page unload it clears all pending debounce timers and immediately fires `pushStore` for each. A test confirms flush behavior (`'flushes a pending debounced write immediately on beforeunload'`). The item status has been updated accordingly. The `navigator.sendBeacon` alternative (for stronger delivery guarantees) remains open as a product decision.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` sendBeacon alternative | Open — current async flush is best-effort; `navigator.sendBeacon` would guarantee delivery but requires format compatibility verification |
 | Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
