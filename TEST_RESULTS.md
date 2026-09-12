@@ -1,5 +1,5 @@
 # Test Results — Overnight Audit Pass
-**Date:** 2026-09-11
+**Date:** 2026-09-12
 
 ---
 
@@ -7,14 +7,22 @@
 
 | Metric | Value |
 |---|---|
-| Total test files | checked via `vitest run` |
+| Total test files | 35 |
 | Total tests before pass | 1364 |
-| Total tests after pass | 1364 |
-| Tests added | 0 |
+| Total tests after pass | 1365 |
+| Tests added | 1 |
 | Tests failed | 0 |
-| Command | `node_modules/.bin/vitest run` |
+| Command | `npx vitest run` |
 
-All 1364 tests pass. No new tests added this pass — no new code paths were found to cover.
+All 1365 tests pass. One new test added: `formatExerciseSpec` undefined-sets `'?'` fallback in `shareWorkout.test.ts`.
+
+---
+
+## New Tests This Pass
+
+| File | Test | Coverage |
+|---|---|---|
+| `src/lib/__tests__/shareWorkout.test.ts` | `formats weight exercises with "?" when sets is undefined` | `formatExerciseSpec` fallback branch (`ex.sets` not a number and not an array) |
 
 ---
 
@@ -32,3 +40,4 @@ All 1364 tests pass. No new tests added this pass — no new code paths were fou
 - `currentStreakStartDate` tested: null for streak=0, today for streak=1, correct historical date for streak=3.
 - Zero-distance run/swim edge cases in `buildLastSessionSummary` tested and locked in.
 - `planDeleteCleanup` integration test covers all six cascade steps across all five stores (history, outcome, program, exerciseHistory, plan).
+- `formatExerciseSpec` in `shareWorkout.ts`: all three branches now tested — number sets, array sets (SetSpec[]), and undefined/null fallback (→ `'?'`).

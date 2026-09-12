@@ -148,6 +148,17 @@ describe('formatWorkoutForClipboard', () => {
     }
   })
 
+  it('formats weight exercises with "?" when sets is undefined', () => {
+    const planDay: PlanDay = {
+      id: 'd', label: 'Lift', slots: [{
+        id: 's', type: 'weights', name: 'Lift',
+        exercises: [{ exercise: 'Squat', sets: undefined as unknown as number, reps: 5 }],
+      }],
+    }
+    const result = formatWorkoutForClipboard(planDay, 'Plan', 'Jun 19')
+    expect(result).toContain('• Squat: ?x5')
+  })
+
   it('renders multiple slots in one day', () => {
     const planDay: PlanDay = {
       id: 'd', label: 'AM/PM', slots: [
