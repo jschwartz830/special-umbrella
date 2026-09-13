@@ -1,57 +1,61 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-09-11
+**Date:** 2026-09-13
 
 ---
 
 ## Executive Summary
 
-The codebase is in excellent shape. All 1364 tests pass. No bugs were found this pass. The audit covered the history/outcome/program store pipeline: `historyStore.ts`, `outcomeStore.ts`, `programStore.ts`, and the `planDeleteCleanup` integration test suite. All logic verified correct, error-resilient, and well-tested. All prior audit gaps remain resolved.
+All 1369 tests pass (up from 1364 — 5 new tests added). Two targeted improvements were made:
+
+1. **`computePersonalRecords` future-date guard** — defensive fix matching prior passes for `computeHistoryStats`, `findBestWeek`, and `findPreviousSessionForPlanDay`.
+2. **`estimateRunDurationMin` fallthrough test** — pinned an important control-flow behavior that was previously unexercised in tests.
+
+No bugs were found beyond the items addressed. The codebase remains in excellent shape.
 
 ---
 
 ## Audit Scope
 
 Modules reviewed this pass:
-- `src/store/historyStore.ts` — entry deduplication, `importEntries`, `importExtraEntries`, `markDaysAsOff`, `updateEntryDate`, `migrateHistoryState`
-- `src/store/outcomeStore.ts` — `logOutcomeWithProgression`, `syncExerciseHistory`, `moveOutcome`, `importOutcomes`, `removeOutcome`, `clearPlanOutcomes`, `migrateOutcomeState`
-- `src/store/programStore.ts` — `initVars`, `getVars`, `setVars`, `clearPlanVars`, `applyProgressionRule`, `migrateProgramState`
-- `src/store/__tests__/planDeleteCleanup.test.ts` — integration cascade-delete coverage
+- `src/lib/historyStats.ts` — `computePersonalRecords` future-date guard; existing dedup/guard patterns reviewed for completeness
+- `src/lib/estimateRunDurationMin.ts` — segment resolution order; duration-regex non-match → distance fallthrough
+- `src/lib/__tests__/historyStats.test.ts` — new tests for `computePersonalRecords` with `today` param
+- `src/lib/__tests__/estimateRunDuration.test.ts` — new test for combined duration+distance segment
+- `src/store/outcomeStore.ts`, `src/store/planStore.ts`, `src/store/exerciseHistoryStore.ts` — re-reviewed for consistency with new `computePersonalRecords` signature; no callers currently pass `today` (backward-compatible)
 
 ---
 
 ## Findings
 
+### Fixed this pass
+
+**`computePersonalRecords` missing future-date guard**
+
+All other stat functions that compute from dated records have been given a `today` guard over the past several passes:
+- `computeHistoryStats`: `pastEntries = entries.filter(e => e.calendarDate <= today)` (2026-08-14)
+- `findBestWeek`: `today?` parameter added (2026-08-24)
+- `findPreviousSessionForPlanDay`: predicate changed to `< currentDate` (2026-08-19)
+- `computeWorkoutTypeBreakdown`: `dateRange` clamped to `today` in HistoryPage (2026-08-24)
+
+`computePersonalRecords` was the only remaining stat function without this guard. A bad CSV import creating `ExerciseSessionRecord` rows with `calendarDate > today` would:
+- Inflate `sessionCount` in the Personal Records table
+- Show a future date as `maxLoadDate` or `maxRepsDate`
+
+**Fix:** Added optional `today?: string` parameter. When provided, records are pre-filtered by `calendarDate <= today` before planId scoping and aggregation. Omitting the parameter preserves prior behavior for all existing callers.
+
+### Pinned this pass
+
+**`estimateRunDurationMin` duration-unrecognized → distance fallthrough**
+
+The implementation correctly falls through from the `seg.duration` branch to the `seg.distance` branch when `duration` doesn't match the `/m(?:in)?$/` regex. The existing test for unrecognized duration (`"30km"`) used a segment with no `distance` field, so only the final 20-min fallback was exercised — not the fallthrough itself. A future developer adding `continue` after the regex non-match would silently break this behavior.
+
+Added one test with `{ duration: '30km', distance: '2' }` → 22 min (2 × 11 min/mi).
+
 ### Confirmed good
 
-- **`historyStore.ts` entry deduplication:** `addEntry` filters by `(planId, calendarDate)` before inserting, so only one entry per workout-date pair exists per plan. `deduplicateByDate` (used in `importEntries`) sorts by `createdAt` ascending and uses a `Map` — last-write wins on same-date pairs within a batch. Both paths correctly isolate by `planId`.
-
-- **`historyStore.ts` importExtraEntries:** Deduplicates by `id`, not by `(planId, calendarDate)` — correct because multiple extras can share a date. Re-imports are safe (idempotent by `id`).
-
-- **`historyStore.ts` markDaysAsOff:** Builds a `Set` of target dates, filters out existing entries for `(planId, date)` pairs in that set, then appends the new `day_off` entries. Correctly scoped to the given `planId`.
-
-- **`historyStore.ts` updateEntryDate:** Moves the target entry to `newDate`, then removes any pre-existing entry on `(planId, newDate)` — intentional delete-on-collision behavior relied upon by CalendarPage, HistoryPage, and TodayPage callers.
-
-- **`historyStore.ts` migrateHistoryState:** Backfills `source: 'history'` for extras missing the `source` field (v0→v1 migration). Correctly uses `e.source === undefined` as the guard.
-
-- **`outcomeStore.ts` logOutcomeWithProgression:** All three progression paths (recommendation build, run progression engine, YAML program rules) are individually wrapped in `try/catch`. A bug in any single path cannot prevent the outcome from being persisted or the log modal from closing. Per-exercise YAML progression iterates `slot.exercises` with per-exercise `try/catch`. Correct defensive design.
-
-- **`outcomeStore.ts` syncExerciseHistory:** Resolves `planName` and `workoutName` by cross-referencing `planStore` and `historyStore` via `getState()` — correct cross-store pattern. Returns early if no `weightsActual.exercises` or if `parseWorkoutInstanceId` fails.
-
-- **`outcomeStore.ts` moveOutcome:** Atomically removes the old key, inserts under the new key with updated `workoutInstanceId` field, and calls `exerciseHistoryStore.moveByWorkoutInstance`. Correctly handles the case where `oldInstanceId` doesn't exist (no-op via `if (!existing) return s`).
-
-- **`outcomeStore.ts` importOutcomes:** Last-writer-wins per `workoutInstanceId` (correct for outcomes, which use `workoutInstanceId` as identity rather than a reliable timestamp). Calls `syncExerciseHistory` for each imported outcome to carry `planName`/`workoutName` context.
-
-- **`outcomeStore.ts` clearPlanOutcomes:** Uses `parseWorkoutInstanceId` to filter by `planId` — correctly handles both regular (`planId_date`) and extra (`planId_date_extra_extraId`) instance IDs. Cascades to `exerciseHistoryStore.clearByPlanId`.
-
-- **`programStore.ts` applyProgressionRule:** Wraps `evaluateCondition`/`evaluateUpdates` in `try/catch`, logs the error with full context, returns `{}` on failure. Correct defensive design — a malformed YAML rule cannot crash the outcome log flow.
-
-- **`programStore.ts` initVars:** Idempotent — only sets vars that don't already exist (`!(k in merged)`). Safe to call on re-activation.
-
-- **`programStore.ts` migrateProgramState:** Backfills `vars: {}` for old snapshots missing the field. Correct.
-
-- **`planDeleteCleanup` integration test:** Covers all six cascade steps: `clearPlanHistory`, `clearPlanOutcomes`, `clearPlanVars`, `clearByPlanId` (exerciseHistory), `removeProgressionStates`, and `deletePlan`. Tests verify plan B is untouched after plan A deletion across all stores. Also covers: activePlanId null-out, extra-workout cascade, program vars (no-op for non-YAML plans), progression states (no-op for empty groupIds).
-
-### No new edge cases or bugs found this pass.
+- All prior fixes remain in place and passing.
+- `computePersonalRecords` existing tests (8 cases) still pass with no behavior change.
+- The `today` parameter is additive and backward-compatible — zero callers needed updating.
 
 ---
 
@@ -63,6 +67,7 @@ Modules reviewed this pass:
 | `updateEntryDate` data-loss on collision | Low | Intentional — CalendarPage, HistoryPage, TodayPage callers rely on delete-on-collision behavior |
 | `beforeunload` Supabase async flush | Low | Product decision needed; `navigator.sendBeacon` alternative requires format compatibility verification |
 | Integration test for TodayPage "Last session" PB hint | Low | Unit coverage exists; rendering path still untested |
+| Pass `today` to `computePersonalRecords` at call sites | Low | The guard now exists; call sites (HistoryPage, PRs modal) should pass `today` to activate it |
 
 ---
 
@@ -70,6 +75,8 @@ Modules reviewed this pass:
 
 | Suite | Before | After | Delta |
 |---|---|---|---|
-| All suites | 1364 | 1364 | 0 |
+| All suites | 1364 | 1369 | +5 |
 
-All 1364 tests pass across 35 files. No new tests added this pass (no new code paths found to cover).
+All 1369 tests pass across 35 files. 5 new tests added this pass:
+- 4 in `historyStats.test.ts` (`computePersonalRecords` future-date behavior)
+- 1 in `estimateRunDuration.test.ts` (segment duration-unrecognized fallthrough)
