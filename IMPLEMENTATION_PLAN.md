@@ -555,3 +555,41 @@ No code changes. Audit confirmed the codebase remains clean and all prior gaps a
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
 | `beforeunload` async Supabase flush | Recommendation only — product decision needed |
 | Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
+## 2026-09-13 Additions
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `computePersonalRecords`: add optional `today` parameter to exclude future-dated records | Defensive fix | `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts` |
+| 2 | `estimateRunDurationMin`: pin the segment duration-unrecognized → distance fallthrough behavior | Tests | `src/lib/__tests__/estimateRunDuration.test.ts` |
+
+### Detail
+
+**1. `computePersonalRecords` future-date guard**
+
+`computePersonalRecords` did not guard against future-dated exercise records. A bad CSV import with a calendarDate > today would:
+- Inflate `sessionCount` (session counter in the PR table)
+- Show a future date as the PR date (e.g., `maxLoadDate: '2026-12-31'`)
+
+This is the same class of bug fixed in prior passes for `computeHistoryStats` (pass 2026-08-14), `findBestWeek` (pass 2026-08-24), and `findPreviousSessionForPlanDay` (pass 2026-08-19).
+
+Fix: add an optional `today?: string` parameter. When provided, records with `calendarDate > today` are excluded before any further filtering or aggregation. When omitted (the existing call sites), behavior is unchanged (backward-compatible). Four new tests cover: future-date exclusion, backward-compatibility without `today`, exclusion combined with planId filter, and all-future records returning an empty array.
+
+**2. `estimateRunDurationMin` duration-unrecognized fallthrough**
+
+When a segment has a `duration` field that doesn't match the `m`/`min` pattern (e.g., `"30km"`), the code correctly falls through without `continue` and evaluates the same segment's `distance` field. This behavior was undocumented in tests: the only test for unrecognized duration (`"30km"`) had no `distance` field, so it tested only the fallback-to-20 path and not the combined case.
+
+Added one test that passes a segment with both `duration: '30km'` and `distance: '2'`, confirming the segment contributes 22 minutes (2 mi × 11 min/mi) rather than 20 (the global fallback). This pins an important control-flow behavior that could be silently broken by adding a `continue` after the duration-regex non-match.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |

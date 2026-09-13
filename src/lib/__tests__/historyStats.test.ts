@@ -1350,6 +1350,42 @@ describe('computePersonalRecords', () => {
     expect(result[0].maxRepsDate).toBe('2026-01-01')
     expect(result[0].sessionCount).toBe(3)
   })
+
+  it('excludes future-dated records when today is provided', () => {
+    const records = [
+      rec('Squat', 225, 5, '2026-01-01'),
+      rec('Squat', 300, 1, '2026-12-31'), // future date — would inflate maxLoad
+    ]
+    const result = computePersonalRecords(records, null, '2026-09-13')
+    expect(result[0].sessionCount).toBe(1)
+    expect(result[0].maxLoad).toBe(225)
+    expect(result[0].maxLoadDate).toBe('2026-01-01')
+  })
+
+  it('includes all records when today is not provided (backward-compatible)', () => {
+    const records = [
+      rec('Squat', 225, 5, '2026-01-01'),
+      rec('Squat', 300, 1, '2026-12-31'),
+    ]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].sessionCount).toBe(2)
+    expect(result[0].maxLoad).toBe(300)
+  })
+
+  it('excludes future-dated records even when planId filter is applied', () => {
+    const records = [
+      rec('Bench Press', 185, 8, '2026-01-01', 'plan-1'),
+      rec('Bench Press', 250, 1, '2026-12-31', 'plan-1'), // future, same plan
+    ]
+    const result = computePersonalRecords(records, 'plan-1', '2026-09-13')
+    expect(result[0].sessionCount).toBe(1)
+    expect(result[0].maxLoad).toBe(185)
+  })
+
+  it('returns empty array when all records are in the future', () => {
+    const records = [rec('Squat', 225, 5, '2026-12-31')]
+    expect(computePersonalRecords(records, null, '2026-09-13')).toEqual([])
+  })
 })
 
 // ── computePlanStreak ──────────────────────────────────────────────────────────
