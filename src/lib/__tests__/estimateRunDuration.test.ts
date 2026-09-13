@@ -58,6 +58,14 @@ describe('estimateRunDurationMin', () => {
     expect(estimateRunDurationMin(withSegmentDuration('30km'))).toBe(20)
   })
 
+  it('falls through to distance when duration is present but unrecognized', () => {
+    // seg has duration="30km" (unrecognized) AND distance="2" (miles).
+    // The duration branch does not continue after a non-match, so the distance
+    // branch is still evaluated. Result: 2mi × 11 min/mi = 22.
+    const slot = { segments: [{ duration: '30km', distance: '2' }] }
+    expect(estimateRunDurationMin(slot)).toBe(22)
+  })
+
   // ── Segment distance → estimated duration ───────────────────────────────────
 
   it('estimates duration from segment distance using default 11 min/mi pace', () => {

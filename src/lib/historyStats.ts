@@ -595,12 +595,18 @@ export interface PersonalRecord {
 /**
  * Derive one PR row per exercise from a flat list of exercise session records.
  * Optionally scoped to a single plan via `planId` (pass `null` for all-time).
+ *
+ * Pass `today` (YYYY-MM-DD) to exclude future-dated records — a bad CSV import
+ * can create exercise records with calendarDate > today, which would otherwise
+ * inflate sessionCount and show a future date as the PR date.
  */
 export function computePersonalRecords(
   records: ExerciseSessionRecord[],
   planId: string | null,
+  today?: string,
 ): PersonalRecord[] {
-  const scoped = planId ? records.filter(r => r.planId === planId) : records
+  const pastRecords = today ? records.filter(r => r.calendarDate <= today) : records
+  const scoped = planId ? pastRecords.filter(r => r.planId === planId) : pastRecords
 
   // Sort ascending by date so later sessions overwrite with `>=`, giving the
   // most-recent date where a PR was matched (not the first date it was set).

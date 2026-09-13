@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-09-13
+
+### `computePersonalRecords` future-date guard + `estimateRunDurationMin` fallthrough test
+
+**Summary:** Two targeted improvements:
+
+1. **`computePersonalRecords` future-date guard** — added optional `today?: string` parameter. When provided, exercise records with `calendarDate > today` are excluded before computing PR values. Matches the guard pattern applied in prior passes to `computeHistoryStats`, `findBestWeek`, and `findPreviousSessionForPlanDay`. Four new tests cover all relevant cases.
+
+2. **`estimateRunDurationMin` fallthrough test** — added one test pinning the behavior when a segment has an unrecognized `duration` format (e.g. `"30km"`) AND a `distance` field. The code correctly falls through to use the distance value; this test ensures a future `continue` insertion won't silently break it.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — added `today?` parameter to `computePersonalRecords`
+- `src/lib/__tests__/historyStats.test.ts` — 4 new tests
+- `src/lib/__tests__/estimateRunDuration.test.ts` — 1 new test
+- `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` (documentation)
+
+**Tests:** 1364 → 1369 (+5)
+
+**Risk:** Minimal. The `today` parameter is additive; omitting it preserves prior behavior. No callers changed.
+
+---
+
 ## 2026-09-11
 
 ### Audit pass — no code changes
