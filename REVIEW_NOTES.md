@@ -1,27 +1,28 @@
 # Review Notes — Overnight Audit Pass
-**Date:** 2026-09-13
+**Date:** 2026-09-14
 
 ---
 
 ## Executive Summary
 
-All 1369 tests pass (up from 1364 — 5 new tests added). Two targeted improvements were made:
+1. **What changed:** Two defensive fixes closing the same class of future-date bug across different call sites.
+2. **Highest confidence:** Both changes are minimal, targeted, and covered by new tests. No architectural risk.
+3. **Risky:** Nothing risky — both are one-liner predicate changes that strictly tighten existing exclusion logic.
+4. **Review first:** The `findPreviousSetsByExercise` change (previousSetsHelper.ts:30) — verify `rest.slice(0, 10) >= currentDate` handles all ID formats correctly (rotation + extra), which the two new tests confirm.
 
-1. **`computePersonalRecords` future-date guard** — defensive fix matching prior passes for `computeHistoryStats`, `findBestWeek`, and `findPreviousSessionForPlanDay`.
-2. **`estimateRunDurationMin` fallthrough test** — pinned an important control-flow behavior that was previously unexercised in tests.
-
-No bugs were found beyond the items addressed. The codebase remains in excellent shape.
+All 1371 tests pass (up from 1369 — 2 new tests added).
 
 ---
 
 ## Audit Scope
 
 Modules reviewed this pass:
-- `src/lib/historyStats.ts` — `computePersonalRecords` future-date guard; existing dedup/guard patterns reviewed for completeness
-- `src/lib/estimateRunDurationMin.ts` — segment resolution order; duration-regex non-match → distance fallthrough
-- `src/lib/__tests__/historyStats.test.ts` — new tests for `computePersonalRecords` with `today` param
-- `src/lib/__tests__/estimateRunDuration.test.ts` — new test for combined duration+distance segment
-- `src/store/outcomeStore.ts`, `src/store/planStore.ts`, `src/store/exerciseHistoryStore.ts` — re-reviewed for consistency with new `computePersonalRecords` signature; no callers currently pass `today` (backward-compatible)
+- `src/lib/previousSetsHelper.ts` — `findPreviousSetsByExercise`: found future-date gap
+- `src/pages/HistoryPage.tsx` — `computePersonalRecords` call site: found missing `today` argument
+- `src/lib/storeSync.ts` — confirmed `beforeunload` handler is present; `pushStore` calls are fire-and-forget (async without await); still a trade-off but no new issue
+- `src/engine/calendarProjection.ts` — `buildMonthGrid`: confirmed correct; `weekStartsOn` parameter wired correctly from settingsStore
+- `src/lib/outcomeSortKey.ts`, `src/lib/planDayUtils.ts` — both simple and correct
+- `src/lib/workoutInstanceId.ts`, `src/store/exerciseHistoryStore.ts` — fully tested; no new issues
 
 ---
 
@@ -29,33 +30,23 @@ Modules reviewed this pass:
 
 ### Fixed this pass
 
-**`computePersonalRecords` missing future-date guard**
+**1. `findPreviousSetsByExercise` missing future-date guard**
 
-All other stat functions that compute from dated records have been given a `today` guard over the past several passes:
-- `computeHistoryStats`: `pastEntries = entries.filter(e => e.calendarDate <= today)` (2026-08-14)
-- `findBestWeek`: `today?` parameter added (2026-08-24)
-- `findPreviousSessionForPlanDay`: predicate changed to `< currentDate` (2026-08-19)
-- `computeWorkoutTypeBreakdown`: `dateRange` clamped to `today` in HistoryPage (2026-08-24)
+The function pre-fills the OutcomeModal's set weights/reps from the most recent prior session. It excluded today's outcomes via `rest.startsWith(currentDate)`, but futures dates were not excluded. Since results are sorted newest-first, a future-dated outcome (e.g. from a bad CSV import with `calendarDate: '2026-12-31'`) would appear first and its sets would be used for pre-fill.
 
-`computePersonalRecords` was the only remaining stat function without this guard. A bad CSV import creating `ExerciseSessionRecord` rows with `calendarDate > today` would:
-- Inflate `sessionCount` in the Personal Records table
-- Show a future date as `maxLoadDate` or `maxRepsDate`
+This is the same class of bug fixed in the 2026-08-19 pass for `findPreviousSessionForPlanDay` (changed `!= currentDate` to `< currentDate`).
 
-**Fix:** Added optional `today?: string` parameter. When provided, records are pre-filtered by `calendarDate <= today` before planId scoping and aggregation. Omitting the parameter preserves prior behavior for all existing callers.
+**Fix:** Changed `rest.startsWith(currentDate)` to `rest.slice(0, 10) >= currentDate`. The new condition is a strict superset: it still excludes today's outcomes and also excludes any future-dated ones. Extracting `slice(0, 10)` rather than relying on `startsWith` makes the date comparison explicit and correct for both rotation IDs (`YYYY-MM-DD`) and extra IDs (`YYYY-MM-DD_extra_extraId`).
 
-### Pinned this pass
+**2. `HistoryPage` — `computePersonalRecords` missing `today` argument**
 
-**`estimateRunDurationMin` duration-unrecognized → distance fallthrough**
-
-The implementation correctly falls through from the `seg.duration` branch to the `seg.distance` branch when `duration` doesn't match the `/m(?:in)?$/` regex. The existing test for unrecognized duration (`"30km"`) used a segment with no `distance` field, so only the final 20-min fallback was exercised — not the fallthrough itself. A future developer adding `continue` after the regex non-match would silently break this behavior.
-
-Added one test with `{ duration: '30km', distance: '2' }` → 22 min (2 × 11 min/mi).
+The 2026-09-13 pass added an optional `today?: string` parameter to `computePersonalRecords` to guard against future-dated exercise records, but the carry-forward recommendation to update call sites was not implemented. Passing `today` to the `HistoryPage` call activates the guard. Also added `today` to the `useMemo` dependency array so the computed value refreshes at midnight.
 
 ### Confirmed good
 
 - All prior fixes remain in place and passing.
-- `computePersonalRecords` existing tests (8 cases) still pass with no behavior change.
-- The `today` parameter is additive and backward-compatible — zero callers needed updating.
+- `storeSync.ts` `beforeunload` handler correctly calls `pushStore` for each pending store; the async-without-await trade-off is unchanged and outside the scope of this pass.
+- `buildMonthGrid` and `calendarProjection` — clean, no issues.
 
 ---
 
@@ -65,9 +56,8 @@ Added one test with `{ duration: '30km', distance: '2' }` → 22 min (2 × 11 mi
 |---|---|---|
 | `TodayPage` state extraction hook | Low | ~1200-line component; high refactor risk, deferred indefinitely |
 | `updateEntryDate` data-loss on collision | Low | Intentional — CalendarPage, HistoryPage, TodayPage callers rely on delete-on-collision behavior |
-| `beforeunload` Supabase async flush | Low | Product decision needed; `navigator.sendBeacon` alternative requires format compatibility verification |
+| `beforeunload` Supabase async flush | Low | Fire-and-forget `pushStore` may not complete before page teardown; `navigator.sendBeacon` alternative requires format compatibility verification |
 | Integration test for TodayPage "Last session" PB hint | Low | Unit coverage exists; rendering path still untested |
-| Pass `today` to `computePersonalRecords` at call sites | Low | The guard now exists; call sites (HistoryPage, PRs modal) should pass `today` to activate it |
 
 ---
 
@@ -75,8 +65,11 @@ Added one test with `{ duration: '30km', distance: '2' }` → 22 min (2 × 11 mi
 
 | Suite | Before | After | Delta |
 |---|---|---|---|
-| All suites | 1364 | 1369 | +5 |
+| All suites | 1369 | 1371 | +2 |
 
-All 1369 tests pass across 35 files. 5 new tests added this pass:
-- 4 in `historyStats.test.ts` (`computePersonalRecords` future-date behavior)
-- 1 in `estimateRunDuration.test.ts` (segment duration-unrecognized fallthrough)
+All 1371 tests pass across 35 files. 2 new tests added this pass:
+
+### `src/lib/__tests__/previousSetsHelper.test.ts` (+2)
+
+- `excludes future-dated rotation outcomes (same class of bug as findPreviousSessionForPlanDay)`
+- `excludes future-dated extra workout outcomes`

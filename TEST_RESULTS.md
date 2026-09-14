@@ -1,3 +1,23 @@
+# Test Results — 2026-09-14
+
+All tests passing.
+
+| Suite | Count |
+|---|---|
+| All test files | 35 |
+| Total tests | 1371 |
+| Passed | 1371 |
+| Failed | 0 |
+
+## New tests added this pass (+2)
+
+### `src/lib/__tests__/previousSetsHelper.test.ts` (+2)
+
+- `excludes future-dated rotation outcomes (same class of bug as findPreviousSessionForPlanDay)`
+- `excludes future-dated extra workout outcomes`
+
+---
+
 # Test Results — 2026-09-13
 
 All tests passing.

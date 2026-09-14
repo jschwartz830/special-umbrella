@@ -262,8 +262,8 @@ export function HistoryPage() {
   const allExerciseRecords = useExerciseHistoryStore(s => s.records)
   const prFlagsMap = useMemo(() => buildPRFlagsMap(allExerciseRecords), [allExerciseRecords])
   const personalRecords = useMemo(
-    () => computePersonalRecords(allExerciseRecords, filterPlanId === 'all' ? null : filterPlanId),
-    [allExerciseRecords, filterPlanId],
+    () => computePersonalRecords(allExerciseRecords, filterPlanId === 'all' ? null : filterPlanId, today),
+    [allExerciseRecords, filterPlanId, today],
   )
 
   const weeklyBreakdown = useMemo<WeeklyBreakdown[]>(() => {

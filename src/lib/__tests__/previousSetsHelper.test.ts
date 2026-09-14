@@ -123,4 +123,39 @@ describe('findPreviousSetsByExercise', () => {
     const result = findPreviousSetsByExercise('plan-1', TODAY, outcomes)
     expect(result).toEqual({})
   })
+
+  it('excludes future-dated rotation outcomes (same class of bug as findPreviousSessionForPlanDay)', () => {
+    // A bad CSV import can create outcomes with calendarDate > today.
+    // Without the >= guard, the future outcome sorts first (newest wins) and
+    // its sets would be returned as the "previous sets" to pre-fill.
+    const outcomes = {
+      'plan-1_2026-12-31': outcome('plan-1', '2026-12-31', [
+        { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 225, completed: true }] },
+      ]),
+      'plan-1_2026-06-01': outcome('plan-1', '2026-06-01', [
+        { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 135, completed: true }] },
+      ]),
+    }
+    const result = findPreviousSetsByExercise('plan-1', TODAY, outcomes)
+    // Should return the past session (Jun 1), not the future one (Dec 31)
+    expect(result['Squat'][0].actualLoad).toBe(135)
+  })
+
+  it('excludes future-dated extra workout outcomes', () => {
+    const futureExtra: WorkoutOutcome = {
+      workoutInstanceId: 'plan-1_2026-12-31_extra_futureId',
+      completionState: 'completed',
+      perceivedEffort: null,
+      notes: null,
+      completedAt: null,
+      weightsActual: {
+        exercises: [
+          { exercise: 'Press', sets: [{ actualReps: 5, actualLoad: 185, completed: true }], progressionMode: null },
+        ],
+      },
+    } as unknown as WorkoutOutcome
+    const outcomes = { 'plan-1_2026-12-31_extra_futureId': futureExtra }
+    const result = findPreviousSetsByExercise('plan-1', TODAY, outcomes)
+    expect(result).toEqual({})
+  })
 })

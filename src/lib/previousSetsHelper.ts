@@ -27,7 +27,7 @@ export function findPreviousSetsByExercise(
       if (excludeInstanceId && outcome.workoutInstanceId === excludeInstanceId) return false
       if (!outcome.workoutInstanceId.startsWith(prefix)) return false
       const rest = outcome.workoutInstanceId.slice(prefix.length)
-      if (rest.startsWith(currentDate)) return false
+      if (rest.slice(0, 10) >= currentDate) return false
       return Boolean(outcome.weightsActual?.exercises?.length)
     })
     .sort((a, b) => outcomeSortKey(b).localeCompare(outcomeSortKey(a)))
