@@ -1,6 +1,10 @@
 import { Info, PartyPopper, TrendingUp, X } from 'lucide-react'
+import type { LastWeekSummary } from '../../hooks/useLastWeekSummary'
 
 export interface TodayBannersProps {
+  // Last-week summary (Mondays only)
+  lastWeekSummary: LastWeekSummary | null
+
   // Expiry banner
   planExpired: boolean
   expiryBannerDismissed: boolean
@@ -31,6 +35,7 @@ export interface TodayBannersProps {
 }
 
 export function TodayBanners({
+  lastWeekSummary,
   planExpired,
   expiryBannerDismissed,
   planDurationValue,
@@ -52,6 +57,29 @@ export function TodayBanners({
 }: TodayBannersProps) {
   return (
     <>
+      {/* Last-week summary — shown on Mondays when there is activity */}
+      {lastWeekSummary && !lastWeekSummary.isDismissed && (
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
+          <span className="text-sm flex-shrink-0" role="img" aria-label="chart">📊</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-sky-300 font-medium">Last week recap</p>
+            <p className="text-xs text-sky-400/70 mt-0.5">
+              {lastWeekSummary.completed} completed
+              {lastWeekSummary.extras > 0 && ` · ${lastWeekSummary.extras} bonus`}
+              {lastWeekSummary.skipped > 0 && ` · ${lastWeekSummary.skipped} skipped`}
+              {lastWeekSummary.dayOffs > 0 && ` · ${lastWeekSummary.dayOffs} rest`}
+            </p>
+          </div>
+          <button
+            onClick={lastWeekSummary.dismiss}
+            className="text-sky-400/60 hover:text-sky-200 flex-shrink-0 transition-colors"
+            aria-label="Dismiss last week summary"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
       {/* Plan completion / expiry banner */}
       {planExpired && !expiryBannerDismissed && (
         <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">

@@ -44,6 +44,7 @@ import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 import { outcomeSortKey } from '../lib/outcomeSortKey'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { TodayBanners } from '../components/today/TodayBanners'
+import { useLastWeekSummary } from '../hooks/useLastWeekSummary'
 import { TodayUpcomingList } from '../components/today/TodayUpcomingList'
 import { TodayCompletedSection } from '../components/today/TodayCompletedSection'
 import { TodayHabitSummary } from '../components/today/TodayHabitSummary'
@@ -229,6 +230,9 @@ export function TodayPage() {
   )
   const { isDismissed: streakMilestoneDismissed, dismiss: dismissStreakMilestone, milestone: streakMilestone } =
     useStreakMilestoneDismiss(earlyPlanStreak)
+
+  // Last-week summary banner — Monday-only, read-only, no state mutations
+  const lastWeekSummary = useLastWeekSummary(plan?.id ?? null, allEntries, extraEntries, today)
 
   if (!plan || !todayResolved) {
     return (
@@ -683,6 +687,7 @@ export function TodayPage() {
       />
 
       <TodayBanners
+        lastWeekSummary={lastWeekSummary}
         planExpired={planExpired}
         expiryBannerDismissed={expiryBannerDismissed}
         planDurationValue={plan.duration.value}
