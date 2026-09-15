@@ -616,13 +616,17 @@ export function computePersonalRecords(
 
   for (const r of sorted) {
     const existing = byExercise.get(r.exerciseName)
+    // Mirror buildPRFlagsMap: treat 0 the same as null — a 0-load or 0-reps
+    // session is bodyweight/unrecorded and should not be surfaced as a PR.
+    const recordLoad = r.maxLoad !== null && r.maxLoad > 0 ? r.maxLoad : null
+    const recordReps = r.maxReps !== null && r.maxReps > 0 ? r.maxReps : null
     if (!existing) {
       byExercise.set(r.exerciseName, {
         exerciseName: r.exerciseName,
-        maxLoad: r.maxLoad,
-        maxLoadDate: r.maxLoad !== null ? r.calendarDate : null,
-        maxReps: r.maxReps,
-        maxRepsDate: r.maxReps !== null ? r.calendarDate : null,
+        maxLoad: recordLoad,
+        maxLoadDate: recordLoad !== null ? r.calendarDate : null,
+        maxReps: recordReps,
+        maxRepsDate: recordReps !== null ? r.calendarDate : null,
         sessionCount: 1,
       })
       continue
@@ -630,12 +634,12 @@ export function computePersonalRecords(
 
     existing.sessionCount++
 
-    if (r.maxLoad !== null && (existing.maxLoad === null || r.maxLoad >= existing.maxLoad)) {
-      existing.maxLoad = r.maxLoad
+    if (recordLoad !== null && (existing.maxLoad === null || recordLoad >= existing.maxLoad)) {
+      existing.maxLoad = recordLoad
       existing.maxLoadDate = r.calendarDate
     }
-    if (r.maxReps !== null && (existing.maxReps === null || r.maxReps >= existing.maxReps)) {
-      existing.maxReps = r.maxReps
+    if (recordReps !== null && (existing.maxReps === null || recordReps >= existing.maxReps)) {
+      existing.maxReps = recordReps
       existing.maxRepsDate = r.calendarDate
     }
   }

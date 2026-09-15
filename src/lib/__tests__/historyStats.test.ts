@@ -1386,6 +1386,40 @@ describe('computePersonalRecords', () => {
     const records = [rec('Squat', 225, 5, '2026-12-31')]
     expect(computePersonalRecords(records, null, '2026-09-13')).toEqual([])
   })
+
+  it('does not surface 0-load session as a PR (bodyweight / unrecorded)', () => {
+    // A session with maxLoad=0 is a bodyweight set — it should not set maxLoad or maxLoadDate.
+    const records = [rec('Push-up', 0, 15, '2026-01-01')]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].maxLoad).toBeNull()
+    expect(result[0].maxLoadDate).toBeNull()
+    // reps are still tracked
+    expect(result[0].maxReps).toBe(15)
+    expect(result[0].sessionCount).toBe(1)
+  })
+
+  it('does not surface 0-reps session as a PR', () => {
+    // maxReps=0 is unrecorded — should not set maxReps or maxRepsDate.
+    const records = [rec('Squat', 135, 0, '2026-01-01')]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].maxLoad).toBe(135)
+    expect(result[0].maxReps).toBeNull()
+    expect(result[0].maxRepsDate).toBeNull()
+  })
+
+  it('correctly picks the real-load session when mixed with a 0-load session', () => {
+    // The 0-load session (bodyweight) must not shadow the real load from the other session.
+    const records = [
+      rec('Dip', 0, 12, '2026-01-01'),    // bodyweight, should not set maxLoad
+      rec('Dip', 45, 8, '2026-01-15'),    // weighted, should set maxLoad=45
+    ]
+    const result = computePersonalRecords(records, null)
+    expect(result[0].maxLoad).toBe(45)
+    expect(result[0].maxLoadDate).toBe('2026-01-15')
+    expect(result[0].maxReps).toBe(12)
+    expect(result[0].maxRepsDate).toBe('2026-01-01')
+    expect(result[0].sessionCount).toBe(2)
+  })
 })
 
 // ── computePlanStreak ──────────────────────────────────────────────────────────

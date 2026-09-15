@@ -1,629 +1,80 @@
-# Implementation Plan — Overnight Audit Pass
-**Date:** 2026-08-14
-
----
+# Overnight Implementation Plan — 2026-09-15
 
 ## Architecture Summary
 
-**Stack:** React 18 + TypeScript + Zustand + Vite, deployed to GitHub Pages as a PWA.
+**Stack**: React 18 + TypeScript + Zustand (persisted via localStorage), Vite build, PWA via vite-plugin-pwa, GitHub Pages deploy. Optional cloud sync via Supabase.
 
-**Core layers:**
-- `src/engine/` — Pure functions (rotation/scheduling logic, calendar projection, program parsing). Stateless; all state is passed in.
-- `src/store/` — Seven Zustand stores, all persisted to `localStorage` via versioned `persist` middleware. Stores are isolated with cross-store calls done via `getState()`.
-- `src/pages/` + `src/components/` — React UI, using hooks that compose store selectors and engine functions.
-- `src/lib/` — Utilities (stats computation, CSV, date helpers, expression evaluator).
-- `src/modules/` — Domain modules (workout outcomes, run adaptation, progression recommendations).
-- `src/programs/` — YAML workout program definitions.
+**Data flow**:
+- `planStore` — plan definitions (days, slots, duration)
+- `historyStore` — rotation entries (complete/skip/day_off) + overrides (advance/go_back/jump/swap_slot) + extra (ad-hoc) entries
+- `outcomeStore` — rich per-session data (sets, reps, distances, perceived effort) keyed by `workoutInstanceId`
+- `exerciseHistoryStore` — denormalized per-exercise session records for fast PR detection
+- `mobilityStore` — standalone daily mobility routine completions
+- `programStore` — YAML-imported program variables (progression state)
+- `settingsStore` — user preferences
 
-**Key invariants:**
-- All calendar dates are `YYYY-MM-DD` local-time strings throughout.
-- `HistoryEntry` for a given `(planId, calendarDate)` pair is deduplicated on write (newest createdAt wins).
-- The rotation pointer advances on `complete | skip | day_off`; unlogged past days stall the pointer.
-- `WorkoutOutcome` is keyed by `workoutInstanceId = planId_YYYY-MM-DD` (or `..._extra_extraId` for ad-hoc).
+**Core engine** (`rotationEngine.ts`): Pure functions that derive workout state from plan + history + overrides. `computeCurrentDayIndex` is the fundamental primitive — all display functions compose on top of it.
 
----
-
-## Product Capability Summary
-
-- **Today View:** Resolves which workout is scheduled, shows pending/complete state, supports full workout tracking (weights, run, mobility), ad-hoc "extra" workouts, and double-day flow.
-- **Calendar View:** Month grid with rotation overlay, retroactive logging via jump overrides, per-day detail modals.
-- **History View:** Reverse-chronological log with PR badges, per-exercise session records.
-- **Plans:** CRUD for custom plans; YAML program import with variable-based progression rules.
-- **Mobility:** Daily routine with completions, library, custom templates.
-- **Stats:** Streak, completion rate, plan progress, cycle progress, workout type breakdown, weekly breakdown, PRs.
-- **Cloud Sync:** Supabase opt-in; CSV export/import as fallback.
+**Test infrastructure**: Vitest, 35 test files, 1371 tests, all green.
 
 ---
 
-## What Appears Strong and Well-Designed
+## What Appears Strong
 
-1. **Rotation engine** — Pure functions, no side effects, comprehensive edge-case tests (887 lines). Consistent handling of overrides, deduplication, and the stall-on-unlogged invariant.
-2. **Test coverage** — 1238 tests across 35 files; all passing. All critical logic paths covered.
-3. **Error resilience in progression** — `logOutcomeWithProgression` wraps every progression-rule evaluation in `try/catch` so a malformed YAML rule can never prevent an outcome from being saved.
-4. **Deduplication discipline** — Store writes, imports, and stats computations consistently apply dedup logic so duplicate entries don't inflate counts.
-5. **UTC-safe date arithmetic** — `historyStats.ts` uses `Date.UTC` for streak/window math, avoiding DST shift bugs.
-6. **Expression evaluator** — Hand-rolled recursive descent parser with no `eval()`, supporting complex YAML progression rules safely.
+1. **Rotation engine** — clean, pure, well-documented, with 95%+ test coverage. The override model is flexible and handles all edge cases (advance/go_back/jump/swap).
+2. **Deduplication discipline** — every stats function handles duplicate entries consistently via a "newest createdAt wins" or Set-based dedup, protecting against CSV import artifacts and cloud-sync races.
+3. **Migration pattern** — all stores have `migrateXxxState` functions that are exported and unit-tested, ensuring upgrade paths are safe.
+4. **PR detection** — `buildPRFlagsMap` (O(N log N)) provides efficient all-time PR flags for list views, correctly handling same-day comparisons.
+5. **Component decomposition** — `TodayPage.tsx` has been progressively split into subcomponents (`TodayBanners`, `TodayPendingCard`, `TodayCompletedSection`, `TodayHabitSummary`, etc.) reducing the rendering surface per component.
+6. **Session summary** — `buildLastSessionSummary` handles weights, run, swim, and mobility in a unified function with good edge-case coverage.
 
 ---
 
-## Key Issues and Risks
+## Key Issues / Risks
 
-### P1 — Missing test coverage for critical edge cases
+### Bugs
 
-**`programParser.ts` — duration/coercion/description paths (resolved 2026-08-20):**
-All previously untested paths in `programParser.ts` are now covered: `parseDurationSecs`, `coerceWorkoutType`, validation error reporting, `validateYamlProgram`, and `buildStructureDescription`. 20 new tests added; test count 1268 → 1288.
+| # | Severity | Description |
+|---|----------|-------------|
+| 1 | Low | `computePersonalRecords` does not guard against 0-load/0-reps sessions, while `buildPRFlagsMap` does. A bodyweight-only session (load=0) can set a `maxLoadDate` of 0 lb in the PR table. |
+| 2 | Medium | **Undo multiple-advance bug**: When a user does two sequential double-day advances in one session, the Undo button removes both extras but only calls `removeLastOverrideByType` once, leaving the rotation pointer one step ahead. |
 
-**`expressionEval.ts` — `evaluateUpdates` multi-statement path:**
-The `splitStatements` function uses parenthesis-depth tracking to avoid splitting `min(a, b)` on the inner comma. This is the correct algorithm, but the behavior is **untested**. A regression here would silently corrupt YAML-driven progression variables.
+### Code Smells
 
-**`workoutInstanceId.ts` — `parseWorkoutInstanceId` with extra IDs:**
-Extra workout instance IDs (`planId_YYYY-MM-DD_extra_extraId`) are parsed by the same function used for rotation IDs. The function is tested for basic cases but not for the extra-ID format.
+| # | Severity | Description |
+|---|----------|-------------|
+| 3 | Low | `TodayPage.tsx` is 1176 lines with 17 `useState` hooks. Functionally correct but hard to reason about. No immediate fix recommended (it has been improving with each subcomponent extraction). |
+| 4 | Low | `computeCurrentStreakDates` has a different parameter order than `computePlanStreak` (`planId` is optional and after `today` in the former, first in the latter). No caller confusion yet but could cause a mispass. |
+| 5 | Low | `estimateRunDurationMin` variable substitution uses a broad word-boundary regex that could accidentally match keywords in distance strings, though in practice YAML distance fields are numeric. |
 
-**`historyStats.ts` — `computeConsecutiveSkips` plan isolation:**
-The skip streak correctly scopes extras and break-dates to the given plan, but this is untested. A bug here would cause the skip-warning banner to fire incorrectly.
+### Missing Test Coverage
 
-### P2 — Missing useful stat: average workouts per week
-
-The stats layer has streak, completion rate, weekly breakdown, best week, and plan progress — but no `computeAverageWorkoutsPerWeek`. This is a commonly expected fitness metric that would be useful in the Plan Progress modal.
-
-### P3 — `expressionEval.ts` — Silent fallback in `parsePrimary`
-
-When the parser encounters an unexpected token (e.g. `comma` or `rparen` in an unexpected position), it silently returns `{ k: 'num', v: 0 }`. No warning is emitted even in development. This makes YAML expression debugging harder.
-
-### P4 — `workoutInstanceId.ts` — Safety assumption not documented
-
-`parseWorkoutInstanceId` uses `indexOf('_YYYY-MM-DD')` to locate the planId boundary. This is safe because planIds are hex-only nanoids (no date-like substrings), but this assumption is undocumented. A future change to the ID alphabet could silently break ID parsing.
-
-### P5 — `computeHistoryStats.totalLogged` counts raw array length
-
-The store prevents duplicate `(planId, calendarDate)` entries via `addEntry`, but `computeHistoryStats` assumes this and does not re-deduplicate. Bad data (e.g. corrupted localStorage) could inflate `totalLogged`. Low risk in practice.
-
-### P6 — Calendar week starts on Sunday (hardcoded)
-
-`buildMonthGrid` uses `weekStartsOn: 0` (Sunday). International users expect Monday-first. No user-configurable setting exists.
+| # | Area | Gap |
+|---|------|-----|
+| 6 | `computePersonalRecords` | No tests for 0-load or 0-reps edge cases |
+| 7 | Undo flow (TodayPage) | Multi-advance scenario not covered (component-level, hard to test) |
+| 8 | `buildLastSessionSummary` | Mobility session summary path not comprehensively tested |
 
 ---
 
 ## Prioritized Plan
 
-| Priority | Item | Action | Rationale |
-|---|---|---|---|
-| 1 | Test: `evaluateUpdates` multi-statement edge cases | Implement | Untested critical progression path |
-| 2 | Test: `parseWorkoutInstanceId` with extra IDs | Implement | Untested ID format used in outcomes |
-| 3 | Test: `computeConsecutiveSkips` plan isolation | Implement | Untested skip-streak scoping |
-| 4 | Feature: `computeAverageWorkoutsPerWeek` | Implement | Useful missing metric; clean addition |
-| 5 | Doc/guard: `parsePrimary` silent fallback | Implement | Add dev-mode warning for easier debugging |
-| 6 | Doc: `parseWorkoutInstanceId` assumption | Document | Low-risk, but worth capturing |
-| 7 | UX: Calendar week start configurable | Recommend only | Requires settings infrastructure |
-| 8 | Refactor: TodayPage state extraction hook | Recommend only | 1150-line file; risky mid-audit |
-| 9 | Stats: `totalLogged` dedup at stats layer | Recommend only | Low risk, defensive change |
+### Safe to Implement
+
+1. **Fix `computePersonalRecords` 0-load guard** — 3-line change + 2 tests. Consistent with `buildPRFlagsMap`.
+2. **Fix Undo multi-advance bug** — Change boolean to counter in TodayPage Undo handler. Narrow, 3-line change.
+3. **Feature: "Last Week" Monday summary banner** — New `useLastWeekSummary` hook using existing `computeWeeklyBreakdown`. Dismissable banner in `TodayBanners`. Read-only, no state mutations.
+
+### Recommendations Only (Not Implemented)
+
+4. **Refactor TodayPage session state** — Extract double-day / bonus outcome state into a custom hook or sub-component. High value but medium risk due to the complexity of the flow.
+5. **Align `computeCurrentStreakDates` parameter order** — Non-breaking: `planId` could become the first parameter after `today`. Requires updating all call sites. No current bug, so deferred.
+6. **Add `isNaN` guard in `estimateRunDurationMin`** — The fallback to `parseFloat → NaN → skip` is correct but undocumented.
 
 ---
 
 ## Rationale for Sequencing
 
-Tests first — they validate existing behavior before any changes. The new stat function (`computeAverageWorkoutsPerWeek`) is purely additive and won't affect existing tests. The `parsePrimary` warning is additive and dev-only so it cannot break production behavior. Calendar week start and TodayPage refactor are left as recommendations because they require product decisions and broader UI changes.
-
----
-
-## Additions — 2026-08-15
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `useToday`: add `visibilitychange` listener for device-wake edge case | Bug fix | `src/hooks/useToday.ts` |
-| 2 | `allSetsHitTarget`: simplify from two parameters to one | Refactor | `src/modules/workout-outcomes/progression.ts` |
-| 3 | `computeHistoryStats`: deduplicate rotation entries in `totalLogged` / `totalCompleted` | Defensive fix | `src/lib/historyStats.ts` |
-
-### Detail
-
-**1. `useToday` visibilitychange bug**
-The hook only used `setTimeout` for midnight refresh. If the device sleeps and the OS pauses or delays the timer, the app would show "yesterday" until something forced a re-render. Adding a `visibilitychange` listener that re-checks the date whenever the page becomes visible catches the device-wake edge case immediately. The `[today]` dep already re-schedules the `setTimeout` on each date change; the new listener just adds a second trigger.
-
-**2. `allSetsHitTarget` single-parameter refactor**
-The original signature `(allSets, completedSets)` ran the `completed` check over `allSets` and the `targetReps` check only over `completedSets`. This was semantically correct but redundant: any set that passes `s.completed` in the first loop would also appear in `completedSets` since `completedSets` was defined as `allSets.filter(s => s.completed)`. The refactor collapses both checks into a single `sets.every(s => { if (!s.completed) return false; ... })` predicate. All three call sites updated. No behaviour change.
-
-**3. `computeHistoryStats` deduplication**
-`totalLogged` was counting `entries.length` directly, assuming the store always enforces the one-entry-per-(planId, calendarDate) invariant. The store does enforce this on write, but `importEntries` and old persisted data could create duplicates in the array. The fix collapses `entries` to a `Set` keyed by `planId__calendarDate` before sizing — the same pattern used by `isPlanExpired` and `computePlanProgress`. `totalCompleted` receives the same treatment.
-
-### Status of previous items
-
-| P# | Item | Status |
-|---|---|---|
-| P1 (multi-statement tests) | Covered in 2026-08-14 pass (`expressionEval.test.ts` 79 tests) | Done |
-| P2 (`computeAverageWorkoutsPerWeek`) | Implemented 2026-08-14 | Done |
-| P3 (`parsePrimary` warning) | Implemented 2026-08-14 | Done |
-| P4 (`parseWorkoutInstanceId` doc) | Implemented 2026-08-14 | Done |
-| P5 (`totalLogged` dedup) | Implemented 2026-08-15 (change 3 above) | Done |
-| P6 (calendar week start) | Recommendation only — not implemented | Open |
-
----
-
-## Additions — 2026-08-16
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `CalendarPage`: preserve jump override when marking a jumped date as `day_off` | Bug fix | `src/pages/CalendarPage.tsx` |
-| 2 | `computeHistoryStats`: deduplicate `last7Completed` / `last30Completed` by `planId__calendarDate` | Defensive fix | `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts` |
-| 3 | `expressionEval`: warn in dev when YAML progression rule references unknown variable | DX improvement | `src/lib/expressionEval.ts`, `src/lib/__tests__/expressionEval.test.ts` |
-
-### Detail
-
-**1. CalendarPage jump-override day_off bug**
-`logForDate` guarded the jump re-add with `action !== 'day_off'`, so marking a previously-jumped date as day_off silently dropped the jump. The rotation engine would then advance from the pre-jump plan day index for all subsequent dates, causing every day after to show the wrong workout. Fix: remove the `action !== 'day_off'` exclusion.
-
-**2. `last7/last30Completed` dedup**
-`totalCompleted` already deduped by `planId__calendarDate` (added 2026-08-15), but the windowed counts did not. A re-imported CSV could inflate the 7-day and 30-day stats while leaving the all-time stat correct. Fix mirrors the `totalCompleted` pattern exactly.
-
-**3. Unknown-variable dev warning**
-Typos in YAML progression rule variable names (e.g. `squatt` vs `squat`) silently evaluate to 0, making the rule appear to do nothing. A `console.warn` behind `import.meta.env.DEV` surfaces these immediately without any production behaviour change. Built-in variables (`effort`, `all_reps`, `session_complete`) are always in `vars` so they never trigger the warning.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| Calendar week start configurable | Recommendation only — requires settings infrastructure |
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of 1150-line component |
-| `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
-| Cloud sync conflict resolution | Out of scope |
-
----
-
-## Additions — 2026-08-23
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `TodayPlanProgressModal`: surface `longestStreak` as "Best streak" | Feature | `src/components/today/TodayPlanProgressModal.tsx`, `src/pages/TodayPage.tsx` |
-| 2 | Calendar week start: configurable Sun/Mon setting | Feature | `src/store/settingsStore.ts`, `src/engine/calendarProjection.ts`, `src/pages/CalendarPage.tsx`, `src/pages/SettingsPage.tsx`, `src/store/__tests__/settingsStore.test.ts` |
-
-### Detail
-
-**1. Best streak in Plan Progress modal**
-`computeHistoryStats` already returned `longestStreak` (the all-time longest streak across all plans) but it was never surfaced in the UI. The Plan Progress modal now shows a "Best streak" row beneath the existing "Current streak" row, hidden when `longestStreak === 0`. Implementation: add `longestStreak: number` prop to `TodayPlanProgressModal`, pass `stats.longestStreak` from `TodayPage`.
-
-**2. Configurable calendar week start (P6 resolved)**
-`buildMonthGrid` previously hardcoded `weekStartsOn: 0` (Sunday). A `weekStartsOn: 0 | 1` preference was added to `settingsStore` with Sunday as the default (backward compatible), included in `migrateSettingsState`, threaded from `CalendarPage` into `buildMonthGrid`, and exposed as a Sunday/Monday button toggle in the Settings page. Five new tests cover the store action and migration.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
-| `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
-| Cloud sync conflict resolution | Out of scope |
-
----
-
-## Additions — 2026-08-19
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `findPreviousSessionForPlanDay`: exclude future-dated entries | Bug fix | `src/lib/sessionSummary.ts`, `src/lib/__tests__/sessionSummary.test.ts` |
-| 2 | `TodayPage`: wrap `computeAverageWorkoutsPerWeek` in `useMemo` | Perf fix | `src/pages/TodayPage.tsx` |
-| 3 | `TodayPlanProgressModal`: surface `computeRotationPlanRemaining` as "Workouts remaining" | Feature | `src/pages/TodayPage.tsx`, `src/components/today/TodayPlanProgressModal.tsx` |
-
-### Detail
-
-**1. `findPreviousSessionForPlanDay` future-date bug**
-`findPreviousSessionForPlanDay` filtered with `e.calendarDate !== currentDate`, which correctly excluded today but allowed future-dated entries through. A CSV import with an erroneously future-dated entry for the same `planDayIndex` would appear as the "Last session" data shown on the Today view. Fix: change the predicate to `e.calendarDate < currentDate` so all present and future dates are excluded. One test added covering the future-date case.
-
-**2. `avgWorkoutsPerWeek` useMemo**
-`computeAverageWorkoutsPerWeek` scans all history entries and extras for every render of `TodayPage`. Previous audit passes documented this as a recommendation (R3) but did not implement it. The fix wraps the call in `useMemo` with deps `[plan.id, planEntries, planExtras, plan.startDate, today]`, consistent with the memoization pattern used by the nearby `rotationLoggedCount` computation. No behaviour change.
-
-**3. "Workouts remaining" in Plan Progress modal**
-`computeRotationPlanRemaining` was implemented and tested in the stats layer but never surfaced in the UI. The Plan Progress modal (opened by tapping the ring on the Today view) now shows a "Workouts remaining" row for rotation-duration plans. Returns `'Done'` when the count reaches 0. No change for weeks-duration plans (prop is null, row is hidden). Implementation: compute in `TodayPage`, pass as `rotationPlanRemaining` prop to `TodayPlanProgressModal`.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| Calendar week start configurable | Recommendation only — requires settings infrastructure |
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1160-line component |
-| `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
-| Cloud sync conflict resolution | Out of scope |
-
----
-
-## Additions — 2026-08-20
-## Additions — 2026-08-21
-## Additions — 2026-08-24
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `historyStats.test`: correct `daysMap` type annotation to use `WorkoutType` | Type fix | `src/lib/__tests__/historyStats.test.ts` |
-| 2 | `programParser`: add 20 tests for untested parser paths | Tests | `src/engine/__tests__/programParser.test.ts` |
-
-### Detail
-
-**1. `daysMap` type annotation fix**
-The `daysMap` helper in `historyStats.test.ts` had a hardcoded union type that didn't include `'run'`. Tests at lines 913 and 924 passed `type: 'run'`, producing `TS2322` compile errors silently swallowed by Vitest's esbuild transform. Fixed by using the imported `WorkoutType` union.
-
-**2. `programParser` test coverage**
-`programParser.test.ts` had only 6 tests. Added 20 new tests covering: `parseDurationSecs`, `coerceWorkoutType`, validation error reporting, `validateYamlProgram`, and `buildStructureDescription`. Test count: 1268 → 1288.
-
----
-
-## Additions — 2026-08-21
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `TodayPage`: memoize `computeLoggedRate` and `computeWorkoutCompletionRate` | Perf fix | `src/pages/TodayPage.tsx` |
-
-### Detail
-
-**1. Memoize `computeLoggedRate` and `computeWorkoutCompletionRate`**
-Both functions scan `planEntries` on every render of `TodayPage`. Wrapped both in `useMemo` with precise dependency arrays, following the identical pattern used for `avgWorkoutsPerWeek` (Aug 19 pass) and `rotationLoggedCount`.
-| 1 | `TodayPage`: memoize `computeLoggedRate` and `computeWorkoutCompletionRate` | Perf fix | `src/pages/TodayPage.tsx` |
-
-### Detail
-
-**1. `computeLoggedRate` + `computeWorkoutCompletionRate` memoization**
-Both calls scan all `planEntries` (O(n)) on every render. The `avgWorkoutsPerWeek` memo (added 2026-08-19) uses the same four deps `[plan.id, planEntries, plan.startDate, today]`. Wrapping both calls in `useMemo` with the same dep array is a safe, direct application of the established pattern.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| Calendar week start configurable | Recommendation only — requires settings infrastructure |
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1160-line component |
-
----
-
-## Additions — 2026-08-22
-
-### Changes implemented this pass (test-only)
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `programParser.test.ts`: 10 new tests covering `buildStructureDescription`, `parseRunSegment`, `parseDurationSecs`, `parseDay` | Coverage | `src/engine/__tests__/programParser.test.ts` |
-| 2 | `explanation.test.ts`: 2 new tests for `reset` and null `lastResult` branches in `buildAdaptationNote` | Coverage | `src/modules/recommendation/__tests__/explanation.test.ts` |
-| 3 | `previousSetsHelper.test.ts`: 2 new tests for extra-workout instance ID handling | Coverage | `src/lib/__tests__/previousSetsHelper.test.ts` |
-
-### Detail
-
-**1. `programParser` branch coverage**
-Three branches of `buildStructureDescription` for weights slots were completely dark: the set-array path (shows "N sets"), the reps-only path (shows "×N"), and the no-exercises path (returns `undefined`). Added tests for all three. A test also documents the raw-vs-parsed type discrepancy: `buildStructureDescription` uses the raw YAML `type` string in the display label while `parseRunSegment` normalises unknown types to `'easy'` — a subtlety that is easy to miss when reading the code. Additional coverage for `parseDurationSecs` (zero, invalid string, 2-minute string) and `parseDay` label default.
-
-**2. `buildAdaptationNote` untested switch branches**
-The `switch (state.lastResult)` in `buildAdaptationNote` has five branches. `reset` and `default` (triggered by `null`/`undefined`) were untested. Added two tests to close the gap.
-
-**3. `findPreviousSetsByExercise` extra-workout IDs**
-Extra workouts use IDs of the form `planId_YYYY-MM-DD_extra_extraId`. The function excludes same-date IDs via `rest.startsWith(currentDate)`. For an extra workout, `rest` is `YYYY-MM-DD_extra_extraId`, which correctly starts with the date prefix. Two tests now pin this contract explicitly.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| Calendar week start configurable | Recommendation only — requires settings infrastructure |
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
-| `beforeunload` flush for Supabase writes | Recommendation only — needs product decision on write semantics |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1160-line component |
-| 1 | `findBestWeek`: exclude future-dated entries when `today` param is passed | Defensive fix | `src/lib/historyStats.ts`, `src/pages/HistoryPage.tsx`, `src/lib/__tests__/historyStats.test.ts` |
-| 2 | `HistoryPage`: clamp `computeWorkoutTypeBreakdown` dateRange to `today` | Defensive fix | `src/pages/HistoryPage.tsx`, `src/lib/__tests__/historyStats.test.ts` |
-
-### Detail
-
-**1. `findBestWeek` future-date guard**
-`findBestWeek` builds its aggregation window from the min/max
-`calendarDate` seen across the plan's entries + extras. A single future-
-dated `complete` (say, from a bad CSV import to `2099-06-01`) would push
-`toDate` all the way to 2099 and let a fake future week win the
-"best week" celebration slot. Fix: add an optional `today` parameter that
-filters out `calendarDate > today` before the window is derived. When
-omitted, the pre-guard behavior is retained (backwards-compatible;
-explicit regression test). `HistoryPage` now passes `today`.
-
-**2. `HistoryPage` type-breakdown range clamp**
-`computeWorkoutTypeBreakdown` already accepted an optional `dateRange`,
-but the `HistoryPage` caller wasn't using it. A future-dated `complete`
-entry from a bad CSV import would count in the History-page type-mix
-label. Passing `{ from: '0000-01-01', to: today }` uses the existing
-(already-tested) dateRange path to exclude future dates. Two new tests
-document the future-date behavior specifically.
-
-### Items still open / recommended only
-
-Same open items as the 2026-08-19 pass — none re-classified this pass.
-
----
-
-## Additions — 2026-08-26
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `storeSync`: apply `migrateSettingsState` for `wpt_settings` cloud hydration | Defensive fix | `src/lib/storeSync.ts`, `src/lib/__tests__/storeSync.test.ts` |
-
-### Detail
-
-**1. `wpt_settings` cloud migration upgrade**
-
-Cloud data hydrated via `syncOnLogin` bypasses Zustand's `persist` middleware migration hook — the hook runs only on `localStorage` reads, not on direct `setState` calls. The `wpt_settings` entry was using `(data) => data` (identity), which meant any new settings field added after a user's last cloud push would silently be absent after login, relying on Zustand's shallow-merge defaults. This is fragile: the field exists only if the store's in-memory initialisation runs before the `setState` call. Changed to `(data) => migrateSettingsState(data, 0)`, matching the explicit approach already used for `wpt_history` (→ `migrateHistoryState`) and `wpt_mobility` (→ `migrateMobilityState`). A new test verifies that old cloud data missing `weekStartsOn` is backfilled to `0` (Sunday default).
-
-**Tests:** 1348 → 1349 (+1 new test in `storeSync.test.ts`)
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
-| Cloud sync conflict resolution | Out of scope |
-
----
-
-## Additions — 2026-08-27
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `storeSync`: apply proper migration functions for `wpt_outcomes`, `wpt_program_vars`, `wpt_exercise_history` cloud hydration | Defensive fix | `src/lib/storeSync.ts`, `src/lib/__tests__/storeSync.test.ts` |
-
-### Detail
-
-**1. `wpt_outcomes`, `wpt_program_vars`, `wpt_exercise_history` cloud migration upgrade**
-
-The Aug 26 pass fixed `wpt_settings` to use `migrateSettingsState` instead of the identity function. The same gap existed for three other stores that have exported migration functions: `migrateOutcomeState`, `migrateProgramState`, and `migrateExerciseHistoryState`. All three were wired with `(data) => data` in `storeSync.ts`'s STORES array, meaning:
-
-- `wpt_outcomes`: cloud data missing `progressionStates` would leave that field `undefined`, breaking any code that calls `getState().progressionStates[groupId]`.
-- `wpt_program_vars`: cloud data missing `vars` would leave it `undefined`, breaking `getVars` and `applyProgressionRule`.
-- `wpt_exercise_history`: cloud data missing `records` would leave it `undefined`, breaking any filter/map over the exercise record list.
-
-Fix: import and call the proper migration functions in the STORES array, matching the pattern established for `wpt_history`, `wpt_mobility`, and `wpt_settings`. Added three new tests that each simulate old cloud data missing the top-level field and verify that hydration via `syncOnLogin` backfills the default correctly.
-
-**Tests:** 1349 → 1352 (+3 new tests in `storeSync.test.ts`)
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1170-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
-| Cloud sync conflict resolution | Out of scope |
-
----
-
-## Additions — 2026-09-02
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `planStore.migratePlanState`: add optional `_fromVersion` parameter for signature consistency | Refactor | `src/store/planStore.ts` |
-| 2 | `outcomeStore.importOutcomes`: document last-writer-wins semantics vs `historyStore.importEntries` | Docs | `src/store/outcomeStore.ts` |
-| 3 | `engine.test.ts`: cover hold/regress/reset/default branches of `buildAdaptationNote` via `resolveWorkoutDisplayTarget` | Tests | `src/modules/run-adaptation/__tests__/engine.test.ts` |
-
-### Detail
-
-**1. `migratePlanState` signature consistency**
-All other store migration functions follow the signature `(persisted: unknown, fromVersion: number): StoreState`. `migratePlanState` was the only exception, accepting only `persisted`. This discrepancy made the function stand out from the pattern without reason. Added `_fromVersion?: number` (optional, intentionally unused) to align with the established convention. Existing callers are unaffected.
-
-**2. `importOutcomes` last-writer-wins documentation**
-`importOutcomes` silently overwrites existing outcomes in array order, while `historyStore.importEntries` explicitly deduplicates by `createdAt` (newest wins). This inconsistency was undocumented. Added an inline comment in `importOutcomes` explaining that outcomes are keyed by instanceId (the identity IS the key), and that a reliable ordering timestamp is unavailable for outcomes — making last-writer-wins the pragmatic choice. Cross-references `historyStore.importEntries` so the difference is discoverable.
-
-**3. `resolveWorkoutDisplayTarget` adaptation note branch coverage**
-`buildAdaptationNote`'s 'hold', 'regress', 'reset', and default switch branches were tested via `explanation.test.ts` but not directly through the `resolveWorkoutDisplayTarget` path in `engine.test.ts`. Added 4 tests that exercise each remaining branch via the selector, including a cast-to-`never` unrecognised `lastResult` string to pin the default-branch fallback. Test count: 1352 → 1356 (+4).
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1180-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
-| `beforeunload` async Supabase flush | Recommendation only — `navigator.sendBeacon` would be more reliable, but format compatibility is unverified |
-| Cloud sync conflict resolution | Out of scope |
-
-
-## Additions — 2026-09-06
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `buildLastSessionSummary`: replace equality-based PB check with strict-greater-than `prFlagsMap` | Bug fix | `src/lib/sessionSummary.ts`, `src/pages/TodayPage.tsx`, `src/lib/__tests__/sessionSummary.test.ts` |
-
-### Detail
-
-**1. `buildLastSessionSummary` PB detection bug fix**
-The "Last session" hint on TodayPage pending cards showed "· PB" whenever the displayed session's heaviest load equalled the all-time maximum — an equality check that marked every repeat performance at the same weight as a personal best. The fix replaces `maxLoadByExercise[ex.exercise] === s.actualLoad` with `prFlagsMap.get(outcome.workoutInstanceId)?.hasLoadPR`, using the existing `buildPRFlagsMap` function which applies strict-greater-than against records strictly before the session's date. Repeated loads no longer show the PB badge; only genuine first-time records do.
-
-Five existing PB tests in `sessionSummary.test.ts` were rewritten to use `ExerciseSessionRecord` fixtures with `buildPRFlagsMap`, explicitly verifying both the positive case (prior record < new load → PB shown) and the negative case (prior record = new load → no PB).
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
-| `beforeunload` async Supabase flush | Recommendation only — `navigator.sendBeacon` would be more reliable, but format compatibility is unverified |
-| Cloud sync conflict resolution | Out of scope |
-| Integration test for TodayPage "Last session" PB hint | New recommendation — unit coverage exists; full rendering path untested |
-
-
-
-## Additions — 2026-09-08
-
-### Changes implemented this pass
-
-No code changes. Audit confirmed the codebase remains clean.
-
-### Scope reviewed
-
-- `src/pages/HistoryPage.tsx` (lines 100–280) — `computeWeeklyBreakdown`, `findBestWeek`, `computeWorkoutTypeBreakdown`, `buildPRFlagsMap` all called with correct guards; `typeCountMapFallback` fallback path for "all plans" view verified correct.
-- `src/pages/TodayPage.tsx` (lines 1–120) — `findPreviousWeightsOutcome`, `findPreviousSessionForPlanDay`, `buildLastSessionSummary` all invoked correctly; `primaryPlanDayIndex` guard confirmed.
-- `src/lib/previousSetsHelper.ts` — `findPreviousSetsByExercise`: excludes current-date outcomes and optional `excludeInstanceId`; sorted by `outcomeSortKey` (most-recent first). Tests confirmed in `previousSetsHelper.test.ts`.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers rely on delete-on-collision behavior |
-| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
-| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
-
----
-
-## Additions — 2026-09-07
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `buildLastSessionSummary`: add tests for zero-distance run/swim bad-data edge cases | Test coverage | `src/lib/__tests__/sessionSummary.test.ts` |
-
-### Detail
-
-**1. Zero-distance edge case tests in `buildLastSessionSummary`**
-Audit revealed that `buildLastSessionSummary` displays "0 mi" when `actualDistanceMiles === 0` and "0 m" when `actualDistanceMeters === 0` — values that are treated as present (not null) by the existing `!= null` guard but represent bad data. The pace derivation sub-expressions already guard against division-by-zero via `distance > 0`, so no pace appears alongside the zero distance string. No existing test pinned this behavior.
-
-Added two tests:
-- Run: `actualDistanceMiles=0, actualDurationMin=30` → `"Last: 0 mi · 30 min"` (no pace, since derivation guards > 0)
-- Swim: `actualDistanceMeters=0, actualDurationMin=20` → `"Last: 0 m · 20 min"` (same guard)
-
-These lock in the current behavior and will catch any accidental regression or future intentional change (e.g. filtering zero distances). Test count: 1362 → 1364 (+2).
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — callers in CalendarPage.tsx:240, HistoryPage.tsx:308,381, TodayPage.tsx:503; collision-delete is intentional |
-| `beforeunload` async Supabase flush | Recommendation only — `navigator.sendBeacon` would be more reliable, but format compatibility is unverified |
-| Cloud sync conflict resolution | Out of scope |
-| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage added for run/swim zero-distance paths; full rendering path still untested |
-
----
-
-## Additions — 2026-09-09
-
-### Changes implemented this pass
-
-No code changes. Audit confirmed the codebase remains clean and all prior gaps are resolved.
-
-### Scope reviewed
-
-- `src/store/outcomeStore.ts` — `logOutcomeWithProgression` error-resilience confirmed: all three progression paths (recommendation build, run progression engine, YAML program rules) are individually wrapped in `try/catch` so a bug in any path cannot prevent the outcome from being saved. `importOutcomes` last-writer-wins semantics documented (2026-09-02 pass). `migrateOutcomeState` backfills `outcomes: {}` and `progressionStates: {}` correctly.
-- `src/modules/workout-outcomes/progression.ts` — `buildProgressionRecommendation` correctly handles weights/run/swim slot types. `allSetsHitTarget` (single-parameter refactor, 2026-08-15) correctly returns false for non-completed sets and checks `actualReps >= targetReps` for numeric targets. String and absent targets pass on completion alone (correct for AMRAP and rep-range targets).
-- `src/modules/workout-outcomes/progressionMode.ts` — `deriveProgressionMode` maps `double`/`dynamic_double` → `'double'`, `triple` → `'volume'`, `step_loading` → `'maintenance'`, fallback → `'single'`. Returns `undefined` when neither `progressionType` nor `hasProgressRule` is set (correct opt-in behavior).
-- `src/modules/run-adaptation/engine.ts` — `evaluateRunProgression` and `applyRunProgressionDecision` fully tested including regress/none/null paths (2026-09-05). Logic correctly resolves target from progression state → runConfig → null. 95% threshold for "hit target" is appropriate (allows minor GPS drift). Baseline floor on regress prevents regressing below the original template distance.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
-| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
-| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
-
----
-
-## 2026-09-11 Additions
-
-### Audit pass — no code changes
-
-### Scope reviewed
-
-- `src/store/historyStore.ts` — Entry deduplication semantics confirmed: `addEntry` deduplicates by `(planId, calendarDate)` (newest wins); `importEntries` uses `deduplicateByDate` (createdAt-based, last-write wins within a batch); `importExtraEntries` deduplicates by `id` (correct — multiple extras can share a date); `markDaysAsOff` scoped to `planId`; `updateEntryDate` delete-on-collision intentional; `migrateHistoryState` v0→v1 backfill correct.
-- `src/store/outcomeStore.ts` — Full re-review. `logOutcomeWithProgression` per-path `try/catch` confirmed. `syncExerciseHistory` cross-store `getState()` pattern correct. `moveOutcome` atomic key swap + cascade correct. `importOutcomes` last-writer-wins semantics correct. `clearPlanOutcomes` filters via `parseWorkoutInstanceId` (handles both regular and extra IDs). `migrateOutcomeState` backfills both `outcomes` and `progressionStates`.
-- `src/store/programStore.ts` — `initVars` idempotent (only sets missing keys). `applyProgressionRule` wraps eval paths in `try/catch`, logs with full context, returns `{}` on error. `migrateProgramState` backfills `vars: {}`.
-- `src/store/__tests__/planDeleteCleanup.test.ts` — Integration cascade-delete test confirmed: covers all six cascade steps (clearPlanHistory, clearPlanOutcomes, clearPlanVars, clearByPlanId, removeProgressionStates, deletePlan), plan-isolation across all five stores, activePlanId null-out, extra-workout cascade, no-op cases.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
-| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
-| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
-
----
-
-## 2026-09-13 Additions
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `computePersonalRecords`: add optional `today` parameter to exclude future-dated records | Defensive fix | `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts` |
-| 2 | `estimateRunDurationMin`: pin the segment duration-unrecognized → distance fallthrough behavior | Tests | `src/lib/__tests__/estimateRunDuration.test.ts` |
-
-### Detail
-
-**1. `computePersonalRecords` future-date guard**
-
-`computePersonalRecords` did not guard against future-dated exercise records. A bad CSV import with a calendarDate > today would:
-- Inflate `sessionCount` (session counter in the PR table)
-- Show a future date as the PR date (e.g., `maxLoadDate: '2026-12-31'`)
-
-This is the same class of bug fixed in prior passes for `computeHistoryStats` (pass 2026-08-14), `findBestWeek` (pass 2026-08-24), and `findPreviousSessionForPlanDay` (pass 2026-08-19).
-
-Fix: add an optional `today?: string` parameter. When provided, records with `calendarDate > today` are excluded before any further filtering or aggregation. When omitted (the existing call sites), behavior is unchanged (backward-compatible). Four new tests cover: future-date exclusion, backward-compatibility without `today`, exclusion combined with planId filter, and all-future records returning an empty array.
-
-**2. `estimateRunDurationMin` duration-unrecognized fallthrough**
-
-When a segment has a `duration` field that doesn't match the `m`/`min` pattern (e.g., `"30km"`), the code correctly falls through without `continue` and evaluates the same segment's `distance` field. This behavior was undocumented in tests: the only test for unrecognized duration (`"30km"`) had no `distance` field, so it tested only the fallback-to-20 path and not the combined case.
-
-Added one test that passes a segment with both `duration: '30km'` and `distance: '2'`, confirming the segment contributes 22 minutes (2 mi × 11 min/mi) rather than 20 (the global fallback). This pins an important control-flow behavior that could be silently broken by adding a `continue` after the duration-regex non-match.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
-| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
-| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
-
----
-
-## 2026-09-14 Additions
-
-### Changes implemented this pass
-
-| # | Item | Type | Files |
-|---|---|---|---|
-| 1 | `findPreviousSetsByExercise`: fix future-date gap (same class as `findPreviousSessionForPlanDay`) | Defensive fix | `src/lib/previousSetsHelper.ts`, `src/lib/__tests__/previousSetsHelper.test.ts` |
-| 2 | `HistoryPage`: activate `computePersonalRecords` future-date guard by passing `today` argument | Bug fix | `src/pages/HistoryPage.tsx` |
-
-### Detail
-
-**1. `findPreviousSetsByExercise` future-date guard**
-
-The function pre-fills the OutcomeModal's set weights/reps from the most recent prior session. It excluded today's outcomes via `rest.startsWith(currentDate)`, but futures dates were not excluded. Since results are sorted newest-first, a future-dated outcome (e.g. from a bad CSV import with `calendarDate: '2026-12-31'`) would appear first and its sets would be used for pre-fill — silently feeding wrong weights/reps into every OutcomeModal opened for that exercise.
-
-This is the same class of bug fixed in prior passes for `computeHistoryStats` (2026-08-14), `findBestWeek` (2026-08-24), `findPreviousSessionForPlanDay` (2026-08-19), and `computePersonalRecords` (2026-09-13).
-
-Fix: changed `rest.startsWith(currentDate)` to `rest.slice(0, 10) >= currentDate`. The new condition is a strict superset: it still excludes today's outcomes and also excludes any future-dated ones. Extracting `slice(0, 10)` rather than relying on `startsWith` makes the date comparison explicit and correct for both rotation IDs (`YYYY-MM-DD`) and extra IDs (`YYYY-MM-DD_extra_extraId`). Two new tests added: one for future-dated rotation outcomes, one for future-dated extra workout outcomes.
-
-**2. `HistoryPage` `computePersonalRecords` call site**
-
-The 2026-09-13 pass added an optional `today?: string` parameter to `computePersonalRecords`, but the carry-forward recommendation to update call sites was not implemented. The `HistoryPage` `useMemo` call was missing `today` as the third argument, so the future-date guard was never activated in the UI. Also added `today` to the `useMemo` dependency array so the computed value refreshes at midnight.
-
-### Items still open / recommended only
-
-| Item | Status |
-|---|---|
-| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
-| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
-| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
-| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+- Fix #1 (0-load guard) first: trivially safe, adds consistency, adds tests.
+- Fix #2 (Undo multi-advance) second: narrow change to one code path, non-breaking.
+- Feature #3 (weekly summary) last: all infrastructure already exists, making this a low-risk addition.
