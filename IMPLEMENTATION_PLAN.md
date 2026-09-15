@@ -593,3 +593,37 @@ Added one test that passes a segment with both `duration: '30km'` and `distance:
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
 | `beforeunload` async Supabase flush | Recommendation only — product decision needed |
 | Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
+## 2026-09-14 Additions
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `findPreviousSetsByExercise`: fix future-date gap (same class as `findPreviousSessionForPlanDay`) | Defensive fix | `src/lib/previousSetsHelper.ts`, `src/lib/__tests__/previousSetsHelper.test.ts` |
+| 2 | `HistoryPage`: activate `computePersonalRecords` future-date guard by passing `today` argument | Bug fix | `src/pages/HistoryPage.tsx` |
+
+### Detail
+
+**1. `findPreviousSetsByExercise` future-date guard**
+
+The function pre-fills the OutcomeModal's set weights/reps from the most recent prior session. It excluded today's outcomes via `rest.startsWith(currentDate)`, but futures dates were not excluded. Since results are sorted newest-first, a future-dated outcome (e.g. from a bad CSV import with `calendarDate: '2026-12-31'`) would appear first and its sets would be used for pre-fill — silently feeding wrong weights/reps into every OutcomeModal opened for that exercise.
+
+This is the same class of bug fixed in prior passes for `computeHistoryStats` (2026-08-14), `findBestWeek` (2026-08-24), `findPreviousSessionForPlanDay` (2026-08-19), and `computePersonalRecords` (2026-09-13).
+
+Fix: changed `rest.startsWith(currentDate)` to `rest.slice(0, 10) >= currentDate`. The new condition is a strict superset: it still excludes today's outcomes and also excludes any future-dated ones. Extracting `slice(0, 10)` rather than relying on `startsWith` makes the date comparison explicit and correct for both rotation IDs (`YYYY-MM-DD`) and extra IDs (`YYYY-MM-DD_extra_extraId`). Two new tests added: one for future-dated rotation outcomes, one for future-dated extra workout outcomes.
+
+**2. `HistoryPage` `computePersonalRecords` call site**
+
+The 2026-09-13 pass added an optional `today?: string` parameter to `computePersonalRecords`, but the carry-forward recommendation to update call sites was not implemented. The `HistoryPage` `useMemo` call was missing `today` as the third argument, so the future-date guard was never activated in the UI. Also added `today` to the `useMemo` dependency array so the computed value refreshes at midnight.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |

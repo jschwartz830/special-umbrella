@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-09-14
+
+### `HistoryPage` future-date guard activation + `findPreviousSetsByExercise` future-date fix
+
+**Summary:** Two targeted improvements:
+
+1. **`HistoryPage` — activate `computePersonalRecords` future-date guard** — the 2026-09-13 pass added an optional `today?` parameter to `computePersonalRecords` but no callers were updated. `HistoryPage` now passes `today` as the third argument, activating the guard so future-dated exercise records (from a bad CSV import) are excluded from the Personal Records table.
+
+2. **`findPreviousSetsByExercise` — exclude future-dated outcomes** — the function used `rest.startsWith(currentDate)` to exclude today's outcomes, but dates strictly after `currentDate` passed through. Since results are sorted newest-first, a future-dated outcome would appear as the "previous sets" to pre-fill in the OutcomeModal. Changed to `rest.slice(0, 10) >= currentDate`, which excludes both today's and future-dated outcomes — matching the semantics of `findPreviousSessionForPlanDay` (fixed in the 2026-08-19 pass).
+
+**Files changed:**
+- `src/pages/HistoryPage.tsx` — pass `today` to `computePersonalRecords`; add `today` to `useMemo` deps
+- `src/lib/previousSetsHelper.ts` — `rest.startsWith(currentDate)` → `rest.slice(0, 10) >= currentDate`
+- `src/lib/__tests__/previousSetsHelper.test.ts` — 2 new tests (future-dated rotation + extra outlet)
+- `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` (documentation)
+
+**Tests:** 1369 → 1371 (+2)
+
+**Risk:** Minimal. The `HistoryPage` change is a one-liner that activates an already-tested guard. The `previousSetsHelper` change tightens the exclusion predicate; the new condition is strictly a superset of the old one (still excludes `currentDate` outcomes, additionally excludes future ones). Both changes only affect users who have future-dated records from a bad CSV import.
+
+---
+
 ## 2026-09-13
 
 ### `computePersonalRecords` future-date guard + `estimateRunDurationMin` fallthrough test
