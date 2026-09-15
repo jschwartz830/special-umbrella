@@ -814,7 +814,7 @@ export function TodayPage() {
             onClick={() => {
               removeEntry(plan.id, today)
               removeOutcome(makeWorkoutInstanceId(plan.id, today))
-              let removedDoubleDay = false
+              let advancedRotationCount = 0
               for (const ex of extraEntries) {
                 if (
                   ex.planId === plan.id &&
@@ -826,11 +826,13 @@ export function TodayPage() {
                   // and its outcome key to a different date.
                   removeOutcome(makeExtraWorkoutInstanceId(plan.id, ex.calendarDate, ex.id))
                   removeExtraEntry(ex.id)
-                  if (ex.advancedRotation ?? (ex.source === 'double_day')) removedDoubleDay = true
+                  if (ex.advancedRotation ?? (ex.source === 'double_day')) advancedRotationCount++
                 }
               }
               sessionExtrasRef.current = new Set()
-              if (removedDoubleDay) removeLastOverrideByType(plan.id, 'advance')
+              for (let i = 0; i < advancedRotationCount; i++) {
+                removeLastOverrideByType(plan.id, 'advance')
+              }
               setNewPRs(null)
             }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 text-xs font-medium transition-colors"
