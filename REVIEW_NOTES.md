@@ -1,75 +1,65 @@
-# Review Notes — Overnight Audit Pass
-**Date:** 2026-09-14
+# Review Notes — 2026-09-15 overnight session
+
+## What was done
+
+Three independent changes were made on branch `claude/admiring-noether-2d6ce2`.
+All 1374 tests pass (`node_modules/.bin/vitest run`).
 
 ---
 
-## Executive Summary
+## Bug fixes
 
-1. **What changed:** Two defensive fixes closing the same class of future-date bug across different call sites.
-2. **Highest confidence:** Both changes are minimal, targeted, and covered by new tests. No architectural risk.
-3. **Risky:** Nothing risky — both are one-liner predicate changes that strictly tighten existing exclusion logic.
-4. **Review first:** The `findPreviousSetsByExercise` change (previousSetsHelper.ts:30) — verify `rest.slice(0, 10) >= currentDate` handles all ID formats correctly (rotation + extra), which the two new tests confirm.
+### Bug #1 — `computePersonalRecords` 0-load guard (Low severity)
 
-All 1371 tests pass (up from 1369 — 2 new tests added).
+`computePersonalRecords` lacked the `> 0` guard that `buildPRFlagsMap`
+already applies.  A bodyweight session (`maxLoad = 0`) could produce a
+"0 lb" entry in the PR table with a `maxLoadDate` set.
 
----
+Fix: extract `recordLoad = r.maxLoad !== null && r.maxLoad > 0 ? r.maxLoad : null`
+(same pattern for `recordReps`) before the upsert logic.  Three new unit tests
+added; all 1374 pass.
 
-## Audit Scope
+### Bug #2 — Undo multi-advance override (Medium severity)
 
-Modules reviewed this pass:
-- `src/lib/previousSetsHelper.ts` — `findPreviousSetsByExercise`: found future-date gap
-- `src/pages/HistoryPage.tsx` — `computePersonalRecords` call site: found missing `today` argument
-- `src/lib/storeSync.ts` — confirmed `beforeunload` handler is present; `pushStore` calls are fire-and-forget (async without await); still a trade-off but no new issue
-- `src/engine/calendarProjection.ts` — `buildMonthGrid`: confirmed correct; `weekStartsOn` parameter wired correctly from settingsStore
-- `src/lib/outcomeSortKey.ts`, `src/lib/planDayUtils.ts` — both simple and correct
-- `src/lib/workoutInstanceId.ts`, `src/store/exerciseHistoryStore.ts` — fully tested; no new issues
+In `TodayPage.tsx` the Undo handler used `removedDoubleDay: boolean`, so
+calling two double-day advances then pressing Undo would only remove one
+`advance` override, advancing the rotation one extra step.
 
----
-
-## Findings
-
-### Fixed this pass
-
-**1. `findPreviousSetsByExercise` missing future-date guard**
-
-The function pre-fills the OutcomeModal's set weights/reps from the most recent prior session. It excluded today's outcomes via `rest.startsWith(currentDate)`, but futures dates were not excluded. Since results are sorted newest-first, a future-dated outcome (e.g. from a bad CSV import with `calendarDate: '2026-12-31'`) would appear first and its sets would be used for pre-fill.
-
-This is the same class of bug fixed in the 2026-08-19 pass for `findPreviousSessionForPlanDay` (changed `!= currentDate` to `< currentDate`).
-
-**Fix:** Changed `rest.startsWith(currentDate)` to `rest.slice(0, 10) >= currentDate`. The new condition is a strict superset: it still excludes today's outcomes and also excludes any future-dated ones. Extracting `slice(0, 10)` rather than relying on `startsWith` makes the date comparison explicit and correct for both rotation IDs (`YYYY-MM-DD`) and extra IDs (`YYYY-MM-DD_extra_extraId`).
-
-**2. `HistoryPage` — `computePersonalRecords` missing `today` argument**
-
-The 2026-09-13 pass added an optional `today?: string` parameter to `computePersonalRecords` to guard against future-dated exercise records, but the carry-forward recommendation to update call sites was not implemented. Passing `today` to the `HistoryPage` call activates the guard. Also added `today` to the `useMemo` dependency array so the computed value refreshes at midnight.
-
-### Confirmed good
-
-- All prior fixes remain in place and passing.
-- `storeSync.ts` `beforeunload` handler correctly calls `pushStore` for each pending store; the async-without-await trade-off is unchanged and outside the scope of this pass.
-- `buildMonthGrid` and `calendarProjection` — clean, no issues.
+Fix: changed to `advancedRotationCount: number`; `removeLastOverrideByType`
+is called once per count.  No new automated tests (the Undo flow is
+component-level and hard to unit-test), but the fix is a mechanical
+single-variable type change with no branch logic.
 
 ---
 
-## Recommendations (carry-forward)
+## Feature
 
-| Item | Priority | Notes |
-|---|---|---|
-| `TodayPage` state extraction hook | Low | ~1200-line component; high refactor risk, deferred indefinitely |
-| `updateEntryDate` data-loss on collision | Low | Intentional — CalendarPage, HistoryPage, TodayPage callers rely on delete-on-collision behavior |
-| `beforeunload` Supabase async flush | Low | Fire-and-forget `pushStore` may not complete before page teardown; `navigator.sendBeacon` alternative requires format compatibility verification |
-| Integration test for TodayPage "Last session" PB hint | Low | Unit coverage exists; rendering path still untested |
+### Feature #3 — Last-week recap banner
+
+A read-only Monday banner showing last week's completed / bonus / skipped /
+rest totals for the active plan.
+
+Reviewer checklist:
+- [ ] `useLastWeekSummary` is called unconditionally (above the
+  `if (!plan || !todayResolved)` early return) — Rules of Hooks satisfied.
+- [ ] Returns `null` on non-Mondays — no accidental renders midweek.
+- [ ] Dismissal key includes `weekStart` — banner resets each week without
+  any manual reset logic.
+- [ ] No new state mutations — purely derived from existing store data.
+- [ ] `TodayBanners` prop is typed via `LastWeekSummary | null`; the banner
+  renders only when non-null and `!isDismissed`.
 
 ---
 
-## Test Results
+## Items deferred (not implemented)
 
-| Suite | Before | After | Delta |
-|---|---|---|---|
-| All suites | 1369 | 1371 | +2 |
-
-All 1371 tests pass across 35 files. 2 new tests added this pass:
-
-### `src/lib/__tests__/previousSetsHelper.test.ts` (+2)
-
-- `excludes future-dated rotation outcomes (same class of bug as findPreviousSessionForPlanDay)`
-- `excludes future-dated extra workout outcomes`
+- **Refactor TodayPage session state** (Issue #3 / Code smell) — medium
+  risk, out of scope for an overnight pass.
+- **Align `computeCurrentStreakDates` parameter order** (Issue #4) —
+  no current bug; deferred.
+- **`isNaN` guard in `estimateRunDurationMin`** (Issue #5) — the existing
+  `parseFloat → NaN → skip` fallback is correct; documentation-only
+  improvement deferred.
+- **Mobility session summary path** (Test gap #8) — not addressed;
+  would need deeper exploration of `buildLastSessionSummary` swim/mobility
+  branches.

@@ -1,51 +1,31 @@
-# Test Results — 2026-09-14
-
-All tests passing.
-
-| Suite | Count |
-|---|---|
-| All test files | 35 |
-| Total tests | 1371 |
-| Passed | 1371 |
-| Failed | 0 |
-
-## New tests added this pass (+2)
-
-### `src/lib/__tests__/previousSetsHelper.test.ts` (+2)
-
-- `excludes future-dated rotation outcomes (same class of bug as findPreviousSessionForPlanDay)`
-- `excludes future-dated extra workout outcomes`
-
----
-
-# Test Results — 2026-09-13
-
-All tests passing.
-
-| Suite | Count |
-|---|---|
-| All test files | 35 |
-| Total tests | 1369 |
-| Passed | 1369 |
-| Failed | 0 |
-
-## New tests added this pass (+5)
-
-### `src/lib/__tests__/historyStats.test.ts` (+4)
-
-- `computePersonalRecords > excludes future-dated records when today is provided`
-- `computePersonalRecords > includes all records when today is not provided (backward-compatible)`
-- `computePersonalRecords > excludes future-dated records even when planId filter is applied`
-- `computePersonalRecords > returns empty array when all records are in the future`
-
-### `src/lib/__tests__/estimateRunDuration.test.ts` (+1)
-
-- `estimateRunDurationMin > falls through to distance when duration is present but unrecognized`
+# Test Results — 2026-09-15 overnight session
 
 ## Command
 
 ```
-npx vitest run
+node_modules/.bin/vitest run
 ```
 
-Duration: ~3.5s
+## Result
+
+```
+Test Files  35 passed (35)
+     Tests  1374 passed (1374)
+  Start at  04:19:39
+  Duration  3.27s
+```
+
+## Baseline
+
+The branch starts from 35 test files / 1371 tests (all green, confirmed
+before making any changes).
+
+## Delta
+
++3 tests added in `src/lib/__tests__/historyStats.test.ts` under
+`describe('computePersonalRecords')`:
+1. `does not surface 0-load session as a PR (bodyweight / unrecorded)`
+2. `does not surface 0-reps session as a PR`
+3. `correctly picks the real-load session when mixed with a 0-load session`
+
+No tests were removed or modified.  All 1374 tests pass on the final head commit.
