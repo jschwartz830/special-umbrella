@@ -214,11 +214,10 @@ export const useOutcomeStore = create<OutcomeState>()(
       },
 
       clearPlanOutcomes(planId) {
+        const prefix = planId + '_'
         set(s => ({
           outcomes: Object.fromEntries(
-            Object.entries(s.outcomes).filter(
-              ([k]) => parseWorkoutInstanceId(k)?.planId !== planId,
-            ),
+            Object.entries(s.outcomes).filter(([k]) => !k.startsWith(prefix)),
           ),
         }))
         useExerciseHistoryStore.getState().clearByPlanId(planId)

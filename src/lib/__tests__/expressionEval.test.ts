@@ -619,6 +619,14 @@ describe('resolveLoad', () => {
   it('strips case-insensitive "LB" suffix', () => {
     expect(resolveLoad('225LB', ctx())).toBe(225)
   })
+
+  it('strips "lbs" suffix (plural form)', () => {
+    expect(resolveLoad('135lbs', ctx())).toBe(135)
+  })
+
+  it('strips "LBS" suffix (uppercase plural form)', () => {
+    expect(resolveLoad('225LBS', ctx())).toBe(225)
+  })
 })
 
 // ── resolveQuantityString ──────────────────────────────────────────────────────

@@ -1,75 +1,110 @@
-# Review Notes — Overnight Audit Pass
-**Date:** 2026-09-14
+# Review Notes — Overnight Audit Run
+_Date: 2026-09-17_
 
 ---
 
 ## Executive Summary
 
-1. **What changed:** Two defensive fixes closing the same class of future-date bug across different call sites.
-2. **Highest confidence:** Both changes are minimal, targeted, and covered by new tests. No architectural risk.
-3. **Risky:** Nothing risky — both are one-liner predicate changes that strictly tighten existing exclusion logic.
-4. **Review first:** The `findPreviousSetsByExercise` change (previousSetsHelper.ts:30) — verify `rest.slice(0, 10) >= currentDate` handles all ID formats correctly (rotation + extra), which the two new tests confirm.
+1. **What changed:** 7 commits — 2 bug fixes (visible UI bug, missing route), 2 performance improvements, 1 code quality cleanup, 1 correctness fix (expressionEval), 1 combined commit with defensive guards + tests + CSV improvement. 6 new tests added (1377 total, all pass).
 
-All 1371 tests pass (up from 1369 — 2 new tests added).
+2. **Highest confidence:** CalendarPage day-header alignment fix. Clear visual bug; the grid cells were correct, the headers were not. Zero logic risk.
 
----
+3. **Riskiest change implemented:** expressionEval `lbs` regex change — behavior change for expressions containing `lbs` suffix. In practice, the tokenizer already extracted the number correctly for simple cases, so the only real behavior change is fixing compound expressions like `0.75 * squatlbs`. Low risk in practice.
 
-## Audit Scope
-
-Modules reviewed this pass:
-- `src/lib/previousSetsHelper.ts` — `findPreviousSetsByExercise`: found future-date gap
-- `src/pages/HistoryPage.tsx` — `computePersonalRecords` call site: found missing `today` argument
-- `src/lib/storeSync.ts` — confirmed `beforeunload` handler is present; `pushStore` calls are fire-and-forget (async without await); still a trade-off but no new issue
-- `src/engine/calendarProjection.ts` — `buildMonthGrid`: confirmed correct; `weekStartsOn` parameter wired correctly from settingsStore
-- `src/lib/outcomeSortKey.ts`, `src/lib/planDayUtils.ts` — both simple and correct
-- `src/lib/workoutInstanceId.ts`, `src/store/exerciseHistoryStore.ts` — fully tested; no new issues
+4. **Review first:** The CalendarPage alignment fix (commit a80004e) — it's the only change that affects visible UI behavior and is the most user-facing.
 
 ---
 
-## Findings
+## Biggest Issues Found
 
-### Fixed this pass
+### Fixed this run
+- **CalendarPage header misaligned with weekStartsOn** — Headers showed wrong day names for Monday-first users. Visible bug on every calendar view.
+- **No 404 catch-all route** — Unknown URLs silently rendered empty pages.
+- **expressionEval `lbs` regex** — Compound load expressions with `lbs` suffix silently looked up wrong variables.
+- **Pace functions divide-by-zero** — Zero distance produced Infinity; could corrupt stored outcome data via future callers.
 
-**1. `findPreviousSetsByExercise` missing future-date guard**
+### Documented, not fixed
+- **CalendarPage selectedIdx stale** (CalendarPage.tsx:604) — `useState` initializer only runs once; if `DayDetailModal` reopens for the same date with a different `rd.planDayIndex` (e.g., after an override changes the displayed day), `selectedIdx` stays stale and the user logs the wrong rotation day. Medium risk, requires understanding the full modal lifecycle before touching.
 
-The function pre-fills the OutcomeModal's set weights/reps from the most recent prior session. It excluded today's outcomes via `rest.startsWith(currentDate)`, but futures dates were not excluded. Since results are sorted newest-first, a future-dated outcome (e.g. from a bad CSV import with `calendarDate: '2026-12-31'`) would appear first and its sets would be used for pre-fill.
+- **TodayPage rotation advance before outcome confirmed** (TodayPage.tsx:619–621) — `actions.advance()` fires on "complete" tap before the outcome modal is confirmed. Dismissing the outcome modal leaves the rotation advanced with no automatic rollback. The Undo button exists as recovery. This is a product decision (advance immediately so the user sees the right next workout), not a clear-cut bug.
 
-This is the same class of bug fixed in the 2026-08-19 pass for `findPreviousSessionForPlanDay` (changed `!= currentDate` to `< currentDate`).
+- **storeSync beforeunload data loss** (storeSync.ts:165) — `pushStore` is async; the browser doesn't wait for inflight promises during page teardown. Changes made in the last 1.5s before tab close may be lost silently. The correct fix uses a `keepalive` fetch, which requires bypassing the Supabase JS client for that one call. Medium-high architectural change.
 
-**Fix:** Changed `rest.startsWith(currentDate)` to `rest.slice(0, 10) >= currentDate`. The new condition is a strict superset: it still excludes today's outcomes and also excludes any future-dated ones. Extracting `slice(0, 10)` rather than relying on `startsWith` makes the date comparison explicit and correct for both rotation IDs (`YYYY-MM-DD`) and extra IDs (`YYYY-MM-DD_extra_extraId`).
-
-**2. `HistoryPage` — `computePersonalRecords` missing `today` argument**
-
-The 2026-09-13 pass added an optional `today?: string` parameter to `computePersonalRecords` to guard against future-dated exercise records, but the carry-forward recommendation to update call sites was not implemented. Passing `today` to the `HistoryPage` call activates the guard. Also added `today` to the `useMemo` dependency array so the computed value refreshes at midnight.
-
-### Confirmed good
-
-- All prior fixes remain in place and passing.
-- `storeSync.ts` `beforeunload` handler correctly calls `pushStore` for each pending store; the async-without-await trade-off is unchanged and outside the scope of this pass.
-- `buildMonthGrid` and `calendarProjection` — clean, no issues.
+- **removeRetroJumpForDate UTC date slice** (historyStore.ts:191) — Uses `.slice(0,10)` on `appliedAt` assuming a local-time timestamp format, but `addOverride` stores UTC ISO by default. Near midnight in UTC-negative zones, a real-time `jump` override could fail to match its intended removal. Very hard to trigger in practice; well-documented in the codebase.
 
 ---
 
-## Recommendations (carry-forward)
+## Improvements Completed
 
-| Item | Priority | Notes |
+| # | Change | Type |
 |---|---|---|
-| `TodayPage` state extraction hook | Low | ~1200-line component; high refactor risk, deferred indefinitely |
-| `updateEntryDate` data-loss on collision | Low | Intentional — CalendarPage, HistoryPage, TodayPage callers rely on delete-on-collision behavior |
-| `beforeunload` Supabase async flush | Low | Fire-and-forget `pushStore` may not complete before page teardown; `navigator.sendBeacon` alternative requires format compatibility verification |
-| Integration test for TodayPage "Last session" PB hint | Low | Unit coverage exists; rendering path still untested |
+| 1 | CalendarPage DAYS header aligned with weekStartsOn | Bug fix |
+| 2 | App.tsx: 404 catch-all redirect to /today | Bug fix |
+| 3 | calendarProjection: removed dead code + mod re-export | Cleanup |
+| 4 | historyStore: removeLastOverrideByType O(n log n) → O(n) | Performance |
+| 5 | outcomeStore: clearPlanOutcomes prefix check | Performance |
+| 6 | expressionEval: /lbs?$/i in resolveLoad | Bug fix |
+| 7 | types.ts: zero-distance guard in pace functions | Defensive fix |
+| 8 | csv.ts: warning for malformed planStartDate | UX improvement |
+| 9 | 6 new regression tests | Test coverage |
 
 ---
 
-## Test Results
+## No Medium-Complexity Feature This Run
 
-| Suite | Before | After | Delta |
-|---|---|---|---|
-| All suites | 1369 | 1371 | +2 |
+The audit surfaced enough high-priority fixes that feature work was deferred. The codebase is stable and well-tested, but the CalendarPage state machine (selectedIdx, modal lifecycle, retroactive jump cleanup) has several subtle issues that deserve attention before adding new surface area.
 
-All 1371 tests pass across 35 files. 2 new tests added this pass:
+**Recommended feature for next run:** A persistent "session notes" display on TodayPage. The `WorkoutOutcome.notes` field already exists and is editable, but the last session's notes are not surfaced in the "Last session" hint on TodayPage. This would be a narrow addition to `buildLastSessionSummary` and `TodayPage`.
 
-### `src/lib/__tests__/previousSetsHelper.test.ts` (+2)
+---
 
-- `excludes future-dated rotation outcomes (same class of bug as findPreviousSessionForPlanDay)`
-- `excludes future-dated extra workout outcomes`
+## Definitely Keep
+
+- All 7 commits — each is small, well-scoped, and passes the full test suite.
+
+## Probably Keep but Tweak
+
+- Nothing this run.
+
+## Do Not Keep
+
+- Nothing this run.
+
+## Recommendations Only (Not Implemented)
+
+1. **CalendarPage selectedIdx stale** — Fix the `DayDetailModal`'s `selectedIdx` initialization. Rather than `useState(planDayIndex)`, use a `key` prop on the modal component tied to the calendar date (or a combination of `date + planDayIndex`) so React re-mounts it with fresh state when it opens for a different context. This is a one-line change but requires confirming the modal's animation behavior when re-mounted.
+
+2. **applyOverridesForDate pre-compute** — Before the main date loop in `getResolvedDaysRange`/`computeCurrentDayIndex`, build a `Map<string, OverrideEntry[]>` from local date → overrides. The `format(new Date(ov.appliedAt), 'yyyy-MM-dd')` conversion currently runs inside the inner loop; pre-computing it eliminates ~N × overrides Date constructions per render.
+
+3. **storeSync keepalive** — Replace the `beforeunload` async push with a `fetch(..., { keepalive: true })` call to the Supabase REST endpoint directly. The Supabase JS client does not expose a `keepalive` option, so this requires constructing the upsert URL and headers manually. Medium complexity.
+
+4. **CalendarPage canDayOff cleanup** — `const canDayOff = true` is an always-true variable that masks the effective condition `!hasEntry`. Remove it and simplify the condition. Low risk but low priority.
+
+5. **progression.ts unreachable fallback** — Line 101: `const mode = primaryEx.progressionMode ?? 'single'` — `primaryEx` was selected because `progressionMode != null`, making the `?? 'single'` unreachable. Simplify to `const mode = primaryEx.progressionMode`.
+
+6. **TodayPage rotation advance timing** — Consider whether `actions.advance()` should fire after the user confirms the outcome modal rather than immediately on "complete" tap. The current approach is intentional (shows the correct next workout while the modal is open) but creates a gap where dismissing the modal leaves the rotation advanced. A product decision is needed before changing this.
+
+7. **CSV run slot config loss on round-trip** — A run slot with no `runSubtype` loses its `runConfig` entirely on CSV reimport (the entire run config block is gated on `if (row.runSubtype)`). Consider falling back to a default subtype or preserving individual fields independently.
+
+---
+
+## Open Questions
+
+1. Should marking a day as `day_off` count toward plan progress/expiry? Currently it advances the rotation pointer but not the progress counter — the rotation wheel turns but the odometer does not. Is this intentional? (rotationEngine.ts:78,313)
+
+2. Should `completionStateToAction('planned')` silently return `'complete'`? A stale or incorrectly written outcome in the 'planned' state would advance the rotation pointer as if the workout was completed. Would an explicit error or warning be better?
+
+3. For the `storeSync beforeunload` reliability issue: is Supabase sync considered authoritative enough that data loss on tab-close is a real concern, or is localStorage always the source of truth?
+
+4. The `perceivedEffort` null value defaults to 3 (middle) for the progress branch but to 0 (lowest) for the regress branch in `progression.ts`. A user who forgets to log effort gets a free progression but never a regression. Is this the intended default behavior?
+
+---
+
+## Known Issues / Incomplete Work
+
+- The CalendarPage selectedIdx stale bug was found but not fixed — it requires confirming modal animation behavior before a `key`-prop fix.
+- No UI-layer tests exist for any page component. The test suite is strong at the engine/library/store level but has no coverage of the page components' state machines.
+
+## Dependencies Added
+
+None.

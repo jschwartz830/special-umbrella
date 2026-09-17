@@ -7,7 +7,7 @@ import {
   endOfWeek,
 } from 'date-fns'
 import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay } from '../types'
-import { getResolvedDaysRange, mod } from './rotationEngine'
+import { getResolvedDaysRange } from './rotationEngine'
 
 export interface CalendarCell {
   date: string           // YYYY-MM-DD
@@ -88,10 +88,5 @@ export function buildMonthGrid(
     }
   }
 
-  if (week.length > 0) weeks.push(week)
-
   return weeks
 }
-
-// Re-export mod so calendarProjection users don't need to import engine internals
-export { mod }

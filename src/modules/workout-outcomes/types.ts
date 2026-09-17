@@ -137,6 +137,7 @@ export function derivePaceSecondsPerMile(
   distanceMiles: number,
   durationMin: number,
 ): number {
+  if (distanceMiles <= 0) return 0
   return (durationMin * 60) / distanceMiles
 }
 
@@ -145,6 +146,7 @@ export function deriveSwimPaceSecondsPer100m(
   distanceMeters: number,
   durationMin: number,
 ): number {
+  if (distanceMeters <= 0) return 0
   return (durationMin * 60) / (distanceMeters / 100)
 }
 
