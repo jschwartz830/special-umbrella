@@ -52,6 +52,14 @@ describe('derivePaceSecondsPerMile', () => {
     const pace = derivePaceSecondsPerMile(1, 10)
     expect(pace).toBe(600) // 10 min/mi = 600 s/mi
   })
+
+  it('returns 0 (not Infinity) for zero distance', () => {
+    expect(derivePaceSecondsPerMile(0, 30)).toBe(0)
+  })
+
+  it('returns 0 (not Infinity) for negative distance', () => {
+    expect(derivePaceSecondsPerMile(-1, 30)).toBe(0)
+  })
 })
 
 // ── deriveSwimPaceSecondsPer100m ──────────────────────────────────────────────
@@ -70,6 +78,14 @@ describe('deriveSwimPaceSecondsPer100m', () => {
   it('formula is (durationMin * 60) / (distanceMeters / 100)', () => {
     const pace = deriveSwimPaceSecondsPer100m(100, 2)
     expect(pace).toBe(120) // 2 min per 100m = 120 s/100m
+  })
+
+  it('returns 0 (not Infinity) for zero distance', () => {
+    expect(deriveSwimPaceSecondsPer100m(0, 30)).toBe(0)
+  })
+
+  it('returns 0 (not Infinity) for negative distance', () => {
+    expect(deriveSwimPaceSecondsPer100m(-100, 30)).toBe(0)
   })
 })
 

@@ -351,9 +351,14 @@ export function plansFromCsv(text: string): PlansImportResult {
       status: status === 'active' ? 'inactive' : status,
       days,
       duration: { type: durationType, value: durationValue },
-      startDate: (first.planStartDate && /^\d{4}-\d{2}-\d{2}$/.test(first.planStartDate) && !isNaN(new Date(first.planStartDate).getTime()))
-        ? first.planStartDate
-        : new Date().toISOString().slice(0, 10),
+      startDate: (() => {
+        const raw = first.planStartDate
+        if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) && !isNaN(new Date(raw).getTime())) {
+          return raw
+        }
+        if (raw) warnings.push(`Plan "${name}": planStartDate "${raw}" is not a valid YYYY-MM-DD date — defaulting to today.`)
+        return new Date().toISOString().slice(0, 10)
+      })(),
       startDayIndex: toNum(first.planStartDayIndex) ?? 0,
       createdAt: now,
       updatedAt: now,
