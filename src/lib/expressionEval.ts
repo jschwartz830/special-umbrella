@@ -389,7 +389,7 @@ export function evaluateUpdates(
  */
 export function resolveLoad(loadExpr: string | undefined, ctx: EvalContext): number | null {
   if (!loadExpr) return null
-  const stripped = loadExpr.replace(/lb$/i, '').replace(/kg$/i, '').trim()
+  const stripped = loadExpr.replace(/lbs?$/i, '').replace(/kg$/i, '').trim()
   try {
     const toks = tokenize(stripped)
     const ast = new Parser(toks).parseExpr()
