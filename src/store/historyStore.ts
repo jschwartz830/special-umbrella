@@ -295,12 +295,14 @@ export const useHistoryStore = create<HistoryState>()(
 
       removeLastOverrideByType(planId, type) {
         set(s => {
-          const matching = s.overrides
+          const latest = s.overrides
             .filter(o => o.planId === planId && o.type === type)
-            .sort((a, b) => b.appliedAt.localeCompare(a.appliedAt))
-          if (matching.length === 0) return s
-          const lastId = matching[0].id
-          return { overrides: s.overrides.filter(o => o.id !== lastId) }
+            .reduce<OverrideEntry | null>(
+              (best, o) => (best === null || o.appliedAt > best.appliedAt ? o : best),
+              null,
+            )
+          if (!latest) return s
+          return { overrides: s.overrides.filter(o => o.id !== latest.id) }
         })
       },
     }),
