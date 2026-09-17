@@ -42,7 +42,7 @@ import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 import { WORKOUT_TYPE_OPTIONS, WORKOUT_META } from '../lib/constants'
 import { computeCurrentStreakDates } from '../lib/historyStats'
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const ALL_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 const WORKOUT_TYPES = WORKOUT_TYPE_OPTIONS
 
@@ -92,6 +92,9 @@ export function CalendarPage() {
   const mobilityRoutine = useMobilityStore(s => s.routine)
   const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
   const weekStartsOn = useSettingsStore(s => s.weekStartsOn)
+  const orderedDays = weekStartsOn === 1
+    ? [...ALL_DAYS.slice(1), ALL_DAYS[0]]
+    : ALL_DAYS
   const outcomes = useOutcomeStore(s => s.outcomes)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
@@ -360,7 +363,7 @@ export function CalendarPage() {
 
           {/* Day headers */}
           <div className="grid grid-cols-7 mb-1">
-            {DAYS.map(d => (
+            {orderedDays.map(d => (
               <div key={d} className="text-center text-xs font-medium text-slate-500 py-1">{d}</div>
             ))}
           </div>
