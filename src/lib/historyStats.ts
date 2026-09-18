@@ -914,12 +914,14 @@ export function computeConsecutiveSkips(
  * @param planDayIndex  The rotation day index to count.
  * @param entries       All history entries for this plan (pre-filtered or not).
  * @param excludeDate   Optional YYYY-MM-DD date to exclude (e.g. today, to get prior count).
+ * @param today         Optional upper bound; entries with calendarDate > today are excluded.
  */
 export function countPlanDayCompletions(
   planId: string,
   planDayIndex: number,
   entries: HistoryEntry[],
   excludeDate?: string,
+  today?: string,
 ): number {
   const dates = new Set(
     entries
@@ -928,7 +930,8 @@ export function countPlanDayCompletions(
           e.planId === planId &&
           e.planDayIndex === planDayIndex &&
           e.action === 'complete' &&
-          e.calendarDate !== excludeDate,
+          e.calendarDate !== excludeDate &&
+          (today === undefined || e.calendarDate <= today),
       )
       .map(e => e.calendarDate),
   )

@@ -1216,6 +1216,25 @@ describe('countPlanDayCompletions', () => {
     // Should be 2 unique dates, not 3
     expect(countPlanDayCompletions('plan-1', 0, entries)).toBe(2)
   })
+
+  it('excludes future-dated entries when today is provided', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-01-01', 'complete'),
+      entry('2026-01-03', 'complete'),
+      entry('2026-01-10', 'complete'), // future relative to today=2026-01-05
+    ]
+    expect(countPlanDayCompletions('plan-1', 0, entries, undefined, '2026-01-05')).toBe(2)
+  })
+
+  it('excludes both today (via excludeDate) and future entries (via today) independently', () => {
+    const entries: HistoryEntry[] = [
+      entry('2026-01-01', 'complete'),
+      entry('2026-01-03', 'complete'), // today — excluded by excludeDate
+      entry('2026-01-10', 'complete'), // future — excluded by today
+    ]
+    // excludeDate=today=2026-01-03: only Jan 1 counts; future Jan 10 also filtered
+    expect(countPlanDayCompletions('plan-1', 0, entries, '2026-01-03', '2026-01-03')).toBe(1)
+  })
 })
 
 // ── computePersonalRecords ────────────────────────────────────────────────────
