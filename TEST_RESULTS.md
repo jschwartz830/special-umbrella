@@ -1,3 +1,23 @@
+# Test Results — 2026-09-18
+
+All tests passing.
+
+| Suite | Count |
+|---|---|
+| All test files | 35 |
+| Total tests | 1373 |
+| Passed | 1373 |
+| Failed | 0 |
+
+## New tests added this pass (+2)
+
+### `src/lib/__tests__/historyStats.test.ts` (+2)
+
+- `countPlanDayCompletions > excludes future-dated entries when today is provided`
+- `countPlanDayCompletions > excludes both today (via excludeDate) and future entries (via today) independently`
+
+---
+
 # Test Results — 2026-09-14
 
 All tests passing.

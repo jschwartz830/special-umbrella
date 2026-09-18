@@ -1,4 +1,57 @@
 # Review Notes — Overnight Audit Pass
+**Date:** 2026-09-18
+
+---
+
+## Executive Summary
+
+1. **What changed:** One defensive fix closing the same class of future-date bug in `countPlanDayCompletions` and its two TodayPage call sites.
+2. **Highest confidence:** Minimal, targeted predicate addition — strictly tightens existing logic; backward-compatible with callers that don't pass `today`.
+3. **Risky:** Nothing risky.
+4. **Review first:** TodayPage line 374 (`useMemo`): confirm `today` is in the dependency array (it is now) so the upcoming-card counts refresh at midnight.
+
+All 1373 tests pass (up from 1371 — 2 new tests added).
+
+---
+
+## Audit Scope
+
+Modules reviewed this pass:
+- `src/lib/historyStats.ts` — `countPlanDayCompletions`: found missing `today` upper-bound parameter
+- `src/pages/TodayPage.tsx` — both `countPlanDayCompletions` call sites: missing future-date guard
+- `src/store/planStore.ts`, `src/store/exerciseHistoryStore.ts`, `src/store/historyStore.ts`, `src/store/outcomeStore.ts` — reviewed; no new issues
+- Carry-forward items (TodayPage state extraction, `updateEntryDate`, `beforeunload` flush, integration test) — still deferred per prior notes
+
+---
+
+## Findings
+
+### Fixed this pass
+
+**1. `countPlanDayCompletions` missing future-date guard**
+
+The function counts completed plan-day entries without excluding future-dated ones. TodayPage calls it for:
+- The "Session N" label on today's pending card — correctly excluded today via `excludeDate`, but futures weren't capped
+- Upcoming cards' session counts — no exclusion at all
+
+This is the same class of bug fixed across multiple prior passes (2026-08-14, 2026-08-19, 2026-08-24, 2026-09-13, 2026-09-14).
+
+**Fix:** Added `today?: string` as a fifth parameter; when provided, entries with `calendarDate > today` are excluded. Updated both TodayPage call sites (line 366 and line 374). Added `today` to the `useMemo` dep array at line 377.
+
+---
+
+## Carry-Forward / Open Items
+
+| Item | Status | Notes |
+|---|---|---|
+| TodayPage state extraction hook | Deferred | ~1200-line component — risky mid-audit refactor |
+| `updateEntryDate` data-loss risk | Deferred | Intentional collision-delete design |
+| `beforeunload` async Supabase flush | Deferred | Product decision needed |
+| Integration test for TodayPage PB hint | Deferred | Unit coverage exists; rendering path untested |
+
+---
+
+# Review Notes — Overnight Audit Pass
 **Date:** 2026-09-14
 
 ---

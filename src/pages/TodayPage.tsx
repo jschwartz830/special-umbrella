@@ -363,7 +363,7 @@ export function TodayPage() {
     : null
 
   const todaySessionCount = isPending
-    ? countPlanDayCompletions(plan.id, primaryPlanDayIndex, planEntries, today)
+    ? countPlanDayCompletions(plan.id, primaryPlanDayIndex, planEntries, today, today)
     : undefined
 
   const upcomingSessionCounts = useMemo(() => {
@@ -371,10 +371,10 @@ export function TodayPage() {
     return Object.fromEntries(
       upcoming.map(rd => [
         rd.calendarDate,
-        countPlanDayCompletions(plan.id, rd.planDayIndex, planEntries),
+        countPlanDayCompletions(plan.id, rd.planDayIndex, planEntries, undefined, today),
       ]),
     )
-  }, [plan, upcoming, planEntries])
+  }, [plan, upcoming, planEntries, today])
 
   // Last-session summaries for upcoming cards (one line each, e.g. "Squat 135 lb · 3×8")
   const upcomingSessionSummaries = useMemo(() => {
