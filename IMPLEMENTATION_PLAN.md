@@ -596,6 +596,45 @@ Added one test that passes a segment with both `duration: '30km'` and `distance:
 
 ---
 
+## 2026-09-18 Additions
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `countPlanDayCompletions`: add `today` upper-bound parameter to exclude future-dated entries | Defensive fix | `src/lib/historyStats.ts`, `src/lib/__tests__/historyStats.test.ts`, `src/pages/TodayPage.tsx` |
+
+### Detail
+
+**1. `countPlanDayCompletions` future-date guard**
+
+`countPlanDayCompletions` counts how many times a specific plan day has been marked complete. It accepted an `excludeDate` parameter (typically `today`) to omit the current day, but had no upper bound against future-dated entries.
+
+TodayPage uses this function in two places:
+- Line 366: for the "Session N" label on the current-day pending card — passes `today` as `excludeDate` (correctly excludes today's own entry), but didn't exclude futures
+- Line 374 (`useMemo`): for session counts on upcoming cards — no exclusion at all
+
+A future-dated `complete` entry (e.g. from a bad CSV import with `calendarDate: '2026-12-31'` matching the plan day's `planDayIndex`) would inflate both the pending card's session count and every upcoming card's session count.
+
+This is the same class of bug fixed in prior passes for `computeHistoryStats` (2026-08-14), `findBestWeek` (2026-08-24), `findPreviousSessionForPlanDay` (2026-08-19), `computePersonalRecords` (2026-09-13), and `findPreviousSetsByExercise` (2026-09-14).
+
+**Fix:**
+- Added optional `today?: string` fifth parameter to `countPlanDayCompletions`; when provided, entries with `calendarDate > today` are excluded.
+- TodayPage line 366: `countPlanDayCompletions(plan.id, primaryPlanDayIndex, planEntries, today, today)` — both the `excludeDate` and `today` caps are now `today`.
+- TodayPage line 374: `countPlanDayCompletions(plan.id, rd.planDayIndex, planEntries, undefined, today)` — no `excludeDate` for upcoming cards, but `today` is passed as upper bound. Also added `today` to the `useMemo` dependency array.
+- Two new tests added: future-date exclusion with `today` only, and combined `excludeDate` + `today` exclusion.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
 ## 2026-09-14 Additions
 
 ### Changes implemented this pass

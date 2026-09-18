@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-09-18
+
+### `countPlanDayCompletions` future-date guard + TodayPage call sites
+
+**Summary:** One targeted fix closing the same class of future-date bug in `countPlanDayCompletions`.
+
+`countPlanDayCompletions` (in `historyStats.ts`) counts how many times a given plan day has been completed. TodayPage calls it in two places: for the "Session N" label on the pending card, and for upcoming cards' session counts. Neither call passed a `today` upper bound, so a future-dated `complete` entry (e.g. from a bad CSV import) could inflate both counts.
+
+**Fix:** Added optional `today?: string` fifth parameter to `countPlanDayCompletions`. When provided, entries with `calendarDate > today` are excluded. Updated both TodayPage call sites to pass `today`, and added `today` to the `useMemo` dependency array. Two new tests cover future-date exclusion independently and in combination with `excludeDate`.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — add `today?: string` param to `countPlanDayCompletions`
+- `src/pages/TodayPage.tsx` — pass `today` to both `countPlanDayCompletions` calls; add `today` to `useMemo` deps
+- `src/lib/__tests__/historyStats.test.ts` — 2 new tests for future-date exclusion
+- `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` (documentation)
+
+**Tests:** 1371 → 1373 (+2)
+
+**Risk:** Minimal. The change strictly tightens the existing predicate — it only affects users who have future-dated entries from a bad import, and only when `today` is provided (callers without `today` are unchanged).
+
+---
+
 ## 2026-09-14
 
 ### `HistoryPage` future-date guard activation + `findPreviousSetsByExercise` future-date fix
