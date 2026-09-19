@@ -2,6 +2,26 @@
 
 ---
 
+## 2026-09-19
+
+### fix(TodayPage): exclude future-dated outcomes/records from weights lookups
+
+**Summary:** Two future-date gaps in `TodayPage.tsx`, same class as the 2026-09-14 pass to `findPreviousSetsByExercise`:
+
+1. **`findPreviousWeightsOutcome` — exclude future-dated outcomes** — the function used `rest.startsWith(currentDate)` to exclude today's outcomes, but outcomes with `calendarDate > today` passed through. Since the function picks the most-recent outcome by `outcomeSortKey`, a future-dated outcome would be selected as the "previous weights session" and pre-fill the OutcomeModal with wrong weights/reps. Changed to `rest.slice(0, 10) >= currentDate`, matching the semantics of `findPreviousSetsByExercise` (fixed 2026-09-14) and `findPreviousSessionForPlanDay` (fixed 2026-08-19).
+
+2. **`maxLoadByExercise` — exclude future-dated exercise records** — the `useMemo` that builds the pre-workout all-time max load per exercise (used for post-workout PR banner detection) was scanning all `exerciseRecords` without filtering out future-dated entries. A bad CSV import with a future-dated exercise record would inflate the baseline, potentially suppressing the PR banner when a genuine record is set in the current session. Added `if (r.calendarDate > today) continue` guard and added `today` to the `useMemo` dependency array so the baseline refreshes at midnight.
+
+**Files changed:**
+- `src/pages/TodayPage.tsx` — `findPreviousWeightsOutcome` future-date fix + `maxLoadByExercise` future-date guard
+- `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` (documentation)
+
+**Tests:** 1371 (no change — both functions are private inline functions in TodayPage; rendering-path coverage remains deferred per prior audit notes)
+
+**Risk:** Minimal. Both changes tighten existing exclusion predicates. They only affect users who have future-dated exercise records from a bad CSV import. Correct data produces identical output.
+
+---
+
 ## 2026-09-14
 
 ### `HistoryPage` future-date guard activation + `findPreviousSetsByExercise` future-date fix
