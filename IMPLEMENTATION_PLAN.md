@@ -627,3 +627,37 @@ The 2026-09-13 pass added an optional `today?: string` parameter to `computePers
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
 | `beforeunload` async Supabase flush | Recommendation only — product decision needed |
 | Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
+## 2026-09-19 Additions
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `findPreviousWeightsOutcome`: fix future-date gap (same class as `findPreviousSetsByExercise` 2026-09-14) | Defensive fix | `src/pages/TodayPage.tsx` |
+| 2 | `maxLoadByExercise`: exclude future-dated exercise records from pre-workout baseline | Defensive fix | `src/pages/TodayPage.tsx` |
+
+### Detail
+
+**1. `findPreviousWeightsOutcome` future-date guard**
+
+The private helper in `TodayPage` used `rest.startsWith(currentDate)` to exclude today's outcomes when picking the most-recent previous weights session. Future-dated outcomes were not excluded. Since the function selects by `outcomeSortKey` (highest = most recent), a future-dated outcome would be chosen over all genuine past sessions and pre-fill the OutcomeModal with wrong weights/reps.
+
+Fix: changed `rest.startsWith(currentDate)` to `rest.slice(0, 10) >= currentDate`, identical to the `findPreviousSetsByExercise` fix from 2026-09-14. No new tests added (inline private function; rendering-path coverage deferred per prior notes).
+
+**2. `maxLoadByExercise` future-date guard**
+
+The useMemo that builds the all-time max load per exercise scanned all `exerciseRecords` without filtering out future-dated entries. This map is captured as `preWorkoutMaxLoad` before saving a new outcome and compared against new loads to detect PRs. A future-dated record from a bad CSV import would inflate the baseline, potentially suppressing the PR banner when a genuine record is set.
+
+Fix: added `if (r.calendarDate > today) continue` guard and added `today` to the `useMemo` dependency array. No new tests added (same reason as above).
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |

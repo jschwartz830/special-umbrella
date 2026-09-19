@@ -71,7 +71,7 @@ function findPreviousWeightsOutcome(
   for (const outcome of Object.values(outcomes)) {
     if (!outcome.workoutInstanceId.startsWith(prefix)) continue
     const rest = outcome.workoutInstanceId.slice(prefix.length)
-    if (rest.startsWith(currentDate)) continue
+    if (rest.slice(0, 10) >= currentDate) continue
     if (!outcome.weightsActual?.exercises?.length) continue
     if (!best || outcomeSortKey(outcome) > outcomeSortKey(best)) best = outcome
   }
@@ -118,10 +118,15 @@ export function TodayPage() {
   )
 
   // Build all-time max load per exercise for post-workout PR banner detection.
+  // Exclude future-dated records — a bad CSV import can create exercise records
+  // with calendarDate > today, which would inflate the pre-workout baseline and
+  // suppress the PR banner when a genuine record is set (same guard applied to
+  // computePersonalRecords, findBestWeek, and findPreviousSetsByExercise).
   const exerciseRecords = useExerciseHistoryStore(s => s.records)
   const maxLoadByExercise = useMemo(() => {
     const map: Record<string, number> = {}
     for (const r of exerciseRecords) {
+      if (r.calendarDate > today) continue
       for (const s of r.sets) {
         if (s.load !== null && s.completed) {
           map[r.exerciseName] = Math.max(map[r.exerciseName] ?? 0, s.load)
@@ -129,7 +134,7 @@ export function TodayPage() {
       }
     }
     return map
-  }, [exerciseRecords])
+  }, [exerciseRecords, today])
 
   // Pre-computed PR flags per workout instance — uses strict-greater-than against
   // prior sessions, so "Last session" hints show "· PB" only when the session
