@@ -1,3 +1,23 @@
+# Test Results — 2026-09-20
+
+All tests passing.
+
+| Suite | Count |
+|---|---|
+| All test files | 35 |
+| Total tests | 1373 |
+| Passed | 1373 |
+| Failed | 0 |
+
+## New tests added this pass (+2)
+
+### `src/lib/__tests__/historyStats.test.ts` (+2)
+
+- `excludes extras for a different plan` (inside `computeAverageWorkoutsPerWeek`)
+- `excludes future-dated extras` (inside `computeAverageWorkoutsPerWeek`)
+
+---
+
 # Test Results — 2026-09-14
 
 All tests passing.

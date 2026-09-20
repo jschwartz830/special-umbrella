@@ -3346,4 +3346,16 @@ describe('computeAverageWorkoutsPerWeek', () => {
     ]
     expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-08', TODAY)).toBe(7.0)
   })
+
+  it('excludes extras for a different plan', () => {
+    const es = [extra('2026-06-10', 'plan-2')]
+    expect(computeAverageWorkoutsPerWeek('plan-1', [], es, '2026-06-08', TODAY)).toBeNull()
+  })
+
+  it('excludes future-dated extras', () => {
+    const entries = [entry('2026-06-10', 'complete')]
+    const es = [extra('2026-06-20')]
+    // 7 days elapsed (Jun 8–14), only 1 active session — future extra excluded
+    expect(computeAverageWorkoutsPerWeek('plan-1', entries, es, '2026-06-08', TODAY)).toBe(1.0)
+  })
 })

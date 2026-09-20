@@ -6,6 +6,7 @@ interface TodayCompletedSectionProps {
   status: DayStatus
   primaryPlanDay: PlanDay
   todayExtras: ExtraWorkoutEntry[]
+  todayOutcomeSummary?: string | null
   onEditOutcome: () => void
   onEditExtra: (extra: ExtraWorkoutEntry) => void
   onDeleteExtra: (extra: ExtraWorkoutEntry) => void
@@ -15,6 +16,7 @@ export function TodayCompletedSection({
   status,
   primaryPlanDay,
   todayExtras,
+  todayOutcomeSummary,
   onEditOutcome,
   onEditExtra,
   onDeleteExtra,
@@ -36,6 +38,9 @@ export function TodayCompletedSection({
               <p className="text-xs text-emerald-300/70 mt-0.5 truncate">
                 {primaryPlanDay.slots.map(s => s.name).join(' + ')}
               </p>
+            )}
+            {todayOutcomeSummary && (
+              <p className="text-xs text-emerald-400/60 mt-0.5 truncate">{todayOutcomeSummary}</p>
             )}
           </div>
           <ChevronRight size={14} className="text-emerald-400/60 flex-shrink-0 mt-1" />

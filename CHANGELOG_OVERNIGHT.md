@@ -2,6 +2,30 @@
 
 ---
 
+## 2026-09-20
+
+### `computeAverageWorkoutsPerWeek` test coverage + TodayCompletedSection outcome summary
+
+**Summary:** Two improvements:
+
+1. **`computeAverageWorkoutsPerWeek` — two missing test cases** — the function filters both `entries` and `extras` by `planId` and `calendarDate <= today`, but the extras branch had no tests pinning either guard. Added:
+   - `"excludes extras for a different plan"` — confirms a cross-plan extra doesn't inflate the count
+   - `"excludes future-dated extras"` — confirms a future-dated extra is excluded, leaving only the rotation entry counted
+
+2. **TodayCompletedSection — outcome summary line** — after completing a workout, the completed card now shows a brief metrics line (e.g. `3×5 @ 185 lb Bench Press` or `2.5 mi · 28 min · 9:02 /mi`) below the slot names. This reuses `buildLastSessionSummary` which was already imported in TodayPage; the `"Last: "` prefix is stripped since the context is the current session.
+
+**Files changed:**
+- `src/lib/__tests__/historyStats.test.ts` — 2 new tests inside `computeAverageWorkoutsPerWeek` describe block
+- `src/components/today/TodayCompletedSection.tsx` — new `todayOutcomeSummary?: string | null` prop + muted metrics line
+- `src/pages/TodayPage.tsx` — compute `todayOutcomeSummary` from `existingOutcome` + pass to `TodayCompletedSection`
+- `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md`, `FEATURE_PROPOSAL.md`, `FEATURE_REVIEW.md` (documentation)
+
+**Tests:** 1371 → 1373 (+2)
+
+**Risk:** Minimal. The test additions cover already-implemented guards. The UI change is additive (new optional prop, new conditional render); existing behavior is unchanged when no outcome data is present.
+
+---
+
 ## 2026-09-14
 
 ### `HistoryPage` future-date guard activation + `findPreviousSetsByExercise` future-date fix

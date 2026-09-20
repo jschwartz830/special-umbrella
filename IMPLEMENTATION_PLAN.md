@@ -106,6 +106,36 @@ Tests first — they validate existing behavior before any changes. The new stat
 
 ---
 
+## Additions — 2026-09-20
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `computeAverageWorkoutsPerWeek`: add 2 missing extras tests | Test coverage | `src/lib/__tests__/historyStats.test.ts` |
+| 2 | TodayCompletedSection: show outcome summary line | Feature | `src/components/today/TodayCompletedSection.tsx`, `src/pages/TodayPage.tsx` |
+
+### Detail
+
+**1. `computeAverageWorkoutsPerWeek` — extras branch test coverage**
+The function filters both `entries` and `extras` by `planId === planId` and `calendarDate <= today`. The rotation-entries branch had 13 tests (including cross-plan and future-date guards) but the extras branch had none for either guard. Added two targeted tests:
+- `"excludes extras for a different plan"` — passes `[extra('2026-06-10', 'plan-2')]` and expects `null`
+- `"excludes future-dated extras"` — passes one rotation entry plus a future-dated extra and expects the result to reflect only the one rotation entry
+
+Both tests passed immediately, confirming the guards were correct but untested.
+
+**2. TodayCompletedSection — outcome summary line**
+After completing a workout, the completed card showed only the workout name and slot names — no metrics. Added a new optional `todayOutcomeSummary?: string | null` prop. In TodayPage, `existingOutcome` is passed to `buildLastSessionSummary` (already imported) and the `"Last: "` prefix is stripped (that prefix is for historical-context hints; the completed card is current-session). The result renders as a muted `text-emerald-400/60` line below the slot names when non-null.
+
+### Carry-forward (all recommendation-only)
+
+- **TodayPage state extraction hook** — 1175-line component; refactor deferred pending product stability
+- **`updateEntryDate` data-loss risk** — mutates `historyEntry` planDayIndex in place; should snapshot before update
+- **`beforeunload` async flush** — `pushStore` calls in `storeSync.ts` are fire-and-forget; potential data loss on hard-close
+- **TodayPage Last session PB hint integration test** — no integration test verifying the hint appears when a PR-flagged outcome exists
+
+---
+
 ## Additions — 2026-08-15
 
 ### Changes implemented this pass

@@ -1,5 +1,28 @@
 # Feature Reviews
 
+## 2026-09-20 (branch `claude/admiring-noether-yylyem`)
+
+### Feature Review: TodayCompletedSection outcome summary line
+
+#### What was actually built
+
+- `TodayCompletedSection` gained `todayOutcomeSummary?: string | null` (optional, backward compatible)
+- In TodayPage (~line 357): `todayOutcomeSummary = existingOutcome ? (buildLastSessionSummary(...) ?? '').replace(/^Last:\s*/, '') || null : null`
+- In TodayCompletedSection: conditional `<p className="text-xs text-emerald-400/60 mt-0.5 truncate">` renders when non-null
+
+#### Design validation
+
+- **Reuse**: `buildLastSessionSummary` handles all workout types (weights, cardio/run, mobility) with correct unit formatting — no new formatting logic needed.
+- **Prefix handling**: The `"Last: "` prefix is stripped via regex. The regex `^Last:\s*` also handles any extra whitespace. If `buildLastSessionSummary` returns `null` (no outcome data), the expression short-circuits to `null` — the line doesn't render.
+- **Empty-string guard**: The `|| null` at the end converts an empty string (if `buildLastSessionSummary` returned `""`) to `null`, preventing a blank line.
+- **Backward compatibility**: Prop is optional with `undefined` default — no existing render sites break.
+
+#### Risk assessment
+
+**Low.** The only new code path is a conditional render of one `<p>` element. All formatting is delegated to the existing `buildLastSessionSummary` which has its own test coverage. The worst-case failure mode is the summary line not appearing (e.g. if `buildLastSessionSummary` returns something unexpected) — not a crash or data mutation.
+
+---
+
 ## Pass 90 — 2026-08-04 (branch `claude/serene-cori-xidg8a`)
 
 ### Feature Review: `computeWorkoutCompletionRate`

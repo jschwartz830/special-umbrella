@@ -1,4 +1,46 @@
 # Review Notes — Overnight Audit Pass
+**Date:** 2026-09-20
+
+---
+
+## Executive Summary
+
+1. **What changed:** Two missing test cases added to `computeAverageWorkoutsPerWeek`; one small UX feature (outcome summary in completed card).
+2. **Highest confidence:** Both test additions are straightforward coverage for guards that already existed and worked — they just lacked tests. The UI change is a conditional render of an optional prop.
+3. **Risky:** Nothing risky — new prop is optional with `undefined` default, so all existing renders are unchanged.
+4. **Review first:** `TodayPage.tsx` line ~357 — the `todayOutcomeSummary` computation: verify the `replace(/^Last:\s*/, '')` regex strips the prefix cleanly across all `buildLastSessionSummary` return shapes (weights, cardio, mobility).
+
+All 1373 tests pass (up from 1371 — 2 new tests added).
+
+---
+
+## Audit Scope
+
+Modules reviewed this pass:
+- `src/lib/historyStats.ts` — `computeAverageWorkoutsPerWeek`: found 2 missing test cases for extras branch
+- `src/components/today/TodayCompletedSection.tsx` — identified missing outcome summary display
+- `src/lib/sessionSummary.ts` — confirmed `buildLastSessionSummary` is suitable for reuse here
+- `src/pages/TodayPage.tsx` — confirmed `existingOutcome` and `buildLastSessionSummary` were already imported and used elsewhere
+
+---
+
+## Findings
+
+### Test gap: `computeAverageWorkoutsPerWeek` extras branch
+
+The function filters extras by both `planId` and `calendarDate <= today`. The rotation-entry branch had 13 tests covering both guards; the extras branch had zero tests for either guard. Added 2 tests pinning the cross-plan and future-date guards for extras.
+
+**Severity:** Low (both guards were already correct; no bug found). **Status:** Resolved — tests added.
+
+### UX gap: TodayCompletedSection shows no metrics after completing
+
+After completing a workout, the completed card showed only the workout name and slot names. `buildLastSessionSummary` was already imported in TodayPage and used for the pending-card hint; the same data was available for the completed card. Added a muted metrics line below the slot names.
+
+**Severity:** UX improvement (not a bug). **Status:** Implemented.
+
+---
+
+# Review Notes — Overnight Audit Pass
 **Date:** 2026-09-14
 
 ---

@@ -355,6 +355,12 @@ export function TodayPage() {
     : null
   const lastSessionSummary = prevSessionOutcome ? buildLastSessionSummary(prevSessionOutcome, prFlagsMap) : null
 
+  // Brief outcome summary for the completed card ("3×5 @ 185 lb Bench Press", etc.)
+  // Strip the "Last: " prefix since this is current-session context, not a historical reference.
+  const todayOutcomeSummary = existingOutcome
+    ? (buildLastSessionSummary(existingOutcome, prFlagsMap) ?? '').replace(/^Last:\s*/, '') || null
+    : null
+
   const prevSessionDate = prevSessionOutcome
     ? parseWorkoutInstanceId(prevSessionOutcome.workoutInstanceId)?.calendarDate ?? null
     : null
@@ -707,6 +713,7 @@ export function TodayPage() {
         status={todayResolved.status}
         primaryPlanDay={primaryPlanDay}
         todayExtras={todayExtras}
+        todayOutcomeSummary={todayOutcomeSummary}
         onEditOutcome={handleEditOutcome}
         onEditExtra={setEditingExtra}
         onDeleteExtra={(extra) => {

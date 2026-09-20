@@ -1,5 +1,22 @@
 # Feature Proposals
 
+## 2026-09-20 (branch `claude/admiring-noether-yylyem`)
+
+### Feature: TodayCompletedSection outcome summary line
+
+**Status**: Implemented this pass.
+
+**Context**: After completing a workout, the "Completed today" card showed only the workout name and slot names. No metrics were visible without tapping "Edit Outcome". `buildLastSessionSummary` was already imported in TodayPage and used to show a "Last session" hint on the pending card — the same formatted string (e.g. `3×5 @ 185 lb Bench Press`, `2.5 mi · 28 min · 9:02 /mi`) is equally useful in the post-completion state.
+
+**What was built**:
+- New `todayOutcomeSummary?: string | null` prop on `TodayCompletedSection`
+- In TodayPage: pass `existingOutcome` through `buildLastSessionSummary`; strip the `"Last: "` prefix (irrelevant in this context — it's current-session, not a historical reference)
+- In TodayCompletedSection: render a muted `text-emerald-400/60` line below the slot names, only when `todayOutcomeSummary` is non-null
+
+**Why this approach**: Zero new data-fetching — reuses the already-computed `existingOutcome` and already-imported `buildLastSessionSummary`. The `"Last: "` prefix removal keeps the label-free rendering consistent with how the completed card presents other data (workout name has no "Name:" prefix, slot names have no "Slots:" prefix).
+
+---
+
 ## Pass 90 — 2026-08-04 (branch `claude/serene-cori-xidg8a`)
 
 ### Feature: `computeWorkoutCompletionRate` — workout quality metric
