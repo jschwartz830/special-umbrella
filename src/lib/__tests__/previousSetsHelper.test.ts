@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findPreviousSetsByExercise } from '../previousSetsHelper'
+import { findPreviousSetsByExercise, findPreviousWeightsOutcome } from '../previousSetsHelper'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 
 function outcome(
@@ -157,5 +157,86 @@ describe('findPreviousSetsByExercise', () => {
     const outcomes = { 'plan-1_2026-12-31_extra_futureId': futureExtra }
     const result = findPreviousSetsByExercise('plan-1', TODAY, outcomes)
     expect(result).toEqual({})
+  })
+})
+
+// ── findPreviousWeightsOutcome ────────────────────────────────────────────────
+
+describe('findPreviousWeightsOutcome', () => {
+  const TODAY = '2026-06-07'
+
+  it('returns null when no outcomes exist', () => {
+    expect(findPreviousWeightsOutcome('plan-1', TODAY, {})).toBeNull()
+  })
+
+  it('returns null when the only outcome is on the current date', () => {
+    const outcomes = {
+      [`plan-1_${TODAY}`]: outcome('plan-1', TODAY, [
+        { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 135, completed: true }] },
+      ]),
+    }
+    expect(findPreviousWeightsOutcome('plan-1', TODAY, outcomes)).toBeNull()
+  })
+
+  it('returns the most recent prior outcome', () => {
+    const earlier = outcome('plan-1', '2026-05-01', [
+      { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 135, completed: true }] },
+    ], '2026-05-01T12:00:00Z')
+    const later = outcome('plan-1', '2026-06-01', [
+      { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 155, completed: true }] },
+    ], '2026-06-01T12:00:00Z')
+    const outcomes = {
+      'plan-1_2026-05-01': earlier,
+      'plan-1_2026-06-01': later,
+    }
+    const result = findPreviousWeightsOutcome('plan-1', TODAY, outcomes)
+    expect(result).toBe(later)
+  })
+
+  it('excludes future-dated outcomes (same class of bug as findPreviousSetsByExercise)', () => {
+    // A future-dated outcome from a bad CSV import should never be returned as "previous".
+    // Without the >= guard, outcomeSortKey on a future date would rank it highest.
+    const futureOutcome = outcome('plan-1', '2026-12-31', [
+      { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 300, completed: true }] },
+    ], '2026-12-31T12:00:00Z')
+    const pastOutcome = outcome('plan-1', '2026-06-01', [
+      { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 135, completed: true }] },
+    ], '2026-06-01T12:00:00Z')
+    const outcomes = {
+      'plan-1_2026-12-31': futureOutcome,
+      'plan-1_2026-06-01': pastOutcome,
+    }
+    const result = findPreviousWeightsOutcome('plan-1', TODAY, outcomes)
+    expect(result).toBe(pastOutcome)
+  })
+
+  it('returns null when only future-dated outcomes exist', () => {
+    const futureOutcome = outcome('plan-1', '2026-12-31', [
+      { exercise: 'Squat', sets: [{ actualReps: 5, actualLoad: 300, completed: true }] },
+    ])
+    const outcomes = { 'plan-1_2026-12-31': futureOutcome }
+    expect(findPreviousWeightsOutcome('plan-1', TODAY, outcomes)).toBeNull()
+  })
+
+  it('does not return outcomes from a different plan', () => {
+    const outcomes = {
+      'plan-2_2026-06-01': outcome('plan-2', '2026-06-01', [
+        { exercise: 'Bench Press', sets: [{ actualReps: 5, actualLoad: 135, completed: true }] },
+      ]),
+    }
+    expect(findPreviousWeightsOutcome('plan-1', TODAY, outcomes)).toBeNull()
+  })
+
+  it('returns null when the only prior outcome has no weights data', () => {
+    const noWeights: WorkoutOutcome = {
+      workoutInstanceId: 'plan-1_2026-06-01',
+      completionState: 'completed',
+      perceivedEffort: null,
+      notes: null,
+      completedAt: null,
+      runActual: { actualDistanceMiles: 3, actualDurationMin: 30, completedAsPlanned: true, averagePaceSecondsPerMile: null },
+    } as unknown as WorkoutOutcome
+    const outcomes = { 'plan-1_2026-06-01': noWeights }
+    expect(findPreviousWeightsOutcome('plan-1', TODAY, outcomes)).toBeNull()
   })
 })

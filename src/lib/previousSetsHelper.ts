@@ -2,6 +2,36 @@ import type { WorkoutOutcome, LoggedSetActual } from '../modules/workout-outcome
 import { outcomeSortKey } from './outcomeSortKey'
 
 /**
+ * Find the most recent outcome with weights data for a plan, excluding
+ * `currentDate` and any future-dated outcomes.
+ *
+ * The exclusion predicate `rest.slice(0, 10) >= currentDate` matches the guard
+ * in `findPreviousSetsByExercise` and `findPreviousSessionForPlanDay` — it
+ * excludes both today's outcomes and any future-dated outcomes from a bad CSV
+ * import, which would otherwise rank first (newest sort key) and be returned
+ * as the "previous" workout.
+ *
+ * Used by TodayPage to pre-fill `ActiveWorkoutTracker` with the previous
+ * weights session.
+ */
+export function findPreviousWeightsOutcome(
+  planId: string,
+  currentDate: string,
+  outcomes: Record<string, WorkoutOutcome>,
+): WorkoutOutcome | null {
+  const prefix = planId + '_'
+  let best: WorkoutOutcome | null = null
+  for (const outcome of Object.values(outcomes)) {
+    if (!outcome.workoutInstanceId.startsWith(prefix)) continue
+    const rest = outcome.workoutInstanceId.slice(prefix.length)
+    if (rest.slice(0, 10) >= currentDate) continue
+    if (!outcome.weightsActual?.exercises?.length) continue
+    if (!best || outcomeSortKey(outcome) > outcomeSortKey(best)) best = outcome
+  }
+  return best
+}
+
+/**
  * Find the most recent set data per exercise for a plan, excluding any outcome
  * on `currentDate` (and optionally a specific `excludeInstanceId`).
  *

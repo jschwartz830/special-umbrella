@@ -41,8 +41,7 @@ import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
-import { outcomeSortKey } from '../lib/outcomeSortKey'
-import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
+import { findPreviousSetsByExercise, findPreviousWeightsOutcome } from '../lib/previousSetsHelper'
 import { TodayBanners } from '../components/today/TodayBanners'
 import { TodayUpcomingList } from '../components/today/TodayUpcomingList'
 import { TodayCompletedSection } from '../components/today/TodayCompletedSection'
@@ -59,24 +58,6 @@ import { TodayUpcomingLogModal } from '../components/today/TodayUpcomingLogModal
 import { SwipeToDelete } from '../components/shared/SwipeToDelete'
 import { WORKOUT_META } from '../lib/constants'
 import { estimateRunDurationMin } from '../lib/estimateRunDuration'
-
-/** Find the most recent outcome with weights data for this plan (excluding today). */
-function findPreviousWeightsOutcome(
-  planId: string,
-  currentDate: string,
-  outcomes: Record<string, WorkoutOutcome>,
-): WorkoutOutcome | null {
-  const prefix = planId + '_'
-  let best: WorkoutOutcome | null = null
-  for (const outcome of Object.values(outcomes)) {
-    if (!outcome.workoutInstanceId.startsWith(prefix)) continue
-    const rest = outcome.workoutInstanceId.slice(prefix.length)
-    if (rest.startsWith(currentDate)) continue
-    if (!outcome.weightsActual?.exercises?.length) continue
-    if (!best || outcomeSortKey(outcome) > outcomeSortKey(best)) best = outcome
-  }
-  return best
-}
 
 
 export function TodayPage() {
