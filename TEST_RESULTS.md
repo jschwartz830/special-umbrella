@@ -1,3 +1,30 @@
+# Test Results — 2026-09-21
+
+All tests passing.
+
+| Suite | Count |
+|---|---|
+| All test files | 35 |
+| Total tests | 1378 |
+| Passed | 1378 |
+| Failed | 0 |
+
+## New tests added this pass (+7)
+
+### `src/lib/__tests__/previousSetsHelper.test.ts` (+7)
+
+New `describe('findPreviousWeightsOutcome')` suite:
+
+- `returns null when no outcomes exist`
+- `returns null when the only outcome is on the current date`
+- `returns the most recent prior outcome`
+- `excludes future-dated outcomes (same class of bug as findPreviousSetsByExercise)`
+- `returns null when only future-dated outcomes exist`
+- `does not return outcomes from a different plan`
+- `returns null when the only prior outcome has no weights data`
+
+---
+
 # Test Results — 2026-09-14
 
 All tests passing.

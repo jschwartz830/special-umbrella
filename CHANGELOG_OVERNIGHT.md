@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-09-21
+
+### `findPreviousWeightsOutcome` — extract, fix future-date bug, add tests
+
+**Summary:** `findPreviousWeightsOutcome` was a private function inside `TodayPage.tsx`
+that used `rest.startsWith(currentDate)` to exclude today's outcomes — identical to the
+bug fixed in `findPreviousSetsByExercise` last pass. A future-dated outcome from a bad CSV
+import would rank first by sort key and be returned as the "previous workout" to pre-fill
+`ActiveWorkoutTracker`.
+
+Two improvements in one commit:
+
+1. **Extract** the function from TodayPage.tsx to `src/lib/previousSetsHelper.ts`, where it
+   can be unit-tested and sits alongside the closely related `findPreviousSetsByExercise`.
+   Removed the `outcomeSortKey` import from TodayPage.tsx that was only needed for the
+   private copy.
+
+2. **Fix** the guard: `rest.startsWith(currentDate)` → `rest.slice(0, 10) >= currentDate`
+   — excludes both today's outcomes and any future-dated ones (same semantics as
+   `findPreviousSetsByExercise`).
+
+**Files changed:**
+- `src/lib/previousSetsHelper.ts` — new exported `findPreviousWeightsOutcome` with fixed guard
+- `src/pages/TodayPage.tsx` — removed private copy; import from previousSetsHelper; removed unused `outcomeSortKey` import
+- `src/lib/__tests__/previousSetsHelper.test.ts` — 7 new tests for `findPreviousWeightsOutcome`
+- `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` (documentation)
+
+**Tests:** 1371 → 1378 (+7)
+
+**Risk:** Minimal. The extraction is a rename+move with a single semantics change
+(the future-date guard). The function's signature and return type are unchanged.
+No callers outside TodayPage; import path updated in TodayPage.
+
+---
+
 ## 2026-09-14
 
 ### `HistoryPage` future-date guard activation + `findPreviousSetsByExercise` future-date fix

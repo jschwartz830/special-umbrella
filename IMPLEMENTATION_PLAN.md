@@ -627,3 +627,30 @@ The 2026-09-13 pass added an optional `today?: string` parameter to `computePers
 | `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
 | `beforeunload` async Supabase flush | Recommendation only — product decision needed |
 | Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
+## Additions — 2026-09-21
+
+### Changes implemented this pass
+
+| # | Item | Type | Files |
+|---|---|---|---|
+| 1 | `findPreviousWeightsOutcome`: extract from TodayPage.tsx, fix future-date guard, add tests | Bug fix + extraction | `src/lib/previousSetsHelper.ts`, `src/pages/TodayPage.tsx`, `src/lib/__tests__/previousSetsHelper.test.ts` |
+
+### Detail
+
+**1. `findPreviousWeightsOutcome` future-date guard + extraction**
+
+`findPreviousWeightsOutcome` was a private function in `TodayPage.tsx` used to find the most recent weights outcome for pre-filling `ActiveWorkoutTracker`. It used `rest.startsWith(currentDate)` to exclude today's outcomes — identical to the pre-fix version of `findPreviousSetsByExercise` corrected in the previous pass. A future-dated outcome from a bad CSV import would sort first (highest `outcomeSortKey`) and be returned as the "previous workout", causing `ActiveWorkoutTracker` to pre-fill with phantom future-session data.
+
+Fix: changed predicate to `rest.slice(0, 10) >= currentDate`, matching `findPreviousSetsByExercise`. Extracted the function to `src/lib/previousSetsHelper.ts` so it can be unit-tested and sits alongside the closely related `findPreviousSetsByExercise`. Removed the `outcomeSortKey` import from `TodayPage.tsx` that was only needed for the private copy. 7 new tests added covering: null result, today exclusion, most-recent selection, future-date exclusion, future-only exclusion, wrong-plan exclusion, no-weights-data exclusion.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| `computeWorkoutCompletionRate` UI surface | Recommendation only — function exists since Pass 90; suggested for HistoryPage stats card |
