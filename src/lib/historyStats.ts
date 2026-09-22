@@ -173,8 +173,10 @@ export interface RotationCycleProgress {
  * Returns `null` for `weeks`-duration plans or plans with no days.
  *
  * A "cycle" is one full pass through all plan.days. Progress is measured by
- * `complete` and `skip` entries — `day_off` entries do not advance the rotation
- * and are excluded (mirrors `isPlanExpired`).
+ * `complete` and `skip` entries — `day_off` entries do not count toward cycle
+ * completion and are excluded (mirrors `isPlanExpired`). Note: `day_off` does
+ * advance the rotation pointer in rotationEngine; this stat intentionally
+ * excludes it from the cycle completion count.
  */
 export function computeRotationCycleProgress(
   plan: Plan,
