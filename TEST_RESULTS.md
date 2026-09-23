@@ -1,4 +1,5 @@
 # Test Results — 2026-09-22
+# Test Results — 2026-09-23
 
 All tests passing.
 
@@ -12,6 +13,13 @@ All tests passing.
 ## New tests added this pass
 
 None — comment-only fix.
+None — documentation-only pass.
+
+## Command
+
+```
+npx vitest run
+```
 
 ---
 
