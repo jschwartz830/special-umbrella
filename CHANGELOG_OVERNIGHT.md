@@ -2,6 +2,19 @@
 
 ---
 
+## 2026-09-22
+
+### Audit pass — comment correction in `computeRotationCycleProgress`
+
+**Summary:** Corrected a misleading JSDoc comment in `historyStats.ts`. The old wording said `day_off` entries "do not advance the rotation", which is factually incorrect: `day_off` does advance the rotation pointer in `rotationEngine.ts`. What the function actually does is exclude `day_off` from the cycle *completion count* — a different concept. The comment now accurately states this distinction.
+
+**Files changed:**
+- `src/lib/historyStats.ts` — corrected `computeRotationCycleProgress` JSDoc: "do not advance the rotation" → "do not count toward cycle completion"; added clarifying note about rotationEngine behavior
+- `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` (documentation)
+
+**Tests:** 1371 (no change — comment-only fix)
+
+**Risk:** None — documentation/comment correction only.
 ## 2026-09-23
 
 ### Audit pass — no code changes
