@@ -536,6 +536,31 @@ No code changes. Audit confirmed the codebase remains clean and all prior gaps a
 
 ---
 
+## 2026-09-23 Additions
+
+### Audit pass — no code changes
+
+### Scope reviewed
+
+- `src/store/historyStore.ts` — Full re-review. `addEntry`/`importEntries`/`importExtraEntries`/`markDaysAsOff`/`updateEntryDate`/`removeRetroJumpForDate`/`removeLastOverrideByType` semantics confirmed. `migrateHistoryState` v0→v1 backfill correct. `deduplicateByDate` sort + Map strategy verified correct (last-in wins per key). `updateExtraEntryDate` intentionally allows multiple extras on a date (no collision check needed).
+- `src/store/planStore.ts` — `duplicatePlan` strip-and-unique-name logic confirmed (strips trailing `(copy N)` then enumerates until collision-free). `deepCloneWorkoutSlot`/`deepClonePlanDay` correct deep-copy paths for `warmup`, `exercises`, `segments`, `drills`. `migratePlanState` null-guards on `days ?? []` and `slots ?? []` confirmed. `migrateSlot` handles all four legacy type migrations correctly.
+- `src/store/settingsStore.ts` — Clean. `weekStartsOn` field present, `migrateSettingsState` backfills all four fields with correct defaults. Cloud hydration fixed in 2026-08-26 pass.
+- `src/modules/workout-outcomes/types.ts` — `WorkoutOutcome` interface complete: `mobilityActual` field confirmed present. `completionStateToAction` mapping verified correct. All helper functions (`derivePaceSecondsPerMile`, `deriveSwimPaceSecondsPer100m`, `formatPace`, `formatSwimPace`) correct.
+- `src/modules/run-adaptation/selectors.ts` — `resolveWorkoutDisplayTarget` preference chain (progression state → runConfig → legacy slot fields) confirmed correct. `buildAdaptationNote` switch coverage confirmed complete (progress/hold/regress/reset/default all tested).
+- `src/lib/__tests__/historyStats.test.ts` — Confirmed comprehensive: `computeConsecutiveSkips` plan isolation, `computeAverageWorkoutsPerWeek`, `isoWeekStart` all 7 weekdays, `padWeekGaps`, `computeWeeklyBreakdown`, `buildPRFlagsMap` two-pass O(N log N) design, `computeWorkoutPRFlags`, `computePersonalRecords` future-date guard.
+- `src/lib/__tests__/sessionSummary.test.ts` — Confirmed comprehensive: `findPreviousSessionForPlanDay` future-date guard, `buildLastSessionSummary` run/swim/weights/mobility/PB/priority-order/zero-distance/pace-guard edge cases all covered.
+
+### Items still open / recommended only
+
+| Item | Status |
+|---|---|
+| `TodayPage` state extraction hook | Recommendation only — risky refactor of ~1200-line component |
+| `updateEntryDate` data-loss risk in historyStore | Recommendation only — collision-delete is intentional |
+| `beforeunload` async Supabase flush | Recommendation only — product decision needed |
+| Integration test for TodayPage "Last session" PB hint | Deferred — unit coverage exists; rendering path still untested |
+
+---
+
 ## 2026-09-11 Additions
 
 ### Audit pass — no code changes

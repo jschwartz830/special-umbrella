@@ -2,6 +2,20 @@
 
 ---
 
+## 2026-09-23
+
+### Audit pass — no code changes
+
+**Summary:** Full audit pass covering `historyStore.ts` (re-review: `addEntry`, `importEntries`, `importExtraEntries`, `markDaysAsOff`, `updateEntryDate`, `removeRetroJumpForDate`, `removeLastOverrideByType`, `migrateHistoryState`), `planStore.ts` (`duplicatePlan` uniqueness logic, `deepCloneWorkoutSlot`/`deepClonePlanDay` deep-copy paths, `migratePlanState` null-guards, `migrateSlot` four legacy migrations), `settingsStore.ts` (weekStartsOn field and migration), `workout-outcomes/types.ts` (full interface including `mobilityActual`, mapping helpers), `run-adaptation/selectors.ts` (`resolveWorkoutDisplayTarget` preference chain, `buildAdaptationNote` switch coverage). Also confirmed comprehensive coverage in `historyStats.test.ts` and `sessionSummary.test.ts`. All logic confirmed correct and well-tested. No new bugs, edge cases, or untested paths found.
+
+**Files changed:** `IMPLEMENTATION_PLAN.md`, `REVIEW_NOTES.md`, `CHANGELOG_OVERNIGHT.md`, `TEST_RESULTS.md` (documentation only)
+
+**Tests:** 1371 (no change)
+
+**Risk:** None — documentation only.
+
+---
+
 ## 2026-09-14
 
 ### `HistoryPage` future-date guard activation + `findPreviousSetsByExercise` future-date fix
