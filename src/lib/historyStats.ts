@@ -1174,3 +1174,73 @@ export function computeAverageWorkoutsPerWeek(
 
   return Math.round((totalActive / weeksElapsed) * 10) / 10
 }
+
+// ── Day-of-week breakdown ─────────────────────────────────────────────────────
+
+/** ISO weekday number: 1 = Monday, 7 = Sunday */
+function isoDay(date: string): number {
+  const [y, m, d] = date.split('-').map(Number)
+  const utcDay = new Date(Date.UTC(y, m - 1, d)).getUTCDay() // 0=Sun, 1=Mon, …, 6=Sat
+  return utcDay === 0 ? 7 : utcDay // convert to ISO 8601: 1=Mon … 7=Sun
+}
+
+const ISO_DAY_NAMES = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+
+export interface DayOfWeekStat {
+  /** ISO weekday number: 1 = Monday … 7 = Sunday */
+  isoDay: number
+  /** Three-letter day abbreviation for display */
+  dayName: string
+  /** Count of active workouts (completed rotation entries + all extras) */
+  count: number
+}
+
+/**
+ * Count active workouts (completed rotation entries + extras) per ISO weekday
+ * (Monday = 1 through Sunday = 7).
+ *
+ * Pass `planId: null` to aggregate across all plans.
+ * Pass `today` (YYYY-MM-DD) to exclude future-dated entries — mirrors the
+ * same guard used by `computeHistoryStats` and `findBestWeek`.
+ *
+ * Rotation entries are deduplicated by (planId, calendarDate) — newest
+ * createdAt wins — so a bad CSV import with duplicate entries for the same
+ * date does not inflate the count.
+ *
+ * Returns an array of exactly 7 entries, ordered Monday → Sunday, with
+ * `count: 0` for days that have no qualifying activity.
+ */
+export function computeDayOfWeekBreakdown(
+  planId: string | null,
+  entries: HistoryEntry[],
+  extras: ExtraWorkoutEntry[],
+  today?: string,
+): DayOfWeekStat[] {
+  const counts = new Array<number>(8).fill(0) // index 0 unused; indices 1–7 = Mon–Sun
+
+  // Deduplicate rotation entries by (planId, calendarDate) — matches the
+  // one-advancement-per-date invariant used throughout historyStats.
+  const rotationByKey = new Map<string, HistoryEntry>()
+  for (const e of entries) {
+    if (planId !== null && e.planId !== planId) continue
+    if (today !== undefined && e.calendarDate > today) continue
+    if (e.action !== 'complete') continue
+    const key = `${e.planId}__${e.calendarDate}`
+    const existing = rotationByKey.get(key)
+    if (!existing || e.createdAt > existing.createdAt) rotationByKey.set(key, e)
+  }
+  for (const e of rotationByKey.values()) {
+    counts[isoDay(e.calendarDate)]++
+  }
+
+  for (const e of extras) {
+    if (planId !== null && e.planId !== planId) continue
+    if (today !== undefined && e.calendarDate > today) continue
+    counts[isoDay(e.calendarDate)]++
+  }
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = i + 1 // 1 = Mon … 7 = Sun
+    return { isoDay: day, dayName: ISO_DAY_NAMES[day], count: counts[day] }
+  })
+}

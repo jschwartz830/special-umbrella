@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags, buildPRFlagsMap, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek } from '../historyStats'
+import { computeHistoryStats, computePlanProgress, computeWorkoutTypeBreakdown, countPastUnloggedDays, getUnloggedPastDates, countTotalUnloggedDays, computeRotationCycleProgress, countPlanDayCompletions, computePersonalRecords, computePlanStreak, computeRotationPlanRemaining, computeWeeklyBreakdown, padWeekGaps, isoWeekStart, computeConsecutiveSkips, computeLoggedRate, getStreakDatesSet, computeCurrentStreakDates, findBestWeek, computeWorkoutPRFlags, buildPRFlagsMap, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek, computeDayOfWeekBreakdown } from '../historyStats'
 import type { HistoryEntry, ExtraWorkoutEntry, Plan, WorkoutOutcome, WorkoutType } from '../../types'
 import type { ExerciseSessionRecord } from '../../store/exerciseHistoryStore'
 
@@ -3345,5 +3345,159 @@ describe('computeAverageWorkoutsPerWeek', () => {
       entry('2026-06-14', 'complete'),
     ]
     expect(computeAverageWorkoutsPerWeek('plan-1', entries, [], '2026-06-08', TODAY)).toBe(7.0)
+  })
+})
+
+// ── computeDayOfWeekBreakdown ─────────────────────────────────────────────────
+// 2026-06-08 = Monday, 2026-06-09 = Tuesday, ..., 2026-06-14 = Sunday
+// 2026-06-15 = next Monday
+
+describe('computeDayOfWeekBreakdown', () => {
+  function dowEntry(
+    date: string,
+    action: HistoryEntry['action'] = 'complete',
+    planId = 'plan-1',
+  ): HistoryEntry {
+    return {
+      id: `${planId}_${date}`,
+      planId,
+      calendarDate: date,
+      planDayIndex: action === 'day_off' ? undefined : 0,
+      action,
+      createdAt: `${date}T12:00:00Z`,
+    }
+  }
+
+  function dowExtra(date: string, planId = 'plan-1'): ExtraWorkoutEntry {
+    return {
+      id: `extra_${planId}_${date}`,
+      planId,
+      calendarDate: date,
+      workoutType: 'yoga',
+      workoutName: 'Yoga',
+      createdAt: `${date}T13:00:00Z`,
+    }
+  }
+
+  it('returns 7 entries ordered Mon–Sun with count 0 when inputs are empty', () => {
+    const result = computeDayOfWeekBreakdown('plan-1', [], [])
+    expect(result).toHaveLength(7)
+    expect(result.map(r => r.isoDay)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    expect(result.map(r => r.dayName)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+    expect(result.every(r => r.count === 0)).toBe(true)
+  })
+
+  it('increments the correct weekday bucket for a Monday', () => {
+    // 2026-06-08 is a Monday
+    const result = computeDayOfWeekBreakdown('plan-1', [dowEntry('2026-06-08')], [])
+    expect(result[0]).toEqual({ isoDay: 1, dayName: 'Mon', count: 1 })
+    expect(result.slice(1).every(r => r.count === 0)).toBe(true)
+  })
+
+  it('increments the correct weekday bucket for a Sunday', () => {
+    // 2026-06-14 is a Sunday
+    const result = computeDayOfWeekBreakdown('plan-1', [dowEntry('2026-06-14')], [])
+    expect(result[6]).toEqual({ isoDay: 7, dayName: 'Sun', count: 1 })
+    expect(result.slice(0, 6).every(r => r.count === 0)).toBe(true)
+  })
+
+  it('accumulates counts across multiple weeks on the same day', () => {
+    // Two Mondays
+    const entries = [dowEntry('2026-06-08'), dowEntry('2026-06-15')]
+    const result = computeDayOfWeekBreakdown('plan-1', entries, [])
+    expect(result[0].count).toBe(2) // Monday
+    expect(result.slice(1).every(r => r.count === 0)).toBe(true)
+  })
+
+  it('does not count skip or day_off entries', () => {
+    const entries = [
+      dowEntry('2026-06-08', 'skip'),
+      dowEntry('2026-06-09', 'day_off'),
+      dowEntry('2026-06-10', 'complete'),
+    ]
+    const result = computeDayOfWeekBreakdown('plan-1', entries, [])
+    // Only Wednesday (isoDay 3) counts
+    expect(result[2].count).toBe(1) // Wednesday
+    expect(result.filter((_, i) => i !== 2).every(r => r.count === 0)).toBe(true)
+  })
+
+  it('counts extras on the correct weekday', () => {
+    // 2026-06-11 = Thursday
+    const result = computeDayOfWeekBreakdown('plan-1', [], [dowExtra('2026-06-11')])
+    expect(result[3].count).toBe(1) // Thursday
+    expect(result.filter((_, i) => i !== 3).every(r => r.count === 0)).toBe(true)
+  })
+
+  it('counts rotation completions and extras independently on the same day', () => {
+    // Both a completed rotation entry and an extra on the same Wednesday
+    const result = computeDayOfWeekBreakdown('plan-1', [dowEntry('2026-06-10')], [dowExtra('2026-06-10')])
+    expect(result[2].count).toBe(2) // Wednesday: 1 rotation + 1 extra
+  })
+
+  it('deduplicates rotation entries by (planId, calendarDate) — duplicate dates count once', () => {
+    const entries: HistoryEntry[] = [
+      { ...dowEntry('2026-06-08'), id: 'e1', createdAt: '2026-06-08T10:00:00Z' },
+      { ...dowEntry('2026-06-08'), id: 'e2', createdAt: '2026-06-08T18:00:00Z' },
+    ]
+    const result = computeDayOfWeekBreakdown('plan-1', entries, [])
+    expect(result[0].count).toBe(1) // Monday — not 2
+  })
+
+  it('filters by planId when provided', () => {
+    const entries = [
+      dowEntry('2026-06-08', 'complete', 'plan-1'), // Monday
+      dowEntry('2026-06-09', 'complete', 'plan-2'), // Tuesday — different plan
+    ]
+    const result = computeDayOfWeekBreakdown('plan-1', entries, [])
+    expect(result[0].count).toBe(1) // Monday
+    expect(result[1].count).toBe(0) // Tuesday from plan-2 excluded
+  })
+
+  it('includes all plans when planId is null', () => {
+    const entries = [
+      dowEntry('2026-06-08', 'complete', 'plan-1'), // Monday
+      dowEntry('2026-06-09', 'complete', 'plan-2'), // Tuesday
+    ]
+    const result = computeDayOfWeekBreakdown(null, entries, [])
+    expect(result[0].count).toBe(1) // Monday from plan-1
+    expect(result[1].count).toBe(1) // Tuesday from plan-2
+  })
+
+  it('excludes future-dated entries when today is provided', () => {
+    const entries = [
+      dowEntry('2026-06-08', 'complete'), // Monday — past
+      dowEntry('2099-01-07', 'complete'), // Monday — future (2099-01-07 is also a Mon)
+    ]
+    const result = computeDayOfWeekBreakdown('plan-1', entries, [], '2026-06-14')
+    expect(result[0].count).toBe(1) // Only the past Monday counts
+  })
+
+  it('excludes future extras when today is provided', () => {
+    const extras = [
+      dowExtra('2026-06-08'), // past Monday
+      dowExtra('2099-01-07'), // future Monday
+    ]
+    const result = computeDayOfWeekBreakdown('plan-1', [], extras, '2026-06-14')
+    expect(result[0].count).toBe(1) // Only the past Monday extra counts
+  })
+
+  it('includes entries on today (today is inclusive upper bound)', () => {
+    const entries = [dowEntry('2026-06-14', 'complete')] // Sunday = today
+    const result = computeDayOfWeekBreakdown('plan-1', entries, [], '2026-06-14')
+    expect(result[6].count).toBe(1) // Sunday
+  })
+
+  it('correctly identifies all 7 weekdays from a full week', () => {
+    const entries = [
+      dowEntry('2026-06-08'), // Mon
+      dowEntry('2026-06-09'), // Tue
+      dowEntry('2026-06-10'), // Wed
+      dowEntry('2026-06-11'), // Thu
+      dowEntry('2026-06-12'), // Fri
+      dowEntry('2026-06-13'), // Sat
+      dowEntry('2026-06-14'), // Sun
+    ]
+    const result = computeDayOfWeekBreakdown('plan-1', entries, [])
+    expect(result.map(r => r.count)).toEqual([1, 1, 1, 1, 1, 1, 1])
   })
 })
