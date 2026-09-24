@@ -1,76 +1,58 @@
-# Test Results — 2026-09-22
-# Test Results — 2026-09-23
+# TEST_RESULTS.md
+## Overnight Pass — 2026-09-24
 
-All tests passing.
+---
 
-| Suite | Count |
-|---|---|
-| All test files | 35 |
-| Total tests | 1371 |
-| Passed | 1371 |
-| Failed | 0 |
+### Tests reviewed
 
-## New tests added this pass
+- **35 test files** covering engine, lib/stats, store, hooks, and module logic
+- **1371 pre-existing tests** — all passing before this pass began
+- Key files reviewed: `rotationEngine.test.ts`, `historyStats.test.ts`, `historyStore.test.ts`, `exerciseHistoryStore.test.ts`, `outcomeStore.test.ts`, `previousSetsHelper.test.ts`, `sessionSummary.test.ts`
 
-None — comment-only fix.
-None — documentation-only pass.
+---
 
-## Command
+### Tests added/updated
+
+**New: `describe('computeDayOfWeekBreakdown', …)` in `src/lib/__tests__/historyStats.test.ts`**
+
+14 new tests covering:
+
+| Test case | Behavior verified |
+|-----------|-------------------|
+| Empty inputs | Returns 7 entries with count 0 each |
+| Monday bucket | Correct isoDay=1 assignment for 2026-06-08 (a Monday) |
+| Sunday bucket | Correct isoDay=7 assignment for 2026-06-14 (a Sunday) |
+| Multi-week accumulation | Same weekday across two weeks adds counts |
+| Skip/day_off exclusion | Only `complete` entries count |
+| Extras on correct weekday | Extra workouts counted per day |
+| Same-day rotation + extra | Both count independently (count = 2) |
+| Deduplication | Two entries same date → count = 1 (not 2) |
+| planId scoping | Different-plan entries excluded when planId given |
+| All-plans (null planId) | Both plans included when planId is null |
+| Future-date guard (entries) | Entries after `today` excluded |
+| Future-date guard (extras) | Extras after `today` excluded |
+| Today inclusive | Entry on `today` is included in count |
+| Full 7-day week | All 7 buckets correctly identified |
+
+**Import updated:** `computeDayOfWeekBreakdown` added to the import line in `historyStats.test.ts`.
+
+---
+
+### Results
 
 ```
-npx vitest run
+Test Files  35 passed (35)
+     Tests  1385 passed (1385)   ← +14 new tests
+  Start at  04:24:51
+  Duration  3.19s
 ```
 
 ---
 
-# Test Results — 2026-09-14
+### Important areas still untested
 
-All tests passing.
+1. **`computeWorkoutTypeBreakdown` future-date behavior without a caller-supplied range**: The function has no built-in `today` guard; it relies on callers to pass `dateRange.to = today`. The existing call site handles this, but a test documenting "without a range, future entries are included" would be valuable defensive documentation.
 
-| Suite | Count |
-|---|---|
-| All test files | 35 |
-| Total tests | 1371 |
-| Passed | 1371 |
-| Failed | 0 |
+2. **`computeWeeklyBreakdown` with caller-omitted today bound**: Same pattern. Not a bug (by design), but a test that documents "passing toDate=today is the caller's responsibility" would add clarity.
 
-## New tests added this pass (+2)
-
-### `src/lib/__tests__/previousSetsHelper.test.ts` (+2)
-
-- `excludes future-dated rotation outcomes (same class of bug as findPreviousSessionForPlanDay)`
-- `excludes future-dated extra workout outcomes`
-
----
-
-# Test Results — 2026-09-13
-
-All tests passing.
-
-| Suite | Count |
-|---|---|
-| All test files | 35 |
-| Total tests | 1369 |
-| Passed | 1369 |
-| Failed | 0 |
-
-## New tests added this pass (+5)
-
-### `src/lib/__tests__/historyStats.test.ts` (+4)
-
-- `computePersonalRecords > excludes future-dated records when today is provided`
-- `computePersonalRecords > includes all records when today is not provided (backward-compatible)`
-- `computePersonalRecords > excludes future-dated records even when planId filter is applied`
-- `computePersonalRecords > returns empty array when all records are in the future`
-
-### `src/lib/__tests__/estimateRunDuration.test.ts` (+1)
-
-- `estimateRunDurationMin > falls through to distance when duration is present but unrecognized`
-
-## Command
-
-```
-npx vitest run
-```
-
-Duration: ~3.5s
+3. **UI integration tests**: The new `computeDayOfWeekBreakdown` function is not yet called from any page. There are no Playwright/integration tests in this repo (test suite is unit-only). When the function is wired into `HistoryPage`, manual testing of the chart rendering would be important.
