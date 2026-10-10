@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List, Target } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
+import { RotateToPortraitOverlay } from '../shared/RotateToPortraitOverlay'
 import type { ExerciseSpec, WarmupRampSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import { deriveProgressionMode } from '../../modules/workout-outcomes/progressionMode'
@@ -432,7 +433,7 @@ export function ActiveWorkoutTracker({
 }: Props) {
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
   const DRAFT_VERSION = 1
-  const { startDelaySeconds, focusMode, setFocusMode } = useSettingsStore()
+  const { startDelaySeconds, focusMode, setFocusMode, focusLandscape } = useSettingsStore()
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [exercisePicker, setExercisePicker] = useState<ExercisePickerMode | null>(null)
   const workoutStartRef = useRef(new Date().toISOString())
@@ -1651,6 +1652,7 @@ export function ActiveWorkoutTracker({
 
     return (
       <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
+        {!focusLandscape && <RotateToPortraitOverlay />}
         {/* Header */}
         <div
           className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 ls:pb-2 border-b border-slate-800"
@@ -1798,7 +1800,7 @@ export function ActiveWorkoutTracker({
               <button
                 onClick={onButton}
                 disabled={!workoutRunning}
-                className={`w-full max-w-xs aspect-square max-h-[300px] ls:w-[min(calc(100dvh-180px),240px)] ls:max-h-none rounded-full flex flex-col items-center justify-center gap-2 font-bold shadow-xl transition-transform active:scale-[0.97] disabled:opacity-40 ${
+                className={`w-full max-w-[300px] aspect-square flex-shrink-0 ls:w-[min(calc(100dvh-180px),240px)] rounded-full flex flex-col items-center justify-center gap-2 font-bold shadow-xl transition-transform active:scale-[0.97] disabled:opacity-40 ${
                   performing
                     ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                     : 'bg-sky-500 hover:bg-sky-600 text-white'
@@ -1848,6 +1850,7 @@ export function ActiveWorkoutTracker({
 
   return (
     <>
+    <RotateToPortraitOverlay />
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
       <div className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 border-b border-slate-800" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
         <button

@@ -12,6 +12,7 @@ function resetStore() {
     startDelaySeconds: 0,
     autoAdvanceSegments: true,
     focusMode: false,
+    focusLandscape: true,
     weekStartsOn: 0,
   })
 }
@@ -120,6 +121,21 @@ describe('settingsStore', () => {
 })
 
 // ── migrateSettingsState ──────────────────────────────────────────────────────
+
+describe('focusLandscape', () => {
+  beforeEach(resetStore)
+
+  it('defaults to true and can be toggled', () => {
+    expect(useSettingsStore.getState().focusLandscape).toBe(true)
+    useSettingsStore.getState().setFocusLandscape(false)
+    expect(useSettingsStore.getState().focusLandscape).toBe(false)
+  })
+
+  it('migration backfills true when missing and preserves a stored false', () => {
+    expect(migrateSettingsState({}, 0).focusLandscape).toBe(true)
+    expect(migrateSettingsState({ focusLandscape: false }, 0).focusLandscape).toBe(false)
+  })
+})
 
 describe('migrateSettingsState', () => {
   it('returns correct defaults when persisted state is null', () => {
