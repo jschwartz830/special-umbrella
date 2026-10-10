@@ -3,6 +3,11 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      screens: {
+        // Phone held sideways — short, wide viewport. Used by the focus-mode
+        // workout view to switch to a side-by-side layout.
+        ls: { raw: '(orientation: landscape) and (max-height: 500px)' },
+      },
       colors: {
         brand: {
           50: '#f0f9ff',

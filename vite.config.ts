@@ -36,7 +36,7 @@ export default defineConfig({
         theme_color: '#0ea5e9',
         background_color: '#0f172a',
         display: 'standalone',
-        orientation: 'portrait',
+        orientation: 'any',
         start_url: '/special-umbrella/',
         icons: [
           {

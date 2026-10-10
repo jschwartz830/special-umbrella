@@ -1652,7 +1652,14 @@ export function ActiveWorkoutTracker({
     return (
       <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
         {/* Header */}
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 border-b border-slate-800" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
+        <div
+          className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 ls:pb-2 border-b border-slate-800"
+          style={{
+            paddingTop: 'max(env(safe-area-inset-top), 12px)',
+            paddingLeft: 'max(env(safe-area-inset-left), 16px)',
+            paddingRight: 'max(env(safe-area-inset-right), 16px)',
+          }}
+        >
           <button
             onClick={onMinimize}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
@@ -1700,10 +1707,18 @@ export function ActiveWorkoutTracker({
             </button>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col px-5 pt-4 pb-6 overflow-y-auto">
+          // Portrait: stacked. Landscape phone (ls): exercise name across the top,
+          // timer/action button on the left, set data on the right.
+          <div
+            className="flex-1 flex flex-col px-5 pt-4 pb-6 overflow-y-auto ls:grid ls:grid-cols-[auto_minmax(0,1fr)] ls:grid-rows-[auto_minmax(0,1fr)] ls:gap-x-6 ls:gap-y-2 ls:pt-2 ls:pb-3"
+            style={{
+              paddingLeft: 'max(env(safe-area-inset-left), 20px)',
+              paddingRight: 'max(env(safe-area-inset-right), 20px)',
+            }}
+          >
             {/* Exercise + set position */}
-            <div className="text-center">
-              <p className="text-xl font-bold text-white leading-tight">{curEx.exercise}</p>
+            <div className="text-center ls:col-span-2">
+              <p className="text-xl ls:text-lg font-bold text-white leading-tight">{curEx.exercise}</p>
               <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-medium">
                 {curSet.isWarmup
                   ? 'Warmup set'
@@ -1711,8 +1726,10 @@ export function ActiveWorkoutTracker({
               </p>
             </div>
 
+            {/* Set data: last / target + entry */}
+            <div className="ls:col-start-2 ls:row-start-2 ls:flex ls:flex-col ls:justify-center ls:min-h-0">
             {/* Last / Target */}
-            <div className="grid grid-cols-2 gap-3 mt-5">
+            <div className="grid grid-cols-2 gap-3 mt-5 ls:mt-0">
               <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-center">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Last</p>
                 <p className="text-sm text-slate-200 font-medium mt-1">{previousSetDisplay(curEx, cur.setIdx)}</p>
@@ -1725,32 +1742,32 @@ export function ActiveWorkoutTracker({
 
             {/* Data entry for current set */}
             <div className="grid grid-cols-2 gap-3 mt-3">
-              <div className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-3">
+              <div className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-3 ls:px-2 ls:py-2">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold text-center mb-2">{unitLabel}</p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 ls:gap-1">
                   <button
                     onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualReps: Math.max(0, (curSet.actualReps ?? 0) - repStep) })}
-                    className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
+                    className="w-9 h-9 ls:w-8 ls:h-8 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
                   >−</button>
                   <NumberTextField
                     inputMode="numeric"
                     value={curSet.actualReps}
                     onChange={v => updateSet(cur.exIdx, cur.setIdx, { actualReps: v })}
                     placeholder={String(curSet.targetReps ?? (curSet.isTimed ? 'secs' : 'reps'))}
-                    className="flex-1 min-w-0 bg-transparent text-2xl font-bold text-white text-center focus:outline-none"
+                    className="flex-1 min-w-0 bg-transparent text-2xl ls:text-xl font-bold text-white text-center focus:outline-none"
                   />
                   <button
                     onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualReps: (curSet.actualReps ?? 0) + repStep })}
-                    className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
+                    className="w-9 h-9 ls:w-8 ls:h-8 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
                   >+</button>
                 </div>
               </div>
-              <div className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-3">
+              <div className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-3 ls:px-2 ls:py-2">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold text-center mb-2">Lbs</p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 ls:gap-1">
                   <button
                     onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualLoad: Math.max(0, (curSet.actualLoad ?? 0) - 5) })}
-                    className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
+                    className="w-9 h-9 ls:w-8 ls:h-8 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
                   >−</button>
                   <NumberTextField
                     inputMode="decimal"
@@ -1761,28 +1778,33 @@ export function ActiveWorkoutTracker({
                         ? String(curSet.resolvedLoadLbs)
                         : (curSet.targetLoad ?? 'lbs')
                     }
-                    className="flex-1 min-w-0 bg-transparent text-2xl font-bold text-white text-center focus:outline-none"
+                    className="flex-1 min-w-0 bg-transparent text-2xl ls:text-xl font-bold text-white text-center focus:outline-none"
                   />
                   <button
                     onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualLoad: (curSet.actualLoad ?? 0) + 5 })}
-                    className="w-9 h-9 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
+                    className="w-9 h-9 ls:w-8 ls:h-8 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
                   >+</button>
                 </div>
               </div>
             </div>
 
+            </div>
+
+            {/* Timer: big action button + rest adjusters. In landscape the rest
+                adjusters stack beside the button so it can use the full column height. */}
+            <div className="flex-1 flex flex-col ls:col-start-1 ls:row-start-2 ls:flex-row ls:items-center ls:justify-center ls:gap-3 ls:min-h-0">
             {/* Big center action button */}
-            <div className="flex-1 flex flex-col items-center justify-center py-6">
+            <div className="flex-1 flex flex-col items-center justify-center py-6 ls:flex-none ls:py-0">
               <button
                 onClick={onButton}
                 disabled={!workoutRunning}
-                className={`w-full max-w-xs aspect-square max-h-[300px] rounded-full flex flex-col items-center justify-center gap-2 font-bold shadow-xl transition-transform active:scale-[0.97] disabled:opacity-40 ${
+                className={`w-full max-w-xs aspect-square max-h-[300px] ls:w-[min(calc(100dvh-180px),240px)] ls:max-h-none rounded-full flex flex-col items-center justify-center gap-2 font-bold shadow-xl transition-transform active:scale-[0.97] disabled:opacity-40 ${
                   performing
                     ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                     : 'bg-sky-500 hover:bg-sky-600 text-white'
                 }`}
               >
-                <span className="text-2xl">{buttonLabel}</span>
+                <span className="text-2xl ls:text-xl">{buttonLabel}</span>
                 {isCountingDown ? (
                   <span className="text-4xl font-mono font-bold text-sky-100">{setTimerCountdown!.remaining}</span>
                 ) : setRunning ? (
@@ -1793,15 +1815,15 @@ export function ActiveWorkoutTracker({
               </button>
 
               {resting && (
-                <p className="mt-5 text-xs text-slate-500">Target {restTarget != null ? fmt(restTarget) : '—'}</p>
+                <p className="mt-5 ls:mt-2 text-xs text-slate-500">Target {restTarget != null ? fmt(restTarget) : '—'}</p>
               )}
               {!workoutRunning && (
-                <p className="mt-5 text-xs text-orange-300">Workout paused — tap the timer to resume</p>
+                <p className="mt-5 ls:mt-2 text-xs text-orange-300 text-center">Workout paused — tap the timer to resume</p>
               )}
             </div>
 
             {/* Corner rest adjusters */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between ls:flex-col-reverse ls:gap-3">
               <button
                 onClick={() => focusAdjustRest(-15, cur)}
                 className="flex flex-col items-center px-5 py-2.5 rounded-xl border border-slate-700 bg-slate-800/60 text-slate-200 active:bg-slate-700 transition-colors"
@@ -1816,6 +1838,7 @@ export function ActiveWorkoutTracker({
                 <span className="text-lg font-bold leading-none">+15</span>
                 <span className="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">Rest</span>
               </button>
+            </div>
             </div>
           </div>
         )}
