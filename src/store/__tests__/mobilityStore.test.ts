@@ -11,7 +11,7 @@
  * The migration itself is a trivial one-liner and is not separately tested here.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { singleTimedSet } from '../../lib/mobilityLibrary'
+import { singleTimedSet, MOBILITY_PRESETS, getLibraryExerciseById } from '../../lib/mobilityLibrary'
 
 vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
@@ -375,6 +375,23 @@ describe('loadPreset', () => {
     expect(ex.id).toBe('custom-unknown')
     expect(ex.name).toBe('custom-unknown')
     expect(ex.sets).toEqual([{ durationSec: 30 }])
+  })
+
+  it('loads explicit sets × reps and notes from a PT preset', () => {
+    const pt = MOBILITY_PRESETS.find(p => p.id === 'preset-pt-home-exercise-program')!
+    useMobilityStore.getState().loadPreset(pt, 'replace')
+    const routine = useMobilityStore.getState().routine
+    expect(routine.map(e => e.name)).toEqual([
+      'Bear Plank Scap Push-Up Plus',
+      'Upper Trap Lift Off',
+      'Half-Kneeling Landmine Press',
+      'Turkish Get-Up (Part 5)',
+    ])
+    expect(routine[0].sets).toEqual([{ reps: 8 }, { reps: 8 }, { reps: 8 }])
+    expect(routine[0].notes).toBe('1 second hold')
+    expect(routine[3].sets).toEqual([{ reps: 10 }, { reps: 10 }])
+    // Every preset exercise resolves to a library entry
+    for (const pe of pt.exercises) expect(getLibraryExerciseById(pe.exerciseId)).toBeDefined()
   })
 })
 

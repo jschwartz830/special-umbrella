@@ -54,6 +54,11 @@ export function singleTimedSet(durationSec: number): MobilitySet[] {
   return [{ durationSec }]
 }
 
+/** `count` identical rep-based sets, e.g. repSets(3, 8) → 3 × 8 reps. */
+export function repSets(count: number, reps: number): MobilitySet[] {
+  return Array.from({ length: count }, () => ({ reps }))
+}
+
 /** Formats a duration in seconds as "45s" / "2m" / "2m 15s". */
 export function formatMobilityDuration(sec: number): string {
   const m = Math.floor(sec / 60)
@@ -265,6 +270,37 @@ export const MOBILITY_LIBRARY: MobilityLibraryExercise[] = [
     durationSec: 60,
     description: 'Lie on back, knees bent, holding a kettlebell bottoms-up directly over the shoulder with arm straight and shoulder retracted. Roll toward the opposite side, keeping the arm vertical by actively repacking/retracting the shoulder blade as you move. Trains shoulder stability and control through rotation.',
     note: 'Move slowly and only as far as the shoulder stays pain-free and the arm stays vertical.',
+    bilateral: true,
+  },
+  {
+    id: 'lib-bear-plank-scap-pushup-plus',
+    name: 'Bear Plank Scap Push-Up Plus',
+    categories: ['scapula-shoulder'],
+    durationSec: 30,
+    description: 'While holding a bear plank with arms straight, drop the chest and pinch the shoulders together, then push up to protract the shoulders. Hold 1 second at the top.',
+  },
+  {
+    id: 'lib-upper-trap-lift-off',
+    name: 'Upper Trap Lift Off',
+    categories: ['scapula-shoulder', 'posture'],
+    durationSec: 90,
+    description: 'Stand up straight with forearms against the wall. Slide arms slightly above your head into a comfortable position. Shrug shoulders, reaching as high as you can, then lift arms off the wall and hold for 10 seconds. Return to the start and repeat.',
+  },
+  {
+    id: 'lib-half-kneeling-landmine-press',
+    name: 'Half-Kneeling Landmine Press',
+    categories: ['scapula-shoulder'],
+    durationSec: 45,
+    description: 'Put a barbell into a corner where it can\'t move. Start half kneeling with the elbow below shoulder level. Press the barbell up on a diagonal, then return to the starting position.',
+    note: '45# plate.',
+    bilateral: true,
+  },
+  {
+    id: 'lib-turkish-get-up-part-5',
+    name: 'Turkish Get-Up (Part 5)',
+    categories: ['scapula-shoulder', 'general'],
+    durationSec: 60,
+    description: 'Final phase of the get-up: with the arm locked overhead, move from the half-kneeling position up to standing, then back down to half kneeling.',
     bilateral: true,
   },
 
@@ -513,7 +549,14 @@ export interface MobilityPreset {
   description: string
   durationMin: number
   categories: MobilityCategory[]
-  exercises: Array<{ exerciseId: string; durationSec: number }>
+  exercises: Array<{
+    exerciseId: string
+    durationSec: number
+    // Optional full dosing (e.g. a PT's sets × reps). When present it's loaded
+    // as-is instead of a single timed set of `durationSec`.
+    sets?: MobilitySet[]
+    notes?: string
+  }>
 }
 
 /**
@@ -642,6 +685,19 @@ export const MOBILITY_PRESETS: MobilityPreset[] = [
       { exerciseId: 'lib-upper-trap-stretch-seated', durationSec: 180 },
       { exerciseId: 'lib-wall-slides-serratus', durationSec: 60 },
       { exerciseId: 'lib-lacrosse-ball-rotator-cuff', durationSec: 600 },
+    ],
+  },
+  {
+    id: 'preset-pt-home-exercise-program',
+    name: 'PT: Home Exercise Program',
+    description: 'Physical therapist\'s home program (Oct 2026) — scapular control and overhead strength. Perform 3× a week.',
+    durationMin: 15,
+    categories: ['scapula-shoulder'],
+    exercises: [
+      { exerciseId: 'lib-bear-plank-scap-pushup-plus', durationSec: 30, sets: repSets(3, 8), notes: '1 second hold' },
+      { exerciseId: 'lib-upper-trap-lift-off', durationSec: 90, sets: repSets(3, 8), notes: '10 second hold each rep' },
+      { exerciseId: 'lib-half-kneeling-landmine-press', durationSec: 45, sets: repSets(3, 8), notes: '45# plate' },
+      { exerciseId: 'lib-turkish-get-up-part-5', durationSec: 60, sets: repSets(2, 10) },
     ],
   },
   {

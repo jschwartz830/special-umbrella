@@ -163,7 +163,12 @@ export const useMobilityStore = create<MobilityState>()(
       loadPreset(preset, mode) {
         const incoming: MobilityExercise[] = preset.exercises.map(pe => {
           const libEx = MOBILITY_LIBRARY.find(e => e.id === pe.exerciseId)
-          return { id: pe.exerciseId, name: libEx?.name ?? pe.exerciseId, sets: singleTimedSet(pe.durationSec) }
+          return {
+            id: pe.exerciseId,
+            name: libEx?.name ?? pe.exerciseId,
+            sets: pe.sets ? pe.sets.map(st => ({ ...st })) : singleTimedSet(pe.durationSec),
+            ...(pe.notes ? { notes: pe.notes } : {}),
+          }
         })
         set(s => {
           if (mode === 'replace') return { routine: incoming }
