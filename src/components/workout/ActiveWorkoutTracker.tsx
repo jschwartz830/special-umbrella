@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List, Target } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
-import { RotateToPortraitOverlay } from '../shared/RotateToPortraitOverlay'
 import type { ExerciseSpec, WarmupRampSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import { deriveProgressionMode } from '../../modules/workout-outcomes/progressionMode'
@@ -433,7 +432,7 @@ export function ActiveWorkoutTracker({
 }: Props) {
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
   const DRAFT_VERSION = 1
-  const { startDelaySeconds, focusMode, setFocusMode, focusLandscape } = useSettingsStore()
+  const { startDelaySeconds, focusMode, setFocusMode } = useSettingsStore()
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [exercisePicker, setExercisePicker] = useState<ExercisePickerMode | null>(null)
   const workoutStartRef = useRef(new Date().toISOString())
@@ -1652,7 +1651,6 @@ export function ActiveWorkoutTracker({
 
     return (
       <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
-        {!focusLandscape && <RotateToPortraitOverlay />}
         {/* Header */}
         <div
           className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 ls:pb-2 border-b border-slate-800"
@@ -1848,11 +1846,15 @@ export function ActiveWorkoutTracker({
     )
   }
 
+  // Portrait: header, timers, exercise list, Done stacked. Landscape phone (ls):
+  // timers + Done pinned in a left column, exercise list scrolls on the right.
   return (
     <>
-    <RotateToPortraitOverlay />
-    <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 border-b border-slate-800" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
+    <div
+      className="fixed inset-0 z-50 bg-slate-900 flex flex-col ls:grid ls:grid-cols-[300px_minmax(0,1fr)] ls:grid-rows-[auto_auto_minmax(0,1fr)]"
+      style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}
+    >
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 ls:pb-2 border-b border-slate-800 ls:col-span-2" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
         <button
           onClick={onMinimize}
           className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
@@ -1894,7 +1896,7 @@ export function ActiveWorkoutTracker({
       </div>
 
       <div
-        className="flex-shrink-0 mx-4 mt-3 border border-slate-700 rounded-xl bg-slate-800/60 cursor-pointer select-none"
+        className="flex-shrink-0 mx-4 mt-3 border border-slate-700 rounded-xl bg-slate-800/60 cursor-pointer select-none ls:col-start-1 ls:row-start-2 ls:mr-0"
         onClick={() => setTimersExpanded(v => !v)}
       >
         <div className="grid grid-cols-3 divide-x divide-slate-700/60 py-2.5">
@@ -1936,7 +1938,7 @@ export function ActiveWorkoutTracker({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-3 pb-28 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 pt-3 pb-28 space-y-3 ls:col-start-2 ls:row-start-2 ls:row-span-2 ls:min-h-0 ls:pb-6">
         {exercises.length === 0 ? (
           <div className="text-center py-10 space-y-1">
             <p className="text-sm text-slate-400">Timer is running.</p>
@@ -2160,7 +2162,7 @@ export function ActiveWorkoutTracker({
         </button>
       </div>
 
-      <div className="flex-shrink-0 px-4 pt-3 pb-6 border-t border-slate-800 bg-slate-900">
+      <div className="flex-shrink-0 px-4 pt-3 pb-6 border-t border-slate-800 bg-slate-900 ls:col-start-1 ls:row-start-3 ls:self-end ls:border-t-0 ls:pr-0 ls:pb-4">
         <button
           onClick={handleDone}
           className="w-full py-3.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold text-sm transition-colors active:scale-[0.98]"
