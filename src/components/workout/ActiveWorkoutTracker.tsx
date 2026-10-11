@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { X, Pause, Play, RotateCcw, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List, Target } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
+import { useLandscapeAutoFocus } from '../../hooks/useLandscapeAutoFocus'
 import type { ExerciseSpec, WarmupRampSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import { deriveProgressionMode } from '../../modules/workout-outcomes/progressionMode'
@@ -433,6 +434,7 @@ export function ActiveWorkoutTracker({
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
   const DRAFT_VERSION = 1
   const { startDelaySeconds, focusMode, setFocusMode } = useSettingsStore()
+  useLandscapeAutoFocus()
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [exercisePicker, setExercisePicker] = useState<ExercisePickerMode | null>(null)
   const workoutStartRef = useRef(new Date().toISOString())
