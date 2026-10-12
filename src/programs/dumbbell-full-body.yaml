@@ -1,0 +1,63 @@
+schemaVersion: 1
+name: "Dumbbell Full Body (Home)"
+description: >
+  Three full-body sessions a week with just a pair of adjustable dumbbells
+  and a bench (or floor). Double progression: add reps within the range, then
+  go up a dumbbell size once every set hits the top of the range.
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  db_press: 40
+  db_row: 40
+  goblet: 50
+  db_rdl: 40
+
+days:
+  - label: "Full Body A"
+    slots:
+      - type: weights
+        name: "DB Full Body A"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        exercises:
+          - { exercise: "Goblet Squat", sets: 3, reps: "8-12", load: goblet, rest: 90s, progressionType: double, progress: { if: all_reps, then: "goblet += 5" } }
+          - { exercise: "Dumbbell Bench Press", sets: 3, reps: "8-12", load: db_press, rest: 90s, progressionType: double, progress: { if: all_reps, then: "db_press += 5" } }
+          - { exercise: "Dumbbell Row", sets: 3, reps: "8-12", load: db_row, rest: 90s, progressionType: double, notes: "Reps per arm", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Dumbbell Lateral Raise", sets: 3, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Plank", sets: 3, duration: 45s, rest: 45s }
+
+  - label: "Full Body B"
+    slots:
+      - type: weights
+        name: "DB Full Body B"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        exercises:
+          - { exercise: "Dumbbell Romanian Deadlift", sets: 3, reps: "8-12", load: db_rdl, rest: 90s, progressionType: double, progress: { if: all_reps, then: "db_rdl += 5" } }
+          - { exercise: "Dumbbell Overhead Press", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Dumbbell Reverse Lunge", sets: 3, reps: "8-12", rest: 90s, progressionType: double, notes: "Reps per leg" }
+          - { exercise: "Push-Ups", sets: 3, reps: "AMRAP", rest: 60s }
+          - { exercise: "Dumbbell Curl", sets: 2, reps: "10-15", rest: 60s, progressionType: double, supersetGroupId: "arms" }
+          - { exercise: "Dumbbell Skullcrusher", sets: 2, reps: "10-15", rest: 60s, progressionType: double, supersetGroupId: "arms" }
+
+  - label: "Full Body C"
+    slots:
+      - type: weights
+        name: "DB Full Body C"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        exercises:
+          - { exercise: "Bulgarian Split Squat", sets: 3, reps: "8-12", rest: 90s, progressionType: double, notes: "Reps per leg" }
+          - { exercise: "Dumbbell Incline Press", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Chest-Supported Dumbbell Row", sets: 3, reps: "10-15", rest: 90s, progressionType: double }
+          - { exercise: "Dumbbell Hip Thrust", sets: 3, reps: "10-15", rest: 90s, progressionType: double }
+          - { exercise: "Dead Bug", sets: 3, reps: 10, rest: 45s, notes: "Reps per side" }

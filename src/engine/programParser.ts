@@ -114,6 +114,7 @@ function parseExerciseSpec(raw: YamlExerciseSpec): ExerciseSpec {
     synergist: Array.isArray(raw.synergist) ? raw.synergist : undefined,
     progress,
     progressionType: raw.progressionType,
+    supersetGroupId: normStr(raw.supersetGroupId),
   }
 }
 

@@ -1,0 +1,70 @@
+schemaVersion: 1
+name: "Half Marathon — 12 Weeks"
+description: >
+  Runna-style half marathon build for runners comfortable with 10K: four
+  runs a week (easy, intervals, tempo, long). The long run builds to 12
+  miles and the quality sessions grow only when you finish in control
+  (effort 3 or less). In the last two weeks before race day, cut the long
+  run back to 6-8 miles to taper.
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  easy_miles: 3.5
+  long_miles: 6
+  tempo_miles: 2
+  interval_reps: 4
+
+days:
+  - label: "Easy Run"
+    slots:
+      - type: run
+        name: "Easy Run + Strides"
+        subtype: easy
+        difficulty: easy
+        durationMin: 40
+        segments:
+          - { type: easy, distance: "easy_miles mi", pace: easy, notes: "Conversational pace" }
+          - type: drills
+            drills:
+              - { name: "Strides", sets: 6, duration: 20s, rest: 60s }
+        progress: { if: "session_complete and effort <= 3", then: "easy_miles = min(easy_miles + 0.25, 5)" }
+
+  - label: "Intervals"
+    slots:
+      - type: run
+        name: "1K Repeats"
+        subtype: intervals
+        difficulty: hard
+        durationMin: 50
+        segments:
+          - { type: warmup, distance: "1.5 mi", pace: easy }
+          - { type: interval, distance: "1000m", pace: "10K effort (RPE 7-8)", reps: interval_reps, rest: 2m }
+          - { type: cooldown, distance: "1 mi", pace: easy }
+        progress: { if: "session_complete and effort <= 3", then: "interval_reps = min(interval_reps + 1, 7)" }
+
+  - label: "Tempo Run"
+    slots:
+      - type: run
+        name: "Half-Marathon Pace Tempo"
+        subtype: tempo
+        difficulty: moderate
+        durationMin: 50
+        segments:
+          - { type: warmup, distance: "1 mi", pace: easy }
+          - { type: race_pace, distance: "tempo_miles mi", pace: "goal half-marathon pace", notes: "Steady, controlled effort" }
+          - { type: cooldown, distance: "1 mi", pace: easy }
+        progress: { if: "session_complete and effort <= 3", then: "tempo_miles = min(tempo_miles + 0.5, 6)" }
+
+  - label: "Long Run"
+    slots:
+      - type: run
+        name: "Long Run"
+        subtype: long
+        difficulty: moderate
+        durationMin: 90
+        segments:
+          - { type: easy, distance: "long_miles mi", pace: easy, notes: "Practice race-day fueling on runs over 75 minutes" }
+        progress: { if: "session_complete and effort <= 3", then: "long_miles = min(long_miles + 1, 12)" }

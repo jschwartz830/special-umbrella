@@ -1,0 +1,167 @@
+schemaVersion: 1
+name: "Reddit PPL (Metallicadpa)"
+description: >
+  The popular 6-day Push/Pull/Legs linear progression for beginner-to-
+  intermediate lifters. Each main lift ends with an AMRAP set. Add weight to
+  main lifts every session you hit all reps (+5 lb deadlift/squat, +2.5 lb
+  others); accessories use double progression — add weight once you hit the
+  top of the rep range on every set. Can be run 3 days a week by doing one
+  rotation over two weeks.
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  deadlift: 185
+  bench: 115
+  squat: 135
+  row: 95
+  ohp: 75
+
+days:
+  - label: "Pull A"
+    slots:
+      - type: weights
+        name: "Pull — Deadlift"
+        focus: pull
+        intent: hypertrophy
+        durationMin: 60
+        exercises:
+          - exercise: "Deadlift"
+            sets:
+              - { reps: "5+", load: deadlift, notes: "AMRAP" }
+            rest: 3m
+            progress: { if: all_reps, then: "deadlift += 5" }
+          - { exercise: "Lat Pulldown", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Cable Row", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Face Pulls", sets: 5, reps: "15-20", rest: 60s, progressionType: double }
+          - { exercise: "Hammer Curls", sets: 4, reps: "8-12", rest: 60s, progressionType: double }
+          - { exercise: "Dumbbell Curls", sets: 4, reps: "8-12", rest: 60s, progressionType: double }
+
+  - label: "Push A"
+    slots:
+      - type: weights
+        name: "Push — Bench"
+        focus: push
+        intent: hypertrophy
+        durationMin: 60
+        exercises:
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 5, load: bench }
+              - { reps: 5, load: bench }
+              - { reps: 5, load: bench }
+              - { reps: 5, load: bench }
+              - { reps: "5+", load: bench, notes: "AMRAP" }
+            rest: 3m
+            progress: { if: all_reps, then: "bench += 2.5" }
+          - exercise: "Overhead Press"
+            sets: 3
+            reps: "8-12"
+            load: "round5(ohp * 0.8)"
+            rest: 2m
+          - { exercise: "Dumbbell Incline Press", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Tricep Pushdowns", sets: 3, reps: "8-12", rest: 60s, progressionType: double, supersetGroupId: "a" }
+          - { exercise: "Lateral Raises", sets: 3, reps: "15-20", rest: 60s, progressionType: double, supersetGroupId: "a" }
+          - { exercise: "Overhead Tricep Extension", sets: 3, reps: "8-12", rest: 60s, progressionType: double, supersetGroupId: "b" }
+          - { exercise: "Cable Lateral Raises", sets: 3, reps: "15-20", rest: 60s, progressionType: double, supersetGroupId: "b" }
+
+  - label: "Legs A"
+    slots:
+      - type: weights
+        name: "Legs — Squat"
+        focus: legs
+        intent: hypertrophy
+        durationMin: 60
+        exercises:
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 5, load: squat }
+              - { reps: 5, load: squat }
+              - { reps: "5+", load: squat, notes: "AMRAP" }
+            rest: 3m
+            progress: { if: all_reps, then: "squat += 5" }
+          - exercise: "Romanian Deadlift"
+            sets: 3
+            reps: "8-12"
+            load: "round5(deadlift * 0.6)"
+            rest: 2m
+          - { exercise: "Leg Press", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Leg Curls", sets: 3, reps: "8-12", rest: 60s, progressionType: double }
+          - { exercise: "Standing Calf Raise", sets: 5, reps: "8-12", rest: 60s, progressionType: double }
+
+  - label: "Pull B"
+    slots:
+      - type: weights
+        name: "Pull — Row"
+        focus: pull
+        intent: hypertrophy
+        durationMin: 60
+        exercises:
+          - exercise: "Barbell Row"
+            sets:
+              - { reps: 5, load: row }
+              - { reps: 5, load: row }
+              - { reps: 5, load: row }
+              - { reps: 5, load: row }
+              - { reps: "5+", load: row, notes: "AMRAP" }
+            rest: 2m
+            progress: { if: all_reps, then: "row += 2.5" }
+          - { exercise: "Pull-Ups", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Cable Row", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Face Pulls", sets: 5, reps: "15-20", rest: 60s, progressionType: double }
+          - { exercise: "Hammer Curls", sets: 4, reps: "8-12", rest: 60s, progressionType: double }
+          - { exercise: "Dumbbell Curls", sets: 4, reps: "8-12", rest: 60s, progressionType: double }
+
+  - label: "Push B"
+    slots:
+      - type: weights
+        name: "Push — OHP"
+        focus: push
+        intent: hypertrophy
+        durationMin: 60
+        exercises:
+          - exercise: "Overhead Press"
+            sets:
+              - { reps: 5, load: ohp }
+              - { reps: 5, load: ohp }
+              - { reps: 5, load: ohp }
+              - { reps: 5, load: ohp }
+              - { reps: "5+", load: ohp, notes: "AMRAP" }
+            rest: 3m
+            progress: { if: all_reps, then: "ohp += 2.5" }
+          - exercise: "Barbell Bench Press"
+            sets: 3
+            reps: "8-12"
+            load: "round5(bench * 0.8)"
+            rest: 2m
+          - { exercise: "Dumbbell Incline Press", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Tricep Pushdowns", sets: 3, reps: "8-12", rest: 60s, progressionType: double, supersetGroupId: "a" }
+          - { exercise: "Lateral Raises", sets: 3, reps: "15-20", rest: 60s, progressionType: double, supersetGroupId: "a" }
+          - { exercise: "Overhead Tricep Extension", sets: 3, reps: "8-12", rest: 60s, progressionType: double, supersetGroupId: "b" }
+          - { exercise: "Cable Lateral Raises", sets: 3, reps: "15-20", rest: 60s, progressionType: double, supersetGroupId: "b" }
+
+  - label: "Legs B"
+    slots:
+      - type: weights
+        name: "Legs — Squat"
+        focus: legs
+        intent: hypertrophy
+        durationMin: 60
+        exercises:
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 5, load: squat }
+              - { reps: 5, load: squat }
+              - { reps: "5+", load: squat, notes: "AMRAP" }
+            rest: 3m
+            progress: { if: all_reps, then: "squat += 5" }
+          - exercise: "Romanian Deadlift"
+            sets: 3
+            reps: "8-12"
+            load: "round5(deadlift * 0.6)"
+            rest: 2m
+          - { exercise: "Leg Press", sets: 3, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Leg Curls", sets: 3, reps: "8-12", rest: 60s, progressionType: double }
+          - { exercise: "Standing Calf Raise", sets: 5, reps: "8-12", rest: 60s, progressionType: double }

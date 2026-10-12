@@ -1,0 +1,474 @@
+schemaVersion: 1
+name: "5/3/1 for Beginners"
+description: >
+  Jim Wendler's 5/3/1 adapted for newer lifters: three full-body days a week,
+  two main lifts per day with 5/3/1 sets plus 5x5 "First Set Last" (FSL)
+  back-off work, and 50-100 reps each of push, pull and single-leg/core
+  assistance. Loads are percentages of a Training Max (TM) — set each TM to
+  about 90% of your 1-rep max. Every 3-week cycle the TMs go up
+  (+5 lb bench/OHP, +10 lb squat/deadlift).
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  squat_tm: 185
+  bench_tm: 135
+  deadlift_tm: 225
+  ohp_tm: 85
+
+days:
+  - label: "Week 1 · Day 1"
+    slots:
+      - type: weights
+        name: "Barbell Squat + Barbell Bench Press"
+        focus: full_body
+        intent: strength
+        durationMin: 70
+        exercises:
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 5, load: "round5(squat_tm * 0.65)" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)" }
+              - { reps: "5+", load: "round5(squat_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+            rest: 3m
+            load: squat_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 5, load: "round5(bench_tm * 0.65)" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)" }
+              - { reps: "5+", load: "round5(bench_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+            rest: 3m
+            load: bench_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Assistance — Push (dips, push-ups)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Pull (chin-ups, rows)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Single-Leg / Core"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Lunges, step-ups, ab wheel, hanging leg raise"
+
+  - label: "Week 1 · Day 2"
+    slots:
+      - type: weights
+        name: "Deadlift + Overhead Press"
+        focus: full_body
+        intent: strength
+        durationMin: 70
+        exercises:
+          - exercise: "Deadlift"
+            sets:
+              - { reps: 5, load: "round5(deadlift_tm * 0.65)" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.75)" }
+              - { reps: "5+", load: "round5(deadlift_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.65)", notes: "FSL" }
+            rest: 3m
+            load: deadlift_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Overhead Press"
+            sets:
+              - { reps: 5, load: "round5(ohp_tm * 0.65)" }
+              - { reps: 5, load: "round5(ohp_tm * 0.75)" }
+              - { reps: "5+", load: "round5(ohp_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(ohp_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.65)", notes: "FSL" }
+            rest: 3m
+            load: ohp_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Assistance — Push (dips, push-ups)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Pull (chin-ups, rows)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Single-Leg / Core"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Lunges, step-ups, ab wheel, hanging leg raise"
+
+  - label: "Week 1 · Day 3"
+    slots:
+      - type: weights
+        name: "Barbell Bench Press + Barbell Squat"
+        focus: full_body
+        intent: strength
+        durationMin: 70
+        exercises:
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 5, load: "round5(bench_tm * 0.65)" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)" }
+              - { reps: "5+", load: "round5(bench_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.65)", notes: "FSL" }
+            rest: 3m
+            load: bench_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 5, load: "round5(squat_tm * 0.65)" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)" }
+              - { reps: "5+", load: "round5(squat_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.65)", notes: "FSL" }
+            rest: 3m
+            load: squat_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Assistance — Push (dips, push-ups)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Pull (chin-ups, rows)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Single-Leg / Core"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Lunges, step-ups, ab wheel, hanging leg raise"
+
+  - label: "Week 2 · Day 1"
+    slots:
+      - type: weights
+        name: "Barbell Squat + Barbell Bench Press"
+        focus: full_body
+        intent: strength
+        durationMin: 70
+        exercises:
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 3, load: "round5(squat_tm * 0.70)" }
+              - { reps: 3, load: "round5(squat_tm * 0.80)" }
+              - { reps: "3+", load: "round5(squat_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+            rest: 3m
+            load: squat_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 3, load: "round5(bench_tm * 0.70)" }
+              - { reps: 3, load: "round5(bench_tm * 0.80)" }
+              - { reps: "3+", load: "round5(bench_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+            rest: 3m
+            load: bench_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Assistance — Push (dips, push-ups)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Pull (chin-ups, rows)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Single-Leg / Core"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Lunges, step-ups, ab wheel, hanging leg raise"
+
+  - label: "Week 2 · Day 2"
+    slots:
+      - type: weights
+        name: "Deadlift + Overhead Press"
+        focus: full_body
+        intent: strength
+        durationMin: 70
+        exercises:
+          - exercise: "Deadlift"
+            sets:
+              - { reps: 3, load: "round5(deadlift_tm * 0.70)" }
+              - { reps: 3, load: "round5(deadlift_tm * 0.80)" }
+              - { reps: "3+", load: "round5(deadlift_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.70)", notes: "FSL" }
+            rest: 3m
+            load: deadlift_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Overhead Press"
+            sets:
+              - { reps: 3, load: "round5(ohp_tm * 0.70)" }
+              - { reps: 3, load: "round5(ohp_tm * 0.80)" }
+              - { reps: "3+", load: "round5(ohp_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(ohp_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.70)", notes: "FSL" }
+            rest: 3m
+            load: ohp_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Assistance — Push (dips, push-ups)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Pull (chin-ups, rows)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Single-Leg / Core"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Lunges, step-ups, ab wheel, hanging leg raise"
+
+  - label: "Week 2 · Day 3"
+    slots:
+      - type: weights
+        name: "Barbell Bench Press + Barbell Squat"
+        focus: full_body
+        intent: strength
+        durationMin: 70
+        exercises:
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 3, load: "round5(bench_tm * 0.70)" }
+              - { reps: 3, load: "round5(bench_tm * 0.80)" }
+              - { reps: "3+", load: "round5(bench_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.70)", notes: "FSL" }
+            rest: 3m
+            load: bench_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 3, load: "round5(squat_tm * 0.70)" }
+              - { reps: 3, load: "round5(squat_tm * 0.80)" }
+              - { reps: "3+", load: "round5(squat_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.70)", notes: "FSL" }
+            rest: 3m
+            load: squat_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Assistance — Push (dips, push-ups)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Pull (chin-ups, rows)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Single-Leg / Core"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Lunges, step-ups, ab wheel, hanging leg raise"
+
+  - label: "Week 3 · Day 1"
+    slots:
+      - type: weights
+        name: "Barbell Squat + Barbell Bench Press"
+        focus: full_body
+        intent: strength
+        durationMin: 70
+        exercises:
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 5, load: "round5(squat_tm * 0.75)" }
+              - { reps: 3, load: "round5(squat_tm * 0.85)" }
+              - { reps: "1+", load: "round5(squat_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+            rest: 3m
+            load: squat_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 5, load: "round5(bench_tm * 0.75)" }
+              - { reps: 3, load: "round5(bench_tm * 0.85)" }
+              - { reps: "1+", load: "round5(bench_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+            rest: 3m
+            load: bench_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Assistance — Push (dips, push-ups)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Pull (chin-ups, rows)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Single-Leg / Core"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Lunges, step-ups, ab wheel, hanging leg raise"
+
+  - label: "Week 3 · Day 2"
+    slots:
+      - type: weights
+        name: "Deadlift + Overhead Press"
+        focus: full_body
+        intent: strength
+        durationMin: 70
+        exercises:
+          - exercise: "Deadlift"
+            sets:
+              - { reps: 5, load: "round5(deadlift_tm * 0.75)" }
+              - { reps: 3, load: "round5(deadlift_tm * 0.85)" }
+              - { reps: "1+", load: "round5(deadlift_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.75)", notes: "FSL" }
+            rest: 3m
+            load: deadlift_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+            progress: { if: session_complete, then: "deadlift_tm += 10" }
+          - exercise: "Overhead Press"
+            sets:
+              - { reps: 5, load: "round5(ohp_tm * 0.75)" }
+              - { reps: 3, load: "round5(ohp_tm * 0.85)" }
+              - { reps: "1+", load: "round5(ohp_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(ohp_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(ohp_tm * 0.75)", notes: "FSL" }
+            rest: 3m
+            load: ohp_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+            progress: { if: session_complete, then: "ohp_tm += 5" }
+          - exercise: "Assistance — Push (dips, push-ups)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Pull (chin-ups, rows)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Single-Leg / Core"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Lunges, step-ups, ab wheel, hanging leg raise"
+
+  - label: "Week 3 · Day 3"
+    slots:
+      - type: weights
+        name: "Barbell Bench Press + Barbell Squat"
+        focus: full_body
+        intent: strength
+        durationMin: 70
+        exercises:
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 5, load: "round5(bench_tm * 0.75)" }
+              - { reps: 3, load: "round5(bench_tm * 0.85)" }
+              - { reps: "1+", load: "round5(bench_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)", notes: "FSL" }
+            rest: 3m
+            load: bench_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+            progress: { if: session_complete, then: "bench_tm += 5" }
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 5, load: "round5(squat_tm * 0.75)" }
+              - { reps: 3, load: "round5(squat_tm * 0.85)" }
+              - { reps: "1+", load: "round5(squat_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)", notes: "FSL" }
+            rest: 3m
+            load: squat_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+            progress: { if: session_complete, then: "squat_tm += 10" }
+          - exercise: "Assistance — Push (dips, push-ups)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Pull (chin-ups, rows)"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Pick one; 50-100 total reps"
+          - exercise: "Assistance — Single-Leg / Core"
+            sets: 3
+            reps: "10-20"
+            rest: 60s
+            notes: "Lunges, step-ups, ab wheel, hanging leg raise"

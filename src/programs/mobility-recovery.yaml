@@ -1,0 +1,65 @@
+schemaVersion: 1
+name: "Mobility & Recovery Week"
+description: >
+  Four 15-20 minute mobility sessions that rotate through the areas lifters
+  and runners get tight: hips and low back, shoulders and upper back, lower
+  legs, and a full-body flow. Do one on rest days or after a workout. Move
+  slowly and stay pain-free.
+
+duration:
+  type: weeks
+  value: 12
+
+days:
+  - label: "Hips & Low Back"
+    slots:
+      - type: mobility
+        name: "Hips & Low Back"
+        intent: recovery_mobility
+        durationMin: 18
+        mobilityExercises:
+          - { id: lib-cat-cow, name: "Cat-Cow", sets: [{ duration: 60s }] }
+          - { id: lib-hip-cars, name: "Hip CARs", sets: [{ reps: 5 }, { reps: 5 }], notes: "5 slow circles per side, each direction" }
+          - { id: lib-hip-9090, name: "Hip 90/90", sets: [{ duration: 90s }, { duration: 90s }], notes: "One set per side" }
+          - { id: lib-worlds-greatest, name: "World's Greatest Stretch", sets: [{ reps: 5 }, { reps: 5 }], notes: "5 per side" }
+          - { id: lib-couch-stretch, name: "Couch Stretch", sets: [{ duration: 60s }, { duration: 60s }], notes: "One set per side" }
+          - { id: lib-pigeon-pose, name: "Pigeon Pose", sets: [{ duration: 60s }, { duration: 60s }], notes: "One set per side" }
+          - { id: lib-deep-squat, name: "Deep Squat Hold", sets: [{ duration: 60s }] }
+
+  - label: "Shoulders & Upper Back"
+    slots:
+      - type: mobility
+        name: "Shoulders & Upper Back"
+        intent: recovery_mobility
+        durationMin: 16
+        mobilityExercises:
+          - { id: lib-thoracic-extension, name: "Thoracic Extension", sets: [{ duration: 60s }], notes: "Over a foam roller or bench" }
+          - { id: lib-thread-needle, name: "Thread the Needle", sets: [{ reps: 8 }, { reps: 8 }], notes: "8 per side" }
+          - { id: lib-shoulder-cars, name: "Shoulder CARs", sets: [{ reps: 5 }, { reps: 5 }], notes: "5 slow circles per side, each direction" }
+          - { id: lib-wall-angel, name: "Wall Angels", sets: [{ reps: 10 }, { reps: 10 }] }
+          - { id: lib-band-pull-apart, name: "Band Pull-Aparts", sets: [{ reps: 15 }, { reps: 15 }] }
+          - { id: lib-doorway-pec, name: "Doorway Pec Stretch", sets: [{ duration: 45s }, { duration: 45s }] }
+          - { id: lib-chin-tuck, name: "Chin Tucks", sets: [{ reps: 10 }] }
+
+  - label: "Lower Legs & Feet"
+    slots:
+      - type: mobility
+        name: "Runner's Lower Legs"
+        intent: recovery_mobility
+        durationMin: 15
+        mobilityExercises:
+          - { id: lib-foot-rolling, name: "Foot Rolling", sets: [{ duration: 60s }, { duration: 60s }], notes: "One set per foot" }
+          - { id: lib-ankle-cars, name: "Ankle CARs", sets: [{ reps: 8 }, { reps: 8 }], notes: "8 circles per side, each direction" }
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Mobility", sets: [{ reps: 10 }, { reps: 10 }], notes: "10 per side" }
+          - { id: lib-standing-calf-stretch, name: "Standing Calf Stretch", sets: [{ duration: 45s }, { duration: 45s }], notes: "One set per side" }
+          - { id: lib-soleus-stretch, name: "Soleus Stretch", sets: [{ duration: 45s }, { duration: 45s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side; close your eyes to progress" }
+
+  - label: "Full-Body Flow"
+    slots:
+      - type: yoga
+        name: "Full-Body Yoga Flow"
+        subtype: recovery
+        difficulty: easy
+        durationMin: 20
+        notes: "3 min breathing, 3 rounds sun salutation A, low lunge and lizard (1 min/side), seated forward fold (2 min), supine twist (1 min/side), 3 min savasana."

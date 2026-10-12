@@ -1,7 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode, type UIEvent } from 'react'
-import gzclp5kTemplate from '../programs/gzclp-5k.yaml?raw'
-import upperLowerTemplate from '../programs/upper-lower-hybrid-12w.yaml?raw'
-import shoulderPtTemplate from '../programs/shoulder-pt.yaml?raw'
+import { PROGRAM_TEMPLATES, PROGRAM_CATEGORIES } from '../programs'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Upload, AlertCircle, CheckCircle, ChevronDown, ChevronRight, Dumbbell, Footprints, Maximize2, Minimize2 } from 'lucide-react'
 import { parseYamlProgram } from '../engine/programParser'
@@ -12,11 +10,7 @@ import type { ExerciseSpec, RunSegment } from '../types/program'
 
 // ── Example stub shown on first load ─────────────────────────────────────────
 
-const TEMPLATE_OPTIONS = [
-  { id: 'gzclp-5k', label: 'GZCLP + 5K Build', yaml: gzclp5kTemplate },
-  { id: 'upper-lower-12w', label: 'Upper/Lower Hybrid 12-Week', yaml: upperLowerTemplate },
-  { id: 'shoulder-pt', label: 'Shoulder PT', yaml: shoulderPtTemplate },
-] as const
+const TEMPLATE_OPTIONS = PROGRAM_TEMPLATES
 
 // ── Preview components ────────────────────────────────────────────────────────
 
@@ -407,7 +401,7 @@ export function ProgramImportPage() {
     errors: string[]
   } | null>(null)
   const [imported, setImported] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<(typeof TEMPLATE_OPTIONS)[number]['id']>('gzclp-5k')
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(TEMPLATE_OPTIONS[0].id)
 
   const handleParse = useCallback(() => {
     if (!yaml.trim()) return
@@ -460,11 +454,15 @@ export function ProgramImportPage() {
           <div className="flex items-center justify-end gap-2">
             <select
               value={selectedTemplate}
-              onChange={e => setSelectedTemplate(e.target.value as (typeof TEMPLATE_OPTIONS)[number]['id'])}
+              onChange={e => setSelectedTemplate(e.target.value)}
               className="min-w-0 flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-md px-2 py-2 sm:flex-none"
             >
-              {TEMPLATE_OPTIONS.map(t => (
-                <option key={t.id} value={t.id}>{t.label}</option>
+              {PROGRAM_CATEGORIES.map(cat => (
+                <optgroup key={cat} label={cat}>
+                  {TEMPLATE_OPTIONS.filter(t => t.category === cat).map(t => (
+                    <option key={t.id} value={t.id}>{t.label} · {t.daysPerWeek}×/wk · {t.level}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             <button

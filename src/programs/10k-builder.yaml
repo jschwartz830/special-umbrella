@@ -1,0 +1,92 @@
+schemaVersion: 1
+name: "5K to 10K Builder"
+description: >
+  Runna-style 10-week plan for runners who can already run 5K: three runs a
+  week — easy, quality (alternating tempo and intervals), and a long run that
+  grows each week. Easy and long runs should feel conversational (RPE 3-4).
+  Runs only progress when you finish them feeling in control (effort 3 or
+  less), so tough weeks repeat automatically. Pair with 1-2 strength
+  sessions and a mobility day.
+
+duration:
+  type: weeks
+  value: 10
+
+vars:
+  easy_miles: 2.5
+  long_miles: 3.5
+  tempo_miles: 1.5
+  interval_reps: 4
+
+days:
+  - label: "Easy Run"
+    slots:
+      - type: run
+        name: "Easy Run + Strides"
+        subtype: easy
+        difficulty: easy
+        durationMin: 35
+        segments:
+          - { type: easy, distance: "easy_miles mi", pace: easy, notes: "Conversational pace" }
+          - type: drills
+            drills:
+              - { name: "Strides", sets: 4, duration: 20s, rest: 60s, notes: "Smooth and fast, not a sprint" }
+        progress: { if: "session_complete and effort <= 3", then: "easy_miles = min(easy_miles + 0.25, 4)" }
+
+  - label: "Tempo Run"
+    slots:
+      - type: run
+        name: "Tempo Run"
+        subtype: tempo
+        difficulty: moderate
+        durationMin: 40
+        segments:
+          - { type: warmup, distance: "1 mi", pace: easy }
+          - { type: tempo, distance: "tempo_miles mi", pace: "comfortably hard (RPE 6-7)", notes: "About your 10K-to-half-marathon effort" }
+          - { type: cooldown, distance: "0.75 mi", pace: easy }
+        progress: { if: "session_complete and effort <= 3", then: "tempo_miles = min(tempo_miles + 0.25, 3.5)" }
+
+  - label: "Long Run"
+    slots:
+      - type: run
+        name: "Long Run"
+        subtype: long
+        difficulty: moderate
+        durationMin: 50
+        segments:
+          - { type: easy, distance: "long_miles mi", pace: easy, notes: "Slow and steady; walk breaks are fine" }
+        progress: { if: "session_complete and effort <= 3", then: "long_miles = min(long_miles + 0.5, 7)" }
+
+  - label: "Easy Run"
+    slots:
+      - type: run
+        name: "Easy Run"
+        subtype: easy
+        difficulty: easy
+        durationMin: 30
+        segments:
+          - { type: easy, distance: "easy_miles mi", pace: easy }
+
+  - label: "Intervals"
+    slots:
+      - type: run
+        name: "800m Intervals"
+        subtype: intervals
+        difficulty: hard
+        durationMin: 45
+        segments:
+          - { type: warmup, distance: "1 mi", pace: easy }
+          - { type: interval, distance: "800m", pace: "5K effort (RPE 8)", reps: interval_reps, rest: 2m, notes: "Jog or walk the recovery" }
+          - { type: cooldown, distance: "0.75 mi", pace: easy }
+        progress: { if: "session_complete and effort <= 3", then: "interval_reps = min(interval_reps + 1, 6)" }
+
+  - label: "Long Run"
+    slots:
+      - type: run
+        name: "Long Run"
+        subtype: long
+        difficulty: moderate
+        durationMin: 50
+        segments:
+          - { type: easy, distance: "long_miles mi", pace: easy, notes: "Slow and steady; walk breaks are fine" }
+        progress: { if: "session_complete and effort <= 3", then: "long_miles = min(long_miles + 0.5, 7)" }

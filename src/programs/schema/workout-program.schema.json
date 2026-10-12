@@ -221,6 +221,10 @@
             "step_loading"
           ]
         },
+        "supersetGroupId": {
+          "description": "Exercises sharing this id are performed as a superset.",
+          "type": "string"
+        },
         "warmup": {
           "$ref": "#/$defs/warmupRamp"
         }

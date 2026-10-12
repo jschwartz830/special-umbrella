@@ -1,0 +1,22 @@
+schemaVersion: 1
+name: "PT Home Exercise Program"
+description: >
+  Physical therapist's home program (Oct 2026): scapular control and
+  overhead strength. Perform 3 times a week.
+
+duration:
+  type: weeks
+  value: 8
+
+days:
+  - label: "PT Home Program"
+    slots:
+      - type: mobility
+        name: "PT — Scapular Control & Overhead Strength"
+        intent: recovery_mobility
+        durationMin: 15
+        mobilityExercises:
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Bear Plank Scap Push-Up Plus", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "1 second hold" }
+          - { id: lib-upper-trap-lift-off, name: "Upper Trap Lift Off", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "10 second hold each rep" }
+          - { id: lib-half-kneeling-landmine-press, name: "Half-Kneeling Landmine Press", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "45# plate" }
+          - { id: lib-turkish-get-up-part-5, name: "Turkish Get-Up (Part 5)", sets: [{ reps: 10 }, { reps: 10 }] }

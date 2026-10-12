@@ -1,0 +1,626 @@
+schemaVersion: 1
+name: "Couch to 5K"
+description: >
+  The classic 9-week beginner running plan: three runs a week, alternating
+  jogging and walking, building to 30 minutes of continuous running. Run at
+  a pace where you could hold a conversation. It's fine to repeat a week
+  before moving on.
+
+duration:
+  type: rotations
+  value: 1
+
+days:
+  - label: "Week 1 · Run 1"
+    slots:
+      - type: run
+        name: "C25K W1R1 — 8 × 1m jog / 90s walk"
+        subtype: intervals
+        difficulty: easy
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 1m
+            pace: easy
+            reps: 8
+            rest: 90s
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 1 · Run 2"
+    slots:
+      - type: run
+        name: "C25K W1R2 — 8 × 1m jog / 90s walk"
+        subtype: intervals
+        difficulty: easy
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 1m
+            pace: easy
+            reps: 8
+            rest: 90s
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 1 · Run 3"
+    slots:
+      - type: run
+        name: "C25K W1R3 — 8 × 1m jog / 90s walk"
+        subtype: intervals
+        difficulty: easy
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 1m
+            pace: easy
+            reps: 8
+            rest: 90s
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 2 · Run 1"
+    slots:
+      - type: run
+        name: "C25K W2R1 — 6 × 90s jog / 2m walk"
+        subtype: intervals
+        difficulty: easy
+        durationMin: 31
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 90s
+            pace: easy
+            reps: 6
+            rest: 2m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 2 · Run 2"
+    slots:
+      - type: run
+        name: "C25K W2R2 — 6 × 90s jog / 2m walk"
+        subtype: intervals
+        difficulty: easy
+        durationMin: 31
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 90s
+            pace: easy
+            reps: 6
+            rest: 2m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 2 · Run 3"
+    slots:
+      - type: run
+        name: "C25K W2R3 — 6 × 90s jog / 2m walk"
+        subtype: intervals
+        difficulty: easy
+        durationMin: 31
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 90s
+            pace: easy
+            reps: 6
+            rest: 2m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 3 · Run 1"
+    slots:
+      - type: run
+        name: "C25K W3R1 — 2 × 90s + 2 × 3m jog intervals"
+        subtype: intervals
+        difficulty: easy
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 90s
+            pace: easy
+            reps: 2
+            rest: 90s
+            notes: "Jog; walk during rest"
+          - type: interval
+            duration: 3m
+            pace: easy
+            reps: 2
+            rest: 3m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 3 · Run 2"
+    slots:
+      - type: run
+        name: "C25K W3R2 — 2 × 90s + 2 × 3m jog intervals"
+        subtype: intervals
+        difficulty: easy
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 90s
+            pace: easy
+            reps: 2
+            rest: 90s
+            notes: "Jog; walk during rest"
+          - type: interval
+            duration: 3m
+            pace: easy
+            reps: 2
+            rest: 3m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 3 · Run 3"
+    slots:
+      - type: run
+        name: "C25K W3R3 — 2 × 90s + 2 × 3m jog intervals"
+        subtype: intervals
+        difficulty: easy
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 90s
+            pace: easy
+            reps: 2
+            rest: 90s
+            notes: "Jog; walk during rest"
+          - type: interval
+            duration: 3m
+            pace: easy
+            reps: 2
+            rest: 3m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 4 · Run 1"
+    slots:
+      - type: run
+        name: "C25K W4R1 — 2 × 3m + 2 × 5m jog intervals"
+        subtype: intervals
+        difficulty: moderate
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 3m
+            pace: easy
+            reps: 2
+            rest: 90s
+            notes: "Jog; walk during rest"
+          - type: interval
+            duration: 5m
+            pace: easy
+            reps: 2
+            rest: 2m30s
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 4 · Run 2"
+    slots:
+      - type: run
+        name: "C25K W4R2 — 2 × 3m + 2 × 5m jog intervals"
+        subtype: intervals
+        difficulty: moderate
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 3m
+            pace: easy
+            reps: 2
+            rest: 90s
+            notes: "Jog; walk during rest"
+          - type: interval
+            duration: 5m
+            pace: easy
+            reps: 2
+            rest: 2m30s
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 4 · Run 3"
+    slots:
+      - type: run
+        name: "C25K W4R3 — 2 × 3m + 2 × 5m jog intervals"
+        subtype: intervals
+        difficulty: moderate
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 3m
+            pace: easy
+            reps: 2
+            rest: 90s
+            notes: "Jog; walk during rest"
+          - type: interval
+            duration: 5m
+            pace: easy
+            reps: 2
+            rest: 2m30s
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 5 · Run 1"
+    slots:
+      - type: run
+        name: "C25K W5R1 — 3 × 5m jog intervals"
+        subtype: intervals
+        difficulty: moderate
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 5m
+            pace: easy
+            reps: 3
+            rest: 3m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 5 · Run 2"
+    slots:
+      - type: run
+        name: "C25K W5R2 — 2 × 8m jog intervals"
+        subtype: intervals
+        difficulty: moderate
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 8m
+            pace: easy
+            reps: 2
+            rest: 5m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 5 · Run 3"
+    slots:
+      - type: run
+        name: "C25K W5R3 — 20 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 20m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 6 · Run 1"
+    slots:
+      - type: run
+        name: "C25K W6R1 — 2 × 5m + 1 × 8m jog intervals"
+        subtype: intervals
+        difficulty: moderate
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 5m
+            pace: easy
+            reps: 2
+            rest: 3m
+            notes: "Jog; walk during rest"
+          - type: interval
+            duration: 8m
+            pace: easy
+            reps: 1
+            rest: 3m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 6 · Run 2"
+    slots:
+      - type: run
+        name: "C25K W6R2 — 2 × 10m jog intervals"
+        subtype: intervals
+        difficulty: moderate
+        durationMin: 30
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: interval
+            duration: 10m
+            pace: easy
+            reps: 2
+            rest: 3m
+            notes: "Jog; walk during rest"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 6 · Run 3"
+    slots:
+      - type: run
+        name: "C25K W6R3 — 22 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 32
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 22m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 7 · Run 1"
+    slots:
+      - type: run
+        name: "C25K W7R1 — 25 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 35
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 25m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 7 · Run 2"
+    slots:
+      - type: run
+        name: "C25K W7R2 — 25 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 35
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 25m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 7 · Run 3"
+    slots:
+      - type: run
+        name: "C25K W7R3 — 25 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 35
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 25m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 8 · Run 1"
+    slots:
+      - type: run
+        name: "C25K W8R1 — 28 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 38
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 28m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 8 · Run 2"
+    slots:
+      - type: run
+        name: "C25K W8R2 — 28 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 38
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 28m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 8 · Run 3"
+    slots:
+      - type: run
+        name: "C25K W8R3 — 28 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 38
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 28m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 9 · Run 1"
+    slots:
+      - type: run
+        name: "C25K W9R1 — 30 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 40
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 30m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 9 · Run 2"
+    slots:
+      - type: run
+        name: "C25K W9R2 — 30 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 40
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 30m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk
+
+  - label: "Week 9 · Run 3"
+    slots:
+      - type: run
+        name: "C25K W9R3 — 30 min continuous run"
+        subtype: easy
+        difficulty: moderate
+        durationMin: 40
+        segments:
+          - type: warmup
+            duration: 5m
+            pace: walk
+            notes: "Brisk walk"
+          - type: easy
+            duration: 30m
+            pace: easy
+            notes: "Run continuously at a conversational pace"
+          - type: cooldown
+            duration: 5m
+            pace: walk

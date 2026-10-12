@@ -1,0 +1,75 @@
+schemaVersion: 1
+name: "StrongLifts 5x5"
+description: >
+  Classic linear progression. Alternate Workout A and B three times a week.
+  Five sets of five on every lift except deadlift (one set of five). Add
+  weight every session you complete all reps. If you miss reps three sessions
+  in a row on a lift, deload it 10%.
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  squat: 95
+  bench: 75
+  row: 75
+  ohp: 55
+  deadlift: 135
+
+days:
+  - label: "Workout A"
+    slots:
+      - type: weights
+        name: "A — Squat / Bench / Row"
+        focus: full_body
+        intent: strength
+        difficulty: moderate
+        durationMin: 50
+        exercises:
+          - exercise: "Barbell Squat"
+            sets: 5
+            reps: 5
+            load: squat
+            rest: 3m
+            progress: { if: all_reps, then: "squat += 5" }
+          - exercise: "Barbell Bench Press"
+            sets: 5
+            reps: 5
+            load: bench
+            rest: 3m
+            progress: { if: all_reps, then: "bench += 5" }
+          - exercise: "Barbell Row"
+            sets: 5
+            reps: 5
+            load: row
+            rest: 3m
+            progress: { if: all_reps, then: "row += 5" }
+
+  - label: "Workout B"
+    slots:
+      - type: weights
+        name: "B — Squat / OHP / Deadlift"
+        focus: full_body
+        intent: strength
+        difficulty: moderate
+        durationMin: 45
+        exercises:
+          - exercise: "Barbell Squat"
+            sets: 5
+            reps: 5
+            load: squat
+            rest: 3m
+            progress: { if: all_reps, then: "squat += 5" }
+          - exercise: "Overhead Press"
+            sets: 5
+            reps: 5
+            load: ohp
+            rest: 3m
+            progress: { if: all_reps, then: "ohp += 5" }
+          - exercise: "Deadlift"
+            sets: 1
+            reps: 5
+            load: deadlift
+            rest: 3m
+            progress: { if: all_reps, then: "deadlift += 10" }

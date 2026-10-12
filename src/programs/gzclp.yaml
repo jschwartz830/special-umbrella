@@ -1,0 +1,166 @@
+schemaVersion: 1
+name: "GZCLP"
+description: >
+  Cody Lefever's GZCL linear progression, 4 days a week (or 3, just keep
+  rotating). Each day pairs a heavy T1 lift (5x3, last set AMRAP), a volume
+  T2 lift (3x10), and a T3 accessory (3x15, last set AMRAP). Add weight
+  whenever you hit all reps. When a T1 stalls, switch to 6x2, then 10x1, then
+  retest a 5RM; when a T2 stalls, switch to 3x8, then 3x6 — edit the sets in
+  the plan when that happens.
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  squat_t1: 135
+  bench_t1: 115
+  ohp_t1: 75
+  deadlift_t1: 185
+  squat_t2: 95
+  bench_t2: 85
+  ohp_t2: 55
+  deadlift_t2: 135
+  pulldown: 70
+  db_row: 35
+
+days:
+  - label: "Day 1 — Squat"
+    slots:
+      - type: weights
+        name: "Squat T1 / Bench T2"
+        focus: full_body
+        intent: strength
+        durationMin: 60
+        exercises:
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 3, load: squat_t1 }
+              - { reps: 3, load: squat_t1 }
+              - { reps: 3, load: squat_t1 }
+              - { reps: 3, load: squat_t1 }
+              - { reps: "3+", load: squat_t1, notes: "AMRAP" }
+            load: squat_t1  # warmup ramp base
+            rest: 3m
+            notes: "T1"
+            warmup: { percentages: [40, 60, 80], reps: [5, 3, 2] }
+            progress: { if: all_reps, then: "squat_t1 += 10" }
+          - exercise: "Barbell Bench Press"
+            sets: 3
+            reps: 10
+            load: bench_t2
+            rest: 2m
+            notes: "T2"
+            progress: { if: all_reps, then: "bench_t2 += 5" }
+          - exercise: "Lat Pulldown"
+            sets:
+              - { reps: 15, load: pulldown }
+              - { reps: 15, load: pulldown }
+              - { reps: "15+", load: pulldown, notes: "AMRAP — add weight once you hit 25" }
+            rest: 75s
+            notes: "T3"
+
+  - label: "Day 2 — OHP"
+    slots:
+      - type: weights
+        name: "OHP T1 / Deadlift T2"
+        focus: full_body
+        intent: strength
+        durationMin: 60
+        exercises:
+          - exercise: "Overhead Press"
+            sets:
+              - { reps: 3, load: ohp_t1 }
+              - { reps: 3, load: ohp_t1 }
+              - { reps: 3, load: ohp_t1 }
+              - { reps: 3, load: ohp_t1 }
+              - { reps: "3+", load: ohp_t1, notes: "AMRAP" }
+            load: ohp_t1  # warmup ramp base
+            rest: 3m
+            notes: "T1"
+            warmup: { percentages: [40, 60, 80], reps: [5, 3, 2] }
+            progress: { if: all_reps, then: "ohp_t1 += 5" }
+          - exercise: "Deadlift"
+            sets: 3
+            reps: 10
+            load: deadlift_t2
+            rest: 2m
+            notes: "T2"
+            progress: { if: all_reps, then: "deadlift_t2 += 10" }
+          - exercise: "Dumbbell Row"
+            sets:
+              - { reps: 15, load: db_row }
+              - { reps: 15, load: db_row }
+              - { reps: "15+", load: db_row, notes: "AMRAP — add weight once you hit 25" }
+            rest: 75s
+            notes: "T3"
+
+  - label: "Day 3 — Bench"
+    slots:
+      - type: weights
+        name: "Bench T1 / Squat T2"
+        focus: full_body
+        intent: strength
+        durationMin: 60
+        exercises:
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 3, load: bench_t1 }
+              - { reps: 3, load: bench_t1 }
+              - { reps: 3, load: bench_t1 }
+              - { reps: 3, load: bench_t1 }
+              - { reps: "3+", load: bench_t1, notes: "AMRAP" }
+            load: bench_t1  # warmup ramp base
+            rest: 3m
+            notes: "T1"
+            warmup: { percentages: [40, 60, 80], reps: [5, 3, 2] }
+            progress: { if: all_reps, then: "bench_t1 += 5" }
+          - exercise: "Barbell Squat"
+            sets: 3
+            reps: 10
+            load: squat_t2
+            rest: 2m
+            notes: "T2"
+            progress: { if: all_reps, then: "squat_t2 += 10" }
+          - exercise: "Lat Pulldown"
+            sets:
+              - { reps: 15, load: pulldown }
+              - { reps: 15, load: pulldown }
+              - { reps: "15+", load: pulldown, notes: "AMRAP — add weight once you hit 25" }
+            rest: 75s
+            notes: "T3"
+
+  - label: "Day 4 — Deadlift"
+    slots:
+      - type: weights
+        name: "Deadlift T1 / OHP T2"
+        focus: full_body
+        intent: strength
+        durationMin: 60
+        exercises:
+          - exercise: "Deadlift"
+            sets:
+              - { reps: 3, load: deadlift_t1 }
+              - { reps: 3, load: deadlift_t1 }
+              - { reps: 3, load: deadlift_t1 }
+              - { reps: 3, load: deadlift_t1 }
+              - { reps: "3+", load: deadlift_t1, notes: "AMRAP" }
+            load: deadlift_t1  # warmup ramp base
+            rest: 3m
+            notes: "T1"
+            warmup: { percentages: [40, 60, 80], reps: [5, 3, 2] }
+            progress: { if: all_reps, then: "deadlift_t1 += 10" }
+          - exercise: "Overhead Press"
+            sets: 3
+            reps: 10
+            load: ohp_t2
+            rest: 2m
+            notes: "T2"
+            progress: { if: all_reps, then: "ohp_t2 += 2.5" }
+          - exercise: "Dumbbell Row"
+            sets:
+              - { reps: 15, load: db_row }
+              - { reps: 15, load: db_row }
+              - { reps: "15+", load: db_row, notes: "AMRAP — add weight once you hit 25" }
+            rest: 75s
+            notes: "T3"

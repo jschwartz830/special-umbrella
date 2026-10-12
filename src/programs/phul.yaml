@@ -1,0 +1,78 @@
+schemaVersion: 1
+name: "PHUL — Power Hypertrophy Upper Lower"
+description: >
+  Four days a week: two heavy "power" days (3-5 reps on compounds) and two
+  "hypertrophy" days (8-15 reps). Uses double progression — work within the
+  rep range and add weight once you hit the top of the range on every set.
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  bench: 155
+  row: 135
+  squat: 185
+  deadlift: 225
+
+days:
+  - label: "Upper Power"
+    slots:
+      - type: weights
+        name: "Upper Power"
+        focus: upper
+        intent: strength
+        durationMin: 65
+        exercises:
+          - { exercise: "Barbell Bench Press", sets: 4, reps: "3-5", load: bench, rest: 3m, progressionType: double, progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Dumbbell Incline Press", sets: 4, reps: "6-10", rest: 2m, progressionType: double }
+          - { exercise: "Barbell Row", sets: 4, reps: "3-5", load: row, rest: 3m, progressionType: double, progress: { if: all_reps, then: "row += 5" } }
+          - { exercise: "Lat Pulldown", sets: 4, reps: "6-10", rest: 2m, progressionType: double }
+          - { exercise: "Overhead Press", sets: 3, reps: "5-8", rest: 2m, progressionType: double }
+          - { exercise: "Barbell Curl", sets: 3, reps: "6-10", rest: 90s, progressionType: double }
+          - { exercise: "Skullcrushers", sets: 3, reps: "6-10", rest: 90s, progressionType: double }
+
+  - label: "Lower Power"
+    slots:
+      - type: weights
+        name: "Lower Power"
+        focus: lower
+        intent: strength
+        durationMin: 65
+        exercises:
+          - { exercise: "Barbell Squat", sets: 4, reps: "3-5", load: squat, rest: 3m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Deadlift", sets: 3, reps: "3-5", load: deadlift, rest: 3m, progressionType: double, progress: { if: all_reps, then: "deadlift += 10" } }
+          - { exercise: "Leg Press", sets: 5, reps: "10-15", rest: 2m, progressionType: double }
+          - { exercise: "Leg Curls", sets: 4, reps: "6-10", rest: 90s, progressionType: double }
+          - { exercise: "Standing Calf Raise", sets: 4, reps: "6-10", rest: 60s, progressionType: double }
+
+  - label: "Upper Hypertrophy"
+    slots:
+      - type: weights
+        name: "Upper Hypertrophy"
+        focus: upper
+        intent: hypertrophy
+        durationMin: 60
+        exercises:
+          - { exercise: "Incline Barbell Bench Press", sets: 4, reps: "8-12", rest: 2m, progressionType: double }
+          - { exercise: "Dumbbell Flyes", sets: 4, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Cable Row", sets: 4, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Dumbbell Row", sets: 4, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Lateral Raises", sets: 4, reps: "8-12", rest: 60s, progressionType: double }
+          - { exercise: "Incline Dumbbell Curl", sets: 4, reps: "8-12", rest: 60s, progressionType: double, supersetGroupId: "arms" }
+          - { exercise: "Tricep Pushdowns", sets: 4, reps: "8-12", rest: 60s, progressionType: double, supersetGroupId: "arms" }
+
+  - label: "Lower Hypertrophy"
+    slots:
+      - type: weights
+        name: "Lower Hypertrophy"
+        focus: lower
+        intent: hypertrophy
+        durationMin: 60
+        exercises:
+          - { exercise: "Front Squat", sets: 4, reps: "8-12", rest: 2m, progressionType: double }
+          - { exercise: "Barbell Lunge", sets: 4, reps: "8-12", rest: 90s, progressionType: double, notes: "Reps per leg" }
+          - { exercise: "Leg Extensions", sets: 4, reps: "10-15", rest: 60s, progressionType: double }
+          - { exercise: "Leg Curls", sets: 4, reps: "10-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Calf Raise", sets: 4, reps: "8-12", rest: 60s, progressionType: double }
+          - { exercise: "Standing Calf Raise", sets: 4, reps: "8-12", rest: 60s, progressionType: double }

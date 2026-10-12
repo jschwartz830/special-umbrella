@@ -192,6 +192,8 @@ export interface YamlExerciseSpec {
   synergist?: string[]
   progress?: { if?: string; then: string; else?: string }
   progressionType?: ProgressionType
+  /** Exercises sharing an id are performed as a superset. */
+  supersetGroupId?: string
 }
 
 export interface YamlDrillSpec {

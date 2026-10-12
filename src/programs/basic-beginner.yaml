@@ -1,0 +1,79 @@
+schemaVersion: 1
+name: "Basic Beginner Routine"
+description: >
+  The r/Fitness starter program. Alternate Workout A and B, three sessions a
+  week on non-consecutive days. The last set of each lift is AMRAP (as many
+  reps as possible). Add weight every session you hit all reps: +2.5 lb upper
+  body, +5 lb lower body. Run it until progress stalls (usually 3-6 months).
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  row: 65
+  bench: 75
+  squat: 95
+  chinup_assist: 0
+  ohp: 55
+  deadlift: 115
+
+days:
+  - label: "Workout A"
+    slots:
+      - type: weights
+        name: "A — Row / Bench / Squat"
+        focus: full_body
+        intent: strength
+        difficulty: moderate
+        durationMin: 50
+        exercises:
+          - exercise: "Barbell Row"
+            sets:
+              - { reps: 5, load: row }
+              - { reps: 5, load: row }
+              - { reps: "5+", load: row, notes: "AMRAP" }
+            rest: 2m
+            progress: { if: all_reps, then: "row += 2.5" }
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 5, load: bench }
+              - { reps: 5, load: bench }
+              - { reps: "5+", load: bench, notes: "AMRAP" }
+            rest: 2m
+            progress: { if: all_reps, then: "bench += 2.5" }
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 5, load: squat }
+              - { reps: 5, load: squat }
+              - { reps: "5+", load: squat, notes: "AMRAP" }
+            rest: 3m
+            progress: { if: all_reps, then: "squat += 5" }
+
+  - label: "Workout B"
+    slots:
+      - type: weights
+        name: "B — Chin-Up / OHP / Deadlift"
+        focus: full_body
+        intent: strength
+        difficulty: moderate
+        durationMin: 45
+        exercises:
+          - exercise: "Chin-Ups"
+            sets: 3
+            reps: "5+"
+            load: chinup_assist
+            rest: 2m
+            notes: "Use band or machine assistance if needed; last set AMRAP."
+          - exercise: "Overhead Press"
+            sets:
+              - { reps: 5, load: ohp }
+              - { reps: 5, load: ohp }
+              - { reps: "5+", load: ohp, notes: "AMRAP" }
+            rest: 2m
+            progress: { if: all_reps, then: "ohp += 2.5" }
+          - exercise: "Deadlift"
+            sets:
+              - { reps: "5+", load: deadlift, notes: "AMRAP" }
+            rest: 3m
+            progress: { if: all_reps, then: "deadlift += 5" }

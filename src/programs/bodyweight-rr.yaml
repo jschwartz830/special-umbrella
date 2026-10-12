@@ -1,0 +1,40 @@
+schemaVersion: 1
+name: "Bodyweight Recommended Routine"
+description: >
+  Based on the r/bodyweightfitness Recommended Routine: three full-body
+  sessions a week, no equipment beyond a pull-up bar and something to dip or
+  row on. Exercises are paired as supersets. Progress by moving to a harder
+  variation once you hit 3 sets of 8 (or the top of the range).
+
+duration:
+  type: weeks
+  value: 12
+
+days:
+  - label: "Bodyweight Session"
+    slots:
+      - type: weights
+        name: "Recommended Routine"
+        focus: full_body
+        intent: strength
+        location: home
+        durationMin: 60
+        warmup:
+          - { exercise: "Yuri's Shoulder Band Warmup", sets: 1, reps: 5 }
+          - { exercise: "Squat Sky Reaches", sets: 1, reps: 10 }
+          - { exercise: "GMB Wrist Prep", sets: 1, reps: 10 }
+          - { exercise: "Deadbugs", sets: 1, duration: 30s }
+          - { exercise: "Arch Hangs", sets: 1, reps: 10 }
+          - { exercise: "Support Hold", sets: 1, duration: 30s }
+          - { exercise: "Easier Squat Progression", sets: 1, reps: 10 }
+          - { exercise: "Easier Hinge Progression", sets: 1, reps: 10 }
+        exercises:
+          - { exercise: "Pull-Up Progression", sets: 3, reps: "5-8", rest: 90s, supersetGroupId: "pair1", notes: "Scap pulls → negatives → pull-ups → weighted" }
+          - { exercise: "Squat Progression", sets: 3, reps: "5-8", rest: 90s, supersetGroupId: "pair1", notes: "Assisted → split squat → Bulgarian → shrimp → pistol" }
+          - { exercise: "Dip Progression", sets: 3, reps: "5-8", rest: 90s, supersetGroupId: "pair2", notes: "Parallel bar support → negatives → dips" }
+          - { exercise: "Hinge Progression", sets: 3, reps: "5-8", rest: 90s, supersetGroupId: "pair2", notes: "Romanian deadlift → single-leg deadlift → banded Nordic curl" }
+          - { exercise: "Row Progression", sets: 3, reps: "5-8", rest: 90s, supersetGroupId: "pair3", notes: "Vertical → incline → horizontal → wide rows" }
+          - { exercise: "Push-Up Progression", sets: 3, reps: "5-8", rest: 90s, supersetGroupId: "pair3", notes: "Vertical → incline → full → diamond → pseudo-planche" }
+          - { exercise: "Anti-Extension Core", sets: 3, reps: "8-12", rest: 60s, supersetGroupId: "core", notes: "Plank → ab wheel" }
+          - { exercise: "Anti-Rotation Core", sets: 3, reps: "8-12", rest: 60s, supersetGroupId: "core", notes: "Banded Pallof press" }
+          - { exercise: "Extension Core", sets: 3, reps: "8-12", rest: 60s, supersetGroupId: "core", notes: "Reverse hyperextension" }

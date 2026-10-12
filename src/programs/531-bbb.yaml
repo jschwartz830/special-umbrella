@@ -1,0 +1,371 @@
+schemaVersion: 1
+name: "5/3/1 Boring But Big"
+description: >
+  Wendler's most popular template: four days a week, one main lift per day
+  with 5/3/1 sets, then 5 sets of 10 at 50% of the Training Max for size,
+  plus light assistance. Set each Training Max (TM) to about 90% of your
+  1-rep max; TMs go up after every 3-week cycle (+5 lb bench/OHP, +10 lb
+  squat/deadlift). Consider a deload week every second or third cycle.
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  ohp_tm: 85
+  deadlift_tm: 225
+  bench_tm: 135
+  squat_tm: 185
+
+days:
+  - label: "Week 1 · Overhead Press"
+    slots:
+      - type: weights
+        name: "Overhead Press — 5/3/1 + BBB"
+        focus: upper
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Overhead Press"
+            sets:
+              - { reps: 5, load: "round5(ohp_tm * 0.65)" }
+              - { reps: 5, load: "round5(ohp_tm * 0.75)" }
+              - { reps: "5+", load: "round5(ohp_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: ohp_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Chin-Ups"
+            sets: 5
+            reps: 10
+            rest: 90s
+          - exercise: "Face Pulls"
+            sets: 3
+            reps: 15
+            rest: 60s
+
+  - label: "Week 1 · Deadlift"
+    slots:
+      - type: weights
+        name: "Deadlift — 5/3/1 + BBB"
+        focus: lower
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Deadlift"
+            sets:
+              - { reps: 5, load: "round5(deadlift_tm * 0.65)" }
+              - { reps: 5, load: "round5(deadlift_tm * 0.75)" }
+              - { reps: "5+", load: "round5(deadlift_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: deadlift_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Hanging Leg Raise"
+            sets: 5
+            reps: 15
+            rest: 60s
+
+  - label: "Week 1 · Barbell Bench Press"
+    slots:
+      - type: weights
+        name: "Barbell Bench Press — 5/3/1 + BBB"
+        focus: upper
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 5, load: "round5(bench_tm * 0.65)" }
+              - { reps: 5, load: "round5(bench_tm * 0.75)" }
+              - { reps: "5+", load: "round5(bench_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: bench_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Dumbbell Row"
+            sets: 5
+            reps: 10
+            rest: 90s
+          - exercise: "Band Pull Aparts"
+            sets: 3
+            reps: 20
+            rest: 45s
+
+  - label: "Week 1 · Barbell Squat"
+    slots:
+      - type: weights
+        name: "Barbell Squat — 5/3/1 + BBB"
+        focus: lower
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 5, load: "round5(squat_tm * 0.65)" }
+              - { reps: 5, load: "round5(squat_tm * 0.75)" }
+              - { reps: "5+", load: "round5(squat_tm * 0.85)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: squat_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Ab Wheel"
+            sets: 5
+            reps: 10
+            rest: 60s
+          - exercise: "Back Extension"
+            sets: 3
+            reps: 15
+            rest: 60s
+
+  - label: "Week 2 · Overhead Press"
+    slots:
+      - type: weights
+        name: "Overhead Press — 5/3/1 + BBB"
+        focus: upper
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Overhead Press"
+            sets:
+              - { reps: 3, load: "round5(ohp_tm * 0.70)" }
+              - { reps: 3, load: "round5(ohp_tm * 0.80)" }
+              - { reps: "3+", load: "round5(ohp_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: ohp_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Chin-Ups"
+            sets: 5
+            reps: 10
+            rest: 90s
+          - exercise: "Face Pulls"
+            sets: 3
+            reps: 15
+            rest: 60s
+
+  - label: "Week 2 · Deadlift"
+    slots:
+      - type: weights
+        name: "Deadlift — 5/3/1 + BBB"
+        focus: lower
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Deadlift"
+            sets:
+              - { reps: 3, load: "round5(deadlift_tm * 0.70)" }
+              - { reps: 3, load: "round5(deadlift_tm * 0.80)" }
+              - { reps: "3+", load: "round5(deadlift_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: deadlift_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Hanging Leg Raise"
+            sets: 5
+            reps: 15
+            rest: 60s
+
+  - label: "Week 2 · Barbell Bench Press"
+    slots:
+      - type: weights
+        name: "Barbell Bench Press — 5/3/1 + BBB"
+        focus: upper
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 3, load: "round5(bench_tm * 0.70)" }
+              - { reps: 3, load: "round5(bench_tm * 0.80)" }
+              - { reps: "3+", load: "round5(bench_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: bench_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Dumbbell Row"
+            sets: 5
+            reps: 10
+            rest: 90s
+          - exercise: "Band Pull Aparts"
+            sets: 3
+            reps: 20
+            rest: 45s
+
+  - label: "Week 2 · Barbell Squat"
+    slots:
+      - type: weights
+        name: "Barbell Squat — 5/3/1 + BBB"
+        focus: lower
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 3, load: "round5(squat_tm * 0.70)" }
+              - { reps: 3, load: "round5(squat_tm * 0.80)" }
+              - { reps: "3+", load: "round5(squat_tm * 0.90)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: squat_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+          - exercise: "Ab Wheel"
+            sets: 5
+            reps: 10
+            rest: 60s
+          - exercise: "Back Extension"
+            sets: 3
+            reps: 15
+            rest: 60s
+
+  - label: "Week 3 · Overhead Press"
+    slots:
+      - type: weights
+        name: "Overhead Press — 5/3/1 + BBB"
+        focus: upper
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Overhead Press"
+            sets:
+              - { reps: 5, load: "round5(ohp_tm * 0.75)" }
+              - { reps: 3, load: "round5(ohp_tm * 0.85)" }
+              - { reps: "1+", load: "round5(ohp_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(ohp_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: ohp_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+            progress: { if: session_complete, then: "ohp_tm += 5" }
+          - exercise: "Chin-Ups"
+            sets: 5
+            reps: 10
+            rest: 90s
+          - exercise: "Face Pulls"
+            sets: 3
+            reps: 15
+            rest: 60s
+
+  - label: "Week 3 · Deadlift"
+    slots:
+      - type: weights
+        name: "Deadlift — 5/3/1 + BBB"
+        focus: lower
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Deadlift"
+            sets:
+              - { reps: 5, load: "round5(deadlift_tm * 0.75)" }
+              - { reps: 3, load: "round5(deadlift_tm * 0.85)" }
+              - { reps: "1+", load: "round5(deadlift_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(deadlift_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: deadlift_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+            progress: { if: session_complete, then: "deadlift_tm += 10" }
+          - exercise: "Hanging Leg Raise"
+            sets: 5
+            reps: 15
+            rest: 60s
+
+  - label: "Week 3 · Barbell Bench Press"
+    slots:
+      - type: weights
+        name: "Barbell Bench Press — 5/3/1 + BBB"
+        focus: upper
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Barbell Bench Press"
+            sets:
+              - { reps: 5, load: "round5(bench_tm * 0.75)" }
+              - { reps: 3, load: "round5(bench_tm * 0.85)" }
+              - { reps: "1+", load: "round5(bench_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(bench_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: bench_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+            progress: { if: session_complete, then: "bench_tm += 5" }
+          - exercise: "Dumbbell Row"
+            sets: 5
+            reps: 10
+            rest: 90s
+          - exercise: "Band Pull Aparts"
+            sets: 3
+            reps: 20
+            rest: 45s
+
+  - label: "Week 3 · Barbell Squat"
+    slots:
+      - type: weights
+        name: "Barbell Squat — 5/3/1 + BBB"
+        focus: lower
+        intent: hypertrophy
+        durationMin: 65
+        exercises:
+          - exercise: "Barbell Squat"
+            sets:
+              - { reps: 5, load: "round5(squat_tm * 0.75)" }
+              - { reps: 3, load: "round5(squat_tm * 0.85)" }
+              - { reps: "1+", load: "round5(squat_tm * 0.95)", notes: "AMRAP" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+              - { reps: 10, load: "round5(squat_tm * 0.50)", notes: "BBB" }
+            rest: 3m
+            load: squat_tm  # warmup ramp base; work sets set their own loads
+            warmup: { percentages: [40, 50, 60], reps: [5, 5, 3] }
+            progress: { if: session_complete, then: "squat_tm += 10" }
+          - exercise: "Ab Wheel"
+            sets: 5
+            reps: 10
+            rest: 60s
+          - exercise: "Back Extension"
+            sets: 3
+            reps: 15
+            rest: 60s
