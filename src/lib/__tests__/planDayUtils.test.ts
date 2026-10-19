@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { extraToPlanDay } from '../planDayUtils'
-import type { ExtraWorkoutEntry } from '../../types'
+import { extraToPlanDay, getOffPlanLogs } from '../planDayUtils'
+import type { ExtraWorkoutEntry, HistoryEntry, Plan } from '../../types'
 
 function makeExtra(
   overrides: Partial<ExtraWorkoutEntry> = {},
@@ -63,5 +63,28 @@ describe('extraToPlanDay', () => {
     expect(typeof day.id).toBe('string')
     expect(typeof day.label).toBe('string')
     expect(Array.isArray(day.slots)).toBe(true)
+  })
+})
+
+describe('getOffPlanLogs', () => {
+  const plan = {
+    id: 'p1', name: 'Old Plan', status: 'inactive', duration: { type: 'weeks', value: 4 }, startDate: '2026-01-01',
+    startDayIndex: 0, createdAt: '', updatedAt: '',
+    days: [{ id: 'd1', label: 'Lift Day', slots: [{ id: 's1', type: 'weights', name: 'Lift' }] }],
+  } as Plan
+  const base = { createdAt: '', calendarDate: '2026-02-01', action: 'complete' as const }
+
+  it('returns completed logs from other plans, live or snapshotted, but not the active plan', () => {
+    const entries: HistoryEntry[] = [
+      { ...base, id: 'a', planId: 'p1', planDayIndex: 0 },
+      { ...base, id: 'b', planId: 'gone', planDayIndex: 0, workout: { planName: 'Deleted', slots: [{ type: 'run', name: 'Run' }] } },
+      { ...base, id: 'c', planId: 'active', planDayIndex: 0 },
+      { ...base, id: 'd', planId: 'p1', planDayIndex: 0, action: 'skip' },
+    ]
+    const logs = getOffPlanLogs(entries, { p1: plan }, 'active', '2026-02-01')
+    expect(logs.map(l => [l.entry.id, l.planName, l.planDay.slots[0].name])).toEqual([
+      ['a', 'Old Plan', 'Lift'],
+      ['b', 'Deleted', 'Run'],
+    ])
   })
 })

@@ -1,4 +1,4 @@
-import type { ExtraWorkoutEntry, Plan, PlanDay, WorkoutSnapshot } from '../types'
+import type { ExtraWorkoutEntry, HistoryEntry, Plan, PlanDay, WorkoutSnapshot } from '../types'
 import { planDayForDate } from '../engine/programWeeks'
 
 /** Sentinel planId for workouts logged with no plan (e.g. ad hoc with no active plan). */
@@ -43,4 +43,33 @@ export function extraToPlanDay(extra: ExtraWorkoutEntry): PlanDay {
     label: extra.workoutName,
     slots: [{ id: extra.id, type: extra.workoutType, name: extra.workoutName }],
   }
+}
+
+/** A completed plan-day log that isn't part of the active plan (another or deleted plan). */
+export interface OffPlanLog {
+  entry: HistoryEntry
+  planDay: PlanDay
+  planName: string | null
+}
+
+/**
+ * Completed workouts logged on `date` under any plan other than the active one,
+ * resolved through the live plan when it still exists, else the log's snapshot.
+ */
+export function getOffPlanLogs(
+  entries: HistoryEntry[],
+  plans: Record<string, Plan>,
+  activePlanId: string | null,
+  date: string,
+): OffPlanLog[] {
+  const out: OffPlanLog[] = []
+  for (const entry of entries) {
+    if (entry.calendarDate !== date || entry.action !== 'complete' || entry.planId === activePlanId) continue
+    const plan = plans[entry.planId]
+    const planDay = (plan ? planDayForDate(plan, entry.planDayIndex ?? -1, entry.calendarDate) : undefined)
+      ?? (entry.workout ? snapshotToPlanDay(entry.workout, entry.id) : undefined)
+    if (!planDay) continue
+    out.push({ entry, planDay, planName: plan?.name ?? entry.workout?.planName ?? null })
+  }
+  return out
 }
