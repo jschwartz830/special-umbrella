@@ -21,6 +21,7 @@ import upperLowerHybrid from './upper-lower-hybrid-12w.yaml?raw'
 import mobilityRecovery from './mobility-recovery.yaml?raw'
 import shoulderPt from './shoulder-pt.yaml?raw'
 import ptHomeProgram from './pt-home-program.yaml?raw'
+import hybridStrengthRunSwim from './hybrid-12w-strength-run-swim.yaml?raw'
 
 export type ProgramCategory = 'Strength' | 'Hypertrophy' | 'Home & Bodyweight' | 'Running' | 'Hybrid' | 'Mobility & Rehab'
 
@@ -52,6 +53,7 @@ export const PROGRAM_TEMPLATES: ProgramTemplate[] = [
   { id: 'half-marathon', label: 'Half Marathon — 12 Weeks', category: 'Running', level: 'Intermediate', daysPerWeek: '4', yaml: halfMarathon },
   { id: 'gzclp-5k', label: 'Hybrid Strength + Run Base', category: 'Hybrid', level: 'Intermediate', daysPerWeek: '7', yaml: hybridStrengthRun },
   { id: 'upper-lower-12w', label: 'Upper/Lower Hybrid 12-Week', category: 'Hybrid', level: 'Intermediate', daysPerWeek: '7', yaml: upperLowerHybrid },
+  { id: 'hybrid-12w-strength-run-swim', label: 'Hybrid 12-Week: Strength, Run, Swim & Mobility', category: 'Hybrid', level: 'Intermediate', daysPerWeek: '5-7', yaml: hybridStrengthRunSwim },
   { id: 'mobility-recovery', label: 'Mobility & Recovery Week', category: 'Mobility & Rehab', level: 'All levels', daysPerWeek: '2-4', yaml: mobilityRecovery },
   { id: 'pt-home-program', label: 'PT Home Exercise Program', category: 'Mobility & Rehab', level: 'All levels', daysPerWeek: '3', yaml: ptHomeProgram },
   { id: 'shoulder-pt', label: 'Shoulder PT', category: 'Mobility & Rehab', level: 'All levels', daysPerWeek: '3', yaml: shoulderPt },
