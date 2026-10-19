@@ -3,8 +3,9 @@ import type { DayStatus, ExtraWorkoutEntry, PlanDay } from '../../types'
 import { SwipeToDelete } from '../shared/SwipeToDelete'
 
 interface TodayCompletedSectionProps {
-  status: DayStatus
-  primaryPlanDay: PlanDay
+  /** Omitted when there is no active plan — only logged extras are shown then. */
+  status?: DayStatus
+  primaryPlanDay?: PlanDay
   todayExtras: ExtraWorkoutEntry[]
   onEditOutcome: () => void
   onEditExtra: (extra: ExtraWorkoutEntry) => void
@@ -24,7 +25,7 @@ export function TodayCompletedSection({
   return (
     <section className="space-y-2">
       <h2 className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">Completed today</h2>
-      {status === 'today_complete' && (
+      {status === 'today_complete' && primaryPlanDay && (
         <button
           onClick={onEditOutcome}
           className="w-full text-left flex items-start gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/12 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors active:scale-[0.99]"

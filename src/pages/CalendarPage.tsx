@@ -30,13 +30,13 @@ import { WorkoutBadge } from '../components/workout/WorkoutBadge'
 import { OutcomeMetrics } from '../components/workout/OutcomeMetrics'
 import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { Modal } from '../components/shared/Modal'
-import { EmptyState } from '../components/shared/EmptyState'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { Plan, ResolvedDay, ActionType, WorkoutType, ExtraWorkoutEntry, PlanDay } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual } from '../modules/workout-outcomes/types'
 import { useProgramStore } from '../store/programStore'
 import type { WorkoutSessionMeta } from '../components/workout/ActiveWorkoutTracker'
-import { extraToPlanDay } from '../lib/planDayUtils'
+import { extraToPlanDay, getOffPlanLogs, NO_PLAN_ID, type OffPlanLog } from '../lib/planDayUtils'
+import { usePlanStore } from '../store/planStore'
 import { findPreviousSetsByExercise } from '../lib/previousSetsHelper'
 import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 import { WORKOUT_TYPE_OPTIONS, WORKOUT_META } from '../lib/constants'
@@ -97,6 +97,9 @@ export function CalendarPage() {
   const removeOutcome = useOutcomeStore(s => s.removeOutcome)
   const moveOutcome = useOutcomeStore(s => s.moveOutcome)
   const programVarsMap = useProgramStore(s => s.vars)
+  const plans = usePlanStore(s => s.plans)
+  // A date with logged workouts but no active-plan day (no plan, or before it started)
+  const [selectedLogDate, setSelectedLogDate] = useState<string | null>(null)
 
   const planProgramVars = useMemo(
     () => (plan ? (programVarsMap[plan.id] ?? {}) : {}),
@@ -196,14 +199,14 @@ export function CalendarPage() {
   }
 
   function openExtraOutcome(extra: ExtraWorkoutEntry) {
-    if (!plan) return
     const resolvedDay = weeks.flat().find(cell => cell.date === extra.calendarDate)?.resolvedDay
     setSelected(null)
+    setSelectedLogDate(null)
     setOutcomeTarget({
-      planId: plan.id,
+      planId: extra.planId,
       calendarDate: extra.calendarDate,
       planDay: extraToPlanDay(extra),
-      instanceId: makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id),
+      instanceId: makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id),
       planDayIndex: resolvedDay?.planDayIndex,
     })
   }
@@ -318,9 +321,25 @@ export function CalendarPage() {
   }
 
   // Extra workout helpers
+  /** Every ad hoc workout logged on the date, whichever plan (or none) it was logged under. */
   function getExtrasForDate(calendarDate: string): ExtraWorkoutEntry[] {
-    if (!plan) return []
-    return extraEntries.filter(e => e.planId === plan.id && e.calendarDate === calendarDate)
+    return extraEntries.filter(e => e.calendarDate === calendarDate)
+  }
+
+  function getOffPlanForDate(calendarDate: string): OffPlanLog[] {
+    return getOffPlanLogs(entries, plans, plan?.id ?? null, calendarDate)
+  }
+
+  function openOffPlanOutcome(log: OffPlanLog) {
+    setSelected(null)
+    setSelectedLogDate(null)
+    setOutcomeTarget({
+      planId: log.entry.planId,
+      calendarDate: log.entry.calendarDate,
+      planDay: log.planDay,
+      instanceId: makeWorkoutInstanceId(log.entry.planId, log.entry.calendarDate),
+      planDayIndex: log.entry.planDayIndex,
+    })
   }
 
   return (
@@ -330,11 +349,10 @@ export function CalendarPage() {
       </div>
 
       {!plan && (
-        <EmptyState title="No active plan" description="Activate a plan to see your schedule." />
+        <p className="text-xs text-slate-500 mb-3">No active plan — showing the workouts you've logged.</p>
       )}
 
-      {plan && (
-        <>
+      <>
           {/* Month nav */}
           <div className="flex items-center justify-between mb-4">
             <button onClick={prevMonth} className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
@@ -377,13 +395,16 @@ export function CalendarPage() {
                   const isDayOff = rd?.status === 'past_day_off' || rd?.status === 'today_day_off'
                   const isPending = rd?.status === 'today_pending'
                   const hasFutureDayOff = rd?.status === 'future' && rd.historyEntry?.action === 'day_off'
-                  const extras = rd ? getExtrasForDate(rd.calendarDate) : []
+                  const extras = cell.isCurrentMonth ? getExtrasForDate(cell.date) : []
+                  const offPlan = cell.isCurrentMonth ? getOffPlanForDate(cell.date) : []
+                  const hasLogs = extras.length > 0 || offPlan.length > 0
+                  const showPlanSlots = !!rd && cell.isCurrentMonth && !isUnlogged && !isDayOff && !hasFutureDayOff
                   const hasMobility = cell.isCurrentMonth && !!mobilityCompletions[cell.date]
                   const isOnStreak = cell.isCurrentMonth && streakDatesSet.has(cell.date)
 
                   const bgClass = cell.isToday
                     ? 'bg-sky-500 text-white'
-                    : isComplete
+                    : isComplete || (hasLogs && !rd)
                       ? 'bg-emerald-500/20 text-emerald-400'
                       : isDayOff || hasFutureDayOff
                         ? 'bg-amber-500/10 text-amber-500/60'
@@ -400,15 +421,19 @@ export function CalendarPage() {
                   return (
                     <button
                       key={cell.date}
-                      onClick={() => rd && cell.isCurrentMonth && setSelected(rd)}
-                      className={`rounded-lg aspect-square flex flex-col items-center justify-center transition-colors ${cell.isCurrentMonth ? bgClass : 'text-slate-700'} ${rd && cell.isCurrentMonth ? 'active:scale-95' : 'cursor-default'} ${hasMobility ? 'ring-1 ring-emerald-400' : ''}`}
+                      onClick={() => {
+                        if (!cell.isCurrentMonth) return
+                        if (rd) setSelected(rd)
+                        else if (hasLogs) setSelectedLogDate(cell.date)
+                      }}
+                      className={`rounded-lg aspect-square flex flex-col items-center justify-center transition-colors ${cell.isCurrentMonth ? bgClass : 'text-slate-700'} ${(rd || hasLogs) && cell.isCurrentMonth ? 'active:scale-95' : 'cursor-default'} ${hasMobility ? 'ring-1 ring-emerald-400' : ''}`}
                     >
                       <span className="text-xs font-semibold leading-none">
                         {new Date(cell.date + 'T00:00').getDate()}
                       </span>
-                      {rd && cell.isCurrentMonth && !isUnlogged && !isDayOff && !hasFutureDayOff && (
+                      {(showPlanSlots || hasLogs) && (
                         <div className="flex gap-0.5 mt-0.5 items-center">
-                          {rd.planDay.slots.map(slot => {
+                          {showPlanSlots && rd.planDay.slots.map(slot => {
                             if (isComplete) {
                               const Icon = WORKOUT_META[slot.type].icon
                               return <Icon key={slot.id} size={8} strokeWidth={2.5} className="text-emerald-400" />
@@ -419,6 +444,10 @@ export function CalendarPage() {
                             const Icon = WORKOUT_META[e.workoutType].icon
                             return <Icon key={e.id} size={8} strokeWidth={2.5} className="text-sky-400" />
                           })}
+                          {offPlan.flatMap(o => o.planDay.slots.map(slot => {
+                            const Icon = WORKOUT_META[slot.type].icon
+                            return <Icon key={`${o.entry.id}-${slot.id}`} size={8} strokeWidth={2.5} className="text-sky-400" />
+                          }))}
                         </div>
                       )}
                       {(isDayOff || hasFutureDayOff) && cell.isCurrentMonth && (
@@ -445,8 +474,7 @@ export function CalendarPage() {
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm ring-1 ring-emerald-400 inline-block" />Mobility</span>
             <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />Streak</span>
           </div>
-        </>
-      )}
+      </>
 
       {/* Day detail modal */}
       {selected && plan && (
@@ -455,6 +483,8 @@ export function CalendarPage() {
           today={today}
           plan={plan}
           extras={getExtrasForDate(selected.calendarDate)}
+          offPlanLogs={getOffPlanForDate(selected.calendarDate)}
+          onEditOffPlan={openOffPlanOutcome}
           outcomes={outcomes}
           mobilityCompletion={mobilityCompletions[selected.calendarDate] ?? null}
           mobilityRoutine={mobilityRoutine}
@@ -472,7 +502,7 @@ export function CalendarPage() {
           onResumeExtra={(extra) => startHistoricalResume(
             extraToPlanDay(extra),
             extra.calendarDate,
-            makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id),
+            makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id),
             extra.id,
           )}
           onAddExtra={(type, name) => {
@@ -481,14 +511,29 @@ export function CalendarPage() {
           }}
           onDeleteExtra={(extra) => {
             removeExtraEntry(extra.id)
-            removeOutcome(makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id))
+            removeOutcome(makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id))
           }}
           onClose={() => setSelected(null)}
         />
       )}
 
+      {selectedLogDate && (
+        <LoggedDayModal
+          date={selectedLogDate}
+          extras={getExtrasForDate(selectedLogDate)}
+          offPlanLogs={getOffPlanForDate(selectedLogDate)}
+          outcomes={outcomes}
+          onEditExtra={openExtraOutcome}
+          onEditOffPlan={openOffPlanOutcome}
+          onAddExtra={(type, name) => addExtraEntry({
+            planId: plan?.id ?? NO_PLAN_ID, calendarDate: selectedLogDate, workoutType: type, workoutName: name, source: 'history',
+          })}
+          onClose={() => setSelectedLogDate(null)}
+        />
+      )}
+
       {/* Outcome modal — shown after completing a workout or editing details */}
-      {outcomeTarget && plan && (
+      {outcomeTarget && (
         <OutcomeModal
           planId={outcomeTarget.planId}
           calendarDate={outcomeTarget.calendarDate}
@@ -508,7 +553,7 @@ export function CalendarPage() {
                 }
               : (outcomes[outcomeTarget.instanceId] ?? null)
           }
-          previousSetsByExercise={plan ? findPreviousSetsByExercise(plan.id, outcomeTarget.calendarDate, outcomes, outcomeTarget.instanceId) : {}}
+          previousSetsByExercise={findPreviousSetsByExercise(outcomeTarget.planId, outcomeTarget.calendarDate, outcomes, outcomeTarget.instanceId)}
           workoutInstanceId={outcomeTarget.instanceId}
           onConfirm={handleOutcomeConfirm}
           onClose={() => {
@@ -562,12 +607,16 @@ function DayDetailModal({
   onResumeExtra,
   onAddExtra,
   onDeleteExtra,
+  offPlanLogs,
+  onEditOffPlan,
   onClose,
 }: {
   resolved: ResolvedDay
   today: string
   plan: Plan
   extras: ExtraWorkoutEntry[]
+  offPlanLogs: OffPlanLog[]
+  onEditOffPlan: (log: OffPlanLog) => void
   outcomes: Record<string, WorkoutOutcome>
   mobilityCompletion: MobilityCompletion | null
   mobilityRoutine: MobilityExercise[]
@@ -729,6 +778,11 @@ function DayDetailModal({
               </button>
             )
           })}
+
+          {/* Workouts logged under another (or a deleted) plan */}
+          {offPlanLogs.map(log => (
+            <OffPlanRow key={log.entry.id} log={log} outcomes={outcomes} onClick={() => onEditOffPlan(log)} />
+          ))}
 
           {/* Mobility completion */}
           {mobilityCompletion && (
@@ -1024,6 +1078,88 @@ function DayDetailModal({
 
         {historyEntry?.notes && (
           <p className="text-sm text-slate-400 italic">"{historyEntry.notes}"</p>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
+function OffPlanRow({ log, outcomes, onClick }: {
+  log: OffPlanLog
+  outcomes: Record<string, WorkoutOutcome>
+  onClick: () => void
+}) {
+  const hasOutcome = !!outcomes[makeWorkoutInstanceId(log.entry.planId, log.entry.calendarDate)]
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-700/30 border border-slate-700/50 hover:border-slate-600 text-left transition-colors active:scale-[0.98]"
+    >
+      <WorkoutBadge type={log.planDay.slots[0]?.type ?? 'other'} size="sm" />
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm text-slate-200 truncate">{log.planDay.slots.map(sl => sl.name).join(' + ')}</span>
+        {log.planName && <span className="block text-[10px] text-slate-500 truncate">{log.planName}</span>}
+      </span>
+      {hasOutcome && <CheckCircle2 size={12} className="text-emerald-400 flex-shrink-0" />}
+      <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
+    </button>
+  )
+}
+
+/** Day view for dates with logged workouts but no active-plan day to show. */
+function LoggedDayModal({ date, extras, offPlanLogs, outcomes, onEditExtra, onEditOffPlan, onAddExtra, onClose }: {
+  date: string
+  extras: ExtraWorkoutEntry[]
+  offPlanLogs: OffPlanLog[]
+  outcomes: Record<string, WorkoutOutcome>
+  onEditExtra: (extra: ExtraWorkoutEntry) => void
+  onEditOffPlan: (log: OffPlanLog) => void
+  onAddExtra: (type: WorkoutType, name: string) => void
+  onClose: () => void
+}) {
+  const [adding, setAdding] = useState(false)
+  const [type, setType] = useState<WorkoutType>('weights')
+  const [name, setName] = useState('')
+  return (
+    <Modal title={format(new Date(date + 'T00:00'), 'EEEE, MMMM d')} onClose={onClose}>
+      <div className="space-y-2">
+        {offPlanLogs.map(log => (
+          <OffPlanRow key={log.entry.id} log={log} outcomes={outcomes} onClick={() => onEditOffPlan(log)} />
+        ))}
+        {extras.map(extra => {
+          const hasOutcome = !!outcomes[makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id)]
+          return (
+            <button
+              key={extra.id}
+              onClick={() => onEditExtra(extra)}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-slate-700/30 border border-slate-700/50 hover:border-slate-600 text-left transition-colors active:scale-[0.98]"
+            >
+              <WorkoutBadge type={extra.workoutType} size="sm" />
+              <span className="flex-1 text-sm text-slate-200 truncate">{extra.workoutName}</span>
+              {hasOutcome && <CheckCircle2 size={12} className="text-emerald-400 flex-shrink-0" />}
+              <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
+            </button>
+          )
+        })}
+        {adding ? (
+          <div className="flex gap-2">
+            <select value={type} onChange={e => setType(e.target.value as WorkoutType)} className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white">
+              {WORKOUT_TYPE_OPTIONS.map(o => <option key={o.type} value={o.type}>{o.label}</option>)}
+            </select>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Name (optional)" className="flex-1 min-w-0 bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white" />
+            <button
+              onClick={() => {
+                onAddExtra(type, name.trim() || WORKOUT_TYPE_OPTIONS.find(o => o.type === type)?.label || type)
+                setAdding(false)
+                setName('')
+              }}
+              className="px-3 py-1.5 rounded-lg bg-sky-500 text-white text-sm font-medium"
+            >Add</button>
+          </div>
+        ) : (
+          <button onClick={() => setAdding(true)} className="w-full py-2 rounded-xl border border-dashed border-slate-600 text-xs text-slate-400 hover:text-sky-300">
+            + Add workout
+          </button>
         )}
       </div>
     </Modal>

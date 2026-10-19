@@ -230,6 +230,52 @@ export function TodayPage() {
   const { isDismissed: streakMilestoneDismissed, dismiss: dismissStreakMilestone, milestone: streakMilestone } =
     useStreakMilestoneDismiss(earlyPlanStreak)
 
+  // Every workout logged today shows as completed, whichever plan (or none) it belongs to.
+  const todayExtras = extraEntries
+    .filter(e => e.calendarDate === today)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+
+  function handleDeleteExtra(extra: ExtraWorkoutEntry) {
+    removeOutcome(makeExtraWorkoutInstanceId(extra.planId, extra.calendarDate, extra.id))
+    removeExtraEntry(extra.id)
+    if (extra.advancedRotation ?? (extra.source === 'double_day')) removeLastOverrideByType(extra.planId, 'advance')
+  }
+
+  // Edit outcome for a completed extra workout
+  const editExtraModal = editingExtra && (() => {
+    const extraPlanId = editingExtra.planId
+    const extraInstanceId = makeExtraWorkoutInstanceId(extraPlanId, today, editingExtra.id)
+    return (
+      <OutcomeModal
+        planId={extraPlanId}
+        calendarDate={today}
+        planDay={extraToPlanDay(editingExtra)}
+        workoutInstanceId={extraInstanceId}
+        existingOutcome={getOutcome(extraInstanceId)}
+        onConfirm={(outcome) => {
+          const slot = extraToPlanDay(editingExtra).slots[0]
+          const completedDate = outcome.completedAt
+            ? format(new Date(outcome.completedAt), 'yyyy-MM-dd')
+            : today
+          let extraOutcome = { ...outcome, workoutInstanceId: extraInstanceId }
+          if (completedDate !== today) {
+            updateExtraEntryDate(editingExtra.id, completedDate)
+            const nextId = makeExtraWorkoutInstanceId(extraPlanId, completedDate, editingExtra.id)
+            moveOutcome(extraInstanceId, nextId)
+            extraOutcome = { ...extraOutcome, workoutInstanceId: nextId }
+          }
+          if (slot) {
+            logOutcomeWithProgression(extraOutcome, slot)
+          } else {
+            useOutcomeStore.getState().setOutcome(extraOutcome)
+          }
+          setEditingExtra(null)
+        }}
+        onClose={() => setEditingExtra(null)}
+      />
+    )
+  })()
+
   if (!plan || !todayResolved) {
     return (
       <div className="px-4 pt-safe">
@@ -266,6 +312,15 @@ export function TodayPage() {
           onOpenConsumed={() => setAdHocOpenRequest(false)}
           onActiveChange={setAdHocActive}
         />
+        <div className="pb-24">
+          <TodayCompletedSection
+            todayExtras={todayExtras}
+            onEditOutcome={() => {}}
+            onEditExtra={setEditingExtra}
+            onDeleteExtra={handleDeleteExtra}
+          />
+        </div>
+        {editExtraModal}
       </div>
     )
   }
@@ -273,10 +328,6 @@ export function TodayPage() {
   const isPending = todayResolved.status === 'today_pending'
   const isResolved = !isPending
   const planExpired = isPlanExpired(plan, planEntries, today)
-  const todayExtras = planExtras
-    .filter(e => e.calendarDate === today)
-    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-
   const instanceId = makeWorkoutInstanceId(plan.id, today)
   const existingOutcome = getOutcome(instanceId)
 
@@ -728,11 +779,7 @@ export function TodayPage() {
         todayExtras={todayExtras}
         onEditOutcome={handleEditOutcome}
         onEditExtra={setEditingExtra}
-        onDeleteExtra={(extra) => {
-          removeOutcome(makeExtraWorkoutInstanceId(plan.id, extra.calendarDate, extra.id))
-          removeExtraEntry(extra.id)
-          if (extra.advancedRotation ?? (extra.source === 'double_day')) removeLastOverrideByType(plan.id, 'advance')
-        }}
+        onDeleteExtra={handleDeleteExtra}
       />
 
       {/* Personal record celebration */}
@@ -1074,39 +1121,7 @@ export function TodayPage() {
         />
       )}
 
-      {/* Edit outcome for a completed extra workout */}
-      {editingExtra && (() => {
-        const extraInstanceId = makeExtraWorkoutInstanceId(plan.id, today, editingExtra.id)
-        return (
-          <OutcomeModal
-            planId={plan.id}
-            calendarDate={today}
-            planDay={extraToPlanDay(editingExtra)}
-            workoutInstanceId={extraInstanceId}
-            existingOutcome={getOutcome(extraInstanceId)}
-            onConfirm={(outcome) => {
-              const slot = extraToPlanDay(editingExtra).slots[0]
-              const completedDate = outcome.completedAt
-                ? format(new Date(outcome.completedAt), 'yyyy-MM-dd')
-                : today
-              let extraOutcome = { ...outcome, workoutInstanceId: extraInstanceId }
-              if (completedDate !== today) {
-                updateExtraEntryDate(editingExtra.id, completedDate)
-                const nextId = makeExtraWorkoutInstanceId(plan.id, completedDate, editingExtra.id)
-                moveOutcome(extraInstanceId, nextId)
-                extraOutcome = { ...extraOutcome, workoutInstanceId: nextId }
-              }
-              if (slot) {
-                logOutcomeWithProgression(extraOutcome, slot)
-              } else {
-                useOutcomeStore.getState().setOutcome(extraOutcome)
-              }
-              setEditingExtra(null)
-            }}
-            onClose={() => setEditingExtra(null)}
-          />
-        )
-      })()}
+      {editExtraModal}
 
       {/* Log upcoming workout modal */}
       {loggingUpcoming && !showUpcomingOutcome && (
