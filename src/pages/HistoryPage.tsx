@@ -37,7 +37,7 @@ import type { ActionType, HistoryEntry, ExtraWorkoutEntry, WorkoutType, PlanDay 
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import type { RunProgressionState } from '../modules/run-adaptation/types'
 import { COMPLETION_STATE_LABELS } from '../modules/workout-outcomes/types'
-import { extraToPlanDay } from '../lib/planDayUtils'
+import { extraToPlanDay, snapshotToPlanDay } from '../lib/planDayUtils'
 import { WORKOUT_TYPE_OPTIONS } from '../lib/constants'
 
 const WORKOUT_TYPES = WORKOUT_TYPE_OPTIONS
@@ -230,7 +230,7 @@ export function HistoryPage() {
         type = item.extra.workoutType
       } else if (item.kind === 'rotation' && item.entry.action === 'complete') {
         const p = plans[item.entry.planId]
-        type = p?.days[item.entry.planDayIndex ?? -1]?.slots[0]?.type
+        type = p?.days[item.entry.planDayIndex ?? -1]?.slots[0]?.type ?? item.entry.workout?.slots[0]?.type
       }
       if (type) counts.set(type, (counts.get(type) ?? 0) + 1)
     }
@@ -327,9 +327,9 @@ export function HistoryPage() {
   }
 
   function openOutcomeForEntry(entry: HistoryEntry) {
-    const plan = plans[entry.planId]
-    if (!plan || entry.planDayIndex === undefined) return
-    const planDay = plan.days[entry.planDayIndex]
+    // Logs outlive their plan: fall back to the snapshot taken when the workout was logged.
+    const planDay = plans[entry.planId]?.days[entry.planDayIndex ?? -1]
+      ?? (entry.workout ? snapshotToPlanDay(entry.workout, entry.id) : undefined)
     if (!planDay) return
     setEditingEntry(null)
     setOutcomeTarget({
@@ -583,6 +583,8 @@ export function HistoryPage() {
             const { entry } = item
             const plan = plans[entry.planId]
             const planDay = plan?.days[entry.planDayIndex ?? -1]
+              ?? (entry.workout ? snapshotToPlanDay(entry.workout, entry.id) : undefined)
+            const planName = plan?.name ?? (entry.workout?.planName ? `${entry.workout.planName} (deleted plan)` : null)
             const instanceId = makeWorkoutInstanceId(entry.planId, entry.calendarDate)
             const outcome = outcomes[instanceId] ?? null
             const progressionState = progressionByInstance.get(instanceId) ?? null
@@ -632,8 +634,8 @@ export function HistoryPage() {
                           {planDay?.slots.map((slot, i) => (
                             <WorkoutSlotDetails key={slot.id} slot={slot} planId={entry.planId} className={i > 0 ? 'pt-2' : ''} />
                           ))}
-                          {plan && (
-                            <p className="text-xs text-slate-500">{plan.name}</p>
+                          {planName && (
+                            <p className="text-xs text-slate-500">{planName}</p>
                           )}
                         </div>
                       )}

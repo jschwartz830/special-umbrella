@@ -1,0 +1,1728 @@
+schemaVersion: 1
+name: "Hybrid 12-Week: Strength, Run, Swim & Mobility"
+description: >
+  Three home lifts (squat / deadlift / accessories optional) plus a Saturday
+  gym machine session and swim, three easy runs building to a 42-minute long
+  run, and Tue/Thu mobility for ankle, hips, T-spine and scapular control.
+  Weeks 4, 8 and 12 are deloads (fewer sets, same weights). One plan day per
+  calendar day; a missed day just waits — do it tomorrow. Rep-range lifts use
+  double progression: add weight yourself once every set hits the top of the
+  range with 2+ reps in reserve.
+
+duration:
+  type: weeks
+  value: 12
+
+vars:
+  squat: 155
+  bench: 85
+  db_row: 30
+  db_lunge: 15
+  deadlift: 185
+  landmine: 45
+  db_split: 15
+
+days:
+  - label: "W1 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W1 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 10 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 10
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 10m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W1 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W1 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Optional Easy Run — 8 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 8
+        notes: "Optional this week — skip freely. Conversational effort."
+        segments:
+          - { type: easy, duration: 8m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W1 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional)"
+        focus: upper
+        intent: hypertrophy
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 2, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 2, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W1 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines"
+        focus: full_body
+        intent: hypertrophy
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 2, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 3, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 2, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 600 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 15
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 600 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W1 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 20 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 20
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 20m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W2 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W2 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 12 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 12
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 12m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W2 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W2 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Optional Easy Run — 10 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 10
+        notes: "Optional this week — skip freely. Conversational effort."
+        segments:
+          - { type: easy, duration: 10m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W2 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional)"
+        focus: upper
+        intent: hypertrophy
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 2, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 2, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W2 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines"
+        focus: full_body
+        intent: hypertrophy
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 2, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 3, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 2, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 600 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 15
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 600 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W2 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 22 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 22
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 22m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W3 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W3 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 12 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 12
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 12m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W3 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W3 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 15 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 15
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 15m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W3 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional)"
+        focus: upper
+        intent: hypertrophy
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 2, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 2, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W3 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines"
+        focus: full_body
+        intent: hypertrophy
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 2, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 3, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 2, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 700 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 18
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 700 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 6 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W3 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 25 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 25
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 25m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W4 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat (Deload)"
+        focus: full_body
+        intent: deload
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 2, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 1, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 2, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 1, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 1, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 2, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W4 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 10 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 10
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 10m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W4 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift (Deload)"
+        focus: full_body
+        intent: deload
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 1, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 2, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 1, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 1, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 1, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 1, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 1, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W4 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 12 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 12
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 12m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W4 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional) (Deload)"
+        focus: upper
+        intent: deload
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 1, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 1, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 1, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 1, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 1, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W4 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines (Deload)"
+        focus: full_body
+        intent: deload
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 1, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 1, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 1, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 1, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 1, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 1, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 1, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 500 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 12
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 500 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 2 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W4 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 20 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 20
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 20m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W5 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W5 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 15 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 15
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 15m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W5 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W5 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 18 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 18
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 18m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W5 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional)"
+        focus: upper
+        intent: hypertrophy
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 2, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 2, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W5 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines"
+        focus: full_body
+        intent: hypertrophy
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 2, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 3, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 2, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 800 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 20
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 800 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W5 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 28 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 28
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 28m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W6 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W6 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 15 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 15
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 15m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W6 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W6 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 20 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 20
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 20m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W6 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional)"
+        focus: upper
+        intent: hypertrophy
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 2, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 2, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W6 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines"
+        focus: full_body
+        intent: hypertrophy
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 2, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 3, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 2, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 900 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 22
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 900 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 5 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W6 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 30 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 30
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 30m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W7 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W7 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 18 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 18
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 18m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W7 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W7 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 20 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 20
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 20m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W7 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional)"
+        focus: upper
+        intent: hypertrophy
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 2, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 2, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W7 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines"
+        focus: full_body
+        intent: hypertrophy
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 2, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 3, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 2, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 1000 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 25
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 1000 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 6 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W7 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 33 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 33
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 33m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W8 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat (Deload)"
+        focus: full_body
+        intent: deload
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 2, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 1, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 2, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 1, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 1, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 2, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W8 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 12 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 12
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 12m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W8 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift (Deload)"
+        focus: full_body
+        intent: deload
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 1, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 2, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 1, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 1, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 1, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 1, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 1, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W8 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 17 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 17
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 17m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W8 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional) (Deload)"
+        focus: upper
+        intent: deload
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 1, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 1, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 1, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 1, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 1, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W8 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines (Deload)"
+        focus: full_body
+        intent: deload
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 1, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 1, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 1, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 1, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 1, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 1, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 1, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 700 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 18
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 700 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 3 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W8 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 25 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 25
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 25m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W9 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W9 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 18 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 18
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 18m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W9 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W9 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 22 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 22
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 22m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W9 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional)"
+        focus: upper
+        intent: hypertrophy
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 2, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 2, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W9 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines"
+        focus: full_body
+        intent: hypertrophy
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 2, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 3, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 2, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 1100 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 28
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 1100 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 3 × 100 + 2 × 200 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W9 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 35 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 35
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 35m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W10 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W10 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 20 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 20
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 20m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W10 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W10 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 23 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 23
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 23m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W10 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional)"
+        focus: upper
+        intent: hypertrophy
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 2, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 2, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W10 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines"
+        focus: full_body
+        intent: hypertrophy
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 2, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 3, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 2, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 1200 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 30
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 1200 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 100 + 2 × 200 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W10 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 38 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 38
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 38m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W11 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W11 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 20 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 20
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 20m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W11 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift"
+        focus: full_body
+        intent: hypertrophy
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W11 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 25 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 25
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 25m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W11 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional)"
+        focus: upper
+        intent: hypertrophy
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 2, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 2, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W11 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines"
+        focus: full_body
+        intent: hypertrophy
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 2, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 3, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 2, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 2, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 1400 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 35
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 1400 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 100 + 3 × 200 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W11 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 42 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 42
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 42m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
+
+  - label: "W12 · Mon — Strength A"
+    slots:
+      - type: weights
+        name: "Strength A — Squat (Deload)"
+        focus: full_body
+        intent: deload
+        location: home
+        durationMin: 45
+        notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Squat, Barbell", sets: 2, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
+          - { exercise: "Bench Press, Barbell", sets: 1, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
+          - { exercise: "Incline Row, Dumbbell", sets: 2, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 1, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Single-Leg Standing Calf Raise", sets: 1, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
+          - { exercise: "Bear Plank Scap Push-Up Plus", sets: 2, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
+
+  - label: "W12 · Tue — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 15 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 15
+        notes: "Treadmill, conversational. Missed? Just do the next session — don't add the minutes elsewhere."
+        segments:
+          - { type: easy, duration: 15m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W12 · Wed — Strength B"
+    slots:
+      - type: weights
+        name: "Strength B — Deadlift (Deload)"
+        focus: full_body
+        intent: deload
+        location: home
+        durationMin: 50
+        notes: "Short on time: deadlift, pull-ups, landmine press only. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Deadlift, Barbell", sets: 1, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Pull Up, Band", sets: 2, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 1, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
+          - { exercise: "Split Squat, Dumbbell", sets: 1, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Nordic Curl (Assisted)", sets: 1, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 1, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
+          - { exercise: "Dead Bug", sets: 1, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
+
+  - label: "W12 · Thu — Easy Run + Mobility"
+    slots:
+      - type: run
+        name: "Easy Run — 20 min"
+        subtype: easy
+        difficulty: easy
+        location: home
+        durationMin: 20
+        notes: "Conversational effort."
+        segments:
+          - { type: easy, duration: 20m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: mobility
+        name: "Mobility + Ankle/Scap"
+        intent: recovery_mobility
+        location: home
+        durationMin: 10
+        mobilityExercises:
+          - { id: lib-ankle-dorsiflexion-wall, name: "Knee-to-Wall Ankle Rocks", sets: [{ reps: 8 }, { reps: 8 }], notes: "One set per side" }
+          - { id: lib-thoracic-rotation, name: "Thoracic Rotations", sets: [{ reps: 6 }, { reps: 6 }], notes: "One set per side" }
+          - { id: hip-flexor-stretch, name: "Half-Kneeling Hip Flexor Stretch", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-single-leg-balance, name: "Single-Leg Balance", sets: [{ duration: 30s }, { duration: 30s }], notes: "One set per side" }
+          - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
+
+  - label: "W12 · Fri — Strength D (Optional)"
+    slots:
+      - type: weights
+        name: "Strength D — Accessories (Optional) (Deload)"
+        focus: upper
+        intent: deload
+        location: home
+        durationMin: 25
+        notes: "Optional — skip freely; this week still counts with 3 lifts. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Incline Bench Press, Dumbbell", sets: 1, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Bent Over One Arm Row, Dumbbell", sets: 1, reps: 10, rest: 60s, notes: "Reps per side" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 1, reps: 15, rest: 45s }
+          - { exercise: "Hammer Curl, Dumbbell", sets: 1, reps: "10-12", rest: 60s, progressionType: double }
+          - { exercise: "Triceps Extension, Dumbbell", sets: 1, reps: 12, rest: 60s, notes: "Or cable pushdown" }
+
+  - label: "W12 · Sat — Strength C + Swim"
+    slots:
+      - type: weights
+        name: "Strength C — Machines (Deload)"
+        focus: full_body
+        intent: deload
+        location: gym
+        durationMin: 60
+        notes: "Start machines at a comfortable effort, 2-4 reps in reserve. Short on time: chest press, row, leg press, pulldown. DELOAD WEEK: same weights, fewer sets, stop 3+ reps short of failure."
+        exercises:
+          - { exercise: "Chest Press, Leverage Machine", sets: 1, reps: "8-12", rest: 90s, progressionType: double }
+          - { exercise: "Seated Row, Cable", sets: 2, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Leg Press, Leverage Machine", sets: 1, reps: "10-12", rest: 90s, progressionType: double }
+          - { exercise: "Lat Pulldown, Cable", sets: 1, reps: "10-12", rest: 75s, progressionType: double, notes: "Neutral grip" }
+          - { exercise: "Lateral Raise, Dumbbell", sets: 1, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Seated Leg Curl, Leverage Machine", sets: 1, reps: "10-12", rest: 75s, progressionType: double }
+          - { exercise: "Seated Calf Raise, Leverage Machine", sets: 1, reps: "12-15", rest: 60s, progressionType: double }
+          - { exercise: "Crunch, Cable", sets: 1, reps: "12-15", rest: 60s, progressionType: double }
+      - type: swim
+        name: "Swim — 900 yd"
+        subtype: technique
+        difficulty: easy
+        location: gym
+        durationMin: 22
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 900 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 5 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+
+  - label: "W12 · Sun — Long Run + Yoga"
+    slots:
+      - type: run
+        name: "Long Easy Run — 32 min"
+        subtype: long
+        difficulty: easy
+        location: outdoor
+        durationMin: 32
+        notes: "Conversational effort; run/walk is fine. Outdoors or treadmill."
+        segments:
+          - { type: easy, duration: 32m, pace: easy, notes: "Conversational effort; run/walk is fine" }
+      - type: yoga
+        name: "Yoga Class"
+        subtype: mobility
+        difficulty: easy
+        location: class
+        durationMin: 60
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."

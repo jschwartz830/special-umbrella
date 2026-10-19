@@ -1,9 +1,10 @@
 /**
- * Integration-style test: deleting a plan should cascade to history, outcomes,
- * progression states, program vars, and exercise history — leaving no orphaned
- * records. Mirrors the wiring in PlansPage where the delete confirm handler calls
- * clearPlanHistory, clearPlanOutcomes, removeProgressionStates, clearPlanVars,
- * clearByPlanId (exerciseHistory), and deletePlan together.
+ * Integration-style test: deleting a plan removes only plan-internal state
+ * (rotation overrides, program vars, run progression states). Workout logs —
+ * history entries, extras, outcomes, exercise history — are standalone records
+ * and are kept, with a snapshot so they still describe themselves. Mirrors the
+ * PlansPage delete handler: detachPlan, removeProgressionStates, clearPlanVars,
+ * deletePlan.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
@@ -23,6 +24,8 @@ import { useProgramStore } from '../programStore'
 import { useExerciseHistoryStore } from '../exerciseHistoryStore'
 // eslint-disable-next-line import/first
 import type { Plan } from '../../types'
+// eslint-disable-next-line import/first
+import { parseWorkoutInstanceId } from '../../lib/workoutInstanceId'
 // eslint-disable-next-line import/first
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 
@@ -62,8 +65,7 @@ beforeEach(() => {
 })
 
 describe('plan delete cleanup (integration)', () => {
-  it('removes the plan, its history entries, and its outcomes', () => {
-    // Seed plan A and plan B in each store
+  it('removes the plan but keeps its logged workouts, snapshotted', () => {
     const planA = makePlan('plan-A', 'Alpha')
     const planB = makePlan('plan-B', 'Bravo')
     usePlanStore.setState({ plans: { [planA.id]: planA, [planB.id]: planB } })
@@ -72,32 +74,38 @@ describe('plan delete cleanup (integration)', () => {
       planId: 'plan-A', calendarDate: '2026-04-01', planDayIndex: 0, action: 'complete',
     })
     useHistoryStore.getState().addEntry({
-      planId: 'plan-A', calendarDate: '2026-04-02', planDayIndex: 0, action: 'skip',
-    })
-    useHistoryStore.getState().addEntry({
       planId: 'plan-B', calendarDate: '2026-04-01', planDayIndex: 0, action: 'complete',
     })
-
+    useHistoryStore.getState().logOverride('plan-A', 'advance')
     useOutcomeStore.getState().setOutcome(makeOutcome('plan-A', '2026-04-01'))
-    useOutcomeStore.getState().setOutcome(makeOutcome('plan-A', '2026-04-02'))
     useOutcomeStore.getState().setOutcome(makeOutcome('plan-B', '2026-04-01'))
 
     // Simulate the PlansPage delete handler
-    useHistoryStore.getState().clearPlanHistory('plan-A')
-    useOutcomeStore.getState().clearPlanOutcomes('plan-A')
+    useHistoryStore.getState().detachPlan(planA)
     usePlanStore.getState().deletePlan('plan-A')
 
-    // Plan A is gone; plan B untouched
     expect(usePlanStore.getState().plans['plan-A']).toBeUndefined()
     expect(usePlanStore.getState().plans['plan-B']).toBeDefined()
 
-    const remainingEntries = useHistoryStore.getState().entries
-    expect(remainingEntries).toHaveLength(1)
-    expect(remainingEntries[0].planId).toBe('plan-B')
+    // Logs survive and describe themselves without the plan
+    const entryA = useHistoryStore.getState().entries.find(e => e.planId === 'plan-A')
+    expect(entryA?.workout).toEqual({ planName: 'Alpha', dayLabel: 'Day 1', slots: [{ type: 'weightlifting', name: 'Lift' }] })
+    expect(useHistoryStore.getState().entries).toHaveLength(2)
+    expect(Object.keys(useOutcomeStore.getState().outcomes)).toHaveLength(2)
 
-    const remainingOutcomes = Object.keys(useOutcomeStore.getState().outcomes)
-    expect(remainingOutcomes).toHaveLength(1)
-    expect(remainingOutcomes[0]).toBe(makeWorkoutInstanceId('plan-B', '2026-04-01'))
+    // Rotation overrides are plan-internal and go
+    expect(useHistoryStore.getState().overrides.filter(o => o.planId === 'plan-A')).toHaveLength(0)
+  })
+
+  it('backfills snapshots for entries logged before snapshots existed', () => {
+    const planA = makePlan('plan-A', 'Alpha')
+    useHistoryStore.setState({
+      entries: [{ id: 'e1', planId: 'plan-A', calendarDate: '2026-04-01', planDayIndex: 0, action: 'complete', createdAt: '2026-04-01T00:00:00Z' }],
+      overrides: [],
+      extraEntries: [],
+    })
+    useHistoryStore.getState().detachPlan(planA)
+    expect(useHistoryStore.getState().entries[0].workout?.slots[0].name).toBe('Lift')
   })
 
   it('clears activePlanId when the deleted plan was active', () => {
@@ -107,52 +115,33 @@ describe('plan delete cleanup (integration)', () => {
     expect(usePlanStore.getState().activePlanId).toBeNull()
   })
 
-  it('removes ad-hoc extra workouts and their outcomes for the deleted plan only', () => {
+  it('keeps ad-hoc extra workouts and records the plan name on them', () => {
     const planA = makePlan('plan-A', 'Alpha')
-    const planB = makePlan('plan-B', 'Bravo')
-    usePlanStore.setState({ plans: { [planA.id]: planA, [planB.id]: planB } })
-
-    // Two extras on plan A, one on plan B
-    const extraAId = useHistoryStore.getState().addExtraEntry({
+    usePlanStore.setState({ plans: { [planA.id]: planA } })
+    const extraId = useHistoryStore.getState().addExtraEntry({
       planId: 'plan-A', calendarDate: '2026-04-01', workoutType: 'yoga', workoutName: 'Evening yoga',
     })
-    const extraA2Id = useHistoryStore.getState().addExtraEntry({
-      planId: 'plan-A', calendarDate: '2026-04-03', workoutType: 'swim', workoutName: 'Pool',
-    })
-    const extraBId = useHistoryStore.getState().addExtraEntry({
-      planId: 'plan-B', calendarDate: '2026-04-01', workoutType: 'yoga', workoutName: 'Morning yoga',
-    })
-
-    // Seed outcomes for each extra
     useOutcomeStore.getState().setOutcome({
-      workoutInstanceId: makeExtraWorkoutInstanceId('plan-A', '2026-04-01', extraAId),
-      completionState: 'completed',
-    })
-    useOutcomeStore.getState().setOutcome({
-      workoutInstanceId: makeExtraWorkoutInstanceId('plan-A', '2026-04-03', extraA2Id),
-      completionState: 'completed',
-    })
-    useOutcomeStore.getState().setOutcome({
-      workoutInstanceId: makeExtraWorkoutInstanceId('plan-B', '2026-04-01', extraBId),
+      workoutInstanceId: makeExtraWorkoutInstanceId('plan-A', '2026-04-01', extraId),
       completionState: 'completed',
     })
 
-    // Simulate the PlansPage delete handler for plan A
-    useHistoryStore.getState().clearPlanHistory('plan-A')
-    useOutcomeStore.getState().clearPlanOutcomes('plan-A')
+    useHistoryStore.getState().detachPlan(planA)
     usePlanStore.getState().deletePlan('plan-A')
 
-    // Plan A extras gone; plan B extra intact
-    const remainingExtras = useHistoryStore.getState().extraEntries
-    expect(remainingExtras).toHaveLength(1)
-    expect(remainingExtras[0].planId).toBe('plan-B')
+    const extras = useHistoryStore.getState().extraEntries
+    expect(extras).toHaveLength(1)
+    expect(extras[0].planName).toBe('Alpha')
+    expect(Object.keys(useOutcomeStore.getState().outcomes)).toHaveLength(1)
+  })
 
-    // Plan A extra outcomes gone; plan B extra outcome intact
-    const remainingOutcomeKeys = Object.keys(useOutcomeStore.getState().outcomes)
-    expect(remainingOutcomeKeys).toHaveLength(1)
-    expect(remainingOutcomeKeys[0]).toBe(
-      makeExtraWorkoutInstanceId('plan-B', '2026-04-01', extraBId),
-    )
+  it('allows workouts logged with no plan at all', () => {
+    const id = useHistoryStore.getState().addExtraEntry({
+      planId: '', calendarDate: '2026-04-01', workoutType: 'swim', workoutName: 'Pool',
+    })
+    const extra = useHistoryStore.getState().extraEntries.find(e => e.id === id)
+    expect(extra?.planName).toBeUndefined()
+    expect(parseWorkoutInstanceId(makeExtraWorkoutInstanceId('', '2026-04-01', id))).toEqual({ planId: '', calendarDate: '2026-04-01' })
   })
 
   it('clears program variables for the deleted plan, leaving other plans intact', () => {
@@ -168,9 +157,8 @@ describe('plan delete cleanup (integration)', () => {
     expect(useProgramStore.getState().getVars('plan-A')).toMatchObject({ squat: 135, bench: 95 })
     expect(useProgramStore.getState().getVars('plan-B')).toMatchObject({ easy_miles: 3.5 })
 
-    // Simulate the PlansPage delete handler (including the fix: clearPlanVars)
-    useHistoryStore.getState().clearPlanHistory('plan-A')
-    useOutcomeStore.getState().clearPlanOutcomes('plan-A')
+    // Simulate the PlansPage delete handler
+    useHistoryStore.getState().detachPlan(planA)
     useProgramStore.getState().clearPlanVars('plan-A')
     usePlanStore.getState().deletePlan('plan-A')
 
@@ -251,7 +239,7 @@ describe('plan delete cleanup (integration)', () => {
     expect(Object.keys(useOutcomeStore.getState().progressionStates)).toHaveLength(1)
   })
 
-  it('clears exercise history records for the deleted plan only', () => {
+  it('keeps exercise history records when a plan is deleted', () => {
     const planA = makePlan('plan-A', 'Alpha')
     const planB = makePlan('plan-B', 'Bravo')
     usePlanStore.setState({ plans: { [planA.id]: planA, [planB.id]: planB } })
@@ -291,15 +279,12 @@ describe('plan delete cleanup (integration)', () => {
     })
 
     // Simulate the full PlansPage delete handler
-    useHistoryStore.getState().clearPlanHistory('plan-A')
-    useOutcomeStore.getState().clearPlanOutcomes('plan-A')
+    useHistoryStore.getState().detachPlan(usePlanStore.getState().plans['plan-A'])
     useProgramStore.getState().clearPlanVars('plan-A')
-    useExerciseHistoryStore.getState().clearByPlanId('plan-A')
     usePlanStore.getState().deletePlan('plan-A')
 
-    // Plan A exercise records removed; plan B record intact
+    // Exercise history is standalone (dated, with plan/workout names snapshotted) — all kept
     const remaining = useExerciseHistoryStore.getState().records
-    expect(remaining).toHaveLength(1)
-    expect(remaining[0].planId).toBe('plan-B')
+    expect(remaining.map(r => r.planName)).toEqual(['Alpha', 'Bravo'])
   })
 })

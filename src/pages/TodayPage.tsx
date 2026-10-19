@@ -34,7 +34,7 @@ import type { WorkoutCompletionRate } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, WorkoutSlot } from '../types'
 import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../modules/workout-outcomes/types'
 import type { MobilitySessionCheckpoint } from '../store/mobilityStore'
-import { extraToPlanDay } from '../lib/planDayUtils'
+import { extraToPlanDay, NO_PLAN_ID } from '../lib/planDayUtils'
 import { MobilityTracker } from '../components/workout/MobilityTracker'
 import { useMobilityStore } from '../store/mobilityStore'
 import { formatWorkoutForClipboard } from '../lib/shareWorkout'
@@ -236,17 +236,36 @@ export function TodayPage() {
         <div className="pt-12">
           <EmptyState
             title="No active plan"
-            description="Create or activate a plan to start tracking your workouts."
+            description="Activate a plan for scheduled workouts, or log a one-off workout now."
             action={
-              <button
-                onClick={() => navigate('/plans')}
-                className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-semibold"
-              >
-                Go to Plans
-              </button>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => navigate('/plans')}
+                  className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-xl text-sm font-semibold"
+                >
+                  Go to Plans
+                </button>
+                <button
+                  onClick={() => setAdHocOpenRequest(true)}
+                  disabled={adHocActive}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                >
+                  Log a workout
+                </button>
+              </div>
             }
           />
         </div>
+        {/* Workouts don't need a plan: log ad hoc ones standalone */}
+        <TodayAdHocWorkout
+          planId={NO_PLAN_ID}
+          today={today}
+          addExtraEntry={addExtraEntry}
+          removeExtraEntry={removeExtraEntry}
+          openRequested={adHocOpenRequest}
+          onOpenConsumed={() => setAdHocOpenRequest(false)}
+          onActiveChange={setAdHocActive}
+        />
       </div>
     )
   }
