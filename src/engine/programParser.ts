@@ -1,7 +1,7 @@
 import { load as yamlLoad } from 'js-yaml'
 import { format } from 'date-fns'
 import { nanoid } from '../lib/utils'
-import type { Plan, WorkoutSlot, PlanDay, WorkoutType } from '../types'
+import type { Plan, WorkoutSlot, PlanDay, WorkoutType, Weekday } from '../types'
 import type {
   ExerciseSpec,
   SetSpec,
@@ -11,6 +11,7 @@ import type {
   ProgramMeta,
   YamlProgram,
   YamlSlot,
+  YamlDay,
   YamlExerciseSpec,
   YamlSetSpec,
   YamlRunSegment,
@@ -272,11 +273,18 @@ function buildStructureDescription(
 
 // ── Day parsing ───────────────────────────────────────────────────────────────
 
-function parseDay(raw: { label: string; slots: YamlSlot[] }): PlanDay {
+const WEEKDAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+function parseDay(raw: YamlDay): PlanDay {
+  const allowedDays = Array.isArray(raw.allowedDays)
+    ? WEEKDAYS.filter(d => raw.allowedDays!.some(a => String(a).toLowerCase().slice(0, 3) === d))
+    : []
   return {
     id: nanoid(),
     label: raw.label ?? 'Workout Day',
     slots: (raw.slots ?? []).map(parseSlot),
+    ...(allowedDays.length > 0 ? { allowedDays } : {}),
+    ...(raw.optional ? { optional: true } : {}),
   }
 }
 
@@ -318,8 +326,28 @@ export function parseYamlProgram(yamlText: string): ParseResult {
     }
   }
 
+  const schedule: Record<string, Array<number | string>> = {}
+  if (raw.schedule && typeof raw.schedule === 'object') {
+    for (const [k, v] of Object.entries(raw.schedule)) {
+      if (Array.isArray(v) && v.length > 0 && v.every(x => typeof x === 'number' || typeof x === 'string')) schedule[k] = v
+      else errors.push(`schedule.${k} must be a non-empty list of numbers or text`)
+    }
+  }
+  const deload = raw.deload && Array.isArray(raw.deload.weeks)
+    ? { weeks: raw.deload.weeks.filter(w => typeof w === 'number'), setsMultiplier: raw.deload.setsMultiplier }
+    : undefined
+  if (raw.weekly && raw.duration?.type !== 'weeks') errors.push('weekly programs need duration.type: weeks')
+
   const programMeta: ProgramMeta | undefined =
-    Object.keys(vars).length > 0 ? { version: 1, vars } : undefined
+    Object.keys(vars).length > 0 || raw.weekly
+      ? {
+          version: 1,
+          vars,
+          ...(raw.weekly ? { weekly: true } : {}),
+          ...(Object.keys(schedule).length > 0 ? { schedule } : {}),
+          ...(deload ? { deload } : {}),
+        }
+      : undefined
 
   const days = Array.isArray(raw.days) ? raw.days.map(parseDay) : []
 

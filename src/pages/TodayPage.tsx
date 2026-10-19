@@ -1,4 +1,7 @@
 import { useState, useMemo, useRef } from 'react'
+import { planDayForDate, programWeekForDate, weeklyChecklist, REST_DAY_INDEX } from '../engine/programWeeks'
+import { TodayWeeklyChecklist } from '../components/today/TodayWeeklyChecklist'
+import { usePlanStore } from '../store/planStore'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
@@ -82,6 +85,7 @@ function findPreviousWeightsOutcome(
 export function TodayPage() {
   const navigate = useNavigate()
   const { plan, todayResolved, upcoming, planEntries } = useActivePlan()
+  const updatePlan = usePlanStore(s => s.updatePlan)
   const actions = usePlanActions(plan?.id ?? null)
   const logAction = useHistoryStore(s => s.logAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
@@ -336,7 +340,7 @@ export function TodayPage() {
   // primary entry still refers to the original day. Prefer the history entry's
   // planDayIndex so the displayed/edited workout matches what was logged.
   const primaryPlanDayIndex = todayResolved.historyEntry?.planDayIndex ?? todayResolved.planDayIndex
-  const primaryPlanDay = plan.days[primaryPlanDayIndex] ?? todayResolved.planDay
+  const primaryPlanDay = planDayForDate(plan, primaryPlanDayIndex, today) ?? todayResolved.planDay
 
   // Resolve run adaptation note for today's workout.
   // Use primaryPlanDay (the day actually logged) rather than todayResolved.planDay
@@ -369,8 +373,14 @@ export function TodayPage() {
   const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
 
   // Collect recent past days with no entry — used to show the stall nudge.
-  const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today, 14)
-  const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, plan.startDate, today)
+  // Weekly programs drop last week's unfinished sessions, so only this week's gaps matter.
+  const weekInfo = programWeekForDate(plan, today)
+  const checklist = weeklyChecklist(plan, planEntries, extraEntries, today)
+  // Weekly programs can have nothing suggested today (week done, or only other-day sessions left)
+  const isWeeklyRest = !!checklist && todayResolved.planDayIndex === REST_DAY_INDEX
+  const nagFrom = weekInfo && weekInfo.weekStart > plan.startDate ? weekInfo.weekStart : plan.startDate
+  const unloggedDates = getUnloggedPastDates(plan.id, planEntries, nagFrom, today, 14)
+  const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, nagFrom, today)
   const olderUnloggedCount = Math.max(0, totalUnlogged - unloggedDates.length)
 
   const loggedRate = useMemo(
@@ -611,6 +621,7 @@ export function TodayPage() {
         calendarDate: today,
         workoutType: selectedSlot?.type ?? 'other',
         workoutName: selectedPlanDay.label,
+        planDayIndex: addFromPlanIdx,
         source: 'double_day',
         advancedRotation: willAdvance,
       })
@@ -685,6 +696,7 @@ export function TodayPage() {
         calendarDate: today,
         workoutType: bonusSlot?.type ?? 'other',
         workoutName: rd.planDay.label,
+        planDayIndex: rd.planDayIndex,
         source: 'double_day',
         advancedRotation: true,
       })
@@ -741,6 +753,28 @@ export function TodayPage() {
           {new Date(today + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
         <h1 className="text-xl font-bold text-white mt-0.5 leading-snug">{plan.name}</h1>
+        {weekInfo && (
+          <div className="flex items-center gap-2 mt-1 text-xs">
+            <span className={weekInfo.paused ? 'text-amber-400' : 'text-slate-400'}>
+              {weekInfo.paused
+                ? 'Paused this week'
+                : `Week ${Math.min(weekInfo.week, weekInfo.totalWeeks)} of ${weekInfo.totalWeeks}${weekInfo.deload ? ' · Deload' : ''}`}
+            </span>
+            <button
+              onClick={() => {
+                const paused = plan.pausedWeeks ?? []
+                updatePlan(plan.id, {
+                  pausedWeeks: weekInfo.paused
+                    ? paused.filter(d => d !== weekInfo.weekStart)
+                    : [...paused, weekInfo.weekStart],
+                })
+              }}
+              className="text-sky-400 hover:text-sky-300"
+            >
+              {weekInfo.paused ? 'Resume' : 'Pause this week'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Compact habit summary row — streak · total workouts · plan % ring */}
@@ -794,6 +828,20 @@ export function TodayPage() {
             <p className="text-xs text-slate-600 mt-0.5">No workout logged — rotation continues tomorrow</p>
           </div>
         </div>
+      ) : isPending && isWeeklyRest ? (
+        <div className="w-full rounded-xl border border-slate-700 bg-slate-800/80 p-4 flex items-center gap-3">
+          <Coffee size={22} className="text-slate-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-slate-300">
+              {checklist!.every(i => i.status !== 'pending') ? 'Week complete' : 'Nothing scheduled today'}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {checklist!.every(i => i.status !== 'pending')
+                ? 'Rest, or log an extra workout.'
+                : 'What\'s left this week is set for other days — pick one below to do it anyway.'}
+            </p>
+          </div>
+        </div>
       ) : isPending ? (
         <TodayPendingCard
           planId={plan.id}
@@ -822,6 +870,15 @@ export function TodayPage() {
         <WorkoutDayCard resolved={todayResolved} planId={plan?.id} isToday sessionCount={todaySessionCount} />
       )}
 
+      {checklist && (
+        <TodayWeeklyChecklist
+          items={checklist}
+          todayIndex={todayResolved.planDayIndex}
+          todayLogged={!isPending}
+          onPick={actions.jumpTo}
+        />
+      )}
+
       {/* Added plan workout preview */}
       {addFromPlanIdx !== null && plan.days[addFromPlanIdx] && (
         <div>
@@ -830,7 +887,7 @@ export function TodayPage() {
           </p>
           <SwipeToDelete onDelete={() => setAddFromPlanIdx(null)}>
             <WorkoutDayCard
-              resolved={{ calendarDate: today, planDayIndex: addFromPlanIdx, planDay: plan.days[addFromPlanIdx], status: 'future' }}
+              resolved={{ calendarDate: today, planDayIndex: addFromPlanIdx, planDay: planDayForDate(plan, addFromPlanIdx, today), status: 'future' }}
               planId={plan?.id}
             />
           </SwipeToDelete>

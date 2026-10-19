@@ -554,7 +554,13 @@ duration:
   type: "weeks" | "rotations"
   value: number
 vars:           # named numeric variables
-  squat: 135`}</pre>
+  squat: 135
+weekly: true    # days = one week; week # follows the calendar
+schedule:       # per-week values, used as {run_tue} in names/notes/durations
+  run_tue: [10, 12, 12, 10]
+deload:         # fewer sets, no progression in these weeks
+  weeks: [4, 8, 12]
+  setsMultiplier: 0.6`}</pre>
             </div>
             <div>
               <p className="text-slate-300 font-medium mb-1">Weights slot</p>

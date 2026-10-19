@@ -92,10 +92,16 @@ export interface WorkoutSlot {
 }
 
 /** One entry in the repeating day sequence */
+export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
+
 export interface PlanDay {
   id: string
   label: string
   slots: WorkoutSlot[]  // 1 or 2 items
+  /** Weekly programs: days this session is suggested on (e.g. gym-only sessions). Soft — can be overridden. */
+  allowedDays?: Weekday[]
+  /** Weekly programs: doesn't count against the week if skipped. */
+  optional?: boolean
 }
 
 export interface PlanDuration {
@@ -116,6 +122,8 @@ export interface Plan {
   updatedAt: string
   /** Present when the plan was imported from a YAML program definition */
   programMeta?: import('./program').ProgramMeta
+  /** Weekly programs: start dates (YYYY-MM-DD) of weeks skipped for travel etc. */
+  pausedWeeks?: string[]
 }
 
 // ── History ──────────────────────────────────────────────────────────────────
@@ -155,6 +163,8 @@ export interface ExtraWorkoutEntry {
    * Pre-v1 records have source=undefined; the v1 migration in historyStore
    * sets them to 'history' (conservative — keeps the entry, never auto-removes).
    */
+  /** Plan day this extra performed (bonus sessions from the plan) — counts it as done that week. */
+  planDayIndex?: number
   source?: 'history' | 'double_day'
   /**
    * Whether adding this extra also advanced the rotation pointer (logged an

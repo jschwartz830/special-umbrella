@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { planDayForDate } from '../engine/programWeeks'
 import {
   ChevronLeft,
   ChevronRight,
@@ -107,8 +108,8 @@ export function CalendarPage() {
   )
 
   const weeks = useMemo(
-    () => buildMonthGrid(year, month, plan, entries, overrides, today, weekStartsOn),
-    [year, month, plan, entries, overrides, today, weekStartsOn],
+    () => buildMonthGrid(year, month, plan, entries, overrides, today, weekStartsOn, extraEntries),
+    [year, month, plan, entries, overrides, today, weekStartsOn, extraEntries],
   )
 
   const streakDatesSet = useMemo(() => {
@@ -166,7 +167,7 @@ export function CalendarPage() {
 
     // After logging complete, open OutcomeModal to capture details
     if (action === 'complete') {
-      const planDay = plan.days[selectedPlanDayIdx]
+      const planDay = planDayForDate(plan, selectedPlanDayIdx, rd.calendarDate)
       if (planDay) {
         setSelected(null)
         setOutcomeTarget({
@@ -186,7 +187,7 @@ export function CalendarPage() {
   function openEditOutcome(rd: ResolvedDay) {
     if (!plan) return
     const planDayIdx = rd.historyEntry?.planDayIndex ?? rd.planDayIndex
-    const planDay = plan.days[planDayIdx]
+    const planDay = planDayForDate(plan, planDayIdx, rd.calendarDate)
     if (!planDay) return
     setSelected(null)
     setOutcomeTarget({
@@ -650,7 +651,8 @@ function DayDetailModal({
     | { kind: 'extra'; extraId: string }
     | null
   >(null)
-  const [selectedIdx, setSelectedIdx] = useState(planDayIndex)
+  // Weekly programs can show a rest date (-1); logging one picks the first session by default
+  const [selectedIdx, setSelectedIdx] = useState(Math.max(0, planDayIndex))
   const [showPicker, setShowPicker] = useState(false)
   const [showAddExtra, setShowAddExtra] = useState(false)
   const [extraType, setExtraType] = useState<WorkoutType>('yoga')
@@ -740,7 +742,7 @@ function DayDetailModal({
                   <button
                     onClick={() => {
                       const loggedIdx = resolved.historyEntry?.planDayIndex ?? resolved.planDayIndex
-                      const resumeDay = plan.days[loggedIdx] ?? resolved.planDay
+                      const resumeDay = planDayForDate(plan, loggedIdx, calendarDate) ?? resolved.planDay
                       onResumeRotation(resumeDay, calendarDate)
                     }}
                     className="text-[10px] text-sky-500 hover:text-sky-400 transition-colors"
@@ -920,7 +922,7 @@ function DayDetailModal({
 
   // ─── Level 2: Rotation detail ─────────────────────────────────────────────
   const rotOutcome = outcomes[makeWorkoutInstanceId(plan.id, calendarDate)] ?? null
-  const displayDay = plan.days[selectedIdx] ?? resolved.planDay
+  const displayDay = planDayForDate(plan, selectedIdx, calendarDate) ?? resolved.planDay
 
   return (
     <Modal title={dateLabel} onClose={onClose}>

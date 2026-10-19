@@ -27,6 +27,7 @@ describe('program template library', () => {
     describe(template.label, () => {
       const { plan, errors } = parseYamlProgram(template.yaml)
       const vars = plan.programMeta?.vars ?? {}
+      const schedule = plan.programMeta?.schedule ?? {}
       const ctx = { vars, effort: 3, all_reps: true, session_complete: true }
 
       const rules: Array<{ where: string; rule: ProgressionRule }> = []
@@ -64,7 +65,7 @@ describe('program template library', () => {
             for (const seg of slot.segments ?? []) {
               for (const field of [seg.distance, seg.duration, typeof seg.reps === 'string' ? seg.reps : undefined]) {
                 for (const id of field?.match(IDENT) ?? []) {
-                  if (!BUILTINS.has(id)) expect(vars, `${day.label}: ${field}`).toHaveProperty(id)
+                  if (!BUILTINS.has(id)) expect(id in vars || id in schedule, `${day.label}: ${field} (${id})`).toBe(true)
                 }
               }
             }
