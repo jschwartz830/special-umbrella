@@ -1,4 +1,6 @@
 import { useState, useMemo, useRef } from 'react'
+import { planDayForDate, programWeekForDate } from '../engine/programWeeks'
+import { usePlanStore } from '../store/planStore'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import {
@@ -82,6 +84,7 @@ function findPreviousWeightsOutcome(
 export function TodayPage() {
   const navigate = useNavigate()
   const { plan, todayResolved, upcoming, planEntries } = useActivePlan()
+  const updatePlan = usePlanStore(s => s.updatePlan)
   const actions = usePlanActions(plan?.id ?? null)
   const logAction = useHistoryStore(s => s.logAction)
   const removeEntry = useHistoryStore(s => s.removeEntry)
@@ -285,7 +288,7 @@ export function TodayPage() {
   // primary entry still refers to the original day. Prefer the history entry's
   // planDayIndex so the displayed/edited workout matches what was logged.
   const primaryPlanDayIndex = todayResolved.historyEntry?.planDayIndex ?? todayResolved.planDayIndex
-  const primaryPlanDay = plan.days[primaryPlanDayIndex] ?? todayResolved.planDay
+  const primaryPlanDay = planDayForDate(plan, primaryPlanDayIndex, today) ?? todayResolved.planDay
 
   // Resolve run adaptation note for today's workout.
   // Use primaryPlanDay (the day actually logged) rather than todayResolved.planDay
@@ -318,8 +321,11 @@ export function TodayPage() {
   const consecutiveSkips = computeConsecutiveSkips(plan.id, planEntries, planExtras, today)
 
   // Collect recent past days with no entry — used to show the stall nudge.
-  const unloggedDates = getUnloggedPastDates(plan.id, planEntries, plan.startDate, today, 14)
-  const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, plan.startDate, today)
+  // Weekly programs drop last week's unfinished sessions, so only this week's gaps matter.
+  const weekInfo = programWeekForDate(plan, today)
+  const nagFrom = weekInfo && weekInfo.weekStart > plan.startDate ? weekInfo.weekStart : plan.startDate
+  const unloggedDates = getUnloggedPastDates(plan.id, planEntries, nagFrom, today, 14)
+  const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, nagFrom, today)
   const olderUnloggedCount = Math.max(0, totalUnlogged - unloggedDates.length)
 
   const loggedRate = useMemo(
@@ -690,6 +696,28 @@ export function TodayPage() {
           {new Date(today + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
         <h1 className="text-xl font-bold text-white mt-0.5 leading-snug">{plan.name}</h1>
+        {weekInfo && (
+          <div className="flex items-center gap-2 mt-1 text-xs">
+            <span className={weekInfo.paused ? 'text-amber-400' : 'text-slate-400'}>
+              {weekInfo.paused
+                ? 'Paused this week'
+                : `Week ${Math.min(weekInfo.week, weekInfo.totalWeeks)} of ${weekInfo.totalWeeks}${weekInfo.deload ? ' · Deload' : ''}`}
+            </span>
+            <button
+              onClick={() => {
+                const paused = plan.pausedWeeks ?? []
+                updatePlan(plan.id, {
+                  pausedWeeks: weekInfo.paused
+                    ? paused.filter(d => d !== weekInfo.weekStart)
+                    : [...paused, weekInfo.weekStart],
+                })
+              }}
+              className="text-sky-400 hover:text-sky-300"
+            >
+              {weekInfo.paused ? 'Resume' : 'Pause this week'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Compact habit summary row — streak · total workouts · plan % ring */}
@@ -783,7 +811,7 @@ export function TodayPage() {
           </p>
           <SwipeToDelete onDelete={() => setAddFromPlanIdx(null)}>
             <WorkoutDayCard
-              resolved={{ calendarDate: today, planDayIndex: addFromPlanIdx, planDay: plan.days[addFromPlanIdx], status: 'future' }}
+              resolved={{ calendarDate: today, planDayIndex: addFromPlanIdx, planDay: planDayForDate(plan, addFromPlanIdx, today), status: 'future' }}
               planId={plan?.id}
             />
           </SwipeToDelete>
