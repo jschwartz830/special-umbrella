@@ -29,6 +29,8 @@ export interface LoggedSetActual {
   restSeconds?: number | null
   actualRestSeconds?: number | null
   notes?: string | null
+  /** Ramp-up set; excluded from progression, volume, and 1RM calculations. */
+  isWarmup?: boolean
 }
 
 export interface LoggedExerciseActual {

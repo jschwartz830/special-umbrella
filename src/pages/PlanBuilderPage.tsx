@@ -17,7 +17,7 @@ import { WORKOUT_META, WORKOUT_TYPES } from '../lib/constants'
 import { Modal } from '../components/shared/Modal'
 import { nanoid } from '../lib/utils'
 import type { Plan, PlanDay, WorkoutSlot } from '../types'
-import type { ExerciseSpec, ProgressionType } from '../types/program'
+import type { ExerciseSpec, ProgressionType, SetSpec } from '../types/program'
 import { EXERCISE_LIBRARY, exerciseEquipment, exercisePrimaryMuscle } from '../lib/exerciseLibrary'
 import { MOBILITY_LIBRARY, singleTimedSet, type MobilityRoutineExercise, type MobilitySet } from '../lib/mobilityLibrary'
 import { MobilityRoutineEditor } from '../components/mobility/MobilityRoutineEditor'
@@ -330,6 +330,14 @@ function SlotEditor({
     const source = slot.exercises ?? []
     const next = source.map((ex, i) => (i === index ? { ...ex, ...patch } : ex))
     updateExercises(next)
+  }
+
+  function updateSetSpec(exIndex: number, setIndex: number, patch: Partial<SetSpec>) {
+    const source = slot.exercises ?? []
+    const ex = source[exIndex]
+    if (!ex || !Array.isArray(ex.sets)) return
+    const sets = ex.sets.map((sp, k) => (k === setIndex ? { ...sp, ...patch } : sp))
+    updateExercise(exIndex, { sets })
   }
 
   function removeExercise(index: number) {
@@ -848,6 +856,90 @@ function SlotEditor({
                     <button type="button" onClick={() => removeExercise(i)} className="p-0.5 text-red-400/80 hover:text-red-300"><Trash2 size={12} /></button>
                   </div>
 
+                  {Array.isArray(ex.sets) ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Sets (per-set reps &amp; weight)</p>
+                        <button
+                          type="button"
+                          onClick={() => updateExercise(i, { sets: (ex.sets as SetSpec[]).length })}
+                          className="text-[10px] text-sky-400 hover:text-sky-300"
+                        >
+                          Same for all sets
+                        </button>
+                      </div>
+                      {ex.sets.map((setSpec, si) => (
+                        <div key={si} className="grid grid-cols-[2rem_1fr_1fr_1fr_1.5rem] items-center gap-1.5">
+                          <span className="text-[10px] text-slate-500">#{si + 1}</span>
+                          <input
+                            type="text"
+                            aria-label={`Set ${si + 1} reps`}
+                            value={setSpec.reps ?? ''}
+                            placeholder={ex.reps != null ? String(ex.reps) : 'reps'}
+                            onChange={e => updateSetSpec(i, si, { reps: e.target.value || undefined })}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                          />
+                          <input
+                            type="text"
+                            aria-label={`Set ${si + 1} load`}
+                            value={setSpec.load ?? ''}
+                            placeholder={ex.load ?? 'load'}
+                            onChange={e => updateSetSpec(i, si, { load: e.target.value || undefined })}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                          />
+                          <input
+                            type="text"
+                            aria-label={`Set ${si + 1} rest`}
+                            value={setSpec.rest ?? ''}
+                            placeholder={ex.rest ?? 'rest'}
+                            onChange={e => updateSetSpec(i, si, { rest: e.target.value || undefined })}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                          />
+                          <button
+                            type="button"
+                            aria-label={`Remove set ${si + 1}`}
+                            disabled={(ex.sets as SetSpec[]).length <= 1}
+                            onClick={() => updateExercise(i, { sets: (ex.sets as SetSpec[]).filter((_, k) => k !== si) })}
+                            className="p-0.5 text-red-400/80 hover:text-red-300 disabled:opacity-30"
+                          ><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const last = (ex.sets as SetSpec[])[(ex.sets as SetSpec[]).length - 1]
+                            updateExercise(i, { sets: [...(ex.sets as SetSpec[]), { ...last }] })
+                          }}
+                          className="flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300"
+                        ><Plus size={11} /> Add set</button>
+                        <span className="text-[10px] text-slate-500">Blank fields use the exercise defaults</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="space-y-1">
+                          <span className="text-[10px] text-slate-400">Default reps</span>
+                          <input
+                            type="text"
+                            value={ex.reps ?? ''}
+                            placeholder="8-12"
+                            onChange={e => updateExercise(i, { reps: e.target.value || undefined })}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[10px] text-slate-400">Default load</span>
+                          <input
+                            type="text"
+                            value={ex.load ?? ''}
+                            placeholder="135lb"
+                            onChange={e => updateExercise(i, { load: e.target.value || undefined })}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <label className="space-y-1">
                       <span className="text-[10px] text-slate-400">Sets</span>
@@ -891,6 +983,18 @@ function SlotEditor({
                       />
                     </label>
                   </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const n = typeof ex.sets === 'number' && ex.sets > 0 ? ex.sets : 3
+                          updateExercise(i, { sets: Array.from({ length: n }, () => ({})) })
+                        }}
+                        className="text-[10px] text-sky-400 hover:text-sky-300"
+                      >
+                        Vary reps / weight per set
+                      </button>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">

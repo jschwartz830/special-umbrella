@@ -9,6 +9,11 @@ import { resolveLoad, type EvalContext } from '../../lib/expressionEval'
 import { EXERCISE_LIBRARY } from '../../lib/exerciseLibrary'
 import { usePlanStore } from '../../store/planStore'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useExerciseHistoryStore } from '../../store/exerciseHistoryStore'
+import {
+  equipmentKindFor, generateWarmups, recentOneRepMax, snapToAchievable, stepAchievable,
+  estimateOneRepMax, type EquipmentLocation,
+} from '../../lib/equipment'
 
 interface SetTrackState {
   setElapsedSeconds: number
@@ -433,7 +438,11 @@ export function ActiveWorkoutTracker({
 }: Props) {
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
   const DRAFT_VERSION = 1
-  const { startDelaySeconds, focusMode, setFocusMode } = useSettingsStore()
+  const { startDelaySeconds, focusMode, setFocusMode, equipment, defaultEquipmentLocation } = useSettingsStore()
+  // Which gym's equipment applies: the workout's own location, else the user's default.
+  const equipmentLocation: EquipmentLocation =
+    slot.location === 'home' || slot.location === 'gym' ? slot.location : defaultEquipmentLocation
+  const equipmentProfile = equipment[equipmentLocation]
   useLandscapeAutoFocus()
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [exercisePicker, setExercisePicker] = useState<ExercisePickerMode | null>(null)
@@ -554,14 +563,28 @@ export function ActiveWorkoutTracker({
     blurTimeoutRef.current = setTimeout(() => setFocusedField(null), 200)
   }, [])
 
+  /** Next/previous weight the equipment can load for an exercise (±5 lb for unconstrained lifts). */
+  function steppedLoad(exerciseName: string, current: number | null, dir: 1 | -1): number {
+    return stepAchievable(current ?? 0, dir, equipmentKindFor(exerciseName), equipmentProfile)
+  }
+
+  /** Size of the next weight jump for the focused weight field, e.g. 5 or 10 lb. */
+  function weightStepLabel(dir: 1 | -1): string {
+    if (!focusedField) return '5'
+    const ex = exercises[focusedField.exIdx]
+    const cur = ex?.sets[focusedField.setIdx]?.actualLoad ?? null
+    const next = steppedLoad(ex?.exercise ?? '', cur, dir)
+    const diff = Math.abs(next - (cur ?? 0))
+    return String(Math.round(diff * 100) / 100 || 5)
+  }
+
   function adjustFocusedField(delta: number) {
     if (!focusedField) return
     const { exIdx, setIdx, type } = focusedField
     const s = exercises[exIdx]?.sets[setIdx]
     if (!s) return
     if (type === 'weight') {
-      const next = Math.max(0, (s.actualLoad ?? 0) + delta)
-      updateSet(exIdx, setIdx, { actualLoad: next })
+      updateSet(exIdx, setIdx, { actualLoad: steppedLoad(exercises[exIdx].exercise, s.actualLoad, delta < 0 ? -1 : 1) })
     } else {
       const next = Math.max(0, (s.actualReps ?? 0) + delta)
       updateSet(exIdx, setIdx, { actualReps: next })
@@ -575,6 +598,9 @@ export function ActiveWorkoutTracker({
     ]
     if (!allExercises.length) return []
 
+    const exerciseHistory = useExerciseHistoryStore.getState().records
+    const today = new Date().toISOString().slice(0, 10)
+
     return allExercises.map(ex => {
       const prevEx = previousSetsByExercise?.[ex.exercise]
         ?? previousOutcome?.weightsActual?.exercises?.find(e => e.exercise === ex.exercise)?.sets
@@ -584,16 +610,49 @@ export function ActiveWorkoutTracker({
         : deriveProgressionMode(ex.progressionType, ex.progress != null)
       const isDouble = progressionMode === 'double'
 
-      function buildSet(load?: string | null, reps?: number | string | null, rest?: string | null, workSetIndex?: number, duration?: string | null): SetTrackState {
-        const resolvedLoadLbs = hasVars
+      // Everything pre-filled below is snapped to weights this location's equipment can load.
+      const kind = equipmentKindFor(ex.exercise)
+      const snap = (v: number | null | undefined): number | null =>
+        v != null && v > 0 ? snapToAchievable(v, kind, equipmentProfile) : (v ?? null)
+      const resolveLbs = (load?: string | null): number | null => {
+        const lbs = hasVars
           ? (resolveLoad(load ?? undefined, evalCtx) ?? parseNumericLoad(load))
           : parseNumericLoad(load)
-        const validLoad = resolvedLoadLbs != null && resolvedLoadLbs > 0 ? resolvedLoadLbs : null
+        return lbs != null && lbs > 0 ? lbs : null
+      }
+
+      const workSpecs = Array.isArray(ex.sets) && ex.sets.length > 0
+        ? ex.sets.map(sp => ({ load: sp.load ?? ex.load, reps: sp.reps ?? ex.reps }))
+        : [{ load: ex.load, reps: ex.reps }]
+      const workCount = Array.isArray(ex.sets) && ex.sets.length > 0
+        ? ex.sets.length
+        : (typeof ex.sets === 'number' ? ex.sets : 3)
+      const historyOneRm = kind === 'none' ? null : recentOneRepMax(exerciseHistory, ex.exercise, today)
+
+      // A warmup-section exercise with no weight filled in gets ~50% of its 1RM.
+      const hasAnyLoad = workSpecs.some(sp => resolveLbs(sp.load) != null)
+      const fallbackLoad = ex.__isWarmup && !hasAnyLoad && historyOneRm
+        ? snap(historyOneRm * 0.5)
+        : null
+
+      // Prior-session sets for this exercise's working sets. New logs flag warmup sets;
+      // older logs don't, so fall back to skipping as many leading sets as we have warmups.
+      const prevHasFlags = prevEx?.some(sp => sp.isWarmup) ?? false
+      const prevWork = prevHasFlags ? prevEx!.filter(sp => !sp.isWarmup) : null
+      const prevWorkAt = (i: number): LoggedSetActual | undefined => {
+        if (prevWork) return prevWork[i]
+        if (!prevEx) return undefined
+        const offset = prevEx.length >= workCount + warmupSets.length ? warmupSets.length : 0
+        return prevEx[i + offset]
+      }
+
+      function buildSet(load?: string | null, reps?: number | string | null, rest?: string | null, workSetIndex?: number, duration?: string | null): SetTrackState {
+        const validLoad = snap(resolveLbs(load)) ?? fallbackLoad
         // Timed set: no reps target, measured in seconds via `duration` ("45s", "1m").
         const timedSecs = reps == null && duration != null ? parseRestSecs(duration) : null
         const isTimed = timedSecs != null
         // For double progression, resolve a specific rep target from previous performance
-        const prevReps = workSetIndex != null ? prevEx?.[workSetIndex + (warmupSets?.length ?? 0)]?.actualReps : undefined
+        const prevReps = workSetIndex != null ? prevWorkAt(workSetIndex)?.actualReps : undefined
         const effectiveReps = isDouble ? resolveDoubleProgressionTarget(reps, prevReps) : reps
         return {
           setElapsedSeconds: 0,
@@ -609,24 +668,43 @@ export function ActiveWorkoutTracker({
         }
       }
 
-      // Build warmup sets first so we know the offset for work set index lookup
-      const warmupSets: SetTrackState[] = !ex.__isWarmup && ex.load
-        ? parseWarmupPercentages(ex.warmup).map((pct, i) => buildSet(
+      // Warmups: an explicit ramp (percentages of the exercise load) wins; otherwise ramp up
+      // from a % of estimated 1RM. `warmup: none` opts an exercise out.
+      const warmupOff = typeof ex.warmup === 'string' && /^\s*(none|off|no)\s*$/i.test(ex.warmup)
+      const rampPcts = parseWarmupPercentages(ex.warmup)
+      let warmupSets: SetTrackState[] = []
+      if (!ex.__isWarmup && !warmupOff) {
+        if (rampPcts.length > 0 && ex.load) {
+          warmupSets = rampPcts.map((pct, i) => buildSet(
             `${pct / 100} * (${ex.load})`,
             warmupRepsForIndex(ex.warmup, i),
             warmupRampObject(ex.warmup)?.rest ?? ex.rest,
           )).map(set => ({ ...set, isWarmup: true }))
-        : []
+            // Snapping can collapse neighbours onto the same weight (e.g. the empty bar).
+            .filter((set, i, all) => i === 0 || set.resolvedLoadLbs == null || set.resolvedLoadLbs !== all[i - 1].resolvedLoadLbs)
+        } else if (kind !== 'none') {
+          const workingLoad = snap(Math.max(0, ...workSpecs.map(sp => resolveLbs(sp.load) ?? 0)))
+          const firstReps = parseInt(String(workSpecs[0].reps ?? ''), 10)
+          const impliedOneRm = workingLoad && Number.isFinite(firstReps) ? estimateOneRepMax(workingLoad, firstReps) : null
+          const oneRm = Math.max(historyOneRm ?? 0, impliedOneRm ?? 0)
+          if (workingLoad && oneRm > 0) {
+            warmupSets = generateWarmups(kind, equipmentProfile, oneRm, workingLoad).map(w => ({
+              ...buildSet(String(w.load), w.reps, '60s'),
+              isWarmup: true,
+            }))
+          }
+        }
+      }
 
       let sets: SetTrackState[]
       if (Array.isArray(ex.sets) && ex.sets.length > 0) {
         const workSets = ex.sets.map((s, i) => {
           const base = buildSet(s.load ?? ex.load, s.reps ?? ex.reps, s.rest ?? ex.rest, i, s.duration ?? ex.duration)
-          const prev = prevEx?.[i + warmupSets.length]
+          const prev = prevWorkAt(i)
           return {
             ...base,
             actualReps: prev?.actualReps ?? base.actualReps,
-            actualLoad: prev?.actualLoad ?? base.actualLoad,
+            actualLoad: snap(prev?.actualLoad) ?? base.actualLoad,
           }
         })
         sets = [...warmupSets, ...workSets]
@@ -634,11 +712,11 @@ export function ActiveWorkoutTracker({
         const n = typeof ex.sets === 'number' ? ex.sets : 3
         const workSets = Array.from({ length: n }, (_, i) => {
           const base = buildSet(ex.load, ex.reps, ex.rest, i, ex.duration)
-          const prev = prevEx?.[i + warmupSets.length]
+          const prev = prevWorkAt(i)
           return {
             ...base,
             actualReps: prev?.actualReps ?? base.actualReps,
-            actualLoad: prev?.actualLoad ?? base.actualLoad,
+            actualLoad: snap(prev?.actualLoad) ?? base.actualLoad,
           }
         })
         sets = [...warmupSets, ...workSets]
@@ -1589,6 +1667,7 @@ export function ActiveWorkoutTracker({
         completed: suppressedExercises.has(exIdx) ? false : s.completed,
         restSeconds: s.restSeconds,
         actualRestSeconds: s.actualRestSeconds,
+        ...(s.isWarmup ? { isWarmup: true } : {}),
       })),
     }))
 
@@ -1768,7 +1847,7 @@ export function ActiveWorkoutTracker({
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold text-center mb-2">Lbs</p>
                 <div className="flex items-center gap-2 ls:gap-1">
                   <button
-                    onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualLoad: Math.max(0, (curSet.actualLoad ?? 0) - 5) })}
+                    onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualLoad: steppedLoad(curEx!.exercise, curSet.actualLoad, -1) })}
                     className="w-9 h-9 ls:w-8 ls:h-8 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
                   >−</button>
                   <NumberTextField
@@ -1783,7 +1862,7 @@ export function ActiveWorkoutTracker({
                     className="flex-1 min-w-0 bg-transparent text-2xl ls:text-xl font-bold text-white text-center focus:outline-none"
                   />
                   <button
-                    onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualLoad: (curSet.actualLoad ?? 0) + 5 })}
+                    onClick={() => updateSet(cur.exIdx, cur.setIdx, { actualLoad: steppedLoad(curEx!.exercise, curSet.actualLoad, 1) })}
                     className="w-9 h-9 ls:w-8 ls:h-8 flex-shrink-0 rounded-lg bg-slate-700 text-slate-200 text-lg font-semibold active:bg-slate-600"
                   >+</button>
                 </div>
@@ -2186,14 +2265,14 @@ export function ActiveWorkoutTracker({
               onClick={() => adjustFocusedField(-5)}
               className="flex-1 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-slate-200 text-sm font-semibold active:bg-slate-500 transition-colors"
             >
-              −5 lbs
+              −{weightStepLabel(-1)} lbs
             </button>
             <button
               onPointerDown={e => e.preventDefault()}
               onClick={() => adjustFocusedField(5)}
               className="flex-1 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-slate-200 text-sm font-semibold active:bg-slate-500 transition-colors"
             >
-              +5 lbs
+              +{weightStepLabel(1)} lbs
             </button>
           </>
         ) : (

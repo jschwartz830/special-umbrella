@@ -11,6 +11,7 @@ export interface ExerciseSetRecord {
   load: number | null   // lbs
   volume: number | null // reps * load (null if either is missing)
   completed: boolean
+  isWarmup?: boolean
 }
 
 // ── Per-exercise-per-workout record ──────────────────────────────────────────
@@ -77,11 +78,12 @@ function toSetRecord(s: RawSet): ExerciseSetRecord {
     load,
     volume: reps !== null && load !== null ? reps * load : null,
     completed: s.completed ?? false,
+    ...(s.isWarmup ? { isWarmup: true } : {}),
   }
 }
 
 function summarize(sets: ExerciseSetRecord[]): Pick<ExerciseSessionRecord, 'totalVolume' | 'maxLoad' | 'maxReps'> {
-  const done = sets.filter(s => s.completed)
+  const done = sets.filter(s => s.completed && !s.isWarmup)
   const vols = done.flatMap(s => (s.volume !== null ? [s.volume] : []))
   const loads = done.flatMap(s => (s.load !== null ? [s.load] : []))
   const reps = done.flatMap(s => (s.reps !== null ? [s.reps] : []))
