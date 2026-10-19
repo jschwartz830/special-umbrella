@@ -17,7 +17,6 @@ import { usePlanStore } from '../store/planStore'
 import { useHistoryStore } from '../store/historyStore'
 import { useOutcomeStore } from '../store/outcomeStore'
 import { useProgramStore } from '../store/programStore'
-import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
 import { isPlanExpired } from '../engine/rotationEngine'
 import { computePlanProgress } from '../lib/historyStats'
 import { Modal } from '../components/shared/Modal'
@@ -152,11 +151,9 @@ export function PlansPage() {
   const setActivePlan = usePlanStore(s => s.setActivePlan)
   const deletePlan = usePlanStore(s => s.deletePlan)
   const importPlans = usePlanStore(s => s.importPlans)
-  const clearHistory = useHistoryStore(s => s.clearPlanHistory)
-  const clearOutcomes = useOutcomeStore(s => s.clearPlanOutcomes)
+  const detachPlan = useHistoryStore(s => s.detachPlan)
   const removeProgressionStates = useOutcomeStore(s => s.removeProgressionStates)
   const clearVars = useProgramStore(s => s.clearPlanVars)
-  const clearExerciseHistory = useExerciseHistoryStore(s => s.clearByPlanId)
   const entries = useHistoryStore(s => s.entries)
   const today = useToday()
 
@@ -356,7 +353,7 @@ export function PlansPage() {
         <Modal title="Delete plan?" onClose={() => setConfirmDelete(null)}>
           <div className="space-y-4">
             <p className="text-sm text-slate-400">
-              This will permanently delete the plan and all its history. This cannot be undone.
+              This deletes the plan. Workouts you logged with it are kept in your history.
             </p>
             <div className="flex gap-2">
               <button
@@ -373,11 +370,11 @@ export function PlansPage() {
                         .flatMap(d => d.slots)
                         .flatMap(s => s.runConfig?.progressionGroupId ? [s.runConfig.progressionGroupId] : [])
                     : []
-                  clearHistory(confirmDelete)
-                  clearOutcomes(confirmDelete)
+                  // Workout logs (entries, outcomes, exercise history) outlive the plan;
+                  // only plan-internal state (rotation overrides, vars, run progression) goes.
+                  if (planToDelete) detachPlan(planToDelete)
                   removeProgressionStates(progressionGroupIds)
                   clearVars(confirmDelete)
-                  clearExerciseHistory(confirmDelete)
                   deletePlan(confirmDelete)
                   setConfirmDelete(null)
                 }}

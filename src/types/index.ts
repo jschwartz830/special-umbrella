@@ -128,6 +128,15 @@ export interface HistoryEntry {
   action: ActionType
   notes?: string
   createdAt: string
+  /** What was scheduled, captured at log time so the log still makes sense after the plan is edited or deleted. */
+  workout?: WorkoutSnapshot
+}
+
+/** Plan-independent description of a logged workout. */
+export interface WorkoutSnapshot {
+  planName?: string
+  dayLabel?: string
+  slots: Array<{ type: WorkoutType; name: string; subtype?: string; location?: string }>
 }
 
 /** An ad-hoc workout logged on a day, outside the plan rotation. */
@@ -157,6 +166,8 @@ export interface ExtraWorkoutEntry {
    * as if true (see call sites).
    */
   advancedRotation?: boolean
+  /** Plan name at log time; empty planId means the workout was logged without a plan. */
+  planName?: string
 }
 
 // ── Overrides ────────────────────────────────────────────────────────────────

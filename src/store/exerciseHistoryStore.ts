@@ -116,7 +116,7 @@ export const useExerciseHistoryStore = create<ExerciseHistoryState>()(
             id: nanoid(),
             exerciseName: ex.exercise,
             calendarDate,
-            planId,
+            planId: planId || null, // '' = logged without a plan
             planName: ctx.planName ?? null,
             workoutName: ctx.workoutName ?? null,
             workoutInstanceId: outcome.workoutInstanceId,

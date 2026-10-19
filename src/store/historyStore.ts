@@ -1,7 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { HistoryEntry, OverrideEntry, ExtraWorkoutEntry, ActionType, OverrideType, WorkoutType } from '../types'
+import type { HistoryEntry, OverrideEntry, ExtraWorkoutEntry, ActionType, OverrideType, WorkoutType, Plan } from '../types'
 import { nanoid } from '../lib/utils'
+import { snapshotPlanDay } from '../lib/planDayUtils'
+import { usePlanStore } from './planStore'
 
 interface HistoryState {
   entries: HistoryEntry[]
@@ -46,6 +48,11 @@ interface HistoryState {
 
   updateEntryAction: (planId: string, calendarDate: string, action: ActionType, planDayIndex?: number) => void
   clearPlanHistory: (planId: string) => void
+  /**
+   * Prepare for a plan's deletion without losing workouts: snapshot every entry/extra
+   * of the plan so it stands on its own, and drop the plan's rotation overrides.
+   */
+  detachPlan: (plan: Plan) => void
   removeEntry: (planId: string, calendarDate: string) => void
 
   /** Bulk import: replaces any existing entry for the same (planId, calendarDate). */
@@ -114,10 +121,13 @@ export const useHistoryStore = create<HistoryState>()(
 
       addEntry(payload) {
         const now = new Date().toISOString()
+        const workout = payload.workout
+          ?? snapshotPlanDay(usePlanStore.getState().plans[payload.planId], payload.planDayIndex)
         const newEntry: HistoryEntry = {
           id: nanoid(),
           createdAt: now,
           ...payload,
+          ...(workout ? { workout } : {}),
         }
         set(s => {
           // Replace any existing entry for same (planId, calendarDate)
@@ -166,17 +176,33 @@ export const useHistoryStore = create<HistoryState>()(
         }))
       },
 
+      detachPlan(plan) {
+        set(s => ({
+          entries: s.entries.map(e =>
+            e.planId !== plan.id || e.workout ? e : { ...e, workout: snapshotPlanDay(plan, e.planDayIndex) },
+          ),
+          extraEntries: s.extraEntries.map(e =>
+            e.planId !== plan.id || e.planName ? e : { ...e, planName: plan.name },
+          ),
+          overrides: s.overrides.filter(o => o.planId !== plan.id),
+        }))
+      },
+
       updateEntryAction(planId, calendarDate, action, planDayIndex?: number) {
         set(s => ({
           entries: s.entries.map(e => {
             if (e.planId !== planId || e.calendarDate !== calendarDate) return e
             if (action === 'day_off') {
-              return { ...e, action, planDayIndex: undefined }
+              const { workout: _dropped, ...rest } = e
+              return { ...rest, action, planDayIndex: undefined }
             }
             // When changing away from day_off, use the provided index or keep the existing one.
             // e.planDayIndex may be undefined if the original entry was a day_off.
             const nextIndex = planDayIndex ?? e.planDayIndex
-            return { ...e, action, planDayIndex: nextIndex }
+            const workout = nextIndex !== e.planDayIndex || !e.workout
+              ? snapshotPlanDay(usePlanStore.getState().plans[planId], nextIndex) ?? e.workout
+              : e.workout
+            return { ...e, action, planDayIndex: nextIndex, ...(workout ? { workout } : {}) }
           }),
         }))
       },
@@ -227,10 +253,12 @@ export const useHistoryStore = create<HistoryState>()(
 
       addExtraEntry(payload) {
         const id = nanoid()
+        const planName = payload.planName ?? usePlanStore.getState().plans[payload.planId]?.name
         const entry: ExtraWorkoutEntry = {
           id,
           createdAt: new Date().toISOString(),
           ...payload,
+          ...(planName ? { planName } : {}),
         }
         set(s => ({ extraEntries: [...s.extraEntries, entry] }))
         return id
