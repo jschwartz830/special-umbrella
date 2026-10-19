@@ -116,6 +116,8 @@ export interface Plan {
   updatedAt: string
   /** Present when the plan was imported from a YAML program definition */
   programMeta?: import('./program').ProgramMeta
+  /** Weekly programs: start dates (YYYY-MM-DD) of weeks skipped for travel etc. */
+  pausedWeeks?: string[]
 }
 
 // ── History ──────────────────────────────────────────────────────────────────

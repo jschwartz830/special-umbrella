@@ -159,6 +159,15 @@ export interface ProgramVarDefs {
 export interface ProgramMeta {
   version: 1
   vars: ProgramVarDefs
+  /**
+   * When true, `days` are one week of sessions and the program week is anchored to the
+   * calendar (see engine/programWeeks.ts) — schedule values and deloads follow the date.
+   */
+  weekly?: boolean
+  /** Per-week values, indexed by program week; referenced as `{key}` in slot strings. */
+  schedule?: Record<string, Array<number | string>>
+  /** Deload weeks: weights sets scaled by setsMultiplier (default 0.6), no progression. */
+  deload?: { weeks: number[]; setsMultiplier?: number }
 }
 
 // ── YAML source document shape (what the parser reads) ────────────────────────
@@ -261,5 +270,8 @@ export interface YamlProgram {
   description?: string
   duration: { type: 'rotations' | 'weeks'; value: number }
   vars?: Record<string, number>
+  weekly?: boolean
+  schedule?: Record<string, Array<number | string>>
+  deload?: { weeks: number[]; setsMultiplier?: number }
   days: YamlDay[]
 }

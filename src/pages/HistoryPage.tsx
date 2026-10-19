@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { planDayForDate } from '../engine/programWeeks'
 import { format, parseISO, addDays } from 'date-fns'
 import { useToday } from '../hooks/useToday'
 import {
@@ -328,7 +329,8 @@ export function HistoryPage() {
 
   function openOutcomeForEntry(entry: HistoryEntry) {
     // Logs outlive their plan: fall back to the snapshot taken when the workout was logged.
-    const planDay = plans[entry.planId]?.days[entry.planDayIndex ?? -1]
+    const livePlan = plans[entry.planId]
+    const planDay = (livePlan ? planDayForDate(livePlan, entry.planDayIndex ?? -1, entry.calendarDate) : undefined)
       ?? (entry.workout ? snapshotToPlanDay(entry.workout, entry.id) : undefined)
     if (!planDay) return
     setEditingEntry(null)
@@ -582,7 +584,7 @@ export function HistoryPage() {
           if (item.kind === 'rotation') {
             const { entry } = item
             const plan = plans[entry.planId]
-            const planDay = plan?.days[entry.planDayIndex ?? -1]
+            const planDay = (plan ? planDayForDate(plan, entry.planDayIndex ?? -1, entry.calendarDate) : undefined)
               ?? (entry.workout ? snapshotToPlanDay(entry.workout, entry.id) : undefined)
             const planName = plan?.name ?? (entry.workout?.planName ? `${entry.workout.planName} (deleted plan)` : null)
             const instanceId = makeWorkoutInstanceId(entry.planId, entry.calendarDate)

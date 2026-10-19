@@ -1,11 +1,15 @@
 import type { ExtraWorkoutEntry, Plan, PlanDay, WorkoutSnapshot } from '../types'
+import { planDayForDate } from '../engine/programWeeks'
 
 /** Sentinel planId for workouts logged with no plan (e.g. ad hoc with no active plan). */
 export const NO_PLAN_ID = ''
 
 /** Capture what a plan day contained, for storing alongside a log entry. */
-export function snapshotPlanDay(plan: Plan | undefined, dayIndex: number | undefined): WorkoutSnapshot | undefined {
-  const day = plan && dayIndex != null ? plan.days[dayIndex] : undefined
+export function snapshotPlanDay(plan: Plan | undefined, dayIndex: number | undefined, date?: string): WorkoutSnapshot | undefined {
+  // With a date, capture the day as it applied then (weekly programs fill per-week values)
+  const day = plan && dayIndex != null
+    ? (date ? planDayForDate(plan, dayIndex, date) : plan.days[dayIndex])
+    : undefined
   if (!plan || !day) return undefined
   return {
     planName: plan.name,

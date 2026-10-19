@@ -1,6 +1,7 @@
 import { format, addDays, parseISO, differenceInCalendarDays } from 'date-fns'
 import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay, DayStatus } from '../types'
 export { nanoid } from '../lib/utils'
+import { realignPointer, planDayForDate, pausedWeekCount } from './programWeeks'
 
 // Date convention: all calendar dates are YYYY-MM-DD strings in the user's LOCAL
 // timezone. `format()` from date-fns uses local time, so entries created at
@@ -70,7 +71,8 @@ export function computeCurrentDayIndex(
   for (let i = 0; i < dayCount; i++) {
     const date = format(addDays(parseISO(plan.startDate), i), 'yyyy-MM-dd')
 
-    // Overrides first — they change what workout was shown on this day
+    // Weekly programs restart at day 1 each week; then overrides change what was shown
+    pointer = realignPointer(plan, date, pointer)
     pointer = applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)
 
     // Then advance based on history entry — all logged actions advance the rotation
@@ -81,7 +83,7 @@ export function computeCurrentDayIndex(
     // No entry (past unlogged day): pointer stays
   }
 
-  return pointer
+  return realignPointer(plan, targetDate, pointer)
 }
 
 /**
@@ -124,7 +126,7 @@ export function getTodayResolvedDay(
   let idx = computeCurrentDayIndex(plan, entries, overrides, today)
   idx = applyOverridesForDate(idx, sortedOverrides, today, plan.days.length)
 
-  const planDay = plan.days[idx]
+  const planDay = planDayForDate(plan, idx, today)
   // Match deduplication behavior of computeCurrentDayIndex / getResolvedDaysRange:
   // pick the entry with the newest createdAt when duplicates exist for today.
   const todayEntries = entries.filter(e => e.planId === plan.id && e.calendarDate === today)
@@ -193,12 +195,13 @@ export function getUpcomingDays(
     // getResolvedDaysRange so that a future jump override (e.g. created by a
     // CalendarPage retroactive edit on a future date) shifts the upcoming list
     // to match the calendar view.
+    pointer = realignPointer(plan, date, pointer)
     pointer = applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)
     const entry = entryByDate.get(date)
     result.push({
       calendarDate: date,
       planDayIndex: pointer,
-      planDay: plan.days[pointer],
+      planDay: planDayForDate(plan, pointer, date),
       status: 'future',
       historyEntry: entry,
     })
@@ -250,9 +253,10 @@ export function getResolvedDaysRange(
     const entry = entryByDate.get(date)
 
     // ── Fix: apply overrides BEFORE reading planDay ──────────────────────
+    pointer = realignPointer(plan, date, pointer)
     pointer = applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)
 
-    const planDay = plan.days[pointer]
+    const planDay = planDayForDate(plan, pointer, date)
 
     // Determine status
     let status: DayStatus
@@ -300,7 +304,8 @@ export function isPlanExpired(
   const { type, value } = plan.duration
   if (value <= 0) return false
   if (type === 'weeks') {
-    const endDate = format(addDays(parseISO(plan.startDate), value * 7), 'yyyy-MM-dd')
+    // Paused weeks (weekly programs) push the end date back
+    const endDate = format(addDays(parseISO(plan.startDate), (value + pausedWeekCount(plan)) * 7), 'yyyy-MM-dd')
     return today >= endDate
   }
   if (plan.days.length === 0) return false

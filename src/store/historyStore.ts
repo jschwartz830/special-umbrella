@@ -122,7 +122,7 @@ export const useHistoryStore = create<HistoryState>()(
       addEntry(payload) {
         const now = new Date().toISOString()
         const workout = payload.workout
-          ?? snapshotPlanDay(usePlanStore.getState().plans[payload.planId], payload.planDayIndex)
+          ?? snapshotPlanDay(usePlanStore.getState().plans[payload.planId], payload.planDayIndex, payload.calendarDate)
         const newEntry: HistoryEntry = {
           id: nanoid(),
           createdAt: now,
@@ -179,7 +179,7 @@ export const useHistoryStore = create<HistoryState>()(
       detachPlan(plan) {
         set(s => ({
           entries: s.entries.map(e =>
-            e.planId !== plan.id || e.workout ? e : { ...e, workout: snapshotPlanDay(plan, e.planDayIndex) },
+            e.planId !== plan.id || e.workout ? e : { ...e, workout: snapshotPlanDay(plan, e.planDayIndex, e.calendarDate) },
           ),
           extraEntries: s.extraEntries.map(e =>
             e.planId !== plan.id || e.planName ? e : { ...e, planName: plan.name },
@@ -200,7 +200,7 @@ export const useHistoryStore = create<HistoryState>()(
             // e.planDayIndex may be undefined if the original entry was a day_off.
             const nextIndex = planDayIndex ?? e.planDayIndex
             const workout = nextIndex !== e.planDayIndex || !e.workout
-              ? snapshotPlanDay(usePlanStore.getState().plans[planId], nextIndex) ?? e.workout
+              ? snapshotPlanDay(usePlanStore.getState().plans[planId], nextIndex, calendarDate) ?? e.workout
               : e.workout
             return { ...e, action, planDayIndex: nextIndex, ...(workout ? { workout } : {}) }
           }),

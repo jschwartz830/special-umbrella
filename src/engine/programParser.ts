@@ -318,8 +318,28 @@ export function parseYamlProgram(yamlText: string): ParseResult {
     }
   }
 
+  const schedule: Record<string, Array<number | string>> = {}
+  if (raw.schedule && typeof raw.schedule === 'object') {
+    for (const [k, v] of Object.entries(raw.schedule)) {
+      if (Array.isArray(v) && v.length > 0 && v.every(x => typeof x === 'number' || typeof x === 'string')) schedule[k] = v
+      else errors.push(`schedule.${k} must be a non-empty list of numbers or text`)
+    }
+  }
+  const deload = raw.deload && Array.isArray(raw.deload.weeks)
+    ? { weeks: raw.deload.weeks.filter(w => typeof w === 'number'), setsMultiplier: raw.deload.setsMultiplier }
+    : undefined
+  if (raw.weekly && raw.duration?.type !== 'weeks') errors.push('weekly programs need duration.type: weeks')
+
   const programMeta: ProgramMeta | undefined =
-    Object.keys(vars).length > 0 ? { version: 1, vars } : undefined
+    Object.keys(vars).length > 0 || raw.weekly
+      ? {
+          version: 1,
+          vars,
+          ...(raw.weekly ? { weekly: true } : {}),
+          ...(Object.keys(schedule).length > 0 ? { schedule } : {}),
+          ...(deload ? { deload } : {}),
+        }
+      : undefined
 
   const days = Array.isArray(raw.days) ? raw.days.map(parseDay) : []
 
