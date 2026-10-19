@@ -131,7 +131,9 @@ export interface RunSegment {
  * `else` – optional failure expression: "squat = round5(squat * 0.85)"
  *
  * Condition keywords injected into eval context:
- *   all_reps        – 1 if completionState === 'completed'
+ *   all_reps        – exercise rules: 1 if every working set reached the top of its
+ *                     rep range (skipped/unfinished exercises don't evaluate at all);
+ *                     slot rules: 1 if completionState === 'completed'
  *   session_complete – 1 if completionState is not 'skipped' or 'planned'
  *   effort          – perceivedEffort value (1–5), 0 if missing
  *
