@@ -90,7 +90,7 @@ function buildWeightsRecommendation(
 ): ProgressionRecommendation | null {
   if (exercises.length === 0) return null
 
-  const allSets = exercises.flatMap(ex => ex.sets)
+  const allSets = exercises.flatMap(ex => ex.sets.filter(s => !s.isWarmup))
   const completedSets = allSets.filter(s => s.completed)
   if (completedSets.length === 0) return null
 
