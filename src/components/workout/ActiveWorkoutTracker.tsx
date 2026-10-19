@@ -614,6 +614,8 @@ export function ActiveWorkoutTracker({
       const kind = equipmentKindFor(ex.exercise)
       const snap = (v: number | null | undefined): number | null =>
         v != null && v > 0 ? snapToAchievable(v, kind, equipmentProfile) : (v ?? null)
+      const isVarLoad = (load?: string | null): boolean =>
+        hasVars && !!load && /[a-z_]/i.test(load.replace(/\s*(lbs?|kg)\s*$/i, ''))
       const resolveLbs = (load?: string | null): number | null => {
         const lbs = hasVars
           ? (resolveLoad(load ?? undefined, evalCtx) ?? parseNumericLoad(load))
@@ -704,7 +706,9 @@ export function ActiveWorkoutTracker({
           return {
             ...base,
             actualReps: prev?.actualReps ?? base.actualReps,
-            actualLoad: snap(prev?.actualLoad) ?? base.actualLoad,
+            // A program-variable load (e.g. `squat`) is the source of truth so progression shows
+            // up; fixed or missing loads carry last session's weight forward.
+            actualLoad: (isVarLoad(s.load ?? ex.load) ? base.resolvedLoadLbs : null) ?? snap(prev?.actualLoad) ?? base.actualLoad,
           }
         })
         sets = [...warmupSets, ...workSets]
@@ -716,7 +720,9 @@ export function ActiveWorkoutTracker({
           return {
             ...base,
             actualReps: prev?.actualReps ?? base.actualReps,
-            actualLoad: snap(prev?.actualLoad) ?? base.actualLoad,
+            // A program-variable load (e.g. `squat`) is the source of truth so progression shows
+            // up; fixed or missing loads carry last session's weight forward.
+            actualLoad: (isVarLoad(ex.load) ? base.resolvedLoadLbs : null) ?? snap(prev?.actualLoad) ?? base.actualLoad,
           }
         })
         sets = [...warmupSets, ...workSets]

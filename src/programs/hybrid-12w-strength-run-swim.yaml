@@ -6,8 +6,9 @@ description: >
   run, and Tue/Thu mobility for ankle, hips, T-spine and scapular control.
   Weeks 4, 8 and 12 are deloads (fewer sets, same weights). One plan day per
   calendar day; a missed day just waits — do it tomorrow. Rep-range lifts use
-  double progression: add weight yourself once every set hits the top of the
-  range with 2+ reps in reserve.
+  double progression: the barbell and home dumbbell lifts add 5 lb once every
+  working set hits the top of the range; machines and accessories you bump
+  yourself.
 
 duration:
   type: weeks
@@ -33,10 +34,10 @@ days:
         durationMin: 45
         notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
         exercises:
-          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
-          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
-          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
-          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips", progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_lunge += 5" } }
           - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
           - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
 
@@ -73,10 +74,10 @@ days:
         durationMin: 50
         notes: "Short on time: deadlift, pull-ups, landmine press only."
         exercises:
-          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m, progress: { if: all_reps, then: "deadlift += 5" } }
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
-          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
-          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
           - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
@@ -175,10 +176,10 @@ days:
         durationMin: 45
         notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
         exercises:
-          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
-          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
-          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
-          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips", progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_lunge += 5" } }
           - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
           - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
 
@@ -215,10 +216,10 @@ days:
         durationMin: 50
         notes: "Short on time: deadlift, pull-ups, landmine press only."
         exercises:
-          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m, progress: { if: all_reps, then: "deadlift += 5" } }
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
-          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
-          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
           - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
@@ -317,10 +318,10 @@ days:
         durationMin: 45
         notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
         exercises:
-          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
-          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
-          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
-          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips", progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_lunge += 5" } }
           - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
           - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
 
@@ -357,10 +358,10 @@ days:
         durationMin: 50
         notes: "Short on time: deadlift, pull-ups, landmine press only."
         exercises:
-          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m, progress: { if: all_reps, then: "deadlift += 5" } }
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
-          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
-          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
           - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
@@ -601,10 +602,10 @@ days:
         durationMin: 45
         notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
         exercises:
-          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
-          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
-          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
-          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips", progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_lunge += 5" } }
           - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
           - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
 
@@ -641,10 +642,10 @@ days:
         durationMin: 50
         notes: "Short on time: deadlift, pull-ups, landmine press only."
         exercises:
-          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m, progress: { if: all_reps, then: "deadlift += 5" } }
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
-          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
-          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
           - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
@@ -743,10 +744,10 @@ days:
         durationMin: 45
         notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
         exercises:
-          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
-          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
-          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
-          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips", progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_lunge += 5" } }
           - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
           - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
 
@@ -783,10 +784,10 @@ days:
         durationMin: 50
         notes: "Short on time: deadlift, pull-ups, landmine press only."
         exercises:
-          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m, progress: { if: all_reps, then: "deadlift += 5" } }
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
-          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
-          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
           - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
@@ -885,10 +886,10 @@ days:
         durationMin: 45
         notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
         exercises:
-          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
-          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
-          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
-          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips", progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_lunge += 5" } }
           - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
           - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
 
@@ -925,10 +926,10 @@ days:
         durationMin: 50
         notes: "Short on time: deadlift, pull-ups, landmine press only."
         exercises:
-          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m, progress: { if: all_reps, then: "deadlift += 5" } }
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
-          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
-          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
           - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
@@ -1169,10 +1170,10 @@ days:
         durationMin: 45
         notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
         exercises:
-          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
-          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
-          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
-          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips", progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_lunge += 5" } }
           - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
           - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
 
@@ -1209,10 +1210,10 @@ days:
         durationMin: 50
         notes: "Short on time: deadlift, pull-ups, landmine press only."
         exercises:
-          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m, progress: { if: all_reps, then: "deadlift += 5" } }
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
-          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
-          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
           - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
@@ -1311,10 +1312,10 @@ days:
         durationMin: 45
         notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
         exercises:
-          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
-          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
-          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
-          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips", progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_lunge += 5" } }
           - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
           - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
 
@@ -1351,10 +1352,10 @@ days:
         durationMin: 50
         notes: "Short on time: deadlift, pull-ups, landmine press only."
         exercises:
-          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m, progress: { if: all_reps, then: "deadlift += 5" } }
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
-          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
-          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
           - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
@@ -1453,10 +1454,10 @@ days:
         durationMin: 45
         notes: "Machine/DB loads: 2-4 reps in reserve. Short on time: squat, bench, row only."
         exercises:
-          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double }
-          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips" }
-          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand" }
-          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Squat, Barbell", sets: 3, reps: "6-8", load: squat, rest: 2.5m, progressionType: double, progress: { if: all_reps, then: "squat += 5" } }
+          - { exercise: "Bench Press, Barbell", sets: 2, reps: "8-10", load: bench, rest: 105s, progressionType: double, notes: "Stop if shoulder/scap control slips", progress: { if: all_reps, then: "bench += 5" } }
+          - { exercise: "Incline Row, Dumbbell", sets: 3, reps: "8-12", load: db_row, rest: 80s, progressionType: double, notes: "Chest-supported; weight per hand", progress: { if: all_reps, then: "db_row += 5" } }
+          - { exercise: "Reverse Lunge, Dumbbell", sets: 2, reps: 8, load: db_lunge, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_lunge += 5" } }
           - { exercise: "Single-Leg Standing Calf Raise", sets: 2, reps: "10-12", rest: 50s, progressionType: double, notes: "Reps per leg; slow lowering" }
           - { exercise: "Bear Plank Scap Push-Up Plus", sets: 3, reps: 8, rest: 45s, notes: "PT scapular exercise — use your prescribed dose" }
 
@@ -1493,10 +1494,10 @@ days:
         durationMin: 50
         notes: "Short on time: deadlift, pull-ups, landmine press only."
         exercises:
-          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m }
+          - { exercise: "Deadlift, Barbell", sets: 2, reps: 5, load: deadlift, rest: 2.75m, progress: { if: all_reps, then: "deadlift += 5" } }
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
-          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar" }
-          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand" }
+          - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
+          - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
           - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }

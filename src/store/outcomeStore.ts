@@ -12,6 +12,7 @@ import { useProgramStore } from './programStore'
 import { usePlanStore } from './planStore'
 import { useHistoryStore } from './historyStore'
 import { useExerciseHistoryStore } from './exerciseHistoryStore'
+import { evaluateExerciseProgress } from '../modules/workout-outcomes/exerciseProgress'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
 
 /** Resolve plan/workout name context and sync a weights outcome to exerciseHistoryStore. */
@@ -177,12 +178,17 @@ export const useOutcomeStore = create<OutcomeState>()(
           }
         }
 
-        // 3b. Per-exercise progression (weights slots)
+        // 3b. Per-exercise progression (weights slots). Each exercise is judged on its own
+        // sets: skipped/unfinished exercises hold, and `all_reps` means every working set
+        // reached the top of its rep range — not merely that the workout was completed.
         if (slot.exercises) {
+          const loggedByName = new Map((outcome.weightsActual?.exercises ?? []).map(e => [e.exercise, e]))
           for (const ex of slot.exercises) {
             if (ex.progress) {
+              const result = evaluateExerciseProgress(ex, loggedByName.get(ex.exercise))
+              if (result === 'incomplete') continue
               try {
-                programStore.applyProgressionRule(planId, ex.progress, ctxBase)
+                programStore.applyProgressionRule(planId, ex.progress, { ...ctxBase, all_reps: result === 'hit' })
               } catch (err) {
                 console.error('[outcomeStore] exercise progression rule failed (outcome already saved):', err)
               }
