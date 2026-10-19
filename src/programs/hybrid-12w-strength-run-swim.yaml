@@ -144,7 +144,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 15
-        notes: "600 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 600 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W1 · Sun — Long Run + Yoga"
     slots:
@@ -163,7 +163,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W2 · Mon — Strength A"
     slots:
@@ -286,7 +286,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 15
-        notes: "600 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 600 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W2 · Sun — Long Run + Yoga"
     slots:
@@ -305,7 +305,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W3 · Mon — Strength A"
     slots:
@@ -428,7 +428,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 18
-        notes: "700 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 6 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 700 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 6 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W3 · Sun — Long Run + Yoga"
     slots:
@@ -447,7 +447,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W4 · Mon — Strength A"
     slots:
@@ -570,7 +570,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 12
-        notes: "500 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 2 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 500 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 2 × 50 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W4 · Sun — Long Run + Yoga"
     slots:
@@ -589,7 +589,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W5 · Mon — Strength A"
     slots:
@@ -712,7 +712,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 20
-        notes: "800 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 800 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W5 · Sun — Long Run + Yoga"
     slots:
@@ -731,7 +731,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W6 · Mon — Strength A"
     slots:
@@ -854,7 +854,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 22
-        notes: "900 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 5 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 900 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 5 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W6 · Sun — Long Run + Yoga"
     slots:
@@ -873,7 +873,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W7 · Mon — Strength A"
     slots:
@@ -996,7 +996,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 25
-        notes: "1000 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 6 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 1000 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 6 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W7 · Sun — Long Run + Yoga"
     slots:
@@ -1015,7 +1015,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W8 · Mon — Strength A"
     slots:
@@ -1138,7 +1138,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 18
-        notes: "700 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 3 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 700 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 3 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W8 · Sun — Long Run + Yoga"
     slots:
@@ -1157,7 +1157,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W9 · Mon — Strength A"
     slots:
@@ -1280,7 +1280,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 28
-        notes: "1100 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 3 × 100 + 2 × 200 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 1100 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 3 × 100 + 2 × 200 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W9 · Sun — Long Run + Yoga"
     slots:
@@ -1299,7 +1299,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W10 · Mon — Strength A"
     slots:
@@ -1422,7 +1422,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 30
-        notes: "1200 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 100 + 2 × 200 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 1200 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 100 + 2 × 200 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W10 · Sun — Long Run + Yoga"
     slots:
@@ -1441,7 +1441,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W11 · Mon — Strength A"
     slots:
@@ -1564,7 +1564,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 35
-        notes: "1400 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 100 + 3 × 200 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 1400 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 4 × 100 + 3 × 200 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W11 · Sun — Long Run + Yoga"
     slots:
@@ -1583,7 +1583,7 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
 
   - label: "W12 · Mon — Strength A"
     slots:
@@ -1706,7 +1706,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 22
-        notes: "900 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 5 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). 900 yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main 5 × 100 with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "W12 · Sun — Long Run + Yoga"
     slots:
@@ -1725,4 +1725,4 @@ days:
         difficulty: easy
         location: class
         durationMin: 60
-        notes: "Weekly class — log as completed or skip."
+        notes: "Weekly class — log as completed or skip. Missed Saturday's swim? Do it here at the gym before or after class."
