@@ -1,7 +1,35 @@
 import { format, addDays, parseISO, differenceInCalendarDays } from 'date-fns'
-import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay, DayStatus } from '../types'
+import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay, DayStatus, ExtraWorkoutEntry, PlanDay } from '../types'
 export { nanoid } from '../lib/utils'
-import { realignPointer, planDayForDate, pausedWeekCount } from './programWeeks'
+import {
+  realignPointer, planDayForDate, pausedWeekCount, isWeeklyProgram, programWeekForDate,
+  weeklyAssignments, REST_DAY_INDEX,
+} from './programWeeks'
+
+const REST_DAY: PlanDay = { id: 'rest', label: 'Rest', slots: [] }
+
+/**
+ * Weekly programs pick each date's session from that week's checklist (see
+ * weeklyAssignments) instead of the strict rotation pointer. Null = not weekly / pre-start.
+ */
+function makeWeeklyLookup(plan: Plan, entries: HistoryEntry[], overrides: OverrideEntry[], extras: ExtraWorkoutEntry[], today: string) {
+  if (!isWeeklyProgram(plan)) return null
+  const byWeek = new Map<string, Map<string, number>>()
+  return (date: string): number | null => {
+    const info = programWeekForDate(plan, date)
+    if (!info) return null
+    let week = byWeek.get(info.weekStart)
+    if (!week) {
+      week = weeklyAssignments(plan, entries, overrides, extras, info.weekStart, today)
+      byWeek.set(info.weekStart, week)
+    }
+    return week.get(date) ?? REST_DAY_INDEX
+  }
+}
+
+function dayAt(plan: Plan, index: number, date: string): PlanDay {
+  return index === REST_DAY_INDEX ? REST_DAY : planDayForDate(plan, index, date)
+}
 
 // Date convention: all calendar dates are YYYY-MM-DD strings in the user's LOCAL
 // timezone. `format()` from date-fns uses local time, so entries created at
@@ -95,6 +123,7 @@ export function getTodayResolvedDay(
   entries: HistoryEntry[],
   overrides: OverrideEntry[],
   today: string,
+  extras: ExtraWorkoutEntry[] = [],
 ): ResolvedDay {
   // Guard: a plan with no days can't have a meaningful rotation day.
   // Return a synthetic rest-day so callers don't receive planDay=undefined.
@@ -122,11 +151,14 @@ export function getTodayResolvedDay(
     .filter(o => o.planId === plan.id)
     .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt))
 
-  // Base pointer (everything before today) + today's overrides
-  let idx = computeCurrentDayIndex(plan, entries, overrides, today)
-  idx = applyOverridesForDate(idx, sortedOverrides, today, plan.days.length)
+  // Base pointer (everything before today) + today's overrides; weekly programs use the checklist
+  let idx = makeWeeklyLookup(plan, entries, overrides, extras, today)?.(today) ?? null
+  if (idx == null) {
+    idx = computeCurrentDayIndex(plan, entries, overrides, today)
+    idx = applyOverridesForDate(idx, sortedOverrides, today, plan.days.length)
+  }
 
-  const planDay = planDayForDate(plan, idx, today)
+  const planDay = dayAt(plan, idx, today)
   // Match deduplication behavior of computeCurrentDayIndex / getResolvedDaysRange:
   // pick the entry with the newest createdAt when duplicates exist for today.
   const todayEntries = entries.filter(e => e.planId === plan.id && e.calendarDate === today)
@@ -160,8 +192,10 @@ export function getUpcomingDays(
   overrides: OverrideEntry[],
   today: string,
   count: number,
+  extras: ExtraWorkoutEntry[] = [],
 ): ResolvedDay[] {
   if (plan.days.length === 0) return []
+  const weekly = makeWeeklyLookup(plan, entries, overrides, extras, today)
 
   const sortedOverrides = [...overrides]
     .filter(o => o.planId === plan.id)
@@ -198,13 +232,17 @@ export function getUpcomingDays(
     pointer = realignPointer(plan, date, pointer)
     pointer = applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)
     const entry = entryByDate.get(date)
-    result.push({
-      calendarDate: date,
-      planDayIndex: pointer,
-      planDay: planDayForDate(plan, pointer, date),
-      status: 'future',
-      historyEntry: entry,
-    })
+    const idx = weekly?.(date) ?? pointer
+    // Weekly programs: dates with nothing suggested aren't listed as upcoming workouts
+    if (idx !== REST_DAY_INDEX) {
+      result.push({
+        calendarDate: date,
+        planDayIndex: idx,
+        planDay: dayAt(plan, idx, date),
+        status: 'future',
+        historyEntry: entry,
+      })
+    }
     pointer = mod(pointer + 1, plan.days.length)
   }
 
@@ -226,8 +264,10 @@ export function getResolvedDaysRange(
   today: string,
   fromDate: string,
   toDate: string,
+  extras: ExtraWorkoutEntry[] = [],
 ): ResolvedDay[] {
   if (plan.days.length === 0) return []
+  const weekly = makeWeeklyLookup(plan, entries, overrides, extras, today)
 
   const entryByDate = new Map<string, HistoryEntry>()
   for (const e of entries) {
@@ -256,7 +296,8 @@ export function getResolvedDaysRange(
     pointer = realignPointer(plan, date, pointer)
     pointer = applyOverridesForDate(pointer, sortedOverrides, date, plan.days.length)
 
-    const planDay = planDayForDate(plan, pointer, date)
+    const shownIndex = weekly?.(date) ?? pointer
+    const planDay = dayAt(plan, shownIndex, date)
 
     // Determine status
     let status: DayStatus
@@ -274,7 +315,7 @@ export function getResolvedDaysRange(
       status = 'future'
     }
 
-    result.push({ calendarDate: date, planDayIndex: pointer, planDay, status, historyEntry: entry })
+    result.push({ calendarDate: date, planDayIndex: shownIndex, planDay, status, historyEntry: entry })
 
     // ── Advance pointer ───────────────────────────────────────────────────
     // Any logged action (complete, skip, day_off) advances the rotation.

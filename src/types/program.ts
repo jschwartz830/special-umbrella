@@ -262,6 +262,9 @@ export interface YamlSlot {
 export interface YamlDay {
   label: string
   slots: YamlSlot[]
+  /** e.g. [sat, sun] — weekly programs suggest the session only on these days */
+  allowedDays?: string[]
+  optional?: boolean
 }
 
 export interface YamlProgram {

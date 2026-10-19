@@ -105,8 +105,8 @@ export function CalendarPage() {
   )
 
   const weeks = useMemo(
-    () => buildMonthGrid(year, month, plan, entries, overrides, today, weekStartsOn),
-    [year, month, plan, entries, overrides, today, weekStartsOn],
+    () => buildMonthGrid(year, month, plan, entries, overrides, today, weekStartsOn, extraEntries),
+    [year, month, plan, entries, overrides, today, weekStartsOn, extraEntries],
   )
 
   const streakDatesSet = useMemo(() => {
@@ -602,7 +602,8 @@ function DayDetailModal({
     | { kind: 'extra'; extraId: string }
     | null
   >(null)
-  const [selectedIdx, setSelectedIdx] = useState(planDayIndex)
+  // Weekly programs can show a rest date (-1); logging one picks the first session by default
+  const [selectedIdx, setSelectedIdx] = useState(Math.max(0, planDayIndex))
   const [showPicker, setShowPicker] = useState(false)
   const [showAddExtra, setShowAddExtra] = useState(false)
   const [extraType, setExtraType] = useState<WorkoutType>('yoga')

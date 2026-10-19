@@ -10,6 +10,7 @@ export function useActivePlan() {
   const activePlanId = usePlanStore(s => s.activePlanId)
   const entries = useHistoryStore(s => s.entries)
   const overrides = useHistoryStore(s => s.overrides)
+  const extraEntries = useHistoryStore(s => s.extraEntries)
 
   const today = useToday()
   const plan = activePlanId ? plans[activePlanId] ?? null : null
@@ -26,13 +27,13 @@ export function useActivePlan() {
 
   const todayResolved = useMemo<ResolvedDay | null>(() => {
     if (!plan) return null
-    return getTodayResolvedDay(plan, planEntries, planOverrides, today)
-  }, [plan, planEntries, planOverrides, today])
+    return getTodayResolvedDay(plan, planEntries, planOverrides, today, extraEntries)
+  }, [plan, planEntries, planOverrides, today, extraEntries])
 
   const upcoming = useMemo<ResolvedDay[]>(() => {
     if (!plan) return []
-    return getUpcomingDays(plan, planEntries, planOverrides, today, 7)
-  }, [plan, planEntries, planOverrides, today])
+    return getUpcomingDays(plan, planEntries, planOverrides, today, 7, extraEntries)
+  }, [plan, planEntries, planOverrides, today, extraEntries])
 
   return { plan, todayResolved, upcoming, today, planEntries, planOverrides }
 }

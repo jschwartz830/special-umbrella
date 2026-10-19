@@ -6,8 +6,10 @@ description: >
   run, and Tue/Thu mobility for ankle, hips, T-spine and scapular control.
   Weeks follow the calendar: a missed session carries to the next day within
   the week, and each Monday starts the new week fresh (nothing doubles up).
-  Pause a week for travel from Today. Weeks 4, 8 and 12 are deloads (fewer
-  sets, same weights, no increases). Barbell and home dumbbell lifts add 5 lb
+  Pause a week for travel from Today. Saturday's gym session (machines +
+  swim) is suggested Sat/Sun only, but you can pick it any day from "This
+  week". Weeks 4, 8 and 12 are deloads (fewer sets, same weights, no
+  increases). Barbell and home dumbbell lifts add 5 lb
   once every working set hits the top of the range; machines you bump yourself.
 
 duration:
@@ -119,6 +121,7 @@ days:
           - { id: lib-bear-plank-scap-pushup-plus, name: "Scapular PT Exercise", sets: [{ reps: 8 }, { reps: 8 }, { reps: 8 }], notes: "Use your PT's prescribed exercise and dose" }
 
   - label: "Fri — Strength D (Optional)"
+    optional: true
     slots:
       - type: weights
         name: "Strength D — Accessories (Optional)"
@@ -135,6 +138,7 @@ days:
           - { exercise: "Triceps Extension, Dumbbell", sets: 2, reps: 12, rest: 60s, notes: "Or cable pushdown" }
 
   - label: "Sat — Strength C + Swim"
+    allowedDays: [sat, sun]
     slots:
       - type: weights
         name: "Strength C — Machines"
@@ -158,7 +162,7 @@ days:
         difficulty: easy
         location: gym
         durationMin: 30
-        notes: "Gym only — Sat or Sun. Can't swim today? Do it Sunday at the gym; if Sunday is out too, skip it (never move it to a weekday). {swim_yd} yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main {swim_main} with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
+        notes: "Gym session — suggested Sat/Sun; pick it from This week to do it another day. {swim_yd} yd total, freestyle. 200 warm-up; 4 × 25 drills (catch-up, fingertip drag, side kick) with 20s rest; main {swim_main} with 20-30s rest (45s after 200s); 100 cool-down. App logs meters: enter yards × 0.914, or note yards."
 
   - label: "Sun — Long Run + Yoga"
     slots:

@@ -6,7 +6,7 @@ import {
   startOfWeek,
   endOfWeek,
 } from 'date-fns'
-import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay } from '../types'
+import type { Plan, HistoryEntry, OverrideEntry, ResolvedDay, ExtraWorkoutEntry } from '../types'
 import { getResolvedDaysRange, mod } from './rotationEngine'
 
 export interface CalendarCell {
@@ -31,6 +31,7 @@ export function buildMonthGrid(
   overrides: OverrideEntry[],
   today: string,
   weekStartsOn: 0 | 1 = 0,
+  extras: ExtraWorkoutEntry[] = [],
 ): CalendarWeek[] {
   const monthStart = startOfMonth(new Date(year, month, 1))
   const monthEnd = endOfMonth(monthStart)
@@ -60,6 +61,7 @@ export function buildMonthGrid(
         today,
         fromDate,
         toDate,
+        extras,
       )
       for (const rd of resolvedDays) {
         resolvedMap.set(rd.calendarDate, rd)

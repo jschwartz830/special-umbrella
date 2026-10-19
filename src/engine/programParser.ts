@@ -1,7 +1,7 @@
 import { load as yamlLoad } from 'js-yaml'
 import { format } from 'date-fns'
 import { nanoid } from '../lib/utils'
-import type { Plan, WorkoutSlot, PlanDay, WorkoutType } from '../types'
+import type { Plan, WorkoutSlot, PlanDay, WorkoutType, Weekday } from '../types'
 import type {
   ExerciseSpec,
   SetSpec,
@@ -11,6 +11,7 @@ import type {
   ProgramMeta,
   YamlProgram,
   YamlSlot,
+  YamlDay,
   YamlExerciseSpec,
   YamlSetSpec,
   YamlRunSegment,
@@ -272,11 +273,18 @@ function buildStructureDescription(
 
 // ── Day parsing ───────────────────────────────────────────────────────────────
 
-function parseDay(raw: { label: string; slots: YamlSlot[] }): PlanDay {
+const WEEKDAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+function parseDay(raw: YamlDay): PlanDay {
+  const allowedDays = Array.isArray(raw.allowedDays)
+    ? WEEKDAYS.filter(d => raw.allowedDays!.some(a => String(a).toLowerCase().slice(0, 3) === d))
+    : []
   return {
     id: nanoid(),
     label: raw.label ?? 'Workout Day',
     slots: (raw.slots ?? []).map(parseSlot),
+    ...(allowedDays.length > 0 ? { allowedDays } : {}),
+    ...(raw.optional ? { optional: true } : {}),
   }
 }
 

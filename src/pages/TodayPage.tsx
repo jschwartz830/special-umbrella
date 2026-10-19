@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react'
-import { planDayForDate, programWeekForDate } from '../engine/programWeeks'
+import { planDayForDate, programWeekForDate, weeklyChecklist, REST_DAY_INDEX } from '../engine/programWeeks'
+import { TodayWeeklyChecklist } from '../components/today/TodayWeeklyChecklist'
 import { usePlanStore } from '../store/planStore'
 import { useNavigate } from 'react-router-dom'
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
@@ -323,6 +324,9 @@ export function TodayPage() {
   // Collect recent past days with no entry — used to show the stall nudge.
   // Weekly programs drop last week's unfinished sessions, so only this week's gaps matter.
   const weekInfo = programWeekForDate(plan, today)
+  const checklist = weeklyChecklist(plan, planEntries, extraEntries, today)
+  // Weekly programs can have nothing suggested today (week done, or only other-day sessions left)
+  const isWeeklyRest = !!checklist && todayResolved.planDayIndex === REST_DAY_INDEX
   const nagFrom = weekInfo && weekInfo.weekStart > plan.startDate ? weekInfo.weekStart : plan.startDate
   const unloggedDates = getUnloggedPastDates(plan.id, planEntries, nagFrom, today, 14)
   const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, nagFrom, today)
@@ -566,6 +570,7 @@ export function TodayPage() {
         calendarDate: today,
         workoutType: selectedSlot?.type ?? 'other',
         workoutName: selectedPlanDay.label,
+        planDayIndex: addFromPlanIdx,
         source: 'double_day',
         advancedRotation: willAdvance,
       })
@@ -640,6 +645,7 @@ export function TodayPage() {
         calendarDate: today,
         workoutType: bonusSlot?.type ?? 'other',
         workoutName: rd.planDay.label,
+        planDayIndex: rd.planDayIndex,
         source: 'double_day',
         advancedRotation: true,
       })
@@ -775,6 +781,20 @@ export function TodayPage() {
             <p className="text-xs text-slate-600 mt-0.5">No workout logged — rotation continues tomorrow</p>
           </div>
         </div>
+      ) : isPending && isWeeklyRest ? (
+        <div className="w-full rounded-xl border border-slate-700 bg-slate-800/80 p-4 flex items-center gap-3">
+          <Coffee size={22} className="text-slate-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-slate-300">
+              {checklist!.every(i => i.status !== 'pending') ? 'Week complete' : 'Nothing scheduled today'}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {checklist!.every(i => i.status !== 'pending')
+                ? 'Rest, or log an extra workout.'
+                : 'What\'s left this week is set for other days — pick one below to do it anyway.'}
+            </p>
+          </div>
+        </div>
       ) : isPending ? (
         <TodayPendingCard
           planId={plan.id}
@@ -801,6 +821,15 @@ export function TodayPage() {
         />
       ) : (
         <WorkoutDayCard resolved={todayResolved} planId={plan?.id} isToday sessionCount={todaySessionCount} />
+      )}
+
+      {checklist && (
+        <TodayWeeklyChecklist
+          items={checklist}
+          todayIndex={todayResolved.planDayIndex}
+          todayLogged={!isPending}
+          onPick={actions.jumpTo}
+        />
       )}
 
       {/* Added plan workout preview */}
