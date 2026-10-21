@@ -26,7 +26,7 @@ export type { ExerciseSpec, SetSpec, RunSegment, DrillSpec, ProgressionRule, Pro
 
 export type PlanStatus = 'active' | 'inactive' | 'archived'
 
-export type OverrideType = 'advance' | 'go_back' | 'jump' | 'swap_slot'
+export type OverrideType = 'advance' | 'go_back' | 'jump' | 'swap_slot' | 'defer'
 
 export type DayStatus =
   | 'past_unlogged'
@@ -187,7 +187,7 @@ export interface OverrideEntry {
   planId: string
   appliedAt: string       // ISO timestamp
   type: OverrideType
-  targetDayIndex?: number // for 'jump'
+  targetDayIndex?: number // for 'jump'; for 'defer', the session put off that day
   slotId?: string         // for 'swap_slot'
   newSlotType?: WorkoutType
   delta?: number          // +1 advance, -1 go_back

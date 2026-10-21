@@ -22,6 +22,13 @@ export function usePlanActions(planId: string | null) {
     logAction(planId, today, undefined, 'day_off')
   }
 
+  /** Weekly programs: rest today and bring this session back after tomorrow's. */
+  function doLater(planDayIndex: number) {
+    if (!planId) return
+    logAction(planId, today, undefined, 'day_off')
+    logOverride(planId, 'defer', { targetDayIndex: planDayIndex })
+  }
+
   function advance() {
     if (!planId) return
     logOverride(planId, 'advance', { delta: 1 })
@@ -42,5 +49,5 @@ export function usePlanActions(planId: string | null) {
     logOverride(planId, 'swap_slot', { slotId, newSlotType })
   }
 
-  return { complete, skip, dayOff, advance, goBack, jumpTo, swapSlot }
+  return { complete, skip, dayOff, doLater, advance, goBack, jumpTo, swapSlot }
 }

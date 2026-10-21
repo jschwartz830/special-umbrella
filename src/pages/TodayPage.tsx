@@ -99,6 +99,7 @@ export function TodayPage() {
   const removeLastOverrideByType = useHistoryStore(s => s.removeLastOverrideByType)
   const allEntries = useHistoryStore(s => s.entries)
   const extraEntries = useHistoryStore(s => s.extraEntries)
+  const allOverrides = useHistoryStore(s => s.overrides)
   const logOutcomeWithProgression = useOutcomeStore(s => s.logOutcomeWithProgression)
   const getOutcome = useOutcomeStore(s => s.getOutcome)
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
@@ -387,6 +388,12 @@ export function TodayPage() {
   const checklist = weeklyChecklist(plan, planEntries, extraEntries, today)
   // Weekly programs can have nothing suggested today (week done, or only other-day sessions left)
   const isWeeklyRest = !!checklist && todayResolved.planDayIndex === REST_DAY_INDEX
+  // "Do later" needs a tomorrow in the same program week to swap with
+  const canDoLater = !!checklist && !isWeeklyRest && !!weekInfo &&
+    differenceInCalendarDays(parseISO(today), parseISO(weekInfo.weekStart)) < 6
+  const deferredToday = allOverrides.find(o =>
+    o.planId === plan.id && o.type === 'defer' && o.targetDayIndex != null &&
+    format(new Date(o.appliedAt), 'yyyy-MM-dd') === today)
   const nagFrom = weekInfo && weekInfo.weekStart > plan.startDate ? weekInfo.weekStart : plan.startDate
   const unloggedDates = getUnloggedPastDates(plan.id, planEntries, nagFrom, today, 14)
   const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, nagFrom, today)
@@ -888,7 +895,11 @@ export function TodayPage() {
           <Coffee size={22} className="text-slate-500 flex-shrink-0" />
           <div>
             <p className="text-sm font-semibold text-slate-400">Rest Day</p>
-            <p className="text-xs text-slate-600 mt-0.5">No workout logged — rotation continues tomorrow</p>
+            <p className="text-xs text-slate-600 mt-0.5">
+              {deferredToday && plan.days[deferredToday.targetDayIndex!]
+                ? `${plan.days[deferredToday.targetDayIndex!].label} moved — it's back after tomorrow's session`
+                : 'No workout logged — rotation continues tomorrow'}
+            </p>
           </div>
         </div>
       ) : isPending && isWeeklyRest ? (
@@ -967,6 +978,15 @@ export function TodayPage() {
           >
             Change Workout
           </button>
+          {canDoLater && (
+            <button
+              onClick={() => actions.doLater(todayResolved.planDayIndex)}
+              title="Rest today; this session comes back after tomorrow's"
+              className="flex-1 flex items-center justify-center px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600 text-xs font-medium transition-colors active:scale-[0.97]"
+            >
+              Do Later
+            </button>
+          )}
           <button
             onClick={handleCopyWorkout}
             aria-label="Copy workout to clipboard"

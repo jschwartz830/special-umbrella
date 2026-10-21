@@ -35,6 +35,26 @@ describe('weeklyAssignments', () => {
       .toEqual(['A', 'Run1', 'B', 'Run2', 'C', 'Long'])
   })
 
+  it('"do later" rests today, runs tomorrow, brings the session back the day after', () => {
+    // Mon A, Tue Run1 done; Wed B put off → Thu Run2, Fri B, weekend as normal (optional D dropped)
+    const entries = [log('2026-11-02', 0), log('2026-11-03', 1),
+      { ...log('2026-11-04', -1, 'day_off'), planDayIndex: undefined }]
+    const defer: OverrideEntry = { id: 'd', planId: 'p', type: 'defer', targetDayIndex: 2, appliedAt: '2026-11-04T07:00:00' }
+    expect(labels(weeklyAssignments(plan, entries, [defer], [], WEEK, '2026-11-04')).slice(3))
+      .toEqual(['Run2', 'B', 'C', 'Long'])
+    // Thursday's run logged: Friday still brings B back
+    expect(labels(weeklyAssignments(plan, [...entries, log('2026-11-05', 3)], [defer], [], WEEK, '2026-11-06'))[4]).toBe('B')
+  })
+
+  it('"do later" falls back to the put-off session when nothing else is left', () => {
+    // Everything but B done by Friday; B put off Saturday → Sunday still offers B
+    const entries = [log('2026-11-02', 0), log('2026-11-03', 1), log('2026-11-04', 3), log('2026-11-05', 4), log('2026-11-06', 5),
+      { ...log('2026-11-07', -1, 'day_off'), planDayIndex: undefined }]
+    const extras = [{ id: 'l', planId: 'p', calendarDate: '2026-11-06', workoutType: 'run' as const, workoutName: 'Long', planDayIndex: 6, createdAt: '' }]
+    const defer: OverrideEntry = { id: 'd', planId: 'p', type: 'defer', targetDayIndex: 2, appliedAt: '2026-11-07T07:00:00' }
+    expect(labels(weeklyAssignments(plan, entries, [defer], extras, WEEK, '2026-11-08'))[6]).toBe('B')
+  })
+
   it('bonus sessions logged as extras count as done', () => {
     const m = weeklyAssignments(plan, [log('2026-11-02', 0)], [], [
       { id: 'x', planId: 'p', calendarDate: '2026-11-02', workoutType: 'run', workoutName: 'Run1', planDayIndex: 1, createdAt: '' },

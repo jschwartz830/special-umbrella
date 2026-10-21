@@ -126,7 +126,8 @@ export function planDayForDate(plan: Plan, index: number, date: string): PlanDay
 // sessions first on their days; optional ones dropped when the week runs short). Logged sessions
 // (rotation entries, or bonus extras from the plan) mark a session done; a `jump`
 // override on a date pins that date to a chosen session — that's how "do this one
-// today" (including outside its allowed days) works.
+// today" (including outside its allowed days) works. A `defer` override ("do later")
+// keeps its session off the next day's suggestion, so it comes back the day after.
 
 const WEEKDAY_BY_INDEX: Weekday[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
@@ -165,22 +166,28 @@ export function weeklyAssignments(
     .sort((a, b) => a.appliedAt.localeCompare(b.appliedAt))) {
     pinned.set(format(new Date(o.appliedAt), 'yyyy-MM-dd'), o.targetDayIndex!)
   }
+  const deferredOn = new Map<string, number>() // date → session put off the day before
+  for (const o of overrides) {
+    if (o.planId !== plan.id || o.type !== 'defer' || o.targetDayIndex == null) continue
+    deferredOn.set(format(addDays(new Date(o.appliedAt), 1), 'yyyy-MM-dd'), o.targetDayIndex)
+  }
   const done = new Set<number>()
   const result = new Map<string, number>()
   // Plan order, except day-limited sessions go first on their days (they have the fewest
   // chances), and optional sessions are skipped once the remaining days are only enough
   // for the required ones — so a missed Monday drops the optional, not the long run.
-  const pick = (date: string, daysLeft: number): number => {
+  const pick = (date: string, daysLeft: number, avoid = deferredOn.get(date) ?? null): number => {
     const requiredLeft = plan.days.filter((d, idx) => !d.optional && !done.has(idx)).length
     const skipOptional = requiredLeft >= daysLeft
     let best = REST_DAY_INDEX
     let bestKey = ''
     plan.days.forEach((d, idx) => {
-      if (done.has(idx) || !isAllowedOn(d, date) || (skipOptional && d.optional)) return
+      if (done.has(idx) || idx === avoid || !isAllowedOn(d, date) || (skipOptional && d.optional)) return
       const key = `${d.allowedDays?.length ? 0 : 1}${String(idx).padStart(3, '0')}`
       if (best === REST_DAY_INDEX || key < bestKey) { best = idx; bestKey = key }
     })
-    return best
+    // The put-off session is still better than nothing
+    return best === REST_DAY_INDEX && avoid != null ? pick(date, daysLeft, null) : best
   }
 
   for (let i = 0; i < 7; i++) {
