@@ -1,5 +1,6 @@
-import { CheckCircle2, ChevronRight } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Play } from 'lucide-react'
 import type { DayStatus, ExtraWorkoutEntry, PlanDay } from '../../types'
+import type { SegmentKind, WorkoutSegment } from '../../lib/workoutSegments'
 import { SwipeToDelete } from '../shared/SwipeToDelete'
 
 interface TodayCompletedSectionProps {
@@ -10,6 +11,9 @@ interface TodayCompletedSectionProps {
   onEditOutcome: () => void
   onEditExtra: (extra: ExtraWorkoutEntry) => void
   onDeleteExtra: (extra: ExtraWorkoutEntry) => void
+  /** Parts of today's logged workout not done yet (e.g. mobility after a run). */
+  remainingSegments?: WorkoutSegment[]
+  onStartSegment?: (kind: SegmentKind) => void
 }
 
 export function TodayCompletedSection({
@@ -19,6 +23,8 @@ export function TodayCompletedSection({
   onEditOutcome,
   onEditExtra,
   onDeleteExtra,
+  remainingSegments = [],
+  onStartSegment,
 }: TodayCompletedSectionProps) {
   if (status !== 'today_complete' && todayExtras.length === 0) return null
 
@@ -42,6 +48,20 @@ export function TodayCompletedSection({
           <ChevronRight size={14} className="text-emerald-400/60 flex-shrink-0 mt-1" />
         </button>
       )}
+      {status === 'today_complete' && remainingSegments.map(seg => (
+        <button
+          key={seg.kind}
+          onClick={() => onStartSegment?.(seg.kind)}
+          className="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700/70 transition-colors active:scale-[0.99]"
+        >
+          <Play size={14} className="text-sky-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-slate-200 font-medium truncate">{seg.slot.name}</p>
+            <p className="text-xs text-slate-500 mt-0.5">Not done yet · tap to start</p>
+          </div>
+          <ChevronRight size={14} className="text-slate-500 flex-shrink-0" />
+        </button>
+      ))}
       {todayExtras.map(extra => (
         <SwipeToDelete
           key={extra.id}

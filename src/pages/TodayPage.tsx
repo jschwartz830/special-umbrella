@@ -57,11 +57,13 @@ import { TodayPlanProgressModal } from '../components/today/TodayPlanProgressMod
 import { TodayCatchupModal } from '../components/today/TodayCatchupModal'
 import { TodayRotationModals } from '../components/today/TodayRotationModals'
 import { TodayPRBanner } from '../components/today/TodayPRBanner'
-import { TodayCardioPromptModal } from '../components/today/TodayCardioPromptModal'
+import { TodayNextSegmentModal } from '../components/today/TodayNextSegmentModal'
 import { TodayUpcomingLogModal } from '../components/today/TodayUpcomingLogModal'
 import { SwipeToDelete } from '../components/shared/SwipeToDelete'
 import { WORKOUT_META } from '../lib/constants'
 import { estimateRunDurationMin } from '../lib/estimateRunDuration'
+import { workoutSegments, nextSegment, remainingSegments, isSegmentLogged } from '../lib/workoutSegments'
+import type { SegmentKind, WorkoutSegment } from '../lib/workoutSegments'
 
 /** Find the most recent outcome with weights data for this plan (excluding today). */
 function findPreviousWeightsOutcome(
@@ -178,8 +180,15 @@ export function TodayPage() {
   const [activeTrackedExercises, setActiveTrackedExercises] = useState<LoggedExerciseActual[] | null>(null)
   const [activeTrackedDurationMin, setActiveTrackedDurationMin] = useState<number | null>(null)
   // Cardio phase state: shown after weights (or as standalone for run-only days)
-  const [cardioState, setCardioState] = useState<'hidden' | 'prompt' | 'open' | 'minimized'>('hidden')
+  const [cardioState, setCardioState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
   const [cardioTrackedDurationMin, setCardioTrackedDurationMin] = useState<number | null>(null)
+  // Multi-segment days (e.g. run → mobility): segments finished this session, and
+  // the one offered next when a segment ends — start it now or log and do it later.
+  const [sessionDoneKinds, setSessionDoneKinds] = useState<SegmentKind[]>([])
+  const [nextSegmentPrompt, setNextSegmentPrompt] = useState<{ doneKind: SegmentKind; next: WorkoutSegment } | null>(null)
+  const [mobilityTracked, setMobilityTracked] = useState<{ actual: MobilityWorkoutActual; durationMin: number } | null>(null)
+  // Set when the mobility slot tracker logs, so its follow-up onClose isn't read as a discard.
+  const mobilitySlotLoggedRef = useRef(false)
   // Mobility state
   const mobilityCompletions = useMobilityStore(s => s.completions)
   const mobilityCompletion = mobilityCompletions[today] ?? null
@@ -484,31 +493,72 @@ export function TodayPage() {
     return null
   })()
 
+  const daySegments = workoutSegments(primaryPlanDay)
+  // Finishing a deferred segment on an already-logged day builds on what's logged.
+  const loggedBase = isPending ? null : existingOutcome
+  const remainingDaySegments = todayResolved.status === 'today_complete'
+    ? remainingSegments(primaryPlanDay, existingOutcome)
+    : []
+  const mobilitySlot = daySegments.find(s => s.kind === 'mobility')?.slot
+  const sessionTrackedMin =
+    (activeTrackedDurationMin ?? 0) + (cardioTrackedDurationMin ?? 0) + (mobilityTracked?.durationMin ?? 0)
+  const hasSessionData = !!(activeTrackedExercises || cardioTrackedDurationMin !== null || mobilityTracked)
+
+  function startSegment(kind: SegmentKind) {
+    if (kind === 'cardio') setCardioState('open')
+    else if (kind === 'mobility') setMobilitySlotState('open')
+    else setActiveWorkoutState('open')
+  }
+
+  function openSessionOutcome() {
+    setNextSegmentPrompt(null)
+    // Topping up a logged day saves as an edit, so PRs aren't announced twice.
+    if (loggedBase) isEditingOutcomeRef.current = true
+    setShowOutcomeModal(true)
+  }
+
+  function finishSegment(kind: SegmentKind) {
+    const done = [...sessionDoneKinds, kind]
+    setSessionDoneKinds(done)
+    const loggedKinds = loggedBase
+      ? daySegments.filter(s => isSegmentLogged(s.kind, loggedBase)).map(s => s.kind)
+      : []
+    const next = nextSegment(primaryPlanDay, [...done, ...loggedKinds])
+    if (next) setNextSegmentPrompt({ doneKind: kind, next })
+    else openSessionOutcome()
+  }
+
+  function resetSession() {
+    setActiveTrackedExercises(null)
+    setActiveTrackedDurationMin(null)
+    setCardioTrackedDurationMin(null)
+    setMobilityTracked(null)
+    setSessionDoneKinds([])
+  }
+
+  /** A tracker closed without finishing — still log anything done earlier in the session. */
+  function handleSegmentAbandoned() {
+    if (sessionDoneKinds.length > 0) openSessionOutcome()
+  }
+
   function handleActiveWorkoutComplete(exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     const elapsedMin = Math.round(meta.totalElapsedSeconds / 60) || null
     setActiveTrackedExercises(exercises)
     setActiveTrackedDurationMin(elapsedMin)
     setActiveWorkoutState('hidden')
-
-    const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
-    if (runSlot) {
-      const runEstimate = estimateRunDurationMin(runSlot, planProgramVars)
-      const totalEstimate = (elapsedMin ?? 0) + runEstimate
-      setCardioState(totalEstimate < 60 ? 'open' : 'prompt')
-    } else {
-      setShowOutcomeModal(true)
-    }
+    finishSegment('weights')
   }
 
   function handleCardioComplete(durationMin: number) {
     setCardioTrackedDurationMin(durationMin)
     setCardioState('hidden')
-    setShowOutcomeModal(true)
+    finishSegment('cardio')
   }
 
   function handleCardioCancel() {
     setCardioState('hidden')
-    setShowOutcomeModal(true)
+    // A pending run-only day still offers manual logging, as before.
+    if (isPending || sessionDoneKinds.length > 0) openSessionOutcome()
   }
 
   function handleMobilitySlotComplete(
@@ -534,6 +584,15 @@ export function TodayPage() {
         }),
       })),
     }
+    setMobilitySlotSession(null)
+    setMobilitySlotState('hidden')
+    // Part of a multi-segment day — fold into the combined session outcome.
+    if (daySegments.length > 1 || sessionDoneKinds.length > 0 || loggedBase) {
+      setMobilityTracked({ actual: mobilityActual, durationMin })
+      finishSegment('mobility')
+      return
+    }
+
     const allDone = exercises.length > 0 && exercises.every(ex => completedExerciseIds.includes(ex.id))
     const completionState: WorkoutCompletionState = exercises.length === 0
       ? 'completed'
@@ -548,8 +607,6 @@ export function TodayPage() {
     }
     logAction(plan!.id, today, primaryPlanDayIndex, completionStateToAction(completionState))
     logOutcomeWithProgression(outcome, slot)
-    setMobilitySlotSession(null)
-    setMobilitySlotState('hidden')
   }
 
   // Reopen a day that's already been logged so the remaining exercises can be
@@ -563,8 +620,7 @@ export function TodayPage() {
     const isEditing = isEditingOutcomeRef.current
     isEditingOutcomeRef.current = false
 
-    setActiveTrackedExercises(null)
-    setActiveTrackedDurationMin(null)
+    resetSession()
 
     const preWorkoutMaxLoad = { ...maxLoadByExercise }
 
@@ -814,6 +870,13 @@ export function TodayPage() {
         onEditOutcome={handleEditOutcome}
         onEditExtra={setEditingExtra}
         onDeleteExtra={handleDeleteExtra}
+        remainingSegments={
+          activeWorkoutState === 'hidden' && cardioState === 'hidden' && mobilitySlotState === 'hidden'
+            && !showOutcomeModal && !nextSegmentPrompt
+            ? remainingDaySegments
+            : []
+        }
+        onStartSegment={startSegment}
       />
 
       {/* Personal record celebration */}
@@ -852,14 +915,9 @@ export function TodayPage() {
           todaySessionCount={todaySessionCount}
           activeWorkoutHidden={activeWorkoutState === 'hidden'}
           onStartWorkout={() => {
-            const firstSlot = primaryPlanDay.slots[0]
-            if (firstSlot && isRunType(firstSlot.type)) {
-              setCardioState('open')
-            } else if (firstSlot && firstSlot.type === 'mobility') {
-              setMobilitySlotState('open')
-            } else {
-              setActiveWorkoutState('open')
-            }
+            // A first slot with no dedicated tracker (e.g. swim) uses the general one.
+            const first = daySegments[0]
+            startSegment(first && first.slot === primaryPlanDay.slots[0] ? first.kind : 'weights')
           }}
           lastSessionSummary={lastSessionSummary}
           prevSessionOutcome={prevSessionOutcome}
@@ -999,40 +1057,39 @@ export function TodayPage() {
           calendarDate={today}
           planDay={primaryPlanDay}
           previousSetsByExercise={previousSetsByExercise}
-          isFromActiveWorkout={!!(activeTrackedExercises || cardioTrackedDurationMin !== null)}
+          isFromActiveWorkout={hasSessionData}
           existingOutcome={
-            (activeTrackedExercises || cardioTrackedDurationMin !== null)
+            hasSessionData
               ? {
                   workoutInstanceId: makeWorkoutInstanceId(plan.id, today),
-                  completionState: 'completed',
-                  completedAt: new Date().toISOString(),
-                  durationActualMin:
-                    (activeTrackedDurationMin ?? 0) + (cardioTrackedDurationMin ?? 0) || null,
-                  perceivedEffort: null,
-                  notes: null,
+                  completionState: loggedBase?.completionState ?? 'completed',
+                  completedAt: loggedBase?.completedAt ?? new Date().toISOString(),
+                  durationActualMin: (loggedBase?.durationActualMin ?? 0) + sessionTrackedMin || null,
+                  perceivedEffort: loggedBase?.perceivedEffort ?? null,
+                  notes: loggedBase?.notes ?? null,
                   runActual: cardioTrackedDurationMin !== null
-                    ? { actualDurationMin: cardioTrackedDurationMin }
-                    : null,
-                  swimActual: null,
+                    ? { ...loggedBase?.runActual, actualDurationMin: cardioTrackedDurationMin }
+                    : loggedBase?.runActual ?? null,
+                  swimActual: loggedBase?.swimActual ?? null,
                   weightsActual: activeTrackedExercises
                     ? { exercises: activeTrackedExercises }
-                    : null,
+                    : loggedBase?.weightsActual ?? null,
+                  mobilityActual: mobilityTracked?.actual ?? loggedBase?.mobilityActual ?? null,
                 }
               : existingOutcome
           }
           onConfirm={handleOutcomeConfirm}
           onClose={() => {
             setShowOutcomeModal(false)
-            setActiveTrackedExercises(null)
-            setActiveTrackedDurationMin(null)
-            setCardioTrackedDurationMin(null)
+            isEditingOutcomeRef.current = false
+            resetSession()
           }}
         />
       )}
 
       {/* Active workout tracker — kept mounted while open or minimized so timers keep running */}
       {activeWorkoutState !== 'hidden' && plan && todayResolved && (() => {
-        const slot = primaryPlanDay.slots[0]
+        const slot = daySegments.find(s => s.kind === 'weights')?.slot ?? primaryPlanDay.slots[0]
         if (!slot) return null
         return (
           <ActiveWorkoutTracker
@@ -1047,29 +1104,32 @@ export function TodayPage() {
             minimized={activeWorkoutState === 'minimized'}
             onMinimize={() => setActiveWorkoutState('minimized')}
             onResume={() => setActiveWorkoutState('open')}
-            onCancel={() => setActiveWorkoutState('hidden')}
+            onCancel={() => {
+              setActiveWorkoutState('hidden')
+              handleSegmentAbandoned()
+            }}
             onComplete={handleActiveWorkoutComplete}
           />
         )
       })()}
 
-      {/* Cardio prompt — shown after weights when total expected time >= 60 min */}
-      {cardioState === 'prompt' && (() => {
-        const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
-        if (!runSlot) return null
-        return (
-          <TodayCardioPromptModal
-            runSlot={runSlot}
-            programVars={planProgramVars}
-            activeTrackedDurationMin={activeTrackedDurationMin}
-            onStart={() => setCardioState('open')}
-            onCancel={handleCardioCancel}
-          />
-        )
-      })()}
+      {/* Next segment — after one part of a multi-part day, start the next or log and do it later */}
+      {nextSegmentPrompt && (
+        <TodayNextSegmentModal
+          doneKind={nextSegmentPrompt.doneKind}
+          next={nextSegmentPrompt.next}
+          programVars={planProgramVars}
+          sessionDurationMin={sessionTrackedMin || null}
+          onStart={() => {
+            setNextSegmentPrompt(null)
+            startSegment(nextSegmentPrompt.next.kind)
+          }}
+          onLater={openSessionOutcome}
+        />
+      )}
 
       {/* Cardio workout tracker */}
-      {cardioState !== 'hidden' && cardioState !== 'prompt' && (() => {
+      {cardioState !== 'hidden' && (() => {
         const runSlot = primaryPlanDay.slots.find(s => isRunType(s.type))
         if (!runSlot) return null
         return (
@@ -1124,11 +1184,11 @@ export function TodayPage() {
 
       {/* Scheduled mobility slot tracker — a `mobility` slot inside today's
           plan day, as opposed to the standalone daily routine above */}
-      {mobilitySlotState !== 'hidden' && primarySlot && primarySlot.type === 'mobility' && (
+      {mobilitySlotState !== 'hidden' && mobilitySlot && (
         <MobilityTracker
           today={today}
-          title={primarySlot.name || 'Mobility'}
-          routine={primarySlot.mobilityExercises ?? []}
+          title={mobilitySlot.name || 'Mobility'}
+          routine={mobilitySlot.mobilityExercises ?? []}
           activeSession={mobilitySlotSession}
           soundEnabled={mobilitySoundEnabled}
           setSoundEnabled={mobilitySetSoundEnabled}
@@ -1145,9 +1205,14 @@ export function TodayPage() {
           saveCheckpoint={cp => setMobilitySlotSession(cp)}
           clearSession={() => setMobilitySlotSession(null)}
           onLogCompletion={({ completedAt, durationMin, completedExerciseIds, completedSets }) => {
-            handleMobilitySlotComplete(primarySlot, completedAt, durationMin, completedExerciseIds, completedSets)
+            mobilitySlotLoggedRef.current = true
+            handleMobilitySlotComplete(mobilitySlot, completedAt, durationMin, completedExerciseIds, completedSets)
           }}
-          onClose={() => setMobilitySlotState('hidden')}
+          onClose={() => {
+            setMobilitySlotState('hidden')
+            if (!mobilitySlotLoggedRef.current) handleSegmentAbandoned()
+            mobilitySlotLoggedRef.current = false
+          }}
           minimized={mobilitySlotState === 'minimized'}
           onMinimize={() => setMobilitySlotState('minimized')}
           onResume={() => setMobilitySlotState('open')}
