@@ -19,4 +19,12 @@ if (!isSupabaseConfigured) {
 export const supabase = createClient(
   isSupabaseConfigured ? supabaseUrl : 'https://placeholder.supabase.co',
   isSupabaseConfigured ? supabaseAnonKey : 'placeholder-anon-key',
+  {
+    auth: {
+      // Both this app and Nanny Ledger are served from the same github.io
+      // origin and share a Supabase project, so the default storage key
+      // (sb-<project-ref>-auth-token) would make them share one login session.
+      storageKey: 'sb-workout-tracker-auth',
+    },
+  },
 )
