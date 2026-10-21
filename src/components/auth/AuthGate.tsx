@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { syncOnLogin, subscribeStores } from '../../lib/storeSync'
+import { upgradeLegacyPlans } from '../../lib/upgradeLegacyPlans'
 
 interface Props {
   children: ReactNode
@@ -31,6 +32,8 @@ export function AuthGate({ children }: Props) {
       // in-flight, don't create subscriptions that will never be cleaned up.
       if (!cancelled) {
         unsubscribeStores = subscribeStores()
+        // After subscribing, so the converted plan is pushed back to the cloud copy
+        upgradeLegacyPlans()
       }
     })
 
