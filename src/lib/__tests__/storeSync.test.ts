@@ -23,26 +23,28 @@ const mockFrom = vi.fn()
 
 vi.mock('../supabase', () => ({
   supabase: {
-    auth: { getUser: (...args: unknown[]) => mockGetUser(...args) },
+    auth: {
+      getUser: (...args: unknown[]) => mockGetUser(...args),
+      // storeSync reads the cached session (works offline); derive it from
+      // the same mock so tests only configure the user once.
+      getSession: async () => {
+        const res = await mockGetUser()
+        const user = res?.data?.user ?? null
+        return { data: { session: user ? { user } : null } }
+      },
+    },
     from: (...args: unknown[]) => mockFrom(...args),
   },
 }))
 
-// eslint-disable-next-line import/first
-import { syncOnLogin, subscribeStores } from '../storeSync'
-// eslint-disable-next-line import/first
+import { syncOnLogin, subscribeStores, __resetSyncStateForTests, getConflictBackup } from '../storeSync'
+import { useSyncStatusStore } from '../../store/syncStatusStore'
 import { useHistoryStore } from '../../store/historyStore'
-// eslint-disable-next-line import/first
 import { usePlanStore } from '../../store/planStore'
-// eslint-disable-next-line import/first
 import { useMobilityStore } from '../../store/mobilityStore'
-// eslint-disable-next-line import/first
 import { useSettingsStore } from '../../store/settingsStore'
-// eslint-disable-next-line import/first
 import { useOutcomeStore } from '../../store/outcomeStore'
-// eslint-disable-next-line import/first
 import { useProgramStore } from '../../store/programStore'
-// eslint-disable-next-line import/first
 import { useExerciseHistoryStore } from '../../store/exerciseHistoryStore'
 
 function makeFakeWindow() {
@@ -64,6 +66,7 @@ let fakeWindow: ReturnType<typeof makeFakeWindow>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  __resetSyncStateForTests()
   mockFrom.mockImplementation(() => ({
     upsert: mockUpsert,
     select: () => ({ eq: mockEq }),
@@ -296,6 +299,18 @@ describe('syncOnLogin', () => {
 })
 
 describe('subscribeStores', () => {
+  // Pushes wait for a successful pull, as they do in the app (AuthGate runs
+  // syncOnLogin before subscribeStores).
+  beforeEach(async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    mockEq.mockResolvedValue({
+      data: [{ store_name: 'wpt_settings', data: { startDelaySeconds: 0 }, updated_at: '2026-01-01T00:00:00Z' }],
+      error: null,
+    })
+    await syncOnLogin()
+    mockUpsert.mockClear()
+  })
+
   it('debounces rapid successive changes to the same store into a single push', async () => {
     vi.useFakeTimers()
     mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
@@ -363,5 +378,156 @@ describe('subscribeStores', () => {
 
     // A second fire after unsubscribe should be a no-op (no listeners left).
     expect(() => fakeWindow.fire('beforeunload')).not.toThrow()
+  })
+})
+
+describe('offline resilience and conflicts', () => {
+  const T0 = '2026-01-01T00:00:00Z'
+
+  function historyPushes() {
+    return mockUpsert.mock.calls.filter(([arg]) => arg.store_name === 'wpt_history')
+  }
+
+  async function loginWithHistoryRow(updatedAt: string, data: Record<string, unknown> = { entries: [], overrides: [], extraEntries: [] }) {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    mockEq.mockResolvedValue({ data: [{ store_name: 'wpt_history', data, updated_at: updatedAt }], error: null })
+    await syncOnLogin()
+  }
+
+  it('keeps a change whose push failed and retries it later', async () => {
+    vi.useFakeTimers()
+    await loginWithHistoryRow(T0)
+    const unsubscribe = subscribeStores()
+
+    mockUpsert.mockResolvedValueOnce({ error: { message: 'timeout' } })
+    useHistoryStore.setState({ overrides: [] })
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(historyPushes()).toHaveLength(1)
+    expect(useSyncStatusStore.getState().status).toBe('error')
+
+    // First retry fires after 5s and succeeds.
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(historyPushes()).toHaveLength(2)
+    expect(useSyncStatusStore.getState().status).toBe('synced')
+
+    unsubscribe()
+  })
+
+  it('pushes unsynced local changes on next login instead of overwriting them', async () => {
+    vi.useFakeTimers()
+    await loginWithHistoryRow(T0)
+    const unsubscribe = subscribeStores()
+
+    // Change made, but the app is killed before the push lands.
+    mockUpsert.mockResolvedValue({ error: { message: 'offline' } })
+    useHistoryStore.setState({ extraEntries: [{ id: 'local-1' } as never] })
+    await vi.advanceTimersByTimeAsync(1500)
+    unsubscribe()
+    mockUpsert.mockResolvedValue({ error: null })
+    mockUpsert.mockClear()
+
+    // Next launch: cloud row is unchanged since our last sync.
+    await loginWithHistoryRow(T0)
+
+    expect(useHistoryStore.getState().extraEntries).toEqual([{ id: 'local-1' }])
+    expect(historyPushes()).toHaveLength(1)
+    expect(historyPushes()[0][0].data.extraEntries).toEqual([{ id: 'local-1' }])
+  })
+
+  it('takes newer cloud data and backs up conflicting local changes', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-02T00:00:00Z'))
+    await loginWithHistoryRow(T0)
+    const unsubscribe = subscribeStores()
+    mockUpsert.mockResolvedValue({ error: { message: 'offline' } })
+    useHistoryStore.setState({ extraEntries: [{ id: 'local-1' } as never] })
+    await vi.advanceTimersByTimeAsync(1500)
+    unsubscribe()
+    mockUpsert.mockResolvedValue({ error: null })
+
+    // Another device wrote after our local edit.
+    await loginWithHistoryRow('2026-01-03T00:00:00Z', {
+      entries: [], overrides: [], extraEntries: [{ id: 'remote-1', source: 'history' }],
+    })
+
+    expect(useHistoryStore.getState().extraEntries.map(e => e.id)).toEqual(['remote-1'])
+    const backup = getConflictBackup()
+    expect((backup?.stores.wpt_history as { extraEntries: { id: string }[] }).extraEntries[0].id).toBe('local-1')
+  })
+
+  it('keeps newer local changes and backs up the older cloud copy', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-05T00:00:00Z'))
+    await loginWithHistoryRow(T0)
+    const unsubscribe = subscribeStores()
+    mockUpsert.mockResolvedValue({ error: { message: 'offline' } })
+    useHistoryStore.setState({ extraEntries: [{ id: 'local-1' } as never] })
+    await vi.advanceTimersByTimeAsync(1500)
+    unsubscribe()
+    mockUpsert.mockResolvedValue({ error: null })
+    mockUpsert.mockClear()
+
+    // Another device wrote, but before our local edit.
+    await loginWithHistoryRow('2026-01-03T00:00:00Z', {
+      entries: [], overrides: [], extraEntries: [{ id: 'remote-1' }],
+    })
+
+    expect(useHistoryStore.getState().extraEntries).toEqual([{ id: 'local-1' }])
+    expect(historyPushes()).toHaveLength(1)
+    const backup = getConflictBackup()
+    expect((backup?.stores.wpt_history as { extraEntries: { id: string }[] }).extraEntries[0].id).toBe('remote-1')
+  })
+
+  it('does not push before a pull has succeeded (offline at launch)', async () => {
+    vi.useFakeTimers()
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
+    mockEq.mockResolvedValue({ data: null, error: { message: 'network down' } })
+    await syncOnLogin()
+    const unsubscribe = subscribeStores()
+
+    useHistoryStore.setState({ extraEntries: [{ id: 'offline-1' } as never] })
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(mockUpsert).not.toHaveBeenCalled()
+
+    // Connectivity returns: the retry pulls first, then pushes the dirty store.
+    mockEq.mockResolvedValue({ data: [{ store_name: 'wpt_history', data: { entries: [] }, updated_at: T0 }], error: null })
+    fakeWindow.fire('online')
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(useHistoryStore.getState().extraEntries).toEqual([{ id: 'offline-1' }])
+    expect(historyPushes()).toHaveLength(1)
+
+    unsubscribe()
+  })
+
+  it('flushes a pending write on pagehide (iOS does not fire beforeunload)', async () => {
+    vi.useFakeTimers()
+    await loginWithHistoryRow(T0)
+    const unsubscribe = subscribeStores()
+    useHistoryStore.setState({ overrides: [] })
+    fakeWindow.fire('pagehide')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(historyPushes()).toHaveLength(1)
+    unsubscribe()
+  })
+
+  it('picks up another device\'s changes when coming back online', async () => {
+    vi.useFakeTimers()
+    await loginWithHistoryRow(T0)
+    const unsubscribe = subscribeStores()
+
+    mockEq.mockResolvedValue({
+      data: [{ store_name: 'wpt_history', data: { entries: [], overrides: [], extraEntries: [{ id: 'remote-2' }] }, updated_at: '2026-02-01T00:00:00Z' }],
+      error: null,
+    })
+    fakeWindow.fire('online')
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(useHistoryStore.getState().extraEntries.map(e => e.id)).toEqual(['remote-2'])
+    // Applying cloud data must not be echoed back up as a local change.
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(historyPushes()).toHaveLength(0)
+
+    unsubscribe()
   })
 })
