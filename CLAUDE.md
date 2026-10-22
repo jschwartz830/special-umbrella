@@ -30,3 +30,7 @@ Key files:
 - `src/pages/CalendarPage.tsx` — calendar with retroactive logging
 - `src/store/historyStore.ts` — workout history + overrides (persisted via localStorage)
 - `src/store/outcomeStore.ts` — rich outcome data per workout instance
+- `src/lib/storeSync.ts` — localStorage ↔ Supabase sync (dirty tracking, retry, conflict backups)
+- `src/lib/backup.ts` — full JSON export/restore (Settings → Sync & backup)
+
+Before pushing, run `npm run lint && npm test && npm run build` (CI runs the same).
