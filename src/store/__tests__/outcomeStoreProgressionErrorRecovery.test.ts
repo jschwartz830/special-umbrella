@@ -23,15 +23,10 @@ vi.mock('../../modules/run-adaptation/engine', () => ({
   applyRunProgressionDecision: vi.fn(),
 }))
 
-// eslint-disable-next-line import/first
 import { useOutcomeStore, makeWorkoutInstanceId } from '../outcomeStore'
-// eslint-disable-next-line import/first
 import { useExerciseHistoryStore } from '../exerciseHistoryStore'
-// eslint-disable-next-line import/first
 import { useProgramStore } from '../programStore'
-// eslint-disable-next-line import/first
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
-// eslint-disable-next-line import/first
 import type { WorkoutSlot } from '../../types'
 
 function makeRunOutcome(planId: string, date: string): WorkoutOutcome {

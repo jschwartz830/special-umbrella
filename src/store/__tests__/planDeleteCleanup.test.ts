@@ -12,21 +12,13 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
 }))
 
-// eslint-disable-next-line import/first
 import { useHistoryStore } from '../historyStore'
-// eslint-disable-next-line import/first
 import { useOutcomeStore, makeWorkoutInstanceId, makeExtraWorkoutInstanceId } from '../outcomeStore'
-// eslint-disable-next-line import/first
 import { usePlanStore } from '../planStore'
-// eslint-disable-next-line import/first
 import { useProgramStore } from '../programStore'
-// eslint-disable-next-line import/first
 import { useExerciseHistoryStore } from '../exerciseHistoryStore'
-// eslint-disable-next-line import/first
 import type { Plan } from '../../types'
-// eslint-disable-next-line import/first
 import { parseWorkoutInstanceId } from '../../lib/workoutInstanceId'
-// eslint-disable-next-line import/first
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 
 function makePlan(id: string, name: string): Plan {

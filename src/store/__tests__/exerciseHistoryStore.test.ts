@@ -10,7 +10,6 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
 }))
 
-// eslint-disable-next-line import/first
 import { useExerciseHistoryStore, migrateExerciseHistoryState } from '../exerciseHistoryStore'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 

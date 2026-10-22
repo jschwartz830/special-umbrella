@@ -4,7 +4,6 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
 }))
 
-// eslint-disable-next-line import/first
 import { useSettingsStore, migrateSettingsState } from '../settingsStore'
 
 function resetStore() {

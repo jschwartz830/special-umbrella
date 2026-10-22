@@ -11,9 +11,7 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
 }))
 
-// eslint-disable-next-line import/first
 import { usePlanStore, makeSlot, migratePlanState } from '../planStore'
-// eslint-disable-next-line import/first
 import type { Plan, WorkoutSlot } from '../../types'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────

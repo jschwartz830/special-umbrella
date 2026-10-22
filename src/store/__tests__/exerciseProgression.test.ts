@@ -8,13 +8,9 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
 }))
 
-// eslint-disable-next-line import/first
 import { useOutcomeStore, makeWorkoutInstanceId } from '../outcomeStore'
-// eslint-disable-next-line import/first
 import { useProgramStore } from '../programStore'
-// eslint-disable-next-line import/first
 import type { WorkoutSlot } from '../../types'
-// eslint-disable-next-line import/first
 import type { LoggedSetActual } from '../../modules/workout-outcomes/types'
 
 const done = (reps: number): LoggedSetActual => ({ actualReps: reps, completed: true })

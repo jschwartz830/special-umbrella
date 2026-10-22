@@ -174,7 +174,7 @@ export function CardioWorkoutTracker({
       setSeg(wallSegRef.current.elapsed + Math.floor((now - wallSegRef.current.time) / 1000))
     }, 1000)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [isPaused])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isPaused])
 
   // On resume from background, trigger an immediate reconcile rather than waiting for
   // the next 1-second interval tick. Mirrors the pattern in ActiveWorkoutTracker.

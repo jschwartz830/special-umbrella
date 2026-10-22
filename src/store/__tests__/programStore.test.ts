@@ -11,7 +11,6 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
 }))
 
-// eslint-disable-next-line import/first
 import { useProgramStore, migrateProgramState } from '../programStore'
 import type { ProgressionRule } from '../../types/program'
 

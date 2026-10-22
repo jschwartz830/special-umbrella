@@ -54,7 +54,7 @@ export function useStreakMilestoneDismiss(streak: number) {
 
   const dismiss = useCallback(() => {
     if (key == null) return
-    try { localStorage.setItem(key, '1') } catch {}
+    try { localStorage.setItem(key, '1') } catch { /* storage blocked */ }
     rerender(v => v + 1)
   }, [key])
 

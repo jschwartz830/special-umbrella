@@ -17,7 +17,6 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
 }))
 
-// eslint-disable-next-line import/first
 import { useMobilityStore, migrateMobilityState } from '../mobilityStore'
 import type { MobilityCompletion, MobilitySessionCheckpoint } from '../mobilityStore'
 

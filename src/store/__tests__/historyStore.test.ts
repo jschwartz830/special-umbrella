@@ -12,7 +12,6 @@ vi.mock('zustand/middleware', () => ({
   persist: (fn: unknown) => fn,
 }))
 
-// eslint-disable-next-line import/first
 import { useHistoryStore, migrateHistoryState } from '../historyStore'
 import type { HistoryEntry, OverrideEntry, ExtraWorkoutEntry } from '../../types'
 

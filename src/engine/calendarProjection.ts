@@ -43,7 +43,7 @@ export function buildMonthGrid(
   // Get resolved days for the entire grid range if we have an active plan.
   // Clamp fromDate to plan.startDate so dates before the plan began are left
   // without a resolvedDay (the calendar renders them as neutral/inactive cells).
-  let resolvedMap = new Map<string, ResolvedDay>()
+  const resolvedMap = new Map<string, ResolvedDay>()
   if (plan) {
     const planEntries = entries.filter(e => e.planId === plan.id)
     const planOverrides = overrides.filter(o => o.planId === plan.id)
