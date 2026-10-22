@@ -29,10 +29,12 @@ import { WorkoutSlotDetails } from '../components/workout/WorkoutSlotDetails'
 import { EmptyState } from '../components/shared/EmptyState'
 import { CsvToolbar, type ImportResult } from '../components/shared/CsvToolbar'
 import { downloadCsv, historyToCsv, historyFromCsv, personalRecordsToCsv } from '../lib/csv'
-import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate, findBestWeek, buildPRFlagsMap, computeWorkoutCompletionRate } from '../lib/historyStats'
+import { computeHistoryStats, computePersonalRecords, computeWeeklyBreakdown, computeDayOfWeekBreakdown, padWeekGaps, computeWorkoutTypeBreakdown, computeLoggedRate, findBestWeek, buildPRFlagsMap, computeWorkoutCompletionRate } from '../lib/historyStats'
 import type { PersonalRecord, WeeklyBreakdown, WorkoutTypeBreakdown } from '../lib/historyStats'
 import { getPlansWithHistory, hasPlanHistory } from '../lib/historyScope'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
+import { useSettingsStore } from '../store/settingsStore'
+import { DayOfWeekSection } from '../components/history/DayOfWeekSection'
 import { completionStateToAction } from '../modules/workout-outcomes/types'
 import type { ActionType, HistoryEntry, ExtraWorkoutEntry, WorkoutType, PlanDay } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
@@ -274,6 +276,13 @@ export function HistoryPage() {
     // Fill gap weeks so training breaks are visible rather than silently skipped.
     return padWeekGaps(active).reverse()
   }, [filterPlanId, filteredEntries, filteredExtras, today])
+
+  const weekStartsOn = useSettingsStore(s => s.weekStartsOn)
+  const dayOfWeekBreakdown = useMemo(
+    () => computeDayOfWeekBreakdown(filterPlanId === 'all' ? null : filterPlanId, filteredEntries, filteredExtras, today),
+    [filterPlanId, filteredEntries, filteredExtras, today],
+  )
+  const hasDayOfWeekData = dayOfWeekBreakdown.some(d => d.count > 0)
 
   const bestWeek = useMemo(
     () => (filterPlanId === 'all' ? null : findBestWeek(filterPlanId, filteredEntries, filteredExtras, today)),
@@ -570,6 +579,10 @@ export function HistoryPage() {
 
       {weeklyBreakdown.length > 0 && (
         <WeeklyActivitySection weeks={weeklyBreakdown} />
+      )}
+
+      {hasDayOfWeekData && (
+        <DayOfWeekSection days={dayOfWeekBreakdown} weekStartsOn={weekStartsOn} />
       )}
 
       {flatItems.length === 0 && filterPlanId !== 'all' && (
