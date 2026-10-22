@@ -4,6 +4,7 @@ import { Modal } from '../components/shared/Modal'
 import { useSettingsStore } from '../store/settingsStore'
 import { useAuthStore } from '../store/authStore'
 import { EquipmentSettings } from '../components/settings/EquipmentSettings'
+import { SyncBackupSettings } from '../components/settings/SyncBackupSettings'
 
 const REFRESH_TIMEOUT_MS = 3000
 
@@ -211,6 +212,8 @@ export function SettingsPage() {
       </section>
 
       <EquipmentSettings />
+
+      <SyncBackupSettings />
 
       <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
         <h2 className="font-medium">App version refresh</h2>
