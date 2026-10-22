@@ -2,14 +2,18 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthGate } from './components/auth/AuthGate'
 import { AppShell } from './components/layout/AppShell'
 import { TodayPage } from './pages/TodayPage'
-import { CalendarPage } from './pages/CalendarPage'
-import { HistoryPage } from './pages/HistoryPage'
-import { PlansPage } from './pages/PlansPage'
-import { PlanBuilderPage } from './pages/PlanBuilderPage'
-import { ProgramImportPage } from './pages/ProgramImportPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { MobilityPage } from './pages/MobilityPage'
 import { ErrorBoundary } from './components/shared/ErrorBoundary'
+import { lazyPage } from './lib/lazyPage'
+
+// Today is the landing page and stays in the main bundle; the rest load on
+// first visit (and are precached by the service worker for offline use).
+const CalendarPage = lazyPage(() => import('./pages/CalendarPage'), 'CalendarPage')
+const HistoryPage = lazyPage(() => import('./pages/HistoryPage'), 'HistoryPage')
+const PlansPage = lazyPage(() => import('./pages/PlansPage'), 'PlansPage')
+const PlanBuilderPage = lazyPage(() => import('./pages/PlanBuilderPage'), 'PlanBuilderPage')
+const ProgramImportPage = lazyPage(() => import('./pages/ProgramImportPage'), 'ProgramImportPage')
+const SettingsPage = lazyPage(() => import('./pages/SettingsPage'), 'SettingsPage')
+const MobilityPage = lazyPage(() => import('./pages/MobilityPage'), 'MobilityPage')
 
 export default function App() {
   return (

@@ -24,6 +24,19 @@ export default defineConfig({
     include: ['src/**/__tests__/**/*.test.ts'],
   },
   base: '/special-umbrella/',
+  build: {
+    rollupOptions: {
+      output: {
+        // Libraries change far less often than app code; separate chunks let
+        // the service worker keep them cached across deploys.
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          supabase: ['@supabase/supabase-js'],
+          vendor: ['date-fns', 'zustand', 'js-yaml'],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
