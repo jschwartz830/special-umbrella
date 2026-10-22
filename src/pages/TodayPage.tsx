@@ -399,18 +399,12 @@ export function TodayPage() {
   const totalUnlogged = countTotalUnloggedDays(plan.id, planEntries, nagFrom, today)
   const olderUnloggedCount = Math.max(0, totalUnlogged - unloggedDates.length)
 
-  const loggedRate = useMemo(
-    () => computeLoggedRate(plan.id, planEntries, plan.startDate, today),
-    [plan.id, planEntries, plan.startDate, today],
-  )
-  const workoutCompletionRate: WorkoutCompletionRate = useMemo(
-    () => computeWorkoutCompletionRate(plan.id, planEntries, today),
-    [plan.id, planEntries, today],
-  )
-  const avgWorkoutsPerWeek = useMemo(
-    () => computeAverageWorkoutsPerWeek(plan.id, planEntries, planExtras, plan.startDate, today),
-    [plan.id, planEntries, planExtras, plan.startDate, today],
-  )
+  // Plain computations, not useMemo: everything below the `!plan` early
+  // return runs only when a plan is active, so hooks here would change the
+  // hook count (and crash) when a plan is activated or removed in place.
+  const loggedRate = computeLoggedRate(plan.id, planEntries, plan.startDate, today)
+  const workoutCompletionRate: WorkoutCompletionRate = computeWorkoutCompletionRate(plan.id, planEntries, today)
+  const avgWorkoutsPerWeek = computeAverageWorkoutsPerWeek(plan.id, planEntries, planExtras, plan.startDate, today)
 
   const weekProgress = plan.duration.type === 'weeks'
     ? computePlanProgress(plan, planEntries, today)
@@ -421,12 +415,9 @@ export function TodayPage() {
   const rotationTotalWorkouts = plan.duration.type === 'rotations' && plan.duration.value > 1
     ? plan.days.length * plan.duration.value
     : 0
-  const rotationLoggedCount = useMemo(
-    () => rotationTotalWorkouts > 0
-      ? new Set(planEntries.filter(e => e.action === 'complete' || e.action === 'skip').map(e => e.calendarDate)).size
-      : 0,
-    [planEntries, rotationTotalWorkouts],
-  )
+  const rotationLoggedCount = rotationTotalWorkouts > 0
+    ? new Set(planEntries.filter(e => e.action === 'complete' || e.action === 'skip').map(e => e.calendarDate)).size
+    : 0
 
   // Cycle progress for rotation-duration plans (null for weeks-duration plans)
   const cycleProgress = plan.duration.type === 'rotations'
@@ -462,26 +453,20 @@ export function TodayPage() {
     ? countPlanDayCompletions(plan.id, primaryPlanDayIndex, planEntries, today)
     : undefined
 
-  const upcomingSessionCounts = useMemo(() => {
-    if (!plan) return {} as Record<string, number>
-    return Object.fromEntries(
-      upcoming.map(rd => [
-        rd.calendarDate,
-        countPlanDayCompletions(plan.id, rd.planDayIndex, planEntries),
-      ]),
-    )
-  }, [plan, upcoming, planEntries])
+  const upcomingSessionCounts: Record<string, number> = Object.fromEntries(
+    upcoming.map(rd => [
+      rd.calendarDate,
+      countPlanDayCompletions(plan.id, rd.planDayIndex, planEntries),
+    ]),
+  )
 
   // Last-session summaries for upcoming cards (one line each, e.g. "Squat 135 lb · 3×8")
-  const upcomingSessionSummaries = useMemo(() => {
-    if (!plan) return {} as Record<string, string | null>
-    return Object.fromEntries(
-      upcoming.map(rd => {
-        const outcome = findPreviousSessionForPlanDay(plan.id, rd.planDayIndex, today, planEntries, allOutcomes)
-        return [rd.calendarDate, outcome ? buildLastSessionSummary(outcome, prFlagsMap) : null]
-      }),
-    )
-  }, [plan, upcoming, today, planEntries, allOutcomes, prFlagsMap])
+  const upcomingSessionSummaries: Record<string, string | null> = Object.fromEntries(
+    upcoming.map(rd => {
+      const outcome = findPreviousSessionForPlanDay(plan.id, rd.planDayIndex, today, planEntries, allOutcomes)
+      return [rd.calendarDate, outcome ? buildLastSessionSummary(outcome, prFlagsMap) : null]
+    }),
+  )
 
   // Exercise count and meta for the compact workout card
   const primarySlot = primaryPlanDay.slots[0]
