@@ -88,10 +88,18 @@ const DELAY_OPTIONS = [
   { label: '30s', value: 30 },
 ]
 
+const MISSED_REPS_REST_OPTIONS = [
+  { label: 'Off', value: 0 },
+  { label: '+15s', value: 15 },
+  { label: '+30s', value: 30 },
+  { label: '+45s', value: 45 },
+  { label: '+60s', value: 60 },
+]
+
 export function SettingsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false)
-  const { startDelaySeconds, setStartDelay, autoAdvanceSegments, setAutoAdvanceSegments, weekStartsOn, setWeekStartsOn } = useSettingsStore()
+  const { startDelaySeconds, setStartDelay, missedRepsExtraRestSeconds, setMissedRepsExtraRest, autoAdvanceSegments, setAutoAdvanceSegments, weekStartsOn, setWeekStartsOn } = useSettingsStore()
   const { user, signOut } = useAuthStore()
 
   const latestCommitDate =
@@ -157,6 +165,29 @@ export function SettingsPage() {
               onClick={() => setStartDelay(opt.value)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                 startDelaySeconds === opt.value
+                  ? 'bg-sky-500 border-sky-500 text-slate-950'
+                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3">
+        <h2 className="font-medium">Extra rest after missed reps</h2>
+        <p className="text-sm text-slate-400">
+          When a work set comes in under its target reps, lengthen the rest timer by this much.
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          {MISSED_REPS_REST_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setMissedRepsExtraRest(opt.value)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                missedRepsExtraRestSeconds === opt.value
                   ? 'bg-sky-500 border-sky-500 text-slate-950'
                   : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500'
               }`}

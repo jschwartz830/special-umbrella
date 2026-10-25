@@ -10,6 +10,9 @@ interface SettingsState {
   /** When on, the active workout tracker opens in single-set focus mode. */
   focusMode: boolean
   setFocusMode: (enabled: boolean) => void
+  /** Extra rest added after a work set that falls short of its target reps (0 = off). */
+  missedRepsExtraRestSeconds: number
+  setMissedRepsExtraRest: (s: number) => void
   /** Calendar week start day: 0 = Sunday (US default), 1 = Monday (ISO/international). */
   weekStartsOn: 0 | 1
   setWeekStartsOn: (day: 0 | 1) => void
@@ -30,6 +33,8 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoAdvanceSegments: (enabled) => set({ autoAdvanceSegments: enabled }),
       focusMode: false,
       setFocusMode: (enabled) => set({ focusMode: enabled }),
+      missedRepsExtraRestSeconds: 30,
+      setMissedRepsExtraRest: (s) => set({ missedRepsExtraRestSeconds: s }),
       weekStartsOn: 0,
       setWeekStartsOn: (day) => set({ weekStartsOn: day }),
       equipment: DEFAULT_EQUIPMENT,
@@ -55,6 +60,7 @@ export function migrateSettingsState(persisted: unknown, _fromVersion: number): 
     startDelaySeconds: s.startDelaySeconds ?? 0,
     autoAdvanceSegments: s.autoAdvanceSegments ?? true,
     focusMode: s.focusMode ?? false,
+    missedRepsExtraRestSeconds: s.missedRepsExtraRestSeconds ?? 30,
     weekStartsOn: s.weekStartsOn ?? 0,
     equipment: {
       home: { ...DEFAULT_EQUIPMENT.home, ...s.equipment?.home },

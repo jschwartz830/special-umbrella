@@ -10,7 +10,7 @@ import { usePlanStore } from '../../store/planStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useExerciseHistoryStore } from '../../store/exerciseHistoryStore'
 import { equipmentKindFor, generateWarmups, recentOneRepMax, snapToAchievable, stepAchievable, estimateOneRepMax, type EquipmentLocation } from '../../lib/equipment'
-import { type SetTrackState, type ExerciseTrackState, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
+import { type SetTrackState, type ExerciseTrackState, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
 import { NumberTextField, TimerCol } from './active/TrackerInputs'
 import { type ExercisePickerMode, ExercisePicker } from './active/ExercisePicker'
 
@@ -54,7 +54,7 @@ export function ActiveWorkoutTracker({
 }: Props) {
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
   const DRAFT_VERSION = 1
-  const { startDelaySeconds, focusMode, setFocusMode, equipment, defaultEquipmentLocation } = useSettingsStore()
+  const { startDelaySeconds, focusMode, setFocusMode, equipment, defaultEquipmentLocation, missedRepsExtraRestSeconds } = useSettingsStore()
   // Which gym's equipment applies: the workout's own location, else the user's default.
   const equipmentLocation: EquipmentLocation =
     slot.location === 'home' || slot.location === 'gym' ? slot.location : defaultEquipmentLocation
@@ -818,7 +818,12 @@ export function ActiveWorkoutTracker({
     }
 
     // Rest timer: adjust the TARGET duration, not elapsed time
-    if (restTargetRef.current == null) return
+    bumpRestTarget(delta)
+  }
+
+  /** Shift the live rest target by `delta` seconds. No-op (false) when no rest is active. */
+  function bumpRestTarget(delta: number): boolean {
+    if (restTargetRef.current == null) return false
     const next = Math.max(15, restTargetRef.current + delta)
     restTargetRef.current = next
     setRestTarget(next)
@@ -827,6 +832,7 @@ export function ActiveWorkoutTracker({
       if (ctx) scheduleRestAudio(ctx, next, restElapsedRef.current ?? 0)
     }
     recordRestElapsed()
+    return true
   }
 
   const SUPERSET_COLORS = ['amber', 'sky', 'purple', 'emerald', 'rose', 'orange'] as const
@@ -942,11 +948,21 @@ export function ActiveWorkoutTracker({
     }
 
     if (completing) {
-      startRest(setToToggle.restSeconds ?? 90, { exIdx, setIdx })
+      const missed = missedTargetReps({ ...setToToggle, actualReps: resolveActualReps(setToToggle.actualReps, setToToggle.targetReps) })
+      startRest((setToToggle.restSeconds ?? 90) + (missed ? missedRepsExtraRestSeconds : 0), { exIdx, setIdx })
     }
   }
 
   function updateSet(exIdx: number, setIdx: number, patch: Partial<SetTrackState>) {
+    // Reps edited during this set's rest: add/remove the missed-reps extra so
+    // the timer reflects the corrected count without discarding manual tweaks.
+    const owner = restOwnerRef.current
+    const before = exercises[exIdx]?.sets[setIdx]
+    if (before && 'actualReps' in patch && owner?.exIdx === exIdx && owner.setIdx === setIdx) {
+      const wasMissed = missedTargetReps(before)
+      const isMissed = missedTargetReps({ ...before, ...patch })
+      if (wasMissed !== isMissed) bumpRestTarget(isMissed ? missedRepsExtraRestSeconds : -missedRepsExtraRestSeconds)
+    }
     setExercises(prev => prev.map((ex, ei) => (
       ei !== exIdx ? ex : {
         ...ex,
@@ -1232,17 +1248,7 @@ export function ActiveWorkoutTracker({
   // +15 / −15 in the focus-view corners bump rest time: the live target while
   // resting, otherwise the planned rest of the set you're about to perform.
   function focusAdjustRest(delta: number, cur: { exIdx: number; setIdx: number } | null) {
-    if (restTargetRef.current != null) {
-      const next = Math.max(15, restTargetRef.current + delta)
-      restTargetRef.current = next
-      setRestTarget(next)
-      if (restRunRef.current) {
-        const ctx = getAudioContext()
-        if (ctx) scheduleRestAudio(ctx, next, restElapsedRef.current ?? 0)
-      }
-      recordRestElapsed()
-      return
-    }
+    if (bumpRestTarget(delta)) return
     if (!cur) return
     const s = exercises[cur.exIdx]?.sets[cur.setIdx]
     if (!s) return

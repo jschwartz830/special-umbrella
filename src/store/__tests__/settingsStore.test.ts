@@ -169,3 +169,18 @@ describe('migrateSettingsState', () => {
     expect(result.autoAdvanceSegments).toBe(true)
   })
 })
+
+describe('missedRepsExtraRestSeconds', () => {
+  it('backfills to 30s when missing from persisted state', () => {
+    expect(migrateSettingsState({ startDelaySeconds: 5 }, 2).missedRepsExtraRestSeconds).toBe(30)
+  })
+
+  it('preserves an explicit 0 (off)', () => {
+    expect(migrateSettingsState({ missedRepsExtraRestSeconds: 0 }, 2).missedRepsExtraRestSeconds).toBe(0)
+  })
+
+  it('setMissedRepsExtraRest updates the value', () => {
+    useSettingsStore.getState().setMissedRepsExtraRest(45)
+    expect(useSettingsStore.getState().missedRepsExtraRestSeconds).toBe(45)
+  })
+})

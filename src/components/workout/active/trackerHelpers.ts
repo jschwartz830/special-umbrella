@@ -86,6 +86,19 @@ export function resolveActualReps(actualReps: number | null, targetReps: number 
   const single = Number(targetReps.trim())
   return Number.isFinite(single) ? single : null
 }
+/**
+ * True when a logged work set came in under its target reps. For a range
+ * ("8-12") the bottom of the range is the bar. Warmups, timed sets, and sets
+ * without a numeric target never count as missed.
+ */
+export function missedTargetReps(set: Pick<SetTrackState, 'actualReps' | 'targetReps' | 'isWarmup' | 'isTimed'>): boolean {
+  if (set.isWarmup || set.isTimed || set.actualReps == null) return false
+  const target = typeof set.targetReps === 'number'
+    ? set.targetReps
+    : parseRepRange(set.targetReps)?.low ?? Number(set.targetReps?.trim())
+  return Number.isFinite(target) && set.actualReps < target
+}
+
 export function fmt(s: number): string {
   const m = Math.floor(s / 60)
   return `${m}:${(s % 60).toString().padStart(2, '0')}`
