@@ -321,7 +321,9 @@ export function ActiveWorkoutTracker({
           const prev = prevWorkAt(i)
           return {
             ...base,
-            actualReps: prev?.actualReps ?? base.actualReps,
+            // Prefill today's numeric target (incl. the double-progression next step);
+            // last session's reps only fill in when there's no numeric target.
+            actualReps: base.actualReps ?? prev?.actualReps ?? null,
             // A program-variable load (e.g. `squat`) is the source of truth so progression shows
             // up; fixed or missing loads carry last session's weight forward.
             actualLoad: (isVarLoad(s.load ?? ex.load) ? base.resolvedLoadLbs : null) ?? snap(prev?.actualLoad) ?? base.actualLoad,
@@ -335,7 +337,7 @@ export function ActiveWorkoutTracker({
           const prev = prevWorkAt(i)
           return {
             ...base,
-            actualReps: prev?.actualReps ?? base.actualReps,
+            actualReps: base.actualReps ?? prev?.actualReps ?? null,
             // A program-variable load (e.g. `squat`) is the source of truth so progression shows
             // up; fixed or missing loads carry last session's weight forward.
             actualLoad: (isVarLoad(ex.load) ? base.resolvedLoadLbs : null) ?? snap(prev?.actualLoad) ?? base.actualLoad,
