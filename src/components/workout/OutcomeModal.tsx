@@ -1,7 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
 import {
-  CheckCircle2,
-  MinusCircle,
   Clock3,
   Ruler,
   Timer,
@@ -14,7 +12,6 @@ import { Modal } from '../shared/Modal'
 import { NumericInputField } from '../shared/NumericInputField'
 import type { PlanDay, WorkoutSlot } from '../../types'
 import type {
-  WorkoutCompletionState,
   PerceivedEffort,
   WorkoutOutcome,
   RunWorkoutActual,
@@ -44,26 +41,6 @@ interface Props {
   onConfirm: (outcome: WorkoutOutcome) => void
   onClose: () => void
 }
-
-const STATE_OPTIONS: {
-  state: WorkoutCompletionState
-  label: string
-  icon: React.ReactNode
-  activeClass: string
-}[] = [
-  {
-    state: 'completed',
-    label: 'Completed',
-    icon: <CheckCircle2 size={16} />,
-    activeClass: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400',
-  },
-  {
-    state: 'partially_completed',
-    label: 'Partial',
-    icon: <MinusCircle size={16} />,
-    activeClass: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400',
-  },
-]
 
 const EFFORT_LABELS: Record<PerceivedEffort, string> = {
   1: 'Very Easy',
@@ -96,12 +73,6 @@ function resolveRepsFromVars(
   // Only resolve pure identifiers — not ranges ("6-10"), AMRAP ("5+"), or literals ("8")
   if (/^[a-zA-Z_]\w*$/.test(trimmed) && trimmed in vars) return vars[trimmed]
   return reps
-}
-
-function autoDetectCompletionState(exercises: LoggedExerciseActual[]): WorkoutCompletionState {
-  if (!exercises.length) return 'completed'
-  const allComplete = exercises.every(ex => ex.sets.every(s => s.completed))
-  return allComplete ? 'completed' : 'partially_completed'
 }
 
 function parseNumericLoad(load?: string): number | null {
@@ -196,15 +167,6 @@ export function OutcomeModal({
   const hasWeights = weightsSlot != null
   const hasSwim = swimSlot != null
 
-  const existingState = existingOutcome?.completionState
-  const autoState = isFromActiveWorkout && existingOutcome?.weightsActual?.exercises?.length
-    ? autoDetectCompletionState(existingOutcome.weightsActual.exercises)
-    : null
-  const [completionState, setCompletionState] = useState<WorkoutCompletionState>(
-    autoState ?? (existingState === 'completed' || existingState === 'partially_completed'
-      ? existingState
-      : 'completed'),
-  )
   const [showEditSets, setShowEditSets] = useState(false)
   const [effort, setEffort] = useState<PerceivedEffort | null>(existingOutcome?.perceivedEffort ?? null)
   const [durationMin, setDurationMin] = useState<string>(existingOutcome?.durationActualMin?.toString() ?? '')
@@ -293,9 +255,11 @@ export function OutcomeModal({
 
     const parsedDuration = parseFloat(durationMin)
     const parsedCompletedAt = fromDateTimeLocalValue(completedAtLocal)
+    // A logged session always counts as completed. Missed reps, short runs and
+    // skipped parts are read from the actuals below by the progression engines.
     const outcome: WorkoutOutcome = {
       workoutInstanceId: workoutInstanceId ?? makeWorkoutInstanceId(planId, calendarDate),
-      completionState,
+      completionState: 'completed',
       completedAt: parsedCompletedAt ?? new Date().toISOString(),
       durationActualMin: isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : null,
       perceivedEffort: effort,
@@ -310,8 +274,6 @@ export function OutcomeModal({
     onConfirm(outcome)
   }
 
-  const stateLabel = completionState === 'partially_completed' ? 'Log Partial' : 'Mark Complete'
-
   return (
     <>
     <Modal
@@ -322,31 +284,11 @@ export function OutcomeModal({
           onClick={handleConfirm}
           className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold transition-colors"
         >
-          {stateLabel}
+          Mark Complete
         </button>
       }
     >
       <div className="space-y-5">
-        <div>
-          <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-2">Status</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {STATE_OPTIONS.map(opt => (
-              <button
-                key={opt.state}
-                onClick={() => { markDirty(); setCompletionState(opt.state) }}
-                className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[10px] font-semibold transition-colors ${
-                  completionState === opt.state
-                    ? opt.activeClass
-                    : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
-                }`}
-              >
-                {opt.icon}
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div>
           <label className="text-xs text-slate-500 uppercase tracking-wide font-medium block mb-2">
             Workout Date/Time

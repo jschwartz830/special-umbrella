@@ -142,6 +142,15 @@ describe('evaluateRunProgression', () => {
       expect(result.reason).toBe('borderline_completion')
     })
 
+    it('holds a completed run that fell slightly short of target', () => {
+      const result = evaluateRunProgression(
+        makeSlot(),
+        makeOutcome({ perceivedEffort: 2, runActual: { actualDistanceMiles: 4.5 } }),
+        makeState(),
+      )
+      expect(result.action).toBe('hold')
+    })
+
     it('holds on partially_completed when not far below target', () => {
       const result = evaluateRunProgression(
         makeSlot(),
@@ -177,6 +186,16 @@ describe('evaluateRunProgression', () => {
           perceivedEffort: 3,
           runActual: { actualDistanceMiles: 3.5 }, // 70% of 5
         }),
+        makeState(),
+      )
+      expect(result.action).toBe('regress')
+      expect(result.reason).toBe('under_completion')
+    })
+
+    it('regresses a completed run logged well short of target', () => {
+      const result = evaluateRunProgression(
+        makeSlot(),
+        makeOutcome({ perceivedEffort: 3, runActual: { actualDistanceMiles: 3.5 } }),
         makeState(),
       )
       expect(result.action).toBe('regress')

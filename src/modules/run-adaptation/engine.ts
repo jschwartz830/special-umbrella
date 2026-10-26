@@ -82,9 +82,8 @@ export function evaluateRunProgression(
     }
   }
 
-  // ── Regress: partial completion with significant underperformance ──────────
+  // ── Regress: logged distance well short of target ─────────────────────────
   if (
-    outcome.completionState === 'partially_completed' &&
     actualDistance != null &&
     actualDistance < targetDistance * 0.8
   ) {

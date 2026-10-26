@@ -159,7 +159,11 @@ export const useOutcomeStore = create<OutcomeState>()(
 
         const ctxBase = {
           effort: outcome.perceivedEffort ?? null,
-          all_reps: outcome.completionState === 'completed',
+          // Slot rules (runs/swims): the session counts, but only progresses when it
+          // went as planned. Exercise rules override this from their own sets below.
+          all_reps: outcome.completionState === 'completed'
+            && outcome.runActual?.completedAsPlanned !== false
+            && outcome.swimActual?.completedAsPlanned !== false,
           // deferred maps to day_off (no workout performed) — exclude alongside skipped/planned
           session_complete:
             outcome.completionState !== 'skipped' &&

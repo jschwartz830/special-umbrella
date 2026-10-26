@@ -256,6 +256,23 @@ describe('logOutcomeWithProgression', () => {
     getState().logOutcomeWithProgression(outcome, slot)
     expect(useProgramStore.getState().vars['plan-1'].myvar).toBe(0)
   })
+
+  it('slot all_reps follows completedAsPlanned, not just completionState', () => {
+    const slot: WorkoutSlot = {
+      id: 'slot-1',
+      type: 'run',
+      name: 'Easy Run',
+      slotProgress: { if: 'all_reps', then: 'myvar += 1' },
+    }
+    useProgramStore.setState({ vars: { 'plan-1': { myvar: 0 } } })
+    getState().logOutcomeWithProgression(
+      makeOutcome('plan-1', '2026-01-01', { runActual: { completedAsPlanned: false } }), slot)
+    expect(useProgramStore.getState().vars['plan-1'].myvar).toBe(0)
+
+    getState().logOutcomeWithProgression(
+      makeOutcome('plan-1', '2026-01-02', { runActual: { completedAsPlanned: true } }), slot)
+    expect(useProgramStore.getState().vars['plan-1'].myvar).toBe(1)
+  })
 })
 
 // ── removeOutcome ─────────────────────────────────────────────────────────────
