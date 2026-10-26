@@ -2,19 +2,37 @@ import { Ruler, Timer, Zap, Dumbbell, Waves, Trophy, Activity } from 'lucide-rea
 import { formatPace, formatSwimPace } from '../../modules/workout-outcomes/types'
 import type { WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import type { RunProgressionState } from '../../modules/run-adaptation/types'
+import type { ExerciseSpec } from '../../types/program'
+import { evaluateExerciseProgress } from '../../modules/workout-outcomes/exerciseProgress'
 
 export function OutcomeMetrics({
   outcome,
   progressionState,
   prFlags,
+  exerciseSpecs,
 }: {
   outcome: WorkoutOutcome
   progressionState?: RunProgressionState | null
   prFlags?: { hasLoadPR: boolean; hasRepsPR: boolean }
+  /** Planned exercises; enables the per-exercise progressing / holding line. */
+  exerciseSpecs?: ExerciseSpec[]
 }) {
-  const weightSetCount = outcome.weightsActual?.exercises
+  const workSets = outcome.weightsActual?.exercises
     ?.flatMap(ex => ex.sets)
-    .filter(s => s.completed).length ?? 0
+    .filter(s => !s.isWarmup) ?? []
+  const workSetsDone = workSets.filter(s => s.completed).length
+
+  // Same judgement the progression rules use: only exercises with a rule, and
+  // only when every working set was done.
+  const loggedByName = new Map((outcome.weightsActual?.exercises ?? []).map(e => [e.exercise, e]))
+  const progressing: string[] = []
+  const holding: string[] = []
+  for (const spec of exerciseSpecs ?? []) {
+    if (!spec.progress) continue
+    const result = evaluateExerciseProgress(spec, loggedByName.get(spec.exercise))
+    if (result === 'hit') progressing.push(spec.exercise)
+    else if (result === 'missed') holding.push(spec.exercise)
+  }
 
   const mobilityExercises = outcome.mobilityActual?.exercises ?? []
   const mobilitySets = mobilityExercises.flatMap(ex => ex.sets ?? [])
@@ -43,7 +61,10 @@ export function OutcomeMetrics({
       {outcome.weightsActual && (
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-xs text-slate-400 flex items-center gap-1">
-            <Dumbbell size={10} /> {weightSetCount} completed set{weightSetCount === 1 ? '' : 's'}
+            <Dumbbell size={10} />
+            {workSetsDone < workSets.length
+              ? `${workSetsDone}/${workSets.length} sets`
+              : `${workSetsDone} set${workSetsDone === 1 ? '' : 's'}`}
           </p>
           {(prFlags?.hasLoadPR || prFlags?.hasRepsPR) && (
             <span className="inline-flex items-center gap-0.5 text-xs font-medium text-yellow-400/90 bg-yellow-500/10 px-1.5 py-0.5 rounded">
@@ -52,6 +73,13 @@ export function OutcomeMetrics({
             </span>
           )}
         </div>
+      )}
+
+      {progressing.length > 0 && (
+        <p className="text-xs text-emerald-400">↑ Progressing: {progressing.join(', ')}</p>
+      )}
+      {holding.length > 0 && (
+        <p className="text-xs text-slate-400">= Holding: {holding.join(', ')}</p>
       )}
 
       {outcome.runActual && (

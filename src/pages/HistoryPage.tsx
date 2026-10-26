@@ -662,6 +662,7 @@ export function HistoryPage() {
                             outcome={outcome}
                             progressionState={progressionState}
                             prFlags={prFlagsMap.get(instanceId)}
+                            exerciseSpecs={planDay?.slots.flatMap(sl => sl.exercises ?? [])}
                           />
                         </div>
                       )}
