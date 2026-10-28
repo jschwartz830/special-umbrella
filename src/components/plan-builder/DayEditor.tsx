@@ -83,14 +83,16 @@ export function DayEditor({
           <button type="button" onClick={onDuplicate} className="p-1 rounded text-slate-500 hover:text-white">
             <Copy size={13} />
           </button>
-          <button type="button" onClick={() => setExpanded(e => !e)} className="p-1 rounded text-slate-500 hover:text-white">
-            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-          <button type="button" onClick={onRemove} disabled={total <= 1}
-            className="p-1 rounded text-red-400/60 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed">
-            <Trash2 size={13} />
-          </button>
         </div>
+        <button
+          type="button"
+          onClick={() => setExpanded(e => !e)}
+          aria-label={expanded ? 'Collapse day' : 'Expand day'}
+          aria-expanded={expanded}
+          className="ml-1 w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-400 active:bg-sky-500/30 transition-colors"
+        >
+          <ChevronDown size={18} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
       </div>
 
       {/* Slots */}
@@ -113,6 +115,17 @@ export function DayEditor({
             >
               <Plus size={13} /> Add second workout
             </button>
+          )}
+          {total > 1 && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onRemove}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-red-400/80 hover:text-red-300 hover:bg-red-500/10 text-xs font-medium transition-colors"
+              >
+                <Trash2 size={13} /> Delete day
+              </button>
+            </div>
           )}
         </div>
       )}

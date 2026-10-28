@@ -195,20 +195,12 @@ export function SlotEditor({
         <button
           type="button"
           onClick={() => setExpanded(e => !e)}
-          className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-400 hover:text-white transition-colors"
+          aria-label={expanded ? 'Collapse workout' : 'Expand workout'}
+          aria-expanded={expanded}
+          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-400 active:bg-sky-500/30 transition-colors"
         >
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          <ChevronDown size={18} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
-
-        {canRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
       </div>
 
       {expanded && (
@@ -853,6 +845,19 @@ export function SlotEditor({
                 className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 resize-none"
               />
             </label>
+          )}
+
+          {/* Delete lives inside the expanded body so it can't be hit when reaching for the toggle */}
+          {canRemove && (
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={onRemove}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
+              >
+                <Trash2 size={13} /> Remove workout
+              </button>
+            </div>
           )}
         </div>
       )}
