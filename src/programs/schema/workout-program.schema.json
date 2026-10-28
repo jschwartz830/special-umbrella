@@ -212,14 +212,25 @@
           }
         },
         "progressionType": {
-          "description": "Labelled progression strategy. single=linear load increment; double=reps-to-max then bump weight; dynamic_double=effort-adjusted double; triple=reps\u2192sets\u2192weight; step_loading=block periodization.",
+          "description": "Labelled progression strategy. single=linear load increment; double=reps-to-max then bump weight; dynamic_double=effort-adjusted double; triple=reps\u2192sets\u2192weight; step_loading=block periodization; rep_ladder=rep ladder from ladderMax, one rep added per successful session.",
           "enum": [
             "single",
             "double",
             "dynamic_double",
             "triple",
-            "step_loading"
+            "step_loading",
+            "rep_ladder"
           ]
+        },
+        "ladderMax": {
+          "description": "rep_ladder only: tested max reps the ladder starts from. Changing it starts a new cycle.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "ladderSessions": {
+          "description": "rep_ladder only: successful sessions per cycle (default 24).",
+          "type": "integer",
+          "minimum": 1
         },
         "supersetGroupId": {
           "description": "Exercises sharing this id are performed as a superset.",

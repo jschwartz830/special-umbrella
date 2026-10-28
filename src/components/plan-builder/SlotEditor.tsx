@@ -12,6 +12,7 @@ import { useDragReorder } from '../../hooks/useDragReorder'
 import type { WorkoutDifficulty, RunWorkoutSubtype, RunWorkoutConfig, WeightsFocusArea, WeightsTrainingIntent, SwimWorkoutSubtype, YogaWorkoutSubtype, OtherWorkoutSubtype } from '../../modules/workout-metadata/types'
 import { RUN_SUBTYPE_LABELS, isRunType, defaultRunSubtype } from '../../modules/workout-metadata/types'
 import { PROGRESSION_TYPE_META, toVarName } from './progressionTypes'
+import { DEFAULT_LADDER_SESSIONS, ladderReps } from '../../modules/rep-ladder/ladder'
 import { AddExerciseModal } from './AddExerciseModal'
 
 // ── Slot editor ──────────────────────────────────────────────────────────────
@@ -765,13 +766,13 @@ export function SlotEditor({
                             ))}
                           </select>
                         </div>
-                        {ex.progressionType && (
+                        {PROGRESSION_TYPE_META.find(pt => pt.type === ex.progressionType)?.template && (
                           <button
                             type="button"
                             title="Fill if/then/else fields with a template for this progression type"
                             onClick={() => {
                               const meta = PROGRESSION_TYPE_META.find(pt => pt.type === ex.progressionType)
-                              if (!meta) return
+                              if (!meta?.template) return
                               const varName = toVarName(ex.exercise)
                               const tpl = meta.template(varName)
                               updateExercise(i, { progress: { if: tpl.if, then: tpl.then, else: tpl.else } })
@@ -789,7 +790,48 @@ export function SlotEditor({
                       )}
                     </div>
 
-                    {/* if / then / else rule fields */}
+                    {ex.progressionType === 'rep_ladder' ? (
+                      <div className="space-y-1.5">
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="space-y-1">
+                            <span className="text-[10px] text-slate-400">Current max reps</span>
+                            <input
+                              type="number"
+                              min="1"
+                              inputMode="numeric"
+                              value={ex.ladderMax ?? ''}
+                              placeholder="e.g. 5"
+                              onChange={e => {
+                                const n = parseInt(e.target.value, 10)
+                                updateExercise(i, { ladderMax: Number.isFinite(n) && n >= 1 ? n : undefined })
+                              }}
+                              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                            />
+                          </label>
+                          <label className="space-y-1">
+                            <span className="text-[10px] text-slate-400">Sessions per cycle</span>
+                            <input
+                              type="number"
+                              min="1"
+                              inputMode="numeric"
+                              value={ex.ladderSessions ?? ''}
+                              placeholder={String(DEFAULT_LADDER_SESSIONS)}
+                              onChange={e => {
+                                const n = parseInt(e.target.value, 10)
+                                updateExercise(i, { ladderSessions: Number.isFinite(n) && n >= 1 ? n : undefined })
+                              }}
+                              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                            />
+                          </label>
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          {ex.ladderMax
+                            ? `Session 1: ${ladderReps(ex.ladderMax, 0).join('-')} · Session 2: ${ladderReps(ex.ladderMax, 1).join('-')} … Sets and reps above are ignored. Entering a new max starts a new cycle.`
+                            : 'Enter your current max to start the ladder.'}
+                        </p>
+                      </div>
+                    ) : (
+                    /* if / then / else rule fields */
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <input
                         type="text"
@@ -827,6 +869,7 @@ export function SlotEditor({
                         className="bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
                       />
                     </div>
+                    )}
                   </div>
                 </div>
               ))}

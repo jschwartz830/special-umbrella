@@ -153,6 +153,7 @@ export function PlansPage() {
   const importPlans = usePlanStore(s => s.importPlans)
   const detachPlan = useHistoryStore(s => s.detachPlan)
   const removeProgressionStates = useOutcomeStore(s => s.removeProgressionStates)
+  const clearPlanLadders = useOutcomeStore(s => s.clearPlanLadders)
   const clearVars = useProgramStore(s => s.clearPlanVars)
   const entries = useHistoryStore(s => s.entries)
   const today = useToday()
@@ -374,6 +375,7 @@ export function PlansPage() {
                   // only plan-internal state (rotation overrides, vars, run progression) goes.
                   if (planToDelete) detachPlan(planToDelete)
                   removeProgressionStates(progressionGroupIds)
+                  clearPlanLadders(confirmDelete)
                   clearVars(confirmDelete)
                   deletePlan(confirmDelete)
                   setConfirmDelete(null)

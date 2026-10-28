@@ -8,6 +8,7 @@ import { useOutcomeStore } from '../../store/outcomeStore'
 import { useProgramStore } from '../../store/programStore'
 import { resolveLoad } from '../../lib/expressionEval'
 import { summarizeMobilitySets } from '../../lib/mobilityLibrary'
+import { withLadderTargets } from '../../modules/rep-ladder/ladder'
 
 interface Props {
   slot: WorkoutSlot
@@ -73,6 +74,10 @@ function formatExercisePrescription(
 ): string[] {
   const lines: string[] = []
   for (const ex of slot.exercises ?? []) {
+    if (ex.ladderStatus && Array.isArray(ex.sets)) {
+      lines.push(`${ex.exercise}: ${ex.sets.map(set => set.reps).join('-')} (${ex.ladderStatus})`)
+      continue
+    }
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {
       const setText = ex.sets
         .map((set, idx) => {
@@ -103,8 +108,10 @@ function formatExercisePrescription(
   return lines
 }
 
-export function WorkoutSlotDetails({ slot, planId, className, collapsed }: Props) {
+export function WorkoutSlotDetails({ slot: rawSlot, planId, className, collapsed }: Props) {
   const getProgressionState = useOutcomeStore(s => s.getProgressionState)
+  const ladderStates = useOutcomeStore(s => s.ladderStates)
+  const slot = withLadderTargets(rawSlot, planId, ladderStates)
   const vars = useProgramStore(s => planId ? (s.vars[planId] ?? {}) : {})
 
   const isRun = isRunType(slot.type)

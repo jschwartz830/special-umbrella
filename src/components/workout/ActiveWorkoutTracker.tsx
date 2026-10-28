@@ -5,6 +5,8 @@ import { useLandscapeAutoFocus } from '../../hooks/useLandscapeAutoFocus'
 import type { ExerciseSpec } from '../../types/program'
 import type { LoggedExerciseActual, LoggedSetActual, WorkoutOutcome } from '../../modules/workout-outcomes/types'
 import { deriveProgressionMode } from '../../modules/workout-outcomes/progressionMode'
+import { withLadderTargets } from '../../modules/rep-ladder/ladder'
+import { useOutcomeStore } from '../../store/outcomeStore'
 import { resolveLoad, type EvalContext } from '../../lib/expressionEval'
 import { usePlanStore } from '../../store/planStore'
 import { useSettingsStore } from '../../store/settingsStore'
@@ -41,7 +43,7 @@ export function ActiveWorkoutTracker({
   planId,
   workoutInstanceId,
   planDay,
-  slot,
+  slot: rawSlot,
   programVars,
   previousOutcome,
   resumeOutcome,
@@ -53,6 +55,12 @@ export function ActiveWorkoutTracker({
   onComplete,
 }: Props) {
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
+  // Rep-ladder exercises get today's rung as concrete sets; everything else passes through.
+  const ladderStates = useOutcomeStore(s => s.ladderStates)
+  const slot = useMemo(
+    () => withLadderTargets(rawSlot, planId, ladderStates, workoutInstanceId),
+    [rawSlot, planId, ladderStates, workoutInstanceId],
+  )
   const DRAFT_VERSION = 1
   const { startDelaySeconds, focusMode, setFocusMode, equipment, defaultEquipmentLocation, missedRepsExtraRestSeconds } = useSettingsStore()
   // Which gym's equipment applies: the workout's own location, else the user's default.
@@ -353,6 +361,7 @@ export function ActiveWorkoutTracker({
         previousSets: prevEx,
         progressionMode,
         supersetGroupId: ex.supersetGroupId,
+        ladderStatus: ex.ladderStatus,
       }
     })
   })
@@ -1014,7 +1023,7 @@ export function ActiveWorkoutTracker({
 
   function getProgressionPreview(ex: ExerciseTrackState): string[] | null {
     if (ex.isWarmup) return null
-    if (!ex.progressionMode) return null
+    if (!ex.progressionMode || ex.ladderStatus) return null
     const workingSets = ex.sets.filter(s => !s.isWarmup)
     if (workingSets.length === 0 || !workingSets.every(s => s.completed)) return null
 
@@ -1670,7 +1679,10 @@ export function ActiveWorkoutTracker({
                 </div>
               )}
               <div className="flex items-center justify-between min-w-0">
-                <p className="text-sm font-semibold text-white leading-tight truncate flex-1">{ex.exercise}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white leading-tight truncate">{ex.exercise}</p>
+                  {ex.ladderStatus && <p className="text-[10px] text-sky-400 mt-0.5 truncate">{ex.ladderStatus}</p>}
+                </div>
                 <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                   <button
                     onClick={() => setSupersetPicker(supersetPicker === exIdx ? null : exIdx)}

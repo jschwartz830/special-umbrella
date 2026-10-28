@@ -27,7 +27,8 @@ import {
 } from '../../modules/workout-outcomes/types'
 import { isRunType } from '../../modules/workout-metadata/types'
 import { deriveProgressionMode } from '../../modules/workout-outcomes/progressionMode'
-import { makeWorkoutInstanceId } from '../../store/outcomeStore'
+import { makeWorkoutInstanceId, useOutcomeStore } from '../../store/outcomeStore'
+import { withLadderTargets } from '../../modules/rep-ladder/ladder'
 import { useProgramStore } from '../../store/programStore'
 
 interface Props {
@@ -93,10 +94,12 @@ function parseRestToSeconds(rest?: string): number | null {
 function buildInitialWeightActuals(
   planDay: PlanDay,
   vars: Record<string, number>,
-  existing?: WorkoutOutcome | null,
+  existing: WorkoutOutcome | null | undefined,
+  resolveSlot: (slot: WorkoutSlot) => WorkoutSlot,
 ): LoggedExerciseActual[] {
   if (existing?.weightsActual?.exercises?.length) return existing.weightsActual.exercises
-  const weightsSlot = getWeightsSlot(planDay)
+  const rawSlot = getWeightsSlot(planDay)
+  const weightsSlot = rawSlot && resolveSlot(rawSlot)
   if (!weightsSlot?.exercises?.length) return []
 
   return weightsSlot.exercises.map(ex => {
@@ -177,7 +180,8 @@ export function OutcomeModal({
   const [completedAsPlanned, setCompletedAsPlanned] = useState<boolean | null>(existingOutcome?.runActual?.completedAsPlanned ?? null)
 
   const [weightExercises, setWeightExercises] = useState<LoggedExerciseActual[]>(
-    () => buildInitialWeightActuals(planDay, vars, existingOutcome),
+    () => buildInitialWeightActuals(planDay, vars, existingOutcome, slot =>
+      withLadderTargets(slot, planId, useOutcomeStore.getState().ladderStates, workoutInstanceId)),
   )
 
   const [swimDistanceMeters, setSwimDistanceMeters] = useState<string>(

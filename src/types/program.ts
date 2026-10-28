@@ -13,6 +13,7 @@
  * dynamic_double  – auto-regulates load based on effort alongside rep range
  * triple          – progress reps, then sets, then weight in sequence
  * step_loading    – pre-set load blocks across a training cycle (block periodization)
+ * rep_ladder      – rep ladder from a tested max, one rep added per successful session (Russian Fighter style)
  */
 export type ProgressionType =
   | 'single'
@@ -20,6 +21,7 @@ export type ProgressionType =
   | 'dynamic_double'
   | 'triple'
   | 'step_loading'
+  | 'rep_ladder'
 
 // ── Set & exercise specs (weightlifting) ─────────────────────────────────────
 
@@ -67,6 +69,12 @@ export interface ExerciseSpec {
   synergist?: string[]
   progress?: ProgressionRule
   progressionType?: ProgressionType
+  /** rep_ladder: tested max reps the ladder is built from. Changing it starts a new cycle. */
+  ladderMax?: number
+  /** rep_ladder: successful sessions per cycle (defaults to 24). */
+  ladderSessions?: number
+  /** rep_ladder: display-only status computed when today's sets are resolved; never saved. */
+  ladderStatus?: string
   supersetGroupId?: string
 }
 
@@ -203,6 +211,8 @@ export interface YamlExerciseSpec {
   synergist?: string[]
   progress?: { if?: string; then: string; else?: string }
   progressionType?: ProgressionType
+  ladderMax?: number
+  ladderSessions?: number
   /** Exercises sharing an id are performed as a superset. */
   supersetGroupId?: string
 }

@@ -115,6 +115,8 @@ function parseExerciseSpec(raw: YamlExerciseSpec): ExerciseSpec {
     synergist: Array.isArray(raw.synergist) ? raw.synergist : undefined,
     progress,
     progressionType: raw.progressionType,
+    ladderMax: typeof raw.ladderMax === 'number' ? raw.ladderMax : undefined,
+    ladderSessions: typeof raw.ladderSessions === 'number' ? raw.ladderSessions : undefined,
     supersetGroupId: normStr(raw.supersetGroupId),
   }
 }

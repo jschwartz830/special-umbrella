@@ -6,7 +6,8 @@ interface ProgressionTypeMeta {
   type: ProgressionType
   label: string
   description: string
-  template: (varName: string) => { if?: string; then: string; else?: string }
+  /** Rule template for the if/then/else fields; absent for types the app drives itself. */
+  template?: (varName: string) => { if?: string; then: string; else?: string }
 }
 
 export const PROGRESSION_TYPE_META: ProgressionTypeMeta[] = [
@@ -39,6 +40,11 @@ export const PROGRESSION_TYPE_META: ProgressionTypeMeta[] = [
     label: 'Step Loading',
     description: 'Pre-set loading blocks per training cycle with automatic weight jumps each block.',
     template: v => ({ if: 'all_reps', then: `${v} += 5`, else: `${v} = round5(${v} * 0.85)` }),
+  },
+  {
+    type: 'rep_ladder',
+    label: 'Rep Ladder (Russian Fighter)',
+    description: 'Descending ladder from your max (5-4-3-2-1); each completed session adds one rep to the next set, a missed one repeats. Counts sessions, not days — best at 3+ sessions a week.',
   },
 ]
 

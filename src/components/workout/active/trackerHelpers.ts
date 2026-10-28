@@ -24,6 +24,8 @@ export interface ExerciseTrackState {
   addedDuringWorkout?: boolean
   progressionMode?: string
   supersetGroupId?: string
+  /** Rep-ladder position, e.g. "Ladder session 3/24 · max 5". */
+  ladderStatus?: string
 }
 
 

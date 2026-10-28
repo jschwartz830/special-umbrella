@@ -14,6 +14,7 @@ import { useHistoryStore } from './historyStore'
 import { useExerciseHistoryStore } from './exerciseHistoryStore'
 import { evaluateExerciseProgress } from '../modules/workout-outcomes/exerciseProgress'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
+import { isLadderExercise, ladderKey, ladderStep, applyLadder, recordLadderResult, type LadderState } from '../modules/rep-ladder/ladder'
 
 /** Resolve plan/workout name context and sync a weights outcome to exerciseHistoryStore. */
 function syncExerciseHistory(outcome: WorkoutOutcome): void {
@@ -38,11 +39,28 @@ function syncExerciseHistory(outcome: WorkoutOutcome): void {
   useExerciseHistoryStore.getState().upsertFromOutcome(outcome, { planName, workoutName })
 }
 
+/** Re-point (or with `to = null`, drop) a logged session in every ladder that counted it. */
+function renameLadderHit(
+  states: Record<string, LadderState>,
+  from: string,
+  to: string | null,
+): Record<string, LadderState> {
+  if (!Object.values(states).some(st => st.hits.includes(from))) return states
+  return Object.fromEntries(Object.entries(states).map(([k, st]) => [
+    k,
+    st.hits.includes(from)
+      ? { ...st, hits: st.hits.flatMap(id => id !== from ? [id] : to ? [to] : []) }
+      : st,
+  ]))
+}
+
 interface OutcomeState {
   /** Keyed by workoutInstanceId = `${planId}_${calendarDate}` */
   outcomes: Record<string, WorkoutOutcome>
   /** Keyed by progressionGroupId */
   progressionStates: Record<string, RunProgressionState>
+  /** Rep-ladder progress, keyed by ladderKey(planId, exercise) */
+  ladderStates: Record<string, LadderState>
 
   setOutcome: (outcome: WorkoutOutcome) => void
   getOutcome: (workoutInstanceId: string) => WorkoutOutcome | null
@@ -77,6 +95,9 @@ interface OutcomeState {
 
   /** Remove progression states for the given group IDs (called on plan delete). */
   removeProgressionStates: (groupIds: string[]) => void
+
+  /** Remove rep-ladder progress for a plan (called on plan delete). */
+  clearPlanLadders: (planId: string) => void
 }
 
 /** @internal Exported only for unit testing. */
@@ -86,6 +107,7 @@ export function migrateOutcomeState(persisted: unknown, _fromVersion: number): O
     ...s,
     outcomes: s.outcomes ?? {},
     progressionStates: s.progressionStates ?? {},
+    ladderStates: s.ladderStates ?? {},
   } as OutcomeState
 }
 
@@ -94,6 +116,7 @@ export const useOutcomeStore = create<OutcomeState>()(
     (set, get) => ({
       outcomes: {},
       progressionStates: {},
+      ladderStates: {},
 
       setOutcome(outcome) {
         set(s => ({
@@ -149,9 +172,30 @@ export const useOutcomeStore = create<OutcomeState>()(
           }
         }
 
-        // 3. Evaluate program-level progression rules (YAML-imported plans)
         const planId = parseWorkoutInstanceId(outcome.workoutInstanceId)?.planId
         if (!planId) return
+
+        // 3. Rep ladders: a session where every set hit its rung advances the ladder;
+        // a miss repeats the step. Judged against the targets this session was given.
+        const ladders = (slot.exercises ?? []).filter(isLadderExercise)
+        if (ladders.length > 0) {
+          try {
+            const loggedByName = new Map((outcome.weightsActual?.exercises ?? []).map(e => [e.exercise, e]))
+            const next = { ...get().ladderStates }
+            for (const ex of ladders) {
+              const key = ladderKey(planId, ex.exercise)
+              const step = ladderStep(next[key], ex.ladderMax, outcome.workoutInstanceId)
+              const result = evaluateExerciseProgress(applyLadder(ex, step), loggedByName.get(ex.exercise))
+              if (result === 'incomplete') continue
+              next[key] = recordLadderResult(next[key], ex.ladderMax, outcome.workoutInstanceId, result === 'hit')
+            }
+            set({ ladderStates: next })
+          } catch (err) {
+            console.error('[outcomeStore] rep-ladder evaluation failed (outcome already saved):', err)
+          }
+        }
+
+        // 4. Evaluate program-level progression rules (YAML-imported plans)
 
         const programStore = useProgramStore.getState()
         const currentVars = programStore.getVars(planId)
@@ -171,7 +215,7 @@ export const useOutcomeStore = create<OutcomeState>()(
             outcome.completionState !== 'deferred',
         }
 
-        // 3a. Slot-level progression (run slots)
+        // 4a. Slot-level progression (run slots)
         // Wrapped in try/catch: a malformed YAML progression rule must never
         // prevent the outcome from being persisted.
         if (slot.slotProgress) {
@@ -182,7 +226,7 @@ export const useOutcomeStore = create<OutcomeState>()(
           }
         }
 
-        // 3b. Per-exercise progression (weights slots). Each exercise is judged on its own
+        // 4b. Per-exercise progression (weights slots). Each exercise is judged on its own
         // sets: skipped/unfinished exercises hold, and `all_reps` means every working set
         // reached the top of its rep range — not merely that the workout was completed.
         if (slot.exercises) {
@@ -218,7 +262,7 @@ export const useOutcomeStore = create<OutcomeState>()(
         set(s => {
           if (!(workoutInstanceId in s.outcomes)) return s
           const { [workoutInstanceId]: _removed, ...rest } = s.outcomes
-          return { outcomes: rest }
+          return { outcomes: rest, ladderStates: renameLadderHit(s.ladderStates, workoutInstanceId, null) }
         })
         useExerciseHistoryStore.getState().removeByWorkoutInstance(workoutInstanceId)
       },
@@ -259,6 +303,7 @@ export const useOutcomeStore = create<OutcomeState>()(
               ...rest,
               [newInstanceId]: { ...existing, workoutInstanceId: newInstanceId },
             },
+            ladderStates: renameLadderHit(s.ladderStates, oldInstanceId, newInstanceId),
           }
         })
         useExerciseHistoryStore.getState().moveByWorkoutInstance(oldInstanceId, newInstanceId)
@@ -274,6 +319,14 @@ export const useOutcomeStore = create<OutcomeState>()(
             ),
           }
         })
+      },
+
+      clearPlanLadders(planId) {
+        set(s => ({
+          ladderStates: Object.fromEntries(
+            Object.entries(s.ladderStates).filter(([k]) => !k.startsWith(`${planId}::`)),
+          ),
+        }))
       },
     }),
     {

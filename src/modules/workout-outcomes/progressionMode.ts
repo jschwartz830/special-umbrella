@@ -12,7 +12,7 @@ export function deriveProgressionMode(
 ): LoggedExerciseActual['progressionMode'] {
   if (!progressionType && !hasProgressRule) return undefined
   if (progressionType === 'double' || progressionType === 'dynamic_double') return 'double'
-  if (progressionType === 'triple') return 'volume'
+  if (progressionType === 'triple' || progressionType === 'rep_ladder') return 'volume'
   if (progressionType === 'step_loading') return 'maintenance'
   return 'single'
 }
