@@ -12,7 +12,7 @@ import { usePlanStore } from '../../store/planStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useExerciseHistoryStore } from '../../store/exerciseHistoryStore'
 import { equipmentKindFor, generateWarmups, recentOneRepMax, snapToAchievable, stepAchievable, estimateOneRepMax, type EquipmentLocation } from '../../lib/equipment'
-import { type SetTrackState, type ExerciseTrackState, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
+import { type SetTrackState, type ExerciseTrackState, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, findNextSet, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
 import { NumberTextField, TimerCol } from './active/TrackerInputs'
 import { type ExercisePickerMode, ExercisePicker } from './active/ExercisePicker'
 
@@ -1244,16 +1244,7 @@ export function ActiveWorkoutTracker({
    * has sets left), otherwise the first incomplete set anywhere in the workout.
    */
   function findCurrentSet(): { exIdx: number; setIdx: number } | null {
-    if (manualFocusExIdx != null && exercises[manualFocusExIdx]) {
-      const setIdx = exercises[manualFocusExIdx].sets.findIndex(s => !s.completed)
-      if (setIdx !== -1) return { exIdx: manualFocusExIdx, setIdx }
-    }
-    for (let ei = 0; ei < exercises.length; ei++) {
-      for (let si = 0; si < exercises[ei].sets.length; si++) {
-        if (!exercises[ei].sets[si].completed) return { exIdx: ei, setIdx: si }
-      }
-    }
-    return null
+    return findNextSet(exercises, manualFocusExIdx)
   }
 
   // +15 / −15 in the focus-view corners bump rest time: the live target while

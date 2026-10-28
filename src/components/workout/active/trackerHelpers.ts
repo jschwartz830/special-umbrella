@@ -126,3 +126,33 @@ export function parseInputNumber(v: string): number | null {
   const n = Number(v)
   return Number.isFinite(n) ? n : null
 }
+
+/**
+ * The set to do next: the first unfinished set, or the first unfinished set of
+ * `focusExIdx` when one is focused. Supersets alternate — within a group, the
+ * member with the fewest finished working sets goes next (ties: plan order),
+ * so A1 → B1 → A2 → B2. A member's warmups run before its first working set.
+ */
+export function findNextSet(
+  exercises: Pick<ExerciseTrackState, 'sets' | 'supersetGroupId'>[],
+  focusExIdx: number | null = null,
+): { exIdx: number; setIdx: number } | null {
+  const nextIn = (ei: number) => exercises[ei].sets.findIndex(s => !s.completed)
+  const doneWork = (ei: number) => exercises[ei].sets.filter(s => s.completed && !s.isWarmup).length
+
+  let start = focusExIdx != null && exercises[focusExIdx] && nextIn(focusExIdx) !== -1 ? focusExIdx : -1
+  if (start === -1) start = exercises.findIndex((_, ei) => nextIn(ei) !== -1)
+  if (start === -1) return null
+
+  const groupId = exercises[start].supersetGroupId
+  // Finish the starting exercise's warmups before handing off to its partner.
+  if (groupId && !exercises[start].sets[nextIn(start)].isWarmup) {
+    let best = start
+    exercises.forEach((ex, ei) => {
+      if (ex.supersetGroupId !== groupId || nextIn(ei) === -1) return
+      if (doneWork(ei) < doneWork(best) || (doneWork(ei) === doneWork(best) && ei < best)) best = ei
+    })
+    start = best
+  }
+  return { exIdx: start, setIdx: nextIn(start) }
+}
