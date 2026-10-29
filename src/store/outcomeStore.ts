@@ -14,7 +14,8 @@ import { useHistoryStore } from './historyStore'
 import { useExerciseHistoryStore } from './exerciseHistoryStore'
 import { evaluateExerciseProgress } from '../modules/workout-outcomes/exerciseProgress'
 import { parseWorkoutInstanceId } from '../lib/workoutInstanceId'
-import { isLadderExercise, ladderKey, ladderStep, applyLadder, recordLadderResult, type LadderState } from '../modules/rep-ladder/ladder'
+import { isLadderExercise, ladderKey, withAutoProgression, recordLadderResult, type LadderState } from '../modules/rep-ladder/ladder'
+import { isRepSchemeExercise, repSchemeSteps, repSchemeSignature } from '../modules/rep-ladder/repScheme'
 
 /** Resolve plan/workout name context and sync a weights outcome to exerciseHistoryStore. */
 function syncExerciseHistory(outcome: WorkoutOutcome): void {
@@ -175,19 +176,22 @@ export const useOutcomeStore = create<OutcomeState>()(
         const planId = parseWorkoutInstanceId(outcome.workoutInstanceId)?.planId
         if (!planId) return
 
-        // 3. Rep ladders: a session where every set hit its rung advances the ladder;
-        // a miss repeats the step. Judged against the targets this session was given.
-        const ladders = (slot.exercises ?? []).filter(isLadderExercise)
+        // 3. Rep ladders / rep schemes: a session where every set hit its target advances
+        // one step; a miss repeats it. Judged against the targets this session was given.
+        // Deload weeks (rep schemes) neither advance nor count as a miss.
+        const ladders = (slot.exercises ?? []).filter(ex =>
+          isLadderExercise(ex) || (isRepSchemeExercise(ex) && ex.deloadSets == null))
         if (ladders.length > 0) {
           try {
             const loggedByName = new Map((outcome.weightsActual?.exercises ?? []).map(e => [e.exercise, e]))
             const next = { ...get().ladderStates }
             for (const ex of ladders) {
               const key = ladderKey(planId, ex.exercise)
-              const step = ladderStep(next[key], ex.ladderMax, outcome.workoutInstanceId)
-              const result = evaluateExerciseProgress(applyLadder(ex, step), loggedByName.get(ex.exercise))
+              const cycleId = isLadderExercise(ex) ? ex.ladderMax : repSchemeSignature(repSchemeSteps(ex))
+              const target = withAutoProgression(ex, planId, next, outcome.workoutInstanceId)
+              const result = evaluateExerciseProgress(target, loggedByName.get(ex.exercise))
               if (result === 'incomplete') continue
-              next[key] = recordLadderResult(next[key], ex.ladderMax, outcome.workoutInstanceId, result === 'hit')
+              next[key] = recordLadderResult(next[key], cycleId, outcome.workoutInstanceId, result === 'hit')
             }
             set({ ladderStates: next })
           } catch (err) {

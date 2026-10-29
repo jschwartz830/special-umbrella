@@ -46,6 +46,11 @@ export const PROGRESSION_TYPE_META: ProgressionTypeMeta[] = [
     label: 'Rep Ladder (Russian Fighter)',
     description: 'Descending ladder from your max (5-4-3-2-1); each completed session adds one rep to the next set, a missed one repeats. Counts sessions, not days — best at 3+ sessions a week.',
   },
+  {
+    type: 'rep_sets',
+    label: 'Reps → Sets (bodyweight)',
+    description: 'For exercises where weight isn’t the lever (Nordics, dead bugs). Add a rep each successful session up the range, then add a set; a miss repeats. After the last step it restarts with a prompt to make it harder.',
+  },
 ]
 
 export function toVarName(exerciseName: string): string {

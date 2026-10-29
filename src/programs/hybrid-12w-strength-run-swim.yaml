@@ -94,7 +94,7 @@ days:
           - { exercise: "Pull Up, Band", sets: 3, reps: "4-6", rest: 90s, progressionType: double, notes: "Assisted; reduce band assistance over time" }
           - { exercise: "Half-Kneeling Landmine Press", sets: 2, reps: 8, load: landmine, rest: 75s, notes: "Reps per side; start with the empty bar", progress: { if: all_reps, then: "landmine += 5" } }
           - { exercise: "Split Squat, Dumbbell", sets: 2, reps: 8, load: db_split, rest: 75s, notes: "Reps per leg; weight per hand", progress: { if: all_reps, then: "db_split += 5" } }
-          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: double }
+          - { exercise: "Nordic Curl (Assisted)", sets: 2, reps: "3-5", rest: 90s, progressionType: rep_sets }
           - { exercise: "Bent-Knee Single-Leg Calf Raise", sets: 2, reps: 12, rest: 50s, notes: "Reps per leg (soleus)" }
           - { exercise: "Dead Bug", sets: 2, reps: 8, rest: 45s, notes: "Reps per side; or plank 30-45s" }
 

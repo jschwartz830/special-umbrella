@@ -9,6 +9,7 @@ import { useProgramStore } from '../../store/programStore'
 import { resolveLoad } from '../../lib/expressionEval'
 import { summarizeMobilitySets } from '../../lib/mobilityLibrary'
 import { withLadderTargets } from '../../modules/rep-ladder/ladder'
+import { formatStep, isRepSchemeExercise } from '../../modules/rep-ladder/repScheme'
 
 interface Props {
   slot: WorkoutSlot
@@ -75,7 +76,9 @@ function formatExercisePrescription(
   const lines: string[] = []
   for (const ex of slot.exercises ?? []) {
     if (ex.ladderStatus && Array.isArray(ex.sets)) {
-      lines.push(`${ex.exercise}: ${ex.sets.map(set => set.reps).join('-')} (${ex.ladderStatus})`)
+      const reps = ex.sets.map(set => Number(set.reps))
+      const text = isRepSchemeExercise(ex) ? formatStep(reps) : reps.join('-')
+      lines.push(`${ex.exercise}: ${text} (${ex.ladderStatus})`)
       continue
     }
     if (Array.isArray(ex.sets) && ex.sets.length > 0) {

@@ -14,6 +14,7 @@
  * triple          – progress reps, then sets, then weight in sequence
  * step_loading    – pre-set load blocks across a training cycle (block periodization)
  * rep_ladder      – rep ladder from a tested max, one rep added per successful session (Russian Fighter style)
+ * rep_sets        – reps then sets: walk a list of sets×reps steps, one step per successful session
  */
 export type ProgressionType =
   | 'single'
@@ -22,6 +23,7 @@ export type ProgressionType =
   | 'triple'
   | 'step_loading'
   | 'rep_ladder'
+  | 'rep_sets'
 
 // ── Set & exercise specs (weightlifting) ─────────────────────────────────────
 
@@ -73,7 +75,11 @@ export interface ExerciseSpec {
   ladderMax?: number
   /** rep_ladder: successful sessions per cycle (defaults to 24). */
   ladderSessions?: number
-  /** rep_ladder: display-only status computed when today's sets are resolved; never saved. */
+  /** rep_sets: custom steps, e.g. "3x4, 3x5, 4x6, 10/10/10". Empty = rep range at sets, then sets + 1. */
+  repScheme?: string
+  /** rep_sets: set cap for a deload week, filled in by the deload transform; never saved. */
+  deloadSets?: number
+  /** rep_ladder / rep_sets: display-only status computed when today's sets are resolved; never saved. */
   ladderStatus?: string
   supersetGroupId?: string
 }
@@ -213,6 +219,7 @@ export interface YamlExerciseSpec {
   progressionType?: ProgressionType
   ladderMax?: number
   ladderSessions?: number
+  repScheme?: string
   /** Exercises sharing an id are performed as a superset. */
   supersetGroupId?: string
 }

@@ -13,6 +13,7 @@ import type { WorkoutDifficulty, RunWorkoutSubtype, RunWorkoutConfig, WeightsFoc
 import { RUN_SUBTYPE_LABELS, isRunType, defaultRunSubtype } from '../../modules/workout-metadata/types'
 import { PROGRESSION_TYPE_META, toVarName } from './progressionTypes'
 import { DEFAULT_LADDER_SESSIONS, ladderReps } from '../../modules/rep-ladder/ladder'
+import { defaultRepScheme, formatStep, parseRepScheme, repSchemeSteps } from '../../modules/rep-ladder/repScheme'
 import { AddExerciseModal } from './AddExerciseModal'
 
 // ── Slot editor ──────────────────────────────────────────────────────────────
@@ -828,6 +829,24 @@ export function SlotEditor({
                           {ex.ladderMax
                             ? `Session 1: ${ladderReps(ex.ladderMax, 0).join('-')} · Session 2: ${ladderReps(ex.ladderMax, 1).join('-')} … Sets and reps above are ignored. Entering a new max starts a new cycle.`
                             : 'Enter your current max to start the ladder.'}
+                        </p>
+                      </div>
+                    ) : ex.progressionType === 'rep_sets' ? (
+                      <div className="space-y-1.5">
+                        <label className="space-y-1 block">
+                          <span className="text-[10px] text-slate-400">Steps (optional)</span>
+                          <input
+                            type="text"
+                            value={ex.repScheme ?? ''}
+                            placeholder={defaultRepScheme(ex).map(formatStep).join(', ')}
+                            onChange={e => updateExercise(i, { repScheme: e.target.value || undefined })}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white"
+                          />
+                        </label>
+                        <p className={`text-[10px] ${ex.repScheme && !parseRepScheme(ex.repScheme) ? 'text-amber-400' : 'text-slate-500'}`}>
+                          {ex.repScheme && !parseRepScheme(ex.repScheme)
+                            ? 'Couldn’t read that — use steps like 3x8, 10/10/8 or 444, separated by commas. Using the default for now.'
+                            : `${repSchemeSteps(ex).map(formatStep).join(' → ')}. One step per session where every set hits its reps; a miss repeats it. Leave blank to use the rep range above at this set count, then one more set. Editing the steps starts over.`}
                         </p>
                       </div>
                     ) : (

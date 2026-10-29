@@ -88,6 +88,11 @@ function fillPlaceholders<T>(value: T, meta: ProgramMeta, week: number): T {
 function deloadExercise(ex: ExerciseSpec, multiplier: number): ExerciseSpec {
   const cut = (n: number) => Math.max(1, Math.round(n * multiplier))
   const { progress: _noProgression, ...rest } = ex
+  // Rep schemes keep their full spec (it identifies the scheme) and cap sets at use.
+  if (ex.progressionType === 'rep_sets') {
+    const n = Array.isArray(ex.sets) ? ex.sets.length : typeof ex.sets === 'number' ? ex.sets : 3
+    return { ...rest, deloadSets: cut(n) }
+  }
   if (Array.isArray(ex.sets)) return { ...rest, sets: ex.sets.slice(0, cut(ex.sets.length)) }
   return { ...rest, sets: cut(typeof ex.sets === 'number' ? ex.sets : 3) }
 }
