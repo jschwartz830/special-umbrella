@@ -10,6 +10,16 @@ export function buildProgressionRecommendation(
   outcome: WorkoutOutcome,
 ): ProgressionRecommendation | null {
   if (slot.type === 'weights' || slot.type === 'weightlifting') {
+    if (slot.isDeload) {
+      const exercises = outcome.weightsActual?.exercises ?? []
+      if (!exercises.some(ex => ex.sets.some(s => s.completed && !s.isWarmup))) return null
+      return {
+        discipline: 'weights',
+        mode: 'maintenance',
+        action: 'hold',
+        note: 'Deload week: no progression — loads and rep targets stay where they are.',
+      }
+    }
     return buildWeightsRecommendation(outcome.weightsActual?.exercises ?? [], outcome.perceivedEffort ?? null)
   }
 

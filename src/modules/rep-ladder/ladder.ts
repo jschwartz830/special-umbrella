@@ -60,12 +60,16 @@ export function ladderStep(state: LadderState | undefined, max: number | string,
 /** Concrete sets for today's ladder step, plus a status line showing where the cycle is. */
 export function applyLadder(ex: ExerciseSpec & { ladderMax: number }, step: number): ExerciseSpec {
   const total = ladderSessions(ex)
-  const reps = ladderReps(ex.ladderMax, Math.min(step, total - 1))
+  let reps = ladderReps(ex.ladderMax, Math.min(step, total - 1))
+  // Deload week: same step, fewer sets, and the session doesn't advance the ladder.
+  if (ex.deloadSets != null) reps = reps.slice(0, Math.max(1, Math.min(reps.length, ex.deloadSets)))
   return {
     ...ex,
     sets: reps.map(r => ({ reps: r })),
     reps: undefined,
-    ladderStatus: step >= total
+    ladderStatus: ex.deloadSets != null
+      ? `Ladder session ${Math.min(step, total - 1) + 1}/${total} · deload, no progress this week`
+      : step >= total
       ? 'Ladder cycle complete — test your max and update it in the plan'
       : `Ladder session ${step + 1}/${total} · max ${ex.ladderMax}`,
   }

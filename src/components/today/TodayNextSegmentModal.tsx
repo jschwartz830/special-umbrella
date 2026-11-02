@@ -1,4 +1,4 @@
-import { Play } from 'lucide-react'
+import { Check, Play } from 'lucide-react'
 import { Modal } from '../shared/Modal'
 import { estimateRunDurationMin } from '../../lib/estimateRunDuration'
 import type { SegmentKind, WorkoutSegment } from '../../lib/workoutSegments'
@@ -17,6 +17,7 @@ const DONE_HEADING: Record<SegmentKind, string> = {
   weights: 'Nice work on the lifts!',
   cardio: 'Nice run!',
   mobility: 'Mobility done!',
+  other: 'Nice work!',
 }
 
 function segmentDetail(next: WorkoutSegment, programVars: Record<string, number>): string {
@@ -24,6 +25,10 @@ function segmentDetail(next: WorkoutSegment, programVars: Record<string, number>
   if (kind === 'cardio') {
     const miles = slot.runConfig?.targetDistanceMiles
     return `~${estimateRunDurationMin(slot, programVars)} min${miles ? ` · ${miles} mi target` : ''}`
+  }
+  if (kind === 'other') {
+    const mins = slot.targetTime ?? slot.targetDuration
+    return mins ? `~${mins} min · tap done once you've finished it` : "Tap done once you've finished it"
   }
   const count = kind === 'mobility' ? slot.mobilityExercises?.length ?? 0 : slot.exercises?.length ?? 0
   return `${count} exercise${count === 1 ? '' : 's'}`
@@ -38,6 +43,7 @@ export function TodayNextSegmentModal({
   onLater,
 }: TodayNextSegmentModalProps) {
   const name = next.slot.name
+  const markDone = next.kind === 'other'
   return (
     <Modal title={DONE_HEADING[doneKind]} onClose={onLater}>
       <div className="space-y-4">
@@ -48,14 +54,16 @@ export function TodayNextSegmentModal({
         </div>
         <p className="text-xs text-slate-500">
           {sessionDurationMin ? `Your session is at ${sessionDurationMin} min. ` : ''}
-          Start it now, or log what you've done and do it later from Today's card.
+          {markDone
+            ? "Mark it done once you've finished, or log what you've done so far and mark it from Today's card later."
+            : "Start it now, or log what you've done and do it later from Today's card."}
         </p>
         <div className="space-y-2">
           <button
             onClick={onStart}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-colors"
           >
-            <Play size={16} /> Start {name}
+            {markDone ? <><Check size={16} /> Done with {name}</> : <><Play size={16} /> Start {name}</>}
           </button>
           <button
             onClick={onLater}

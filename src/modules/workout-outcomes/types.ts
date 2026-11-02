@@ -91,6 +91,8 @@ export interface WorkoutOutcome {
   swimActual?: SwimWorkoutActual | null
   /** Only present for mobility slots */
   mobilityActual?: MobilityWorkoutActual | null
+  /** The plan day's untracked part (a class, swim, yoga…) was marked done. */
+  otherSegmentDone?: boolean | null
   progressionRecommendation?: ProgressionRecommendation | null
 }
 

@@ -57,6 +57,8 @@ import { TodayPlanProgressModal } from '../components/today/TodayPlanProgressMod
 import { TodayCatchupModal } from '../components/today/TodayCatchupModal'
 import { TodayRotationModals } from '../components/today/TodayRotationModals'
 import { TodayPRBanner } from '../components/today/TodayPRBanner'
+import { TodayNextTargetsCard } from '../components/today/TodayNextTargetsCard'
+import { buildNextTargets, type NextTarget } from '../modules/workout-outcomes/nextTargets'
 import { TodayNextSegmentModal } from '../components/today/TodayNextSegmentModal'
 import { TodayUpcomingLogModal } from '../components/today/TodayUpcomingLogModal'
 import { SwipeToDelete } from '../components/shared/SwipeToDelete'
@@ -155,6 +157,7 @@ export function TodayPage() {
   const [showAddFromPlan, setShowAddFromPlan] = useState(false)
   const [showOverride, setShowOverride] = useState(false)
   const [newPRs, setNewPRs] = useState<string[] | null>(null)
+  const [nextTargets, setNextTargets] = useState<NextTarget[] | null>(null)
   const [workoutCopied, setWorkoutCopied] = useState(false)
   const [showJump, setShowJump] = useState(false)
   const [showCatchupConfirm, setShowCatchupConfirm] = useState(false)
@@ -494,11 +497,14 @@ export function TodayPage() {
   const mobilitySlot = daySegments.find(s => s.kind === 'mobility')?.slot
   const sessionTrackedMin =
     (activeTrackedDurationMin ?? 0) + (cardioTrackedDurationMin ?? 0) + (mobilityTracked?.durationMin ?? 0)
-  const hasSessionData = !!(activeTrackedExercises || cardioTrackedDurationMin !== null || mobilityTracked)
+  const otherDoneThisSession = sessionDoneKinds.includes('other')
+  const hasSessionData = !!(activeTrackedExercises || cardioTrackedDurationMin !== null || mobilityTracked || otherDoneThisSession)
 
   function startSegment(kind: SegmentKind) {
     if (kind === 'cardio') setCardioState('open')
     else if (kind === 'mobility') setMobilitySlotState('open')
+    // Done off the app (a class, swim…): starting it from a prompt means marking it done.
+    else if (kind === 'other') finishSegment('other')
     else setActiveWorkoutState('open')
   }
 
@@ -538,7 +544,11 @@ export function TodayPage() {
     setActiveTrackedExercises(exercises)
     setActiveTrackedDurationMin(elapsedMin)
     setActiveWorkoutState('hidden')
-    finishSegment('weights')
+    // With no lifts on the day, the general tracker was timing the untracked part (e.g. a swim).
+    const trackedKind: SegmentKind = !daySegments.some(s => s.kind === 'weights') && daySegments.some(s => s.kind === 'other')
+      ? 'other'
+      : 'weights'
+    finishSegment(trackedKind)
   }
 
   function handleCardioComplete(durationMin: number) {
@@ -611,6 +621,7 @@ export function TodayPage() {
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
     const isEditing = isEditingOutcomeRef.current
     isEditingOutcomeRef.current = false
+    const sessionHadLifts = activeTrackedExercises != null
 
     resetSession()
 
@@ -642,11 +653,32 @@ export function TodayPage() {
       }
     }
 
-    const primarySlotForLog = primaryPlanDay.slots[0]
-    if (primarySlotForLog) {
-      logOutcomeWithProgression(outcome, primarySlotForLog)
+    const varsBefore = { ...useProgramStore.getState().getVars(plan!.id) }
+    if (primaryPlanDay.slots.length > 0) {
+      logOutcomeWithProgression(outcome, primaryPlanDay.slots)
     } else {
       useOutcomeStore.getState().setOutcome(outcome)
+    }
+
+    // Each lift's target for next time, read after this session's progression ran.
+    const liftsSlot = primaryPlanDay.slots.find(s => (s.exercises?.length ?? 0) > 0)
+    const liftedToday = outcome.weightsActual?.exercises?.some(ex => ex.sets.some(st => st.completed && !st.isWarmup))
+    if (liftsSlot && liftedToday && (!isEditing || sessionHadLifts)) {
+      try {
+        const targets = buildNextTargets({
+          planId: plan!.id,
+          workoutInstanceId: outcome.workoutInstanceId,
+          slot: liftsSlot,
+          logged: outcome.weightsActual!.exercises,
+          varsBefore,
+          varsAfter: useProgramStore.getState().getVars(plan!.id),
+          ladderStates: useOutcomeStore.getState().ladderStates,
+          effort: outcome.perceivedEffort ?? null,
+        })
+        setNextTargets(targets.length > 0 ? targets : null)
+      } catch (err) {
+        console.error('[TodayPage] next-target summary failed (outcome already saved):', err)
+      }
     }
 
     if (!isEditing && outcome.weightsActual?.exercises?.length) {
@@ -701,9 +733,9 @@ export function TodayPage() {
       moveOutcome(oldId, nextId)
       outcome = { ...outcome, workoutInstanceId: nextId }
     }
-    const slot = bonusOutcome.rd.planDay.slots[0]
-    if (slot) {
-      logOutcomeWithProgression(outcome, slot)
+    const slots = bonusOutcome.rd.planDay.slots
+    if (slots.length > 0) {
+      logOutcomeWithProgression(outcome, slots)
     } else {
       useOutcomeStore.getState().setOutcome(outcome)
     }
@@ -767,7 +799,7 @@ export function TodayPage() {
 
   function handleUpcomingOutcomeConfirm(outcome: WorkoutOutcome) {
     if (!loggingUpcoming) return
-    const slot = loggingUpcoming.rd.planDay.slots[0]
+    const slots = loggingUpcoming.rd.planDay.slots
     const instanceId = loggingUpcoming.extraId
       ? makeExtraWorkoutInstanceId(plan!.id, today, loggingUpcoming.extraId)
       : undefined
@@ -782,8 +814,8 @@ export function TodayPage() {
       moveOutcome(instanceId, nextId)
       finalOutcome.workoutInstanceId = nextId
     }
-    if (slot) {
-      logOutcomeWithProgression(finalOutcome, slot)
+    if (slots.length > 0) {
+      logOutcomeWithProgression(finalOutcome, slots)
     } else {
       useOutcomeStore.getState().setOutcome(finalOutcome)
     }
@@ -874,6 +906,9 @@ export function TodayPage() {
       {/* Personal record celebration */}
       {newPRs && <TodayPRBanner newPRs={newPRs} onDismiss={() => setNewPRs(null)} />}
 
+      {/* Next-session targets after a lifting session */}
+      {nextTargets && <TodayNextTargetsCard targets={nextTargets} onDismiss={() => setNextTargets(null)} />}
+
       {/* Today's workout — compact card */}
       {todayResolved.status === 'today_day_off' ? (
         <div className="w-full rounded-xl border border-slate-700 bg-slate-800/80 p-4 flex items-center gap-3">
@@ -911,9 +946,10 @@ export function TodayPage() {
           todaySessionCount={todaySessionCount}
           activeWorkoutHidden={activeWorkoutState === 'hidden'}
           onStartWorkout={() => {
-            // A first slot with no dedicated tracker (e.g. swim) uses the general one.
-            const first = daySegments[0]
-            startSegment(first && first.slot === primaryPlanDay.slots[0] ? first.kind : 'weights')
+            // Start with the first tracked part (an untracked class is offered after it).
+            // A day with nothing trackable (e.g. a swim) uses the general tracker.
+            const first = daySegments.find(s => s.kind !== 'other')
+            startSegment(first ? first.kind : 'weights')
           }}
           lastSessionSummary={lastSessionSummary}
           prevSessionOutcome={prevSessionOutcome}
@@ -1080,6 +1116,7 @@ export function TodayPage() {
                     ? { exercises: activeTrackedExercises }
                     : loggedBase?.weightsActual ?? null,
                   mobilityActual: mobilityTracked?.actual ?? loggedBase?.mobilityActual ?? null,
+                  otherSegmentDone: otherDoneThisSession || loggedBase?.otherSegmentDone || null,
                 }
               : existingOutcome
           }

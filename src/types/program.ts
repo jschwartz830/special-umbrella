@@ -77,7 +77,7 @@ export interface ExerciseSpec {
   ladderSessions?: number
   /** rep_sets: custom steps, e.g. "3x4, 3x5, 4x6, 10/10/10". Empty = rep range at sets, then sets + 1. */
   repScheme?: string
-  /** rep_sets: set cap for a deload week, filled in by the deload transform; never saved. */
+  /** rep_sets / rep_ladder: set cap for a deload week, filled in by the deload transform; never saved. */
   deloadSets?: number
   /** rep_ladder / rep_sets: display-only status computed when today's sets are resolved; never saved. */
   ladderStatus?: string

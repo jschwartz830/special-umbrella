@@ -273,6 +273,7 @@ export function OutcomeModal({
       weightsActual: hasWeights ? { exercises: weightExercises } : null,
       // Not editable here — carry through what a mobility tracker logged.
       mobilityActual: existingOutcome?.mobilityActual ?? null,
+      ...(existingOutcome?.otherSegmentDone ? { otherSegmentDone: true } : {}),
     }
 
     onConfirm(outcome)

@@ -70,10 +70,10 @@ interface OutcomeState {
   getProgressionState: (progressionGroupId: string) => RunProgressionState | null
 
   /**
-   * Log an outcome and, if the slot is a progression-eligible run,
-   * evaluate and persist the next progression state.
+   * Log an outcome and evaluate progression (runs, rep ladders, program rules)
+   * for the slot — or every slot of a multi-part plan day.
    */
-  logOutcomeWithProgression: (outcome: WorkoutOutcome, slot: WorkoutSlot) => void
+  logOutcomeWithProgression: (outcome: WorkoutOutcome, slot: WorkoutSlot | WorkoutSlot[]) => void
 
   /**
    * Patch the notes field on an existing outcome record.
@@ -143,9 +143,17 @@ export const useOutcomeStore = create<OutcomeState>()(
         return get().progressionStates[progressionGroupId] ?? null
       },
 
-      logOutcomeWithProgression(outcome, slot) {
+      logOutcomeWithProgression(outcome, slotOrSlots) {
+        // A plan day can hold several slots (run → lifts → mobility); each one's
+        // progression is judged against the same combined outcome.
+        const slots = Array.isArray(slotOrSlots) ? slotOrSlots : [slotOrSlots]
+
         // 1. Attach an outcome-level progression recommendation and persist
-        const recommendation = buildProgressionRecommendation(slot, outcome)
+        let recommendation: WorkoutOutcome['progressionRecommendation'] = null
+        for (const slot of slots) {
+          recommendation = buildProgressionRecommendation(slot, outcome)
+          if (recommendation) break
+        }
         get().setOutcome({
           ...outcome,
           progressionRecommendation: recommendation,
@@ -154,8 +162,9 @@ export const useOutcomeStore = create<OutcomeState>()(
         // 2. Evaluate legacy run progression (runConfig-based).
         // Wrapped in try/catch: a bug in the progression engine must never
         // prevent the outcome from being persisted or the modal from closing.
-        const groupId = slot.runConfig?.progressionGroupId
-        if (slot.runConfig?.progressionEligible && groupId) {
+        for (const slot of slots) {
+          const groupId = slot.runConfig?.progressionGroupId
+          if (!slot.runConfig?.progressionEligible || !groupId) continue
           try {
             const prevState = get().progressionStates[groupId] ?? null
             const decision = evaluateRunProgression(slot, outcome, prevState)
@@ -176,14 +185,15 @@ export const useOutcomeStore = create<OutcomeState>()(
         const planId = parseWorkoutInstanceId(outcome.workoutInstanceId)?.planId
         if (!planId) return
 
+        const loggedByName = new Map((outcome.weightsActual?.exercises ?? []).map(e => [e.exercise, e]))
+
         // 3. Rep ladders / rep schemes: a session where every set hit its target advances
         // one step; a miss repeats it. Judged against the targets this session was given.
-        // Deload weeks (rep schemes) neither advance nor count as a miss.
-        const ladders = (slot.exercises ?? []).filter(ex =>
-          isLadderExercise(ex) || (isRepSchemeExercise(ex) && ex.deloadSets == null))
+        // Deload weeks neither advance nor count as a miss.
+        const ladders = slots.filter(s => !s.isDeload).flatMap(s => s.exercises ?? []).filter(ex =>
+          (isLadderExercise(ex) || isRepSchemeExercise(ex)) && ex.deloadSets == null)
         if (ladders.length > 0) {
           try {
-            const loggedByName = new Map((outcome.weightsActual?.exercises ?? []).map(e => [e.exercise, e]))
             const next = { ...get().ladderStates }
             for (const ex of ladders) {
               const key = ladderKey(planId, ex.exercise)
@@ -219,30 +229,32 @@ export const useOutcomeStore = create<OutcomeState>()(
             outcome.completionState !== 'deferred',
         }
 
-        // 4a. Slot-level progression (run slots)
-        // Wrapped in try/catch: a malformed YAML progression rule must never
-        // prevent the outcome from being persisted.
-        if (slot.slotProgress) {
-          try {
-            programStore.applyProgressionRule(planId, slot.slotProgress, ctxBase)
-          } catch (err) {
-            console.error('[outcomeStore] slot-level progression rule failed (outcome already saved):', err)
+        for (const slot of slots) {
+          // 4a. Slot-level progression (run slots)
+          // Wrapped in try/catch: a malformed YAML progression rule must never
+          // prevent the outcome from being persisted.
+          if (slot.slotProgress) {
+            try {
+              programStore.applyProgressionRule(planId, slot.slotProgress, ctxBase)
+            } catch (err) {
+              console.error('[outcomeStore] slot-level progression rule failed (outcome already saved):', err)
+            }
           }
-        }
 
-        // 4b. Per-exercise progression (weights slots). Each exercise is judged on its own
-        // sets: skipped/unfinished exercises hold, and `all_reps` means every working set
-        // reached the top of its rep range — not merely that the workout was completed.
-        if (slot.exercises) {
-          const loggedByName = new Map((outcome.weightsActual?.exercises ?? []).map(e => [e.exercise, e]))
-          for (const ex of slot.exercises) {
-            if (ex.progress) {
-              const result = evaluateExerciseProgress(ex, loggedByName.get(ex.exercise))
-              if (result === 'incomplete') continue
-              try {
-                programStore.applyProgressionRule(planId, ex.progress, { ...ctxBase, all_reps: result === 'hit' })
-              } catch (err) {
-                console.error('[outcomeStore] exercise progression rule failed (outcome already saved):', err)
+          // 4b. Per-exercise progression (weights slots). Each exercise is judged on its own
+          // sets: skipped/unfinished exercises hold, and `all_reps` means every working set
+          // reached the top of its rep range — not merely that the workout was completed.
+          // Deload weeks never progress (program deloads also strip the rules).
+          if (slot.exercises && !slot.isDeload) {
+            for (const ex of slot.exercises) {
+              if (ex.progress) {
+                const result = evaluateExerciseProgress(ex, loggedByName.get(ex.exercise))
+                if (result === 'incomplete') continue
+                try {
+                  programStore.applyProgressionRule(planId, ex.progress, { ...ctxBase, all_reps: result === 'hit' })
+                } catch (err) {
+                  console.error('[outcomeStore] exercise progression rule failed (outcome already saved):', err)
+                }
               }
             }
           }

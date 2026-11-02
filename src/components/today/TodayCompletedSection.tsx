@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronRight, Play } from 'lucide-react'
+import { Check, CheckCircle2, ChevronRight, Play } from 'lucide-react'
 import type { DayStatus, ExtraWorkoutEntry, PlanDay } from '../../types'
 import type { SegmentKind, WorkoutSegment } from '../../lib/workoutSegments'
 import { SwipeToDelete } from '../shared/SwipeToDelete'
@@ -54,10 +54,14 @@ export function TodayCompletedSection({
           onClick={() => onStartSegment?.(seg.kind)}
           className="w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700/70 transition-colors active:scale-[0.99]"
         >
-          <Play size={14} className="text-sky-400 flex-shrink-0" />
+          {seg.kind === 'other'
+            ? <Check size={14} className="text-sky-400 flex-shrink-0" />
+            : <Play size={14} className="text-sky-400 flex-shrink-0" />}
           <div className="flex-1 min-w-0">
             <p className="text-sm text-slate-200 font-medium truncate">{seg.slot.name}</p>
-            <p className="text-xs text-slate-500 mt-0.5">Not done yet · tap to start</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Not done yet · tap to {seg.kind === 'other' ? 'mark done' : 'start'}
+            </p>
           </div>
           <ChevronRight size={14} className="text-slate-500 flex-shrink-0" />
         </button>

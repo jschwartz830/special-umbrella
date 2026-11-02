@@ -17,6 +17,7 @@ const lifts: WorkoutSlot = {
   exercises: [{ exercise: 'Squat', sets: 3, reps: 5 }],
 }
 const swim: WorkoutSlot = { id: 's', type: 'swim', name: 'Swim' }
+const workoutClass: WorkoutSlot = { id: 'c', type: 'other', name: 'Spin class' }
 
 function day(...slots: WorkoutSlot[]): PlanDay {
   return { id: 'd', label: 'Day', slots }
@@ -32,8 +33,14 @@ describe('workoutSegments', () => {
     expect(workoutSegments(day(lifts, run)).map(s => s.kind)).toEqual(['weights', 'cardio'])
   })
 
-  it('skips slots without a live tracker', () => {
-    expect(workoutSegments(day(swim, mobility)).map(s => s.kind)).toEqual(['mobility'])
+  it('lists slots without a live tracker (class, swim) as mark-done segments', () => {
+    expect(workoutSegments(day(swim, mobility)).map(s => s.kind)).toEqual(['other', 'mobility'])
+    expect(workoutSegments(day(run, workoutClass)).map(s => s.kind)).toEqual(['cardio', 'other'])
+  })
+
+  it('skips rest slots', () => {
+    expect(workoutSegments(day(run, { id: 'x', type: 'other', subtype: 'rest', name: 'Rest' })).map(s => s.kind))
+      .toEqual(['cardio'])
   })
 })
 
@@ -57,9 +64,21 @@ describe('isSegmentLogged', () => {
       mobilityActual: { exercises: [{ exercise: 'x', sets: [{ completed: true }] }] },
     }))).toBe(true)
   })
+
+  it('counts a class as logged only once marked done (or a swim with data)', () => {
+    expect(isSegmentLogged('other', outcome({ runActual: { actualDurationMin: 30 } }))).toBe(false)
+    expect(isSegmentLogged('other', outcome({ otherSegmentDone: true }))).toBe(true)
+    expect(isSegmentLogged('other', outcome({ swimActual: { actualDistanceMeters: 800 } }))).toBe(true)
+  })
 })
 
 describe('remainingSegments', () => {
+  it('keeps the class pending when only the run was logged', () => {
+    const logged = outcome({ runActual: { actualDurationMin: 32 } })
+    expect(remainingSegments(day(run, workoutClass), logged).map(s => s.slot)).toEqual([workoutClass])
+    expect(remainingSegments(day(run, workoutClass), { ...logged, otherSegmentDone: true })).toEqual([])
+  })
+
   it('returns the mobility segment when only the run was logged', () => {
     const logged = outcome({ runActual: { actualDurationMin: 32 } })
     expect(remainingSegments(day(run, mobility), logged).map(s => s.kind)).toEqual(['mobility'])

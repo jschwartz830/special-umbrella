@@ -2,8 +2,11 @@ import type { PlanDay, WorkoutSlot } from '../types'
 import type { WorkoutOutcome } from '../modules/workout-outcomes/types'
 import { isRunType } from '../modules/workout-metadata/types'
 
-/** A part of a plan day that has its own live tracker. */
-export type SegmentKind = 'weights' | 'cardio' | 'mobility'
+/**
+ * A part of a plan day: one with its own live tracker, or `other` — a part done
+ * off the app (a class, swim, yoga) that's simply marked done.
+ */
+export type SegmentKind = 'weights' | 'cardio' | 'mobility' | 'other'
 
 export interface WorkoutSegment {
   kind: SegmentKind
@@ -14,11 +17,12 @@ function segmentKindForSlot(slot: WorkoutSlot): SegmentKind | null {
   if (isRunType(slot.type)) return 'cardio'
   if (slot.type === 'mobility') return 'mobility'
   if ((slot.exercises?.length ?? 0) > 0 || (slot.warmup?.length ?? 0) > 0) return 'weights'
-  return null
+  if (slot.type === 'rest' || slot.subtype === 'rest') return null
+  return 'other'
 }
 
 /**
- * Trackable segments of a plan day in slot order, e.g. run → mobility.
+ * Segments of a plan day in slot order, e.g. run → class.
  * One per kind — each tracker handles a single slot of its kind.
  */
 export function workoutSegments(planDay: PlanDay): WorkoutSegment[] {
@@ -39,6 +43,10 @@ export function isSegmentLogged(kind: SegmentKind, outcome: WorkoutOutcome): boo
       return outcome.runActual?.actualDurationMin != null || outcome.runActual?.actualDistanceMiles != null
     case 'mobility':
       return !!outcome.mobilityActual?.exercises?.some(ex => ex.sets.some(s => s.completed))
+    case 'other':
+      return outcome.otherSegmentDone === true
+        || outcome.swimActual?.actualDurationMin != null
+        || outcome.swimActual?.actualDistanceMeters != null
   }
 }
 
