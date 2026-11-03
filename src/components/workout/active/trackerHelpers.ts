@@ -129,30 +129,39 @@ export function parseInputNumber(v: string): number | null {
 
 /**
  * The set to do next: the first unfinished set, or the first unfinished set of
- * `focusExIdx` when one is focused. Supersets alternate — within a group, the
- * member with the fewest finished working sets goes next (ties: plan order),
- * so A1 → B1 → A2 → B2. A member's warmups run before its first working set.
+ * `focusExIdx` when one is focused. Supersets alternate — warmups first, then
+ * working sets. Within a group, while any member has warmups left, the member
+ * with the fewest finished warmups goes next (A-w1 → B-w1 → A-w2 → B-w2); after
+ * that, the member with the fewest finished working sets (A1 → B1 → A2 → B2).
+ * Ties go to plan order.
  */
 export function findNextSet(
   exercises: Pick<ExerciseTrackState, 'sets' | 'supersetGroupId'>[],
   focusExIdx: number | null = null,
 ): { exIdx: number; setIdx: number } | null {
   const nextIn = (ei: number) => exercises[ei].sets.findIndex(s => !s.completed)
-  const doneWork = (ei: number) => exercises[ei].sets.filter(s => s.completed && !s.isWarmup).length
+  const nextWarmupIn = (ei: number) => exercises[ei].sets.findIndex(s => !s.completed && s.isWarmup)
+  const done = (ei: number, warmup: boolean) =>
+    exercises[ei].sets.filter(s => s.completed && !!s.isWarmup === warmup).length
 
   let start = focusExIdx != null && exercises[focusExIdx] && nextIn(focusExIdx) !== -1 ? focusExIdx : -1
   if (start === -1) start = exercises.findIndex((_, ei) => nextIn(ei) !== -1)
   if (start === -1) return null
 
   const groupId = exercises[start].supersetGroupId
-  // Finish the starting exercise's warmups before handing off to its partner.
-  if (groupId && !exercises[start].sets[nextIn(start)].isWarmup) {
-    let best = start
-    exercises.forEach((ex, ei) => {
-      if (ex.supersetGroupId !== groupId || nextIn(ei) === -1) return
-      if (doneWork(ei) < doneWork(best) || (doneWork(ei) === doneWork(best) && ei < best)) best = ei
-    })
-    start = best
+  if (!groupId) return { exIdx: start, setIdx: nextIn(start) }
+
+  const members = exercises.map((_, ei) => ei).filter(ei => exercises[ei].supersetGroupId === groupId)
+  const pick = (candidates: number[], warmup: boolean) => candidates.reduce((best, ei) =>
+    done(ei, warmup) < done(best, warmup) || (done(ei, warmup) === done(best, warmup) && ei < best) ? ei : best)
+
+  // Warmups for every member come before anyone's working sets.
+  const warming = members.filter(ei => nextWarmupIn(ei) !== -1)
+  if (warming.length > 0) {
+    const ei = pick(warming, true)
+    return { exIdx: ei, setIdx: nextWarmupIn(ei) }
   }
-  return { exIdx: start, setIdx: nextIn(start) }
+  const working = members.filter(ei => nextIn(ei) !== -1)
+  const ei = pick(working, false)
+  return { exIdx: ei, setIdx: nextIn(ei) }
 }

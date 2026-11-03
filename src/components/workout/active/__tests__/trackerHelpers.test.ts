@@ -42,12 +42,34 @@ describe('findNextSet', () => {
     expect(findNextSet([a, b1])).toEqual({ exIdx: 0, setIdx: 1 })
   })
 
-  it('runs a member\'s warmups before handing off, and partner warmups before its first work set', () => {
-    const a = ex([set(true, true), set(false, true), set(false)], 'g')
-    const b = ex([set(false, true), set(false)], 'g')
+  it('alternates warmups between members, then working sets', () => {
+    const w = (n: number) => Array.from({ length: n }, (_, i) => i)
+    // Simulate a whole superset: A has 2 warmups + 2 work sets, B has 2 + 2.
+    const a = ex([set(false, true), set(false, true), set(false), set(false)], 'g')
+    const b = ex([set(false, true), set(false, true), set(false), set(false)], 'g')
+    const order: string[] = []
+    for (const _ of w(8)) {
+      const next = findNextSet([a, b])!
+      const target = [a, b][next.exIdx].sets[next.setIdx]
+      order.push(`${next.exIdx === 0 ? 'A' : 'B'}${target.isWarmup ? 'w' : ''}`)
+      target.completed = true
+    }
+    expect(order).toEqual(['Aw', 'Bw', 'Aw', 'Bw', 'A', 'B', 'A', 'B'])
+    expect(findNextSet([a, b])).toBeNull()
+  })
+
+  it('finishes remaining warmups before any working set, even if one member has more', () => {
+    const a = ex([set(true, true), set(false, true), set(false, true), set(false)], 'g')
+    const b = ex([set(true, true), set(false)], 'g')
     expect(findNextSet([a, b])).toEqual({ exIdx: 0, setIdx: 1 })
-    const aDone1 = ex([set(true, true), set(true, true), set(true), set(false)], 'g')
-    expect(findNextSet([aDone1, b])).toEqual({ exIdx: 1, setIdx: 0 })
+    const a2 = ex([set(true, true), set(true, true), set(false, true), set(false)], 'g')
+    expect(findNextSet([a2, b])).toEqual({ exIdx: 0, setIdx: 2 })
+  })
+
+  it('a member without warmups waits for its partner\'s warmups', () => {
+    const a = ex([set(false)], 'g')
+    const b = ex([set(false, true), set(false)], 'g')
+    expect(findNextSet([a, b])).toEqual({ exIdx: 1, setIdx: 0 })
   })
 
   it('finishes the remaining member when the partner is done', () => {
