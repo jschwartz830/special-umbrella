@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { X, Pause, Play, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List, Target } from 'lucide-react'
+import { X, Pause, Play, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List, Target, AlertTriangle } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
 import { useLandscapeAutoFocus } from '../../hooks/useLandscapeAutoFocus'
 import type { ExerciseSpec } from '../../types/program'
@@ -14,6 +14,7 @@ import { useExerciseHistoryStore } from '../../store/exerciseHistoryStore'
 import { equipmentKindFor, generateWarmups, recentOneRepMax, snapToAchievable, stepAchievable, estimateOneRepMax, type EquipmentLocation } from '../../lib/equipment'
 import { type SetTrackState, type ExerciseTrackState, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, findNextSet, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
 import { NumberTextField, TimerCol } from './active/TrackerInputs'
+import { findSupersetMisalignments, conformSuperset, type ConformOption } from './active/supersetAlignment'
 import { type ExercisePickerMode, ExercisePicker } from './active/ExercisePicker'
 
 export interface WorkoutSessionMeta {
@@ -105,6 +106,8 @@ export function ActiveWorkoutTracker({
   const [suppressedExercises, setSuppressedExercises] = useState<Set<number>>(() => new Set())
   const [revealedSets, setRevealedSets] = useState<Set<string>>(() => new Set())
   const [supersetPicker, setSupersetPicker] = useState<number | null>(null) // exIdx being assigned
+  // Superset mismatches the user chose to keep, keyed by group + set counts (a new mismatch shows again).
+  const [keptMisalignments, setKeptMisalignments] = useState<Set<string>>(new Set())
   // Manually-picked focus target, set from the full exercise list (e.g. "start here"
   // instead of the plan's order). Falls back to the first incomplete set once this
   // exercise's own sets are all logged.
@@ -860,6 +863,17 @@ export function ActiveWorkoutTracker({
     })
     return map
   }, [exercises])
+
+  const misalignments = useMemo(() => findSupersetMisalignments(exercises)
+    .map(m => ({ ...m, key: `${m.groupId}:${m.warmups.join(',')}:${m.working.join(',')}` }))
+    .filter(m => !keptMisalignments.has(m.key)), [exercises, keptMisalignments])
+
+  function applyConform(groupId: string, option: ConformOption) {
+    setExercises(prev => conformSuperset(prev, groupId, option, name => {
+      const kind = equipmentKindFor(name)
+      return lbs => snapToAchievable(lbs, kind, equipmentProfile)
+    }))
+  }
 
   function assignSuperset(exIdx: number, groupId: string | null) {
     setExercises(prev => prev.map((ex, ei) =>
@@ -1661,12 +1675,43 @@ export function ActiveWorkoutTracker({
             const ssInfo = ex.supersetGroupId ? supersetGroups.get(ex.supersetGroupId) : undefined
             const ssColors = ssInfo ? getColorClasses(ssInfo.color) : null
             const isTimedExercise = ex.sets.some(s => s.isTimed)
+            const misaligned = misalignments.find(m => m.members[0] === exIdx)
             return (
             <div key={ex.exercise + exIdx} className={`bg-slate-800/60 rounded-xl p-3 space-y-2 border ${ssColors ? ssColors.border : 'border-transparent'}`}>
               {ssInfo && (
                 <div className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider ${ssColors!.text}`}>
                   <Link2 size={10} />
                   <span>Superset {ssInfo.label}</span>
+                </div>
+              )}
+              {misaligned && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 space-y-1.5">
+                  <div className="flex items-start gap-1.5">
+                    <AlertTriangle size={12} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="text-xs font-semibold text-amber-300">Superset sets don't line up</p>
+                      {misaligned.summary.map(line => (
+                        <p key={line} className="text-[11px] text-amber-200/70">{line}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {misaligned.options.map(opt => (
+                      <button
+                        key={`${opt.part}-${opt.target}`}
+                        onClick={() => applyConform(misaligned.groupId, opt)}
+                        className="px-2 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-[11px] font-medium text-amber-200 transition-colors"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setKeptMisalignments(prev => new Set(prev).add(misaligned.key))}
+                      className="px-2 py-1 rounded-md bg-slate-700 hover:bg-slate-600 text-[11px] font-medium text-slate-300 transition-colors"
+                    >
+                      Keep as is
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="flex items-center justify-between min-w-0">
