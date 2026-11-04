@@ -129,6 +129,17 @@ function fewestPlates(inv: Array<[number, number]>, used: number[], target: numb
   return out
 }
 
+/**
+ * Plates per side (heaviest first, fewest plates) that load `load` lbs on a bar weighing
+ * `bar`, using the owned plates. [] means the empty bar; null means it can't be loaded.
+ */
+export function platesForLoad(bar: number, plates: PlateSpec[], load: number): number[] | null {
+  const perSide = u(load - bar) / 2
+  if (!Number.isInteger(perSide) || perSide < 0) return null
+  const fill = fewestPlates(inventory(plates), [], perSide)
+  return fill ? fill.sort((a, b) => b - a) : null
+}
+
 type Cost = [moves: number, plates: number, deviation: number]
 const less = (a: Cost, b: Cost) => a[0] !== b[0] ? a[0] < b[0] : a[1] !== b[1] ? a[1] < b[1] : a[2] < b[2] - 1e-9
 const add = (a: Cost, b: Cost): Cost => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]

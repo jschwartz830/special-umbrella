@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyPlatePlan, plateNoteFor } from '../platePlan'
+import { applyPlatePlan, plateNoteFor, plateLineFor } from '../platePlan'
 import { DEFAULT_EQUIPMENT } from '../../../../lib/equipment'
 import type { SetTrackState } from '../trackerHelpers'
 
@@ -27,5 +27,26 @@ describe('applyPlatePlan', () => {
     expect(applyPlatePlan(sets, 'dumbbell', DEFAULT_EQUIPMENT.gym)).toBe(sets)
     const noWarm = [set(185)]
     expect(applyPlatePlan(noWarm, 'barbell', DEFAULT_EQUIPMENT.gym)).toBe(noWarm)
+  })
+})
+
+describe('plateLineFor', () => {
+  const gym = DEFAULT_EQUIPMENT.gym
+  it('lists plates per side, heaviest first', () => {
+    expect(plateLineFor(set(225), 'barbell', gym)).toBe('Plates: 45/45 per side')
+    expect(plateLineFor(set(140), 'barbell', gym)).toBe('Plates: 45/2.5 per side')
+    expect(plateLineFor(set(45), 'barbell', gym)).toBe('Plates: empty bar')
+    expect(plateLineFor(set(55), 'ezbar', gym)).toBe('Plates: 10/5 per side')
+  })
+  it('flags weights the plates cannot make', () => {
+    expect(plateLineFor(set(136), 'barbell', gym)).toBe("Plates: can't load with your plates")
+    expect(plateLineFor(set(30), 'barbell', gym)).toBe('Plates: below the 45 lb bar')
+  })
+  it('matches the warmup plan stack, and ignores non-bar equipment', () => {
+    const out = applyPlatePlan([set(70, true), set(110, true), set(135)], 'barbell', DEFAULT_EQUIPMENT.home)
+    expect(out.map(s => plateLineFor(s, 'barbell', DEFAULT_EQUIPMENT.home))).toEqual([
+      'Plates: 10 per side', 'Plates: 10/25 per side', 'Plates: 10/25/10 per side',
+    ])
+    expect(plateLineFor(set(40), 'dumbbell', gym)).toBeNull()
   })
 })

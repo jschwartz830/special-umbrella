@@ -18,6 +18,8 @@ export interface SetTrackState {
   plateNote?: string
   /** The weight the note was planned for; the note hides once the weight is edited. */
   plateNoteLoad?: number | null
+  /** The planned per-side stack for plateNoteLoad, so the Plates line matches the loading note. */
+  platePerSide?: number[]
 }
 
 export interface ExerciseTrackState {

@@ -15,7 +15,7 @@ import { equipmentKindFor, generateWarmups, recentOneRepMax, snapToAchievable, s
 import { type SetTrackState, type ExerciseTrackState, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, findNextSet, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
 import { NumberTextField, TimerCol } from './active/TrackerInputs'
 import { findSupersetMisalignments, conformSuperset, type ConformOption } from './active/supersetAlignment'
-import { applyPlatePlan, plateNoteFor } from './active/platePlan'
+import { applyPlatePlan, plateNoteFor, plateLineFor } from './active/platePlan'
 import { type ExercisePickerMode, ExercisePicker } from './active/ExercisePicker'
 
 export interface WorkoutSessionMeta {
@@ -1516,6 +1516,12 @@ export function ActiveWorkoutTracker({
                 </div>
               </div>
             </div>
+            {(() => {
+              const line = plateLineFor(curSet, equipmentKindFor(curEx.exercise), equipmentProfile)
+              return line && (
+                <p className="mt-2 text-center text-xs text-slate-400 font-medium tabular-nums">{line}</p>
+              )
+            })()}
 
             </div>
 
@@ -1880,9 +1886,17 @@ export function ActiveWorkoutTracker({
                       <Check size={11} />
                     </button>
                     </div>
-                    {plateNoteFor(s) && !s.completed && (
-                      <p className="pl-[7.7%] pt-0.5 text-[10px] text-orange-300/80">{plateNoteFor(s)}</p>
-                    )}
+                    {!s.completed && (() => {
+                      const line = plateLineFor(s, equipmentKindFor(ex.exercise), equipmentProfile)
+                      const note = plateNoteFor(s)
+                      return (line || note) && (
+                        <p className="pl-[7.7%] pt-0.5 text-[10px] text-slate-400 tabular-nums">
+                          {line}
+                          {line && note && ' · '}
+                          {note && <span className="text-orange-300/80">{note}</span>}
+                        </p>
+                      )
+                    })()}
                   </div>
                 )
               })}
