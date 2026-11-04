@@ -14,6 +14,10 @@ export interface SetTrackState {
   isWarmup?: boolean
   /** True when the set is measured in seconds (duration-based) rather than reps. */
   isTimed?: boolean
+  /** Barbell loading step from the previous set, per side ("+25s", "−10s, +35s"). */
+  plateNote?: string
+  /** The weight the note was planned for; the note hides once the weight is edited. */
+  plateNoteLoad?: number | null
 }
 
 export interface ExerciseTrackState {

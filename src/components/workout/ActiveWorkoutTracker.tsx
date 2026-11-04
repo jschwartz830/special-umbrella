@@ -15,6 +15,7 @@ import { equipmentKindFor, generateWarmups, recentOneRepMax, snapToAchievable, s
 import { type SetTrackState, type ExerciseTrackState, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, findNextSet, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
 import { NumberTextField, TimerCol } from './active/TrackerInputs'
 import { findSupersetMisalignments, conformSuperset, type ConformOption } from './active/supersetAlignment'
+import { applyPlatePlan, plateNoteFor } from './active/platePlan'
 import { type ExercisePickerMode, ExercisePicker } from './active/ExercisePicker'
 
 export interface WorkoutSessionMeta {
@@ -340,7 +341,7 @@ export function ActiveWorkoutTracker({
             actualLoad: (isVarLoad(s.load ?? ex.load) ? base.resolvedLoadLbs : null) ?? snap(prev?.actualLoad) ?? base.actualLoad,
           }
         })
-        sets = [...warmupSets, ...workSets]
+        sets = applyPlatePlan([...warmupSets, ...workSets], kind, equipmentProfile)
       } else {
         const n = typeof ex.sets === 'number' ? ex.sets : 3
         const workSets = Array.from({ length: n }, (_, i) => {
@@ -354,7 +355,7 @@ export function ActiveWorkoutTracker({
             actualLoad: (isVarLoad(ex.load) ? base.resolvedLoadLbs : null) ?? snap(prev?.actualLoad) ?? base.actualLoad,
           }
         })
-        sets = [...warmupSets, ...workSets]
+        sets = applyPlatePlan([...warmupSets, ...workSets], kind, equipmentProfile)
       }
 
       return {
@@ -1462,6 +1463,9 @@ export function ActiveWorkoutTracker({
               <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-center">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Target</p>
                 <p className="text-sm text-sky-200 font-medium mt-1">{targetLabel(curSet)}</p>
+                {plateNoteFor(curSet) && (
+                  <p className="text-xs text-orange-300/80 mt-0.5">{plateNoteFor(curSet)}</p>
+                )}
               </div>
             </div>
 
@@ -1876,6 +1880,9 @@ export function ActiveWorkoutTracker({
                       <Check size={11} />
                     </button>
                     </div>
+                    {plateNoteFor(s) && !s.completed && (
+                      <p className="pl-[7.7%] pt-0.5 text-[10px] text-orange-300/80">{plateNoteFor(s)}</p>
+                    )}
                   </div>
                 )
               })}
