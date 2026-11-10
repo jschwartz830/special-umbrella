@@ -352,7 +352,7 @@ export function CardioWorkoutTracker({
       )}
 
       {/* Content */}
-      <div className="flex-1 flex flex-col gap-5 px-4 py-4">
+      <div className="flex-1 flex flex-col gap-5 px-4 pt-4 pb-[max(calc(env(safe-area-inset-bottom)+8px),16px)]">
         {/* Total elapsed clock */}
         <div className="text-center">
           <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Total time</p>

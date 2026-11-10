@@ -877,7 +877,7 @@ export function MobilityTracker({
       )}
 
       {/* ── Bottom: progress dots + nav + log ── */}
-      <div className="px-4 pt-3 pb-4 border-t border-slate-800 space-y-3">
+      <div className="px-4 pt-3 pb-[max(calc(env(safe-area-inset-bottom)+8px),16px)] border-t border-slate-800 space-y-3">
 
         {/* Progress dots — tap to jump to any exercise */}
         {routine.length > 0 && (

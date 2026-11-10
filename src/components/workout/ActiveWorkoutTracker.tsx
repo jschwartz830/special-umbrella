@@ -1436,7 +1436,7 @@ export function ActiveWorkoutTracker({
           // Portrait: stacked. Landscape phone (ls): exercise name across the top,
           // timer/action button on the left, set data on the right.
           <div
-            className="flex-1 flex flex-col px-5 pt-4 pb-6 overflow-y-auto ls:grid ls:grid-cols-[auto_minmax(0,1fr)] ls:grid-rows-[auto_minmax(0,1fr)] ls:gap-x-6 ls:gap-y-2 ls:pt-2 ls:pb-3"
+            className="flex-1 flex flex-col px-5 pt-4 pb-[max(calc(env(safe-area-inset-bottom)+8px),24px)] overflow-y-auto ls:grid ls:grid-cols-[auto_minmax(0,1fr)] ls:grid-rows-[auto_minmax(0,1fr)] ls:gap-x-6 ls:gap-y-2 ls:pt-2 ls:pb-[max(env(safe-area-inset-bottom),12px)]"
             style={{
               paddingLeft: 'max(env(safe-area-inset-left), 20px)',
               paddingRight: 'max(env(safe-area-inset-right), 20px)',
@@ -1945,7 +1945,7 @@ export function ActiveWorkoutTracker({
         </button>
       </div>
 
-      <div className="flex-shrink-0 px-4 pt-3 pb-6 border-t border-slate-800 bg-slate-900 ls:col-start-1 ls:row-start-3 ls:self-end ls:border-t-0 ls:pr-0 ls:pb-4">
+      <div className="flex-shrink-0 px-4 pt-3 pb-[max(calc(env(safe-area-inset-bottom)+8px),24px)] border-t border-slate-800 bg-slate-900 ls:col-start-1 ls:row-start-3 ls:self-end ls:border-t-0 ls:pr-0 ls:pb-[max(calc(env(safe-area-inset-bottom)+8px),16px)]">
         <button
           onClick={handleDone}
           className="w-full py-3.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-semibold text-sm transition-colors active:scale-[0.98]"
