@@ -22,17 +22,6 @@ export interface MobilityCompletion {
   completedSets?: Record<string, number[]>
 }
 
-export interface MobilitySessionCheckpoint {
-  date: string
-  exerciseIds: string[]   // routine snapshot at session start
-  currentIdx: number
-  currentSetIdx: number   // which set within the current exercise
-  completedIds: string[]  // exercises with every set completed
-  completedSets: Record<string, number[]>  // exerciseId -> completed set indices
-  totalElapsedSec: number
-  exElapsedSec: number    // accumulated time on the current timed set before pause
-}
-
 const DEFAULT_ROUTINE: MobilityExercise[] = [
   { id: 'hip-90-90', name: 'Hip 90/90', sets: singleTimedSet(60) },
   { id: 'worlds-greatest', name: "World's Greatest Stretch", sets: singleTimedSet(60) },
@@ -50,7 +39,6 @@ function cloneExercises(exercises: MobilityRoutineExercise[]): MobilityRoutineEx
 interface MobilityState {
   routine: MobilityExercise[]
   completions: Record<string, MobilityCompletion>
-  activeSession: MobilitySessionCheckpoint | null
   soundEnabled: boolean
   customTemplates: MobilityUserTemplate[]
 
@@ -71,14 +59,6 @@ interface MobilityState {
   loadTemplate: (id: string, mode: 'replace' | 'append') => void
   logCompletion: (date: string, completion: MobilityCompletion) => void
   removeCompletion: (date: string) => void
-  startSession: (date: string, exerciseIds: string[]) => void
-  /** Reopens a day that already has a logged completion, seeding a resumable
-   *  session from its progress so the remaining exercises can be finished.
-   *  No-ops if a session for `date` is already active (don't clobber unsaved
-   *  progress) or if there's no completion to resume from. */
-  resumeCompletion: (date: string, exerciseIds: string[]) => void
-  saveCheckpoint: (cp: MobilitySessionCheckpoint) => void
-  clearSession: () => void
 }
 
 export const useMobilityStore = create<MobilityState>()(
@@ -86,7 +66,6 @@ export const useMobilityStore = create<MobilityState>()(
     (set) => ({
       routine: DEFAULT_ROUTINE,
       completions: {},
-      activeSession: null,
       soundEnabled: true,
       customTemplates: [],
 
@@ -225,55 +204,10 @@ export const useMobilityStore = create<MobilityState>()(
           return { completions: next }
         })
       },
-
-      startSession(date, exerciseIds) {
-        set({
-          activeSession: {
-            date,
-            exerciseIds,
-            currentIdx: 0,
-            currentSetIdx: 0,
-            completedIds: [],
-            completedSets: {},
-            totalElapsedSec: 0,
-            exElapsedSec: 0,
-          },
-        })
-      },
-
-      resumeCompletion(date, exerciseIds) {
-        set(s => {
-          if (s.activeSession?.date === date) return s
-          const completion = s.completions[date]
-          if (!completion) return s
-          if (exerciseIds.length === 0) return s
-          const firstIncompleteIdx = exerciseIds.findIndex(id => !completion.completedExerciseIds.includes(id))
-          return {
-            activeSession: {
-              date,
-              exerciseIds,
-              currentIdx: firstIncompleteIdx === -1 ? exerciseIds.length - 1 : firstIncompleteIdx,
-              currentSetIdx: 0,
-              completedIds: completion.completedExerciseIds,
-              completedSets: completion.completedSets ?? {},
-              totalElapsedSec: completion.durationMin * 60,
-              exElapsedSec: 0,
-            },
-          }
-        })
-      },
-
-      saveCheckpoint(cp) {
-        set({ activeSession: cp })
-      },
-
-      clearSession() {
-        set({ activeSession: null })
-      },
     }),
     {
       name: 'wpt_mobility',
-      version: 4,
+      version: 5,
       migrate: migrateMobilityState,
     },
   ),
@@ -281,17 +215,14 @@ export const useMobilityStore = create<MobilityState>()(
 
 /** @internal Exported for testing — see src/store/__tests__/mobilityStore.test.ts */
 export function migrateMobilityState(state: unknown, fromVersion: number): unknown {
-  if (fromVersion >= 4) return state
-  if (fromVersion <= 1) {
-    state = { ...(state as object), activeSession: null }
-  }
+  if (fromVersion >= 5) return state
   if (fromVersion <= 2) {
     const s = state as { routine?: Array<{ id: string; name: string; durationSec?: number; sets?: MobilitySet[] }> }
     const routine = (s.routine ?? []).map(e => ({
       ...e,
       sets: e.sets ?? singleTimedSet(e.durationSec ?? 30),
     }))
-    state = { ...(state as object), routine, activeSession: null }
+    state = { ...(state as object), routine }
   }
   if (fromVersion <= 3) {
     const s = state as { customTemplates?: MobilityUserTemplate[] }
@@ -301,9 +232,12 @@ export function migrateMobilityState(state: unknown, fromVersion: number): unkno
   // versioned localStorage migration. Always normalize the routine here so a
   // legacy cloud payload cannot leave the editor rendering fallback sets that
   // its actions are then unable to update or save as a template.
-  const current = state as { routine?: MobilityRoutineExercise[]; customTemplates?: MobilityUserTemplate[] }
+  // v5 drops the old MobilityTracker's resumable checkpoint (`activeSession`);
+  // in-progress sessions now live in the shared tracker's per-device draft.
+  const { activeSession: _dropped, ...rest } = state as { activeSession?: unknown }
+  const current = rest as { routine?: MobilityRoutineExercise[]; customTemplates?: MobilityUserTemplate[] }
   return {
-    ...(state as object),
+    ...rest,
     routine: normalizeMobilityRoutine(current.routine),
     customTemplates: (current.customTemplates ?? []).map(template => ({
       ...template,

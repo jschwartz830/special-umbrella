@@ -2,13 +2,11 @@
  * Tests for mobilityStore business logic.
  * Covers: addExercise, removeExercise, reorderExercise, updateExercise,
  * addSet/updateSet/removeSet, logCompletion, removeCompletion, default
- * routine, addExerciseFromLibrary, loadPreset, startSession, saveCheckpoint,
- * clearSession, and the v2->v3 migration to the sets-based model.
+ * routine, addExerciseFromLibrary, loadPreset, templates, and the persisted
+ * state migrations.
  *
  * The persist middleware is mocked as a pass-through so the store works
- * in a Node test environment without localStorage. This also bypasses the
- * v1->v2 migration, which adds { activeSession: null } to persisted state.
- * The migration itself is a trivial one-liner and is not separately tested here.
+ * in a Node test environment without localStorage.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { singleTimedSet, MOBILITY_PRESETS, getLibraryExerciseById } from '../../lib/mobilityLibrary'
@@ -18,7 +16,7 @@ vi.mock('zustand/middleware', () => ({
 }))
 
 import { useMobilityStore, migrateMobilityState } from '../mobilityStore'
-import type { MobilityCompletion, MobilitySessionCheckpoint } from '../mobilityStore'
+import type { MobilityCompletion } from '../mobilityStore'
 
 const DEFAULT_ROUTINE = [
   { id: 'hip-90-90',       name: 'Hip 90/90',                  sets: singleTimedSet(60) },
@@ -34,7 +32,6 @@ function resetStore() {
   useMobilityStore.setState({
     routine: DEFAULT_ROUTINE,
     completions: {},
-    activeSession: null,
     customTemplates: [],
   })
 }
@@ -551,213 +548,6 @@ describe('loadTemplate', () => {
   })
 })
 
-// ── startSession ──────────────────────────────────────────────────────────────
-
-describe('startSession', () => {
-  beforeEach(resetStore)
-
-  it('creates an activeSession with the given date and exerciseIds', () => {
-    const ids = ['hip-90-90', 'cat-cow']
-    useMobilityStore.getState().startSession('2026-07-01', ids)
-    const s = useMobilityStore.getState().activeSession
-    expect(s?.date).toBe('2026-07-01')
-    expect(s?.exerciseIds).toEqual(ids)
-  })
-
-  it('initializes currentIdx and currentSetIdx to 0', () => {
-    useMobilityStore.getState().startSession('2026-07-01', ['hip-90-90'])
-    const s = useMobilityStore.getState().activeSession
-    expect(s?.currentIdx).toBe(0)
-    expect(s?.currentSetIdx).toBe(0)
-  })
-
-  it('initializes completedIds and completedSets to empty', () => {
-    useMobilityStore.getState().startSession('2026-07-01', ['hip-90-90'])
-    const s = useMobilityStore.getState().activeSession
-    expect(s?.completedIds).toEqual([])
-    expect(s?.completedSets).toEqual({})
-  })
-
-  it('initializes totalElapsedSec and exElapsedSec to 0', () => {
-    useMobilityStore.getState().startSession('2026-07-01', ['hip-90-90'])
-    const s = useMobilityStore.getState().activeSession
-    expect(s?.totalElapsedSec).toBe(0)
-    expect(s?.exElapsedSec).toBe(0)
-  })
-
-  it('overwrites any existing activeSession', () => {
-    useMobilityStore.getState().startSession('2026-06-30', ['hip-90-90'])
-    useMobilityStore.getState().startSession('2026-07-01', ['cat-cow'])
-    const s = useMobilityStore.getState().activeSession
-    expect(s?.date).toBe('2026-07-01')
-    expect(s?.exerciseIds).toEqual(['cat-cow'])
-  })
-})
-
-// ── saveCheckpoint ────────────────────────────────────────────────────────────
-
-describe('saveCheckpoint', () => {
-  beforeEach(resetStore)
-
-  const checkpoint: MobilitySessionCheckpoint = {
-    date: '2026-07-01',
-    exerciseIds: ['hip-90-90', 'cat-cow', 'pigeon-pose'],
-    currentIdx: 1,
-    currentSetIdx: 0,
-    completedIds: ['hip-90-90'],
-    completedSets: { 'hip-90-90': [0] },
-    totalElapsedSec: 75,
-    exElapsedSec: 12.5,
-  }
-
-  it('replaces activeSession with the provided checkpoint', () => {
-    useMobilityStore.getState().saveCheckpoint(checkpoint)
-    expect(useMobilityStore.getState().activeSession).toEqual(checkpoint)
-  })
-
-  it('stores all checkpoint fields correctly', () => {
-    useMobilityStore.getState().saveCheckpoint(checkpoint)
-    const s = useMobilityStore.getState().activeSession!
-    expect(s.currentIdx).toBe(1)
-    expect(s.completedIds).toEqual(['hip-90-90'])
-    expect(s.totalElapsedSec).toBe(75)
-    expect(s.exElapsedSec).toBe(12.5)
-  })
-
-  it('overwrites a previously saved checkpoint', () => {
-    useMobilityStore.getState().saveCheckpoint(checkpoint)
-    const updated: MobilitySessionCheckpoint = { ...checkpoint, currentIdx: 2, completedIds: ['hip-90-90', 'cat-cow'] }
-    useMobilityStore.getState().saveCheckpoint(updated)
-    expect(useMobilityStore.getState().activeSession?.currentIdx).toBe(2)
-    expect(useMobilityStore.getState().activeSession?.completedIds).toHaveLength(2)
-  })
-})
-
-// ── resumeCompletion ──────────────────────────────────────────────────────────
-
-describe('resumeCompletion', () => {
-  beforeEach(resetStore)
-
-  const ids = ['hip-90-90', 'worlds-greatest', 'cat-cow']
-
-  it('seeds an activeSession from the logged completion', () => {
-    useMobilityStore.getState().logCompletion('2026-07-01', {
-      completedAt: '2026-07-01T08:00:00.000Z',
-      durationMin: 5,
-      completedExerciseIds: ['hip-90-90'],
-      completedSets: { 'hip-90-90': [0] },
-    })
-    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
-    const s = useMobilityStore.getState().activeSession
-    expect(s?.date).toBe('2026-07-01')
-    expect(s?.completedIds).toEqual(['hip-90-90'])
-    expect(s?.completedSets).toEqual({ 'hip-90-90': [0] })
-    expect(s?.totalElapsedSec).toBe(300)
-  })
-
-  it('positions currentIdx at the first not-yet-completed exercise', () => {
-    useMobilityStore.getState().logCompletion('2026-07-01', {
-      completedAt: '2026-07-01T08:00:00.000Z',
-      durationMin: 5,
-      completedExerciseIds: ['hip-90-90'],
-    })
-    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
-    expect(useMobilityStore.getState().activeSession?.currentIdx).toBe(1) // worlds-greatest
-  })
-
-  it('lands on the last exercise when every exercise was already completed', () => {
-    useMobilityStore.getState().logCompletion('2026-07-01', {
-      completedAt: '2026-07-01T08:00:00.000Z',
-      durationMin: 5,
-      completedExerciseIds: ids,
-    })
-    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
-    expect(useMobilityStore.getState().activeSession?.currentIdx).toBe(ids.length - 1)
-  })
-
-  it('is a no-op when there is no completion for the date', () => {
-    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
-    expect(useMobilityStore.getState().activeSession).toBeNull()
-  })
-
-  it('does not clobber an already-active session for the same date', () => {
-    useMobilityStore.getState().logCompletion('2026-07-01', {
-      completedAt: '2026-07-01T08:00:00.000Z',
-      durationMin: 5,
-      completedExerciseIds: ['hip-90-90'],
-    })
-    useMobilityStore.getState().startSession('2026-07-01', ids)
-    useMobilityStore.getState().saveCheckpoint({
-      date: '2026-07-01',
-      exerciseIds: ids,
-      currentIdx: 2,
-      currentSetIdx: 0,
-      completedIds: ['hip-90-90', 'worlds-greatest'],
-      completedSets: {},
-      totalElapsedSec: 999,
-      exElapsedSec: 0,
-    })
-    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
-    const s = useMobilityStore.getState().activeSession
-    expect(s?.currentIdx).toBe(2)
-    expect(s?.totalElapsedSec).toBe(999)
-  })
-
-  it('leaves the original completion untouched', () => {
-    const completion = {
-      completedAt: '2026-07-01T08:00:00.000Z',
-      durationMin: 5,
-      completedExerciseIds: ['hip-90-90'],
-    }
-    useMobilityStore.getState().logCompletion('2026-07-01', completion)
-    useMobilityStore.getState().resumeCompletion('2026-07-01', ids)
-    expect(useMobilityStore.getState().completions['2026-07-01']).toEqual(completion)
-  })
-
-  it('is a no-op when exerciseIds is empty (guard against empty-routine crash)', () => {
-    useMobilityStore.getState().logCompletion('2026-07-01', {
-      completedAt: '2026-07-01T08:00:00.000Z',
-      durationMin: 5,
-      completedExerciseIds: [],
-    })
-    // An empty routine would previously compute currentIdx = Math.max(0, -1) = 0,
-    // indexing into an empty array and returning undefined.
-    useMobilityStore.getState().resumeCompletion('2026-07-01', [])
-    expect(useMobilityStore.getState().activeSession).toBeNull()
-  })
-})
-
-// ── clearSession ──────────────────────────────────────────────────────────────
-
-describe('clearSession', () => {
-  beforeEach(resetStore)
-
-  it('sets activeSession to null', () => {
-    useMobilityStore.getState().startSession('2026-07-01', ['hip-90-90'])
-    useMobilityStore.getState().clearSession()
-    expect(useMobilityStore.getState().activeSession).toBeNull()
-  })
-
-  it('is a no-op when activeSession is already null', () => {
-    expect(useMobilityStore.getState().activeSession).toBeNull()
-    useMobilityStore.getState().clearSession()
-    expect(useMobilityStore.getState().activeSession).toBeNull()
-  })
-
-  it('leaves routine and completions intact after clear', () => {
-    const completion: MobilityCompletion = {
-      completedAt: '2026-07-01T08:00:00.000Z',
-      durationMin: 10,
-      completedExerciseIds: ['hip-90-90'],
-    }
-    useMobilityStore.getState().logCompletion('2026-07-01', completion)
-    useMobilityStore.getState().startSession('2026-07-01', ['hip-90-90'])
-    useMobilityStore.getState().clearSession()
-    expect(useMobilityStore.getState().routine).toHaveLength(DEFAULT_ROUTINE.length)
-    expect(useMobilityStore.getState().completions['2026-07-01']).toEqual(completion)
-  })
-})
-
 // ── v2 -> v3 migration ──────────────────────────────────────────────────────
 
 describe('migrateMobilityState (v2 -> v3)', () => {
@@ -765,27 +555,25 @@ describe('migrateMobilityState (v2 -> v3)', () => {
     const legacyState = {
       routine: [{ id: 'hip-90-90', name: 'Hip 90/90', durationSec: 60 }],
       completions: {},
-      activeSession: null,
     }
     const migrated = migrateMobilityState(legacyState, 2) as { routine: Array<{ sets: Array<{ durationSec?: number }> }> }
     expect(migrated.routine[0].sets).toEqual([{ durationSec: 60 }])
   })
 
-  it('nulls out an in-flight activeSession from before v3', () => {
+  it('drops an in-flight activeSession from before v3', () => {
     const legacyState = {
       routine: [],
       completions: {},
       activeSession: { date: '2026-01-01', exerciseIds: [], currentIdx: 0, completedIds: [], totalElapsedSec: 0, exElapsedSec: 0 },
     }
-    const migrated = migrateMobilityState(legacyState, 2) as { activeSession: unknown }
-    expect(migrated.activeSession).toBeNull()
+    const migrated = migrateMobilityState(legacyState, 2) as object
+    expect(migrated).not.toHaveProperty('activeSession')
   })
 
   it('preserves already-present sets when re-applying the v2->v3 step', () => {
     const state = {
       routine: [{ id: 'a', name: 'A', sets: [{ reps: 10 }] }],
       completions: {},
-      activeSession: null,
     }
     const migrated = migrateMobilityState(state, 2) as { routine: typeof state.routine }
     expect(migrated.routine).toEqual(state.routine)
@@ -799,7 +587,6 @@ describe('migrateMobilityState (v3 -> v4)', () => {
     const legacyState = {
       routine: DEFAULT_ROUTINE,
       completions: {},
-      activeSession: null,
     }
     const migrated = migrateMobilityState(legacyState, 3) as { customTemplates: unknown }
     expect(migrated.customTemplates).toEqual([])
@@ -810,21 +597,40 @@ describe('migrateMobilityState (v3 -> v4)', () => {
     const legacyState = {
       routine: DEFAULT_ROUTINE,
       completions: {},
-      activeSession: null,
       customTemplates: templates,
     }
     const migrated = migrateMobilityState(legacyState, 3) as { customTemplates: unknown }
     expect(migrated.customTemplates).toEqual(templates)
   })
 
-  it('leaves an already-migrated (v4) state untouched', () => {
+})
+
+// ── v4 -> v5 migration ──────────────────────────────────────────────────────
+
+describe('migrateMobilityState (v4 -> v5)', () => {
+  it('drops the old tracker checkpoint and keeps everything else', () => {
+    const completions = { '2026-07-01': { completedAt: 'x', durationMin: 5, completedExerciseIds: ['hip-90-90'] } }
+    const state = {
+      routine: DEFAULT_ROUTINE,
+      completions,
+      activeSession: { date: '2026-07-01', exerciseIds: ['hip-90-90'], currentIdx: 0, currentSetIdx: 0, completedIds: [], completedSets: {}, totalElapsedSec: 30, exElapsedSec: 0 },
+      soundEnabled: false,
+      customTemplates: [],
+    }
+    const migrated = migrateMobilityState(state, 4) as Record<string, unknown>
+    expect(migrated).not.toHaveProperty('activeSession')
+    expect(migrated.routine).toEqual(DEFAULT_ROUTINE)
+    expect(migrated.completions).toEqual(completions)
+    expect(migrated.soundEnabled).toBe(false)
+  })
+
+  it('leaves an already-migrated (v5) state untouched', () => {
     const state = {
       routine: DEFAULT_ROUTINE,
       completions: {},
-      activeSession: null,
       customTemplates: [],
     }
-    const migrated = migrateMobilityState(state, 4)
+    const migrated = migrateMobilityState(state, 5)
     expect(migrated).toBe(state)
   })
 })
