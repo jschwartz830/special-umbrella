@@ -1,17 +1,22 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { ActiveWorkoutTracker } from '../workout/ActiveWorkoutTracker'
 import type { WorkoutSessionMeta } from '../workout/ActiveWorkoutTracker'
 import { CardioWorkoutTracker } from '../workout/CardioWorkoutTracker'
-import { MobilityTracker } from '../workout/MobilityTracker'
 import { OutcomeModal } from '../workout/OutcomeModal'
 import { Modal } from '../shared/Modal'
 import { useOutcomeStore, makeExtraWorkoutInstanceId } from '../../store/outcomeStore'
 import type { ExtraWorkoutEntry } from '../../types'
 import type { WorkoutType, WorkoutSlot, PlanDay } from '../../types'
-import type { LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../../modules/workout-outcomes/types'
-import type { MobilitySessionCheckpoint } from '../../store/mobilityStore'
+import type { LoggedExerciseActual } from '../../modules/workout-outcomes/types'
 import { useMobilityStore } from '../../store/mobilityStore'
+import {
+  mobilityRoutineToSlot,
+  trackedToMobilityActual,
+  trackedToMobilityProgress,
+  mobilityCompletionState,
+  insertRoutineExercise,
+  replaceRoutineExercise,
+} from '../../lib/mobilityAdapter'
 import { nanoid } from '../../lib/utils'
 import { WORKOUT_TYPE_OPTIONS } from '../../lib/constants'
 
@@ -51,12 +56,10 @@ export function TodayAdHocWorkout({
   const [trackedExercises, setTrackedExercises] = useState<LoggedExerciseActual[] | null>(null)
   const [trackedDurationMin, setTrackedDurationMin] = useState<number | null>(null)
   const [showOutcome, setShowOutcome] = useState(false)
-  const [mobilitySession, setMobilitySession] = useState<MobilitySessionCheckpoint | null>(null)
-  const mobilityLoggedRef = useRef(false)
-  const navigate = useNavigate()
   const mobilityRoutine = useMobilityStore(s => s.routine)
   const mobilitySoundEnabled = useMobilityStore(s => s.soundEnabled)
   const mobilitySetSoundEnabled = useMobilityStore(s => s.setSoundEnabled)
+  const setMobilityRoutine = useMobilityStore(s => s.setRoutine)
 
   const isActive = trackerState !== 'hidden' || showOutcome
   useEffect(() => { onActiveChange(isActive) }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -75,7 +78,6 @@ export function TodayAdHocWorkout({
     setPlanDay(null)
     setTrackedExercises(null)
     setTrackedDurationMin(null)
-    setMobilitySession(null)
   }
 
   function cancelTracker() {
@@ -84,42 +86,18 @@ export function TodayAdHocWorkout({
     setTrackerState('hidden')
   }
 
-  function handleMobilityLog(
-    mobilitySlot: WorkoutSlot,
-    completedAt: string,
-    durationMin: number,
-    completedExerciseIds: string[],
-    completedSets: Record<string, number[]>,
-  ) {
+  function handleMobilityLog(mobilitySlot: WorkoutSlot, logged: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     if (!extraId) return
-    const exercises = mobilitySlot.mobilityExercises ?? []
-    const mobilityActual: MobilityWorkoutActual = {
-      exercises: exercises.map(ex => ({
-        exercise: ex.name,
-        sets: ex.sets.map((s, i) => {
-          const done = (completedSets[ex.id] ?? []).includes(i)
-          return {
-            targetDurationSec: s.durationSec ?? null,
-            targetReps: s.reps ?? null,
-            actualDurationSec: done ? s.durationSec ?? null : null,
-            actualReps: done ? s.reps ?? null : null,
-            completed: done,
-          }
-        }),
-      })),
-    }
-    const allDone = exercises.length > 0 && exercises.every(ex => completedExerciseIds.includes(ex.id))
-    const completionState: WorkoutCompletionState = exercises.length === 0 || allDone
-      ? 'completed'
-      : completedExerciseIds.length > 0 ? 'partially_completed' : 'skipped'
+    const { completedExerciseIds } = trackedToMobilityProgress(logged, mobilitySlot.mobilityExercises)
     useOutcomeStore.getState().setOutcome({
       workoutInstanceId: makeExtraWorkoutInstanceId(planId, today, extraId),
-      completionState,
-      completedAt,
-      durationActualMin: durationMin,
-      mobilityActual,
+      completionState: mobilityCompletionState(mobilitySlot.mobilityExercises, completedExerciseIds),
+      completedAt: meta.endTime,
+      durationActualMin: Math.max(1, Math.round(meta.totalElapsedSeconds / 60)),
+      mobilityActual: trackedToMobilityActual(logged),
     })
-    mobilityLoggedRef.current = true
+    resetState()
+    setTrackerState('hidden')
   }
 
   return (
@@ -164,46 +142,31 @@ export function TodayAdHocWorkout({
       )}
 
       {/* Mobility — runs a snapshot of the saved mobility routine */}
-      {trackerState !== 'hidden' && extraId && slot && trackerKind(slot.type) === 'mobility' && (
-        <MobilityTracker
-          today={today}
-          title={slot.name}
-          routine={slot.mobilityExercises ?? []}
-          activeSession={mobilitySession}
-          soundEnabled={mobilitySoundEnabled}
-          setSoundEnabled={mobilitySetSoundEnabled}
-          startSession={(date, exerciseIds) => setMobilitySession({
-            date,
-            exerciseIds,
-            currentIdx: 0,
-            currentSetIdx: 0,
-            completedIds: [],
-            completedSets: {},
-            totalElapsedSec: 0,
-            exElapsedSec: 0,
-          })}
-          saveCheckpoint={cp => setMobilitySession(cp)}
-          clearSession={() => setMobilitySession(null)}
-          onLogCompletion={({ completedAt, durationMin, completedExerciseIds, completedSets }) => {
-            handleMobilityLog(slot, completedAt, durationMin, completedExerciseIds, completedSets)
-          }}
-          onClose={() => {
-            if (mobilityLoggedRef.current) {
-              resetState()
-              setTrackerState('hidden')
-            } else {
-              cancelTracker()
-            }
-          }}
-          minimized={trackerState === 'minimized'}
-          onMinimize={() => setTrackerState('minimized')}
-          onResume={() => setTrackerState('open')}
-          onManageRoutine={() => {
-            cancelTracker()
-            navigate('/mobility')
-          }}
-        />
-      )}
+      {trackerState !== 'hidden' && extraId && slot && planDay && trackerKind(slot.type) === 'mobility' && (() => {
+        const trackerSlot = mobilityRoutineToSlot(slot.mobilityExercises, { id: slot.id, name: slot.name })
+        return (
+          <ActiveWorkoutTracker
+            variant="mobility"
+            planId={planId}
+            workoutInstanceId={makeExtraWorkoutInstanceId(planId, today, extraId)}
+            planDay={planDay}
+            slot={trackerSlot}
+            programVars={{}}
+            previousOutcome={null}
+            minimized={trackerState === 'minimized'}
+            onMinimize={() => setTrackerState('minimized')}
+            onResume={() => setTrackerState('open')}
+            onCancel={cancelTracker}
+            onComplete={(logged, meta) => handleMobilityLog(slot, logged, meta)}
+            soundEnabled={mobilitySoundEnabled}
+            onSoundEnabledChange={mobilitySetSoundEnabled}
+            onSaveToRoutine={{
+              add: (name, index) => setMobilityRoutine(insertRoutineExercise(useMobilityStore.getState().routine, name, index)),
+              replace: (index, name) => setMobilityRoutine(replaceRoutineExercise(useMobilityStore.getState().routine, index, name)),
+            }}
+          />
+        )
+      })()}
 
       {showOutcome && extraId && planDay && (() => {
         const instanceId = makeExtraWorkoutInstanceId(planId, today, extraId)
@@ -281,7 +244,6 @@ export function TodayAdHocWorkout({
                 const slotId = nanoid()
                 const newSlot: WorkoutSlot = { id: slotId, type, name: workoutName }
                 if (type === 'mobility') newSlot.mobilityExercises = mobilityRoutine.map(ex => ({ ...ex, sets: ex.sets.map(st => ({ ...st })) }))
-                mobilityLoggedRef.current = false
                 const day: PlanDay = { id: nanoid(), label: workoutName, slots: [newSlot] }
                 const newExtraId = addExtraEntry({
                   planId,
