@@ -4,6 +4,7 @@ import { nanoid } from '../lib/utils'
 import {
   MOBILITY_LIBRARY,
   normalizeMobilityRoutine,
+  presetToRoutine,
   singleTimedSet,
   type MobilityPreset,
   type MobilityRoutineExercise,
@@ -140,15 +141,7 @@ export const useMobilityStore = create<MobilityState>()(
       },
 
       loadPreset(preset, mode) {
-        const incoming: MobilityExercise[] = preset.exercises.map(pe => {
-          const libEx = MOBILITY_LIBRARY.find(e => e.id === pe.exerciseId)
-          return {
-            id: pe.exerciseId,
-            name: libEx?.name ?? pe.exerciseId,
-            sets: pe.sets ? pe.sets.map(st => ({ ...st })) : singleTimedSet(pe.durationSec),
-            ...(pe.notes ? { notes: pe.notes } : {}),
-          }
-        })
+        const incoming: MobilityExercise[] = presetToRoutine(preset)
         set(s => {
           if (mode === 'replace') return { routine: incoming }
           const existing = new Set(s.routine.map(e => e.id))

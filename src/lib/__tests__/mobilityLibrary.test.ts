@@ -12,6 +12,9 @@ import {
   formatMobilityDuration,
   getLibraryExerciseById,
   mobilityExerciseName,
+  MOBILITY_PRESETS,
+  presetToRoutine,
+  routinesMatch,
 } from '../mobilityLibrary'
 
 describe('isBilateralExercise', () => {
@@ -177,5 +180,29 @@ describe('normalizeMobilityRoutine', () => {
     const broken = [{ id: 'a', name: 'A' }] as unknown as Parameters<typeof normalizeMobilityRoutine>[0]
     const result = normalizeMobilityRoutine(broken)
     expect(result[0].sets).toEqual([{ durationSec: 30 }])
+  })
+})
+
+describe('presetToRoutine', () => {
+  it('maps preset exercises to routine entries with library names', () => {
+    const quick = MOBILITY_PRESETS.find(p => p.id === 'preset-quick-5')!
+    const routine = presetToRoutine(quick)
+    expect(routine[1]).toEqual({ id: 'lib-wall-slides', name: 'Wall Slides', sets: [{ durationSec: 45 }] })
+    expect(routine).toHaveLength(quick.exercises.length)
+  })
+})
+
+describe('routinesMatch', () => {
+  const a = [
+    { id: 'x', name: 'X', sets: [{ durationSec: 30 }] },
+    { id: 'y', name: 'Y', sets: [{ reps: 10 }], restSec: 15 },
+  ]
+
+  it('ignores names and notes but not order, dosing, or rest', () => {
+    expect(routinesMatch(a, [{ ...a[0], name: 'Renamed', notes: 'n' }, a[1]])).toBe(true)
+    expect(routinesMatch(a, [a[1], a[0]])).toBe(false)
+    expect(routinesMatch(a, [a[0], { ...a[1], sets: [{ reps: 12 }] }])).toBe(false)
+    expect(routinesMatch(a, [a[0], { ...a[1], restSec: 0 }])).toBe(false)
+    expect(routinesMatch(a, [a[0]])).toBe(false)
   })
 })
