@@ -4,16 +4,29 @@ import { EXERCISE_LIBRARY } from '../../../lib/exerciseLibrary'
 
 export type ExercisePickerMode = { mode: 'add' } | { mode: 'replace'; exIdx: number }
 
+export interface PickerLibraryItem {
+  name: string
+  /** Secondary line, e.g. target muscles. */
+  detail: string
+}
+
+const STRENGTH_LIBRARY: PickerLibraryItem[] = EXERCISE_LIBRARY.map(ex => ({ name: ex.name, detail: ex.target.join(', ') }))
+
 export function ExercisePicker({
   mode,
   exerciseNames,
   canSaveToTemplate,
+  saveToTemplateLabel = 'Save to plan',
+  library = STRENGTH_LIBRARY,
   onSelect,
   onClose,
 }: {
   mode: 'add' | 'replace'
   exerciseNames: string[]
   canSaveToTemplate: boolean
+  saveToTemplateLabel?: string
+  /** Exercises to search; defaults to the strength exercise library. */
+  library?: PickerLibraryItem[]
   onSelect: (name: string, insertAt: number, saveToTemplate: boolean) => void
   onClose: () => void
 }) {
@@ -25,9 +38,9 @@ export function ExercisePicker({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return EXERCISE_LIBRARY.slice(0, 25)
-    return EXERCISE_LIBRARY.filter(ex => ex.name.toLowerCase().includes(q)).slice(0, 40)
-  }, [query])
+    if (!q) return library.slice(0, 25)
+    return library.filter(ex => ex.name.toLowerCase().includes(q)).slice(0, 40)
+  }, [query, library])
 
   function handleSelect(name: string) {
     onSelect(name, insertAt, saveToTemplate)
@@ -56,7 +69,7 @@ export function ExercisePicker({
         </h2>
         {canSaveToTemplate && (
           <label className="flex items-center gap-1.5 cursor-pointer shrink-0">
-            <span className="text-[10px] text-slate-400 leading-none">Save to plan</span>
+            <span className="text-[10px] text-slate-400 leading-none">{saveToTemplateLabel}</span>
             <div
               onClick={() => setSaveToTemplate(v => !v)}
               className={`w-8 h-5 rounded-full relative transition-colors cursor-pointer ${saveToTemplate ? 'bg-sky-500' : 'bg-slate-600'}`}
@@ -151,7 +164,7 @@ export function ExercisePicker({
             className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-slate-800 transition-colors"
           >
             <p className="text-sm text-white leading-tight">{ex.name}</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">{ex.target.join(', ')}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{ex.detail}</p>
           </button>
         ))}
       </div>

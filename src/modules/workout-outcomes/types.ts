@@ -31,6 +31,8 @@ export interface LoggedSetActual {
   notes?: string | null
   /** Ramp-up set; excluded from progression, volume, and 1RM calculations. */
   isWarmup?: boolean
+  /** Duration-based set: targetReps / actualReps hold seconds, not reps. */
+  isTimed?: boolean
 }
 
 export interface LoggedExerciseActual {
