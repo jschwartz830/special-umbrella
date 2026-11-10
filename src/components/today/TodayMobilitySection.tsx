@@ -1,6 +1,7 @@
 import { CheckCircle2, Play, Plus, RotateCcw, Settings2, Zap } from 'lucide-react'
 import type { MobilityCompletion, MobilityExercise } from '../../store/mobilityStore'
 import { totalTimedSec } from '../../lib/mobilityLibrary'
+import { MobilityRoutineSwitcher } from './MobilityRoutineSwitcher'
 
 interface TodayMobilitySectionProps {
   mobilityRoutine: MobilityExercise[]
@@ -123,6 +124,8 @@ export function TodayMobilitySection({
           <Play size={14} className="text-slate-500 flex-shrink-0" />
         </button>
       )}
+      {/* Pick which routine to run — only before today's session has started */}
+      {mobilityRoutine.length > 0 && !mobilityCompletion && !mobilityInProgress && <MobilityRoutineSwitcher />}
     </section>
   )
 }

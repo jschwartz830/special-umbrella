@@ -572,6 +572,29 @@ export interface MobilityUserTemplate {
   createdAt: string
 }
 
+/** A preset's exercises as routine entries (library names; full dosing when given). */
+export function presetToRoutine(preset: MobilityPreset): MobilityRoutineExercise[] {
+  return preset.exercises.map(pe => {
+    const libEx = MOBILITY_LIBRARY.find(e => e.id === pe.exerciseId)
+    return {
+      id: pe.exerciseId,
+      name: libEx?.name ?? pe.exerciseId,
+      sets: pe.sets ? pe.sets.map(st => ({ ...st })) : singleTimedSet(pe.durationSec),
+      ...(pe.notes ? { notes: pe.notes } : {}),
+    }
+  })
+}
+
+/** Same exercises, order and dosing (sets + rest); names and notes are ignored. */
+export function routinesMatch(a: MobilityRoutineExercise[], b: MobilityRoutineExercise[]): boolean {
+  const key = (r: MobilityRoutineExercise[]) => JSON.stringify(normalizeMobilityRoutine(r).map(e => [
+    e.id,
+    e.restSec ?? 0,
+    e.sets.map(st => [st.durationSec ?? null, st.reps ?? null]),
+  ]))
+  return a.length === b.length && key(a) === key(b)
+}
+
 export const MOBILITY_PRESETS: MobilityPreset[] = [
   {
     id: 'preset-quick-5',
