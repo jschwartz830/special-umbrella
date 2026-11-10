@@ -77,7 +77,7 @@ beforeEach(() => {
   // singletons shared across the whole file.
   useHistoryStore.setState({ entries: [], overrides: [], extraEntries: [] })
   usePlanStore.setState({ plans: {}, activePlanId: null })
-  useMobilityStore.setState({ activeSession: null })
+  useMobilityStore.setState({ routine: [], completions: {} })
   useOutcomeStore.setState({ outcomes: {}, progressionStates: {} })
   useProgramStore.setState({ vars: {} })
   useExerciseHistoryStore.setState({ records: [] })
@@ -198,14 +198,14 @@ describe('syncOnLogin', () => {
     expect(useHistoryStore.getState().extraEntries[0].source).toBe('history')
   })
 
-  it('applies the wpt_mobility migrate function to backfill missing activeSession', async () => {
+  it('applies the wpt_mobility migrate function to cloud rows', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
     mockEq.mockResolvedValue({
       data: [
         {
           store_name: 'wpt_mobility',
-          // Legacy (v1) cloud row predates the activeSession field entirely.
-          data: { routine: [], completions: {} },
+          // Legacy cloud row: pre-sets routine item and the old tracker's checkpoint.
+          data: { routine: [{ id: 'a', name: 'A', durationSec: 40 }], completions: {}, activeSession: { date: '2026-01-01' } },
         },
       ],
       error: null,
@@ -213,7 +213,8 @@ describe('syncOnLogin', () => {
 
     await syncOnLogin()
 
-    expect(useMobilityStore.getState().activeSession).toBeNull()
+    expect(useMobilityStore.getState().routine[0].sets).toEqual([{ durationSec: 40 }])
+    expect(useMobilityStore.getState()).not.toHaveProperty('activeSession')
   })
 
   it('ignores rows for unknown/renamed store names instead of throwing', async () => {
