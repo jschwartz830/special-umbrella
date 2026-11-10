@@ -1527,13 +1527,15 @@ export function ActiveWorkoutTracker({
 
             {/* Timer: big action button + rest adjusters. In landscape the rest
                 adjusters stack beside the button so it can use the full column height. */}
-            <div className="flex-1 flex flex-col ls:col-start-1 ls:row-start-2 ls:flex-row ls:items-center ls:justify-center ls:gap-3 ls:min-h-0">
-            {/* Big center action button */}
-            <div className="flex-1 flex flex-col items-center justify-center py-6 ls:flex-none ls:py-0">
+            <div className="flex-1 min-h-0 flex flex-col ls:col-start-1 ls:row-start-2 ls:flex-row ls:items-center ls:justify-center ls:gap-3">
+            {/* Big center action button. In portrait it sizes to the space left
+                after the set data (plate math etc.) so the rest adjusters stay on screen. */}
+            <div className="flex-1 min-h-[180px] flex flex-col items-center justify-center py-4 ls:flex-none ls:min-h-0 ls:py-0">
+              <div className="flex-1 min-h-0 w-full flex items-center justify-center [container-type:size] ls:flex-none ls:w-auto ls:[container-type:normal]">
               <button
                 onClick={onButton}
                 disabled={!workoutRunning}
-                className={`w-full max-w-[300px] aspect-square flex-shrink-0 ls:w-[min(calc(100dvh-180px),240px)] rounded-full flex flex-col items-center justify-center gap-2 font-bold shadow-xl transition-transform active:scale-[0.97] disabled:opacity-40 ${
+                className={`w-[min(300px,100cqw,100cqh)] aspect-square flex-shrink-0 ls:w-[min(calc(100dvh-180px),240px)] rounded-full flex flex-col items-center justify-center gap-2 font-bold shadow-xl transition-transform active:scale-[0.97] disabled:opacity-40 ${
                   performing
                     ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                     : 'bg-sky-500 hover:bg-sky-600 text-white'
@@ -1548,12 +1550,13 @@ export function ActiveWorkoutTracker({
                   <span className={`text-4xl font-mono font-bold ${restOver ? 'text-red-200' : 'text-emerald-100'}`}>{fmt(restElapsed!)}</span>
                 ) : null}
               </button>
+              </div>
 
               {resting && (
-                <p className="mt-5 ls:mt-2 text-xs text-slate-500">Target {restTarget != null ? fmt(restTarget) : '—'}</p>
+                <p className="mt-3 ls:mt-2 text-xs text-slate-500">Target {restTarget != null ? fmt(restTarget) : '—'}</p>
               )}
               {!workoutRunning && (
-                <p className="mt-5 ls:mt-2 text-xs text-orange-300 text-center">Workout paused — tap the timer to resume</p>
+                <p className="mt-3 ls:mt-2 text-xs text-orange-300 text-center">Workout paused — tap the timer to resume</p>
               )}
             </div>
 
