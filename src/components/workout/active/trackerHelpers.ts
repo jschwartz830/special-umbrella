@@ -117,6 +117,29 @@ export function timedTargetSecs(set: Pick<SetTrackState, 'isTimed' | 'actualReps
   return secs != null && secs > 0 ? secs : null
 }
 
+/** localStorage key for an in-progress tracker session's draft. */
+export function activeDraftKey(workoutInstanceId: string): string {
+  return `wpt_active_draft_${workoutInstanceId}`
+}
+
+/**
+ * Progress in a saved tracker draft — exercises with every set logged, out of
+ * all exercises — or null when there's no (readable) draft.
+ */
+export function readDraftProgress(workoutInstanceId: string): { doneExercises: number; totalExercises: number } | null {
+  try {
+    const raw = window.localStorage.getItem(activeDraftKey(workoutInstanceId))
+    if (!raw) return null
+    const exercises = (JSON.parse(raw) as { exercises?: Pick<ExerciseTrackState, 'sets'>[] }).exercises ?? []
+    return {
+      doneExercises: exercises.filter(ex => ex.sets.length > 0 && ex.sets.every(s => s.completed)).length,
+      totalExercises: exercises.length,
+    }
+  } catch {
+    return null
+  }
+}
+
 export function fmt(s: number): string {
   const m = Math.floor(s / 60)
   return `${m}:${(s % 60).toString().padStart(2, '0')}`

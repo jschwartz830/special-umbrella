@@ -12,7 +12,7 @@ import { usePlanStore } from '../../store/planStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useExerciseHistoryStore } from '../../store/exerciseHistoryStore'
 import { equipmentKindFor, generateWarmups, recentOneRepMax, snapToAchievable, stepAchievable, estimateOneRepMax, type EquipmentLocation } from '../../lib/equipment'
-import { type SetTrackState, type ExerciseTrackState, timedTargetSecs, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, findNextSet, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
+import { type SetTrackState, type ExerciseTrackState, activeDraftKey, timedTargetSecs, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, findNextSet, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
 import { NumberTextField, TimerCol } from './active/TrackerInputs'
 import { findSupersetMisalignments, conformSuperset, type ConformOption } from './active/supersetAlignment'
 import { applyPlatePlan, plateNoteFor, plateLineFor } from './active/platePlan'
@@ -57,6 +57,14 @@ interface Props {
   soundEnabled?: boolean
   /** Shows a mute toggle in the header when provided. */
   onSoundEnabledChange?: (enabled: boolean) => void
+  /**
+   * Mobility: persists picker adds/swaps marked "Save to routine". `index` is
+   * the position among the routine's own exercises (session additions skipped).
+   */
+  onSaveToRoutine?: {
+    add: (name: string, index: number) => void
+    replace: (index: number, name: string) => void
+  }
 }
 
 export function ActiveWorkoutTracker({
@@ -76,9 +84,10 @@ export function ActiveWorkoutTracker({
   variant = 'strength',
   soundEnabled = true,
   onSoundEnabledChange,
+  onSaveToRoutine,
 }: Props) {
   const isMobility = variant === 'mobility'
-  const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
+  const draftStorageKey = activeDraftKey(workoutInstanceId)
   // Rep-ladder exercises get today's rung as concrete sets; everything else passes through.
   const ladderStates = useOutcomeStore(s => s.ladderStates)
   const slot = useMemo(
@@ -1320,14 +1329,25 @@ export function ActiveWorkoutTracker({
     setExercisePicker(null)
   }
 
+  /** Position among the exercises that came from the routine (not added this session). */
+  function routineIndex(exIdx: number): number {
+    return exercises.slice(0, exIdx).filter(ex => !ex.addedDuringWorkout).length
+  }
+
   function handlePickerSelect(name: string, insertAt: number, saveToTemplate: boolean) {
     if (!exercisePicker) return
     if (exercisePicker.mode === 'add') {
+      if (saveToTemplate) {
+        if (isMobility) onSaveToRoutine?.add(name, routineIndex(insertAt))
+        else saveExerciseToTemplate(name, insertAt)
+      }
       addExercise(name, insertAt)
-      if (saveToTemplate) saveExerciseToTemplate(name, insertAt)
     } else {
+      if (saveToTemplate) {
+        if (isMobility) onSaveToRoutine?.replace(routineIndex(exercisePicker.exIdx), name)
+        else replaceExerciseInTemplate(exercisePicker.exIdx, name)
+      }
       replaceExercise(exercisePicker.exIdx, name)
-      if (saveToTemplate) replaceExerciseInTemplate(exercisePicker.exIdx, name)
     }
   }
 
@@ -2182,12 +2202,12 @@ export function ActiveWorkoutTracker({
         mode={exercisePicker.mode}
         exerciseNames={exercises.map(ex => ex.exercise)}
         canSaveToTemplate={
-          // Plan templates store mobility routines elsewhere (mobilityExercises).
-          !isMobility && (
+          (!isMobility || !!onSaveToRoutine) && (
             exercisePicker.mode !== 'replace' ||
             !exercises[exercisePicker.exIdx]?.addedDuringWorkout
           )
         }
+        saveToTemplateLabel={isMobility ? 'Save to routine' : undefined}
         library={isMobility ? MOBILITY_PICKER_LIBRARY : undefined}
         onSelect={handlePickerSelect}
         onClose={() => setExercisePicker(null)}

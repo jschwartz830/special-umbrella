@@ -1,12 +1,13 @@
 import { CheckCircle2, Play, Plus, RotateCcw, Zap } from 'lucide-react'
-import type { MobilityCompletion, MobilityExercise, MobilitySessionCheckpoint } from '../../store/mobilityStore'
+import type { MobilityCompletion, MobilityExercise } from '../../store/mobilityStore'
 import { totalTimedSec } from '../../lib/mobilityLibrary'
 
 interface TodayMobilitySectionProps {
   mobilityRoutine: MobilityExercise[]
   mobilityCompletion: MobilityCompletion | null
   mobilityInProgress: boolean
-  mobilityActiveSession: MobilitySessionCheckpoint | null
+  /** Exercises fully logged in today's in-progress session. */
+  mobilityDraftDoneCount: number
   onUndoCompletion: () => void
   onOpenTracker: () => void
   onResumeCompletion: () => void
@@ -17,7 +18,7 @@ export function TodayMobilitySection({
   mobilityRoutine,
   mobilityCompletion,
   mobilityInProgress,
-  mobilityActiveSession,
+  mobilityDraftDoneCount,
   onUndoCompletion,
   onOpenTracker,
   onResumeCompletion,
@@ -26,6 +27,8 @@ export function TodayMobilitySection({
   const remainingCount = mobilityCompletion
     ? mobilityRoutine.filter(ex => !mobilityCompletion.completedExerciseIds.includes(ex.id)).length
     : 0
+  // Exercises added mid-session aren't part of the routine, so count against it.
+  const doneCount = mobilityRoutine.length - remainingCount
   return (
     <section>
       <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -50,7 +53,7 @@ export function TodayMobilitySection({
               <p className="text-sm text-teal-200 font-medium">Mobility done</p>
               <p className="text-xs text-teal-300/60 mt-0.5">
                 {mobilityCompletion.durationMin} min ·{' '}
-                {mobilityCompletion.completedExerciseIds.length}/{mobilityRoutine.length} exercises ·{' '}
+                {doneCount}/{mobilityRoutine.length} exercises ·{' '}
                 tap to finish {remainingCount} more
               </p>
             </button>
@@ -59,7 +62,7 @@ export function TodayMobilitySection({
               <p className="text-sm text-teal-200 font-medium">Mobility done</p>
               <p className="text-xs text-teal-300/60 mt-0.5">
                 {mobilityCompletion.durationMin} min ·{' '}
-                {mobilityCompletion.completedExerciseIds.length}/{mobilityRoutine.length} exercises
+                {doneCount}/{mobilityRoutine.length} exercises
               </p>
             </div>
           )}
@@ -85,7 +88,7 @@ export function TodayMobilitySection({
           <div className="flex-1 min-w-0">
             <p className="text-sm text-sky-200 font-medium">Mobility in progress</p>
             <p className="text-xs text-sky-300/60 mt-0.5">
-              {mobilityActiveSession!.completedIds.length}/{mobilityRoutine.length} exercises done — pick up anytime
+              {Math.min(mobilityDraftDoneCount, mobilityRoutine.length)}/{mobilityRoutine.length} exercises done — pick up anytime
             </p>
           </div>
           <button

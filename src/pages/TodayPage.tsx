@@ -35,11 +35,20 @@ import { isPlanExpired } from '../engine/rotationEngine'
 import { computeHistoryStats, getUnloggedPastDates, countTotalUnloggedDays, computePlanProgress, countPlanDayCompletions, computePlanStreak, computeConsecutiveSkips, computeLoggedRate, computeRotationCycleProgress, computeWorkoutCompletionRate, computeAverageWorkoutsPerWeek, computeRotationPlanRemaining, buildPRFlagsMap } from '../lib/historyStats'
 import type { WorkoutCompletionRate } from '../lib/historyStats'
 import type { ResolvedDay, ExtraWorkoutEntry, WorkoutSlot } from '../types'
-import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState } from '../modules/workout-outcomes/types'
-import type { MobilitySessionCheckpoint } from '../store/mobilityStore'
+import type { WorkoutOutcome, LoggedExerciseActual, MobilityWorkoutActual } from '../modules/workout-outcomes/types'
 import { extraToPlanDay, NO_PLAN_ID } from '../lib/planDayUtils'
-import { MobilityTracker } from '../components/workout/MobilityTracker'
 import { useMobilityStore } from '../store/mobilityStore'
+import {
+  mobilityRoutineToSlot,
+  trackedToMobilityActual,
+  trackedToMobilityProgress,
+  insertRoutineExercise,
+  replaceRoutineExercise,
+  mobilityCompletionToResumeOutcome,
+  mobilityCompletionState,
+} from '../lib/mobilityAdapter'
+import { readDraftProgress } from '../components/workout/active/trackerHelpers'
+import type { MobilityRoutineExercise } from '../lib/mobilityLibrary'
 import { formatWorkoutForClipboard } from '../lib/shareWorkout'
 import { findPreviousSessionForPlanDay, buildLastSessionSummary } from '../lib/sessionSummary'
 import { useExerciseHistoryStore } from '../store/exerciseHistoryStore'
@@ -191,45 +200,33 @@ export function TodayPage() {
   const [sessionDoneKinds, setSessionDoneKinds] = useState<SegmentKind[]>([])
   const [nextSegmentPrompt, setNextSegmentPrompt] = useState<{ doneKind: SegmentKind; next: WorkoutSegment } | null>(null)
   const [mobilityTracked, setMobilityTracked] = useState<{ actual: MobilityWorkoutActual; durationMin: number } | null>(null)
-  // Set when the mobility slot tracker logs, so its follow-up onClose isn't read as a discard.
-  const mobilitySlotLoggedRef = useRef(false)
   // Mobility state
   const mobilityCompletions = useMobilityStore(s => s.completions)
   const mobilityCompletion = mobilityCompletions[today] ?? null
   const mobilityRoutine = useMobilityStore(s => s.routine)
   const removeMobilityCompletion = useMobilityStore(s => s.removeCompletion)
-  const mobilityActiveSession = useMobilityStore(s => s.activeSession)
   const mobilityLogCompletion = useMobilityStore(s => s.logCompletion)
-  const mobilityStartSession = useMobilityStore(s => s.startSession)
-  const mobilityResumeCompletion = useMobilityStore(s => s.resumeCompletion)
-  const mobilitySaveCheckpoint = useMobilityStore(s => s.saveCheckpoint)
-  const mobilityClearSession = useMobilityStore(s => s.clearSession)
+  const setMobilityRoutine = useMobilityStore(s => s.setRoutine)
   const mobilitySoundEnabled = useMobilityStore(s => s.soundEnabled)
   const mobilitySetSoundEnabled = useMobilityStore(s => s.setSoundEnabled)
   const [mobilityState, setMobilityState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
+  // Set when reopening an already-logged routine to finish the rest: seeds the
+  // tracker with the logged progress.
+  const [mobilityResumeOutcome, setMobilityResumeOutcome] = useState<WorkoutOutcome | null>(null)
+  // The daily routine runs on the shared tracker, which keeps an in-progress
+  // draft per day — so it can be finished bit by bit throughout the day.
+  const mobilityInstanceId = `mobility_${today}`
+  const mobilitySlotInstanceId = `${plan ? makeWorkoutInstanceId(plan.id, today) : today}_mobility`
   // Scheduled `mobility` slot inside today's plan day — distinct from the
-  // standalone global Daily Mobility Routine above. Session state lives only
-  // in this component (not persisted) since it tracks a specific plan day's
-  // slot rather than the global routine.
+  // standalone global Daily Mobility Routine above.
   const [mobilitySlotState, setMobilitySlotState] = useState<'hidden' | 'open' | 'minimized'>('hidden')
   // Ad hoc workout — start-modal trigger and tracker-active flag; full state lives in TodayAdHocWorkout
   const [adHocOpenRequest, setAdHocOpenRequest] = useState(false)
   const [adHocActive, setAdHocActive] = useState(false)
-  const [mobilitySlotSession, setMobilitySlotSession] = useState<MobilitySessionCheckpoint | null>(null)
-  // A checkpoint left behind when the tracker unmounts mid-routine — lets
-  // today's card offer "Continue"
-  // instead of starting the whole routine over. Deliberately does NOT
-  // require the checkpoint's exerciseIds to exactly match the live routine:
-  // MobilityTracker's reconcileCheckpoint() already re-maps progress onto
-  // an edited routine (add/remove/reorder), so a mismatch here doesn't mean
-  // the checkpoint is stale — it just means "Manage routine" was used
-  // mid-session, which is the case this feature exists to support.
-  const mobilityInProgress = !!(
-    !mobilityCompletion &&
-    mobilityActiveSession &&
-    mobilityActiveSession.date === today &&
-    (mobilityActiveSession.completedIds.length > 0 || mobilityActiveSession.totalElapsedSec >= 3)
-  )
+  // A draft left by a closed/minimized tracker — today's card offers
+  // "Continue" instead of starting the whole routine over.
+  const mobilityDraft = mobilityCompletion ? null : readDraftProgress(mobilityInstanceId)
+  const mobilityInProgress = mobilityDraft != null
 
   // Progress ring detail modal
   const [showPlanProgressModal, setShowPlanProgressModal] = useState(false)
@@ -563,30 +560,12 @@ export function TodayPage() {
     if (isPending || sessionDoneKinds.length > 0) openSessionOutcome()
   }
 
-  function handleMobilitySlotComplete(
-    slot: WorkoutSlot,
-    completedAt: string,
-    durationMin: number,
-    completedExerciseIds: string[],
-    completedSets: Record<string, number[]>,
-  ) {
+  function handleMobilitySlotComplete(slot: WorkoutSlot, logged: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
     const exercises = slot.mobilityExercises ?? []
-    const mobilityActual: MobilityWorkoutActual = {
-      exercises: exercises.map(ex => ({
-        exercise: ex.name,
-        sets: ex.sets.map((s, i) => {
-          const done = (completedSets[ex.id] ?? []).includes(i)
-          return {
-            targetDurationSec: s.durationSec ?? null,
-            targetReps: s.reps ?? null,
-            actualDurationSec: done ? s.durationSec ?? null : null,
-            actualReps: done ? s.reps ?? null : null,
-            completed: done,
-          }
-        }),
-      })),
-    }
-    setMobilitySlotSession(null)
+    const mobilityActual = trackedToMobilityActual(logged)
+    const { completedExerciseIds } = trackedToMobilityProgress(logged, exercises)
+    const completedAt = meta.endTime
+    const durationMin = Math.max(1, Math.round(meta.totalElapsedSeconds / 60))
     setMobilitySlotState('hidden')
     // Part of a multi-segment day — fold into the combined session outcome.
     if (daySegments.length > 1 || sessionDoneKinds.length > 0 || loggedBase) {
@@ -595,10 +574,7 @@ export function TodayPage() {
       return
     }
 
-    const allDone = exercises.length > 0 && exercises.every(ex => completedExerciseIds.includes(ex.id))
-    const completionState: WorkoutCompletionState = exercises.length === 0
-      ? 'completed'
-      : allDone ? 'completed' : completedExerciseIds.length > 0 ? 'partially_completed' : 'skipped'
+    const completionState = mobilityCompletionState(exercises, completedExerciseIds)
 
     const outcome: WorkoutOutcome = {
       workoutInstanceId: makeWorkoutInstanceId(plan!.id, today),
@@ -612,10 +588,37 @@ export function TodayPage() {
   }
 
   // Reopen a day that's already been logged so the remaining exercises can be
-  // finished — seeds a resumable session from the logged completion.
+  // finished — seeds the tracker from the logged completion.
   function handleResumeMobilityCompletion() {
-    mobilityResumeCompletion(today, mobilityRoutine.map(ex => ex.id))
+    if (mobilityCompletion) {
+      setMobilityResumeOutcome(mobilityCompletionToResumeOutcome(mobilityCompletion, mobilityRoutine, mobilityInstanceId))
+    }
     setMobilityState('open')
+  }
+
+  function handleMobilityRoutineComplete(logged: LoggedExerciseActual[], meta: WorkoutSessionMeta) {
+    const { completedExerciseIds, completedSets } = trackedToMobilityProgress(logged, mobilityRoutine)
+    mobilityLogCompletion(today, {
+      completedAt: meta.endTime,
+      durationMin: Math.max(1, Math.round(meta.totalElapsedSeconds / 60)),
+      completedExerciseIds,
+      completedSets,
+    })
+    setMobilityState('hidden')
+    setMobilityResumeOutcome(null)
+  }
+
+  /** Applies a picker "Save to routine" to today's scheduled mobility slot in the plan. */
+  function updateMobilitySlotRoutine(edit: (routine: MobilityRoutineExercise[]) => MobilityRoutineExercise[]) {
+    if (!plan || !mobilitySlot) return
+    const live = usePlanStore.getState().plans[plan.id]
+    if (!live) return
+    usePlanStore.getState().updatePlan(plan.id, {
+      days: live.days.map(d => d.id !== primaryPlanDay.id ? d : {
+        ...d,
+        slots: d.slots.map(sl => sl.id !== mobilitySlot.id ? sl : { ...sl, mobilityExercises: edit(sl.mobilityExercises ?? []) }),
+      }),
+    })
   }
 
   function handleOutcomeConfirm(outcome: WorkoutOutcome) {
@@ -1073,7 +1076,7 @@ export function TodayPage() {
         mobilityRoutine={mobilityRoutine}
         mobilityCompletion={mobilityCompletion}
         mobilityInProgress={mobilityInProgress}
-        mobilityActiveSession={mobilityActiveSession}
+        mobilityDraftDoneCount={mobilityDraft?.doneExercises ?? 0}
         onUndoCompletion={() => removeMobilityCompletion(today)}
         onOpenTracker={() => setMobilityState('open')}
         onResumeCompletion={handleResumeMobilityCompletion}
@@ -1198,72 +1201,68 @@ export function TodayPage() {
         onActiveChange={setAdHocActive}
       />
 
-      {/* Mobility tracker — closing saves a checkpoint so the routine can be
-          finished bit by bit throughout the day instead of all at once */}
-      {mobilityState !== 'hidden' && (
-        <MobilityTracker
-          today={today}
-          routine={mobilityRoutine}
-          activeSession={mobilityActiveSession}
-          soundEnabled={mobilitySoundEnabled}
-          setSoundEnabled={mobilitySetSoundEnabled}
-          startSession={mobilityStartSession}
-          saveCheckpoint={mobilitySaveCheckpoint}
-          clearSession={mobilityClearSession}
-          onLogCompletion={({ completedAt, durationMin, completedExerciseIds, completedSets }) => {
-            mobilityLogCompletion(today, { completedAt, durationMin, completedExerciseIds, completedSets })
-          }}
-          onClose={() => setMobilityState('hidden')}
-          minimized={mobilityState === 'minimized'}
-          onMinimize={() => setMobilityState('minimized')}
-          onResume={() => setMobilityState('open')}
-          onManageRoutine={() => {
-            setMobilityState('hidden')
-            navigate('/mobility')
-          }}
-        />
-      )}
+      {/* Daily mobility routine — runs on the shared tracker. Minimizing or
+          reloading keeps a per-day draft so it can be finished bit by bit. */}
+      {mobilityState !== 'hidden' && (() => {
+        const slot = mobilityRoutineToSlot(mobilityRoutine, { id: 'daily-mobility', name: 'Daily Routine' })
+        return (
+          <ActiveWorkoutTracker
+            variant="mobility"
+            planId={plan.id}
+            workoutInstanceId={mobilityInstanceId}
+            planDay={{ id: 'daily-mobility', label: 'Daily Mobility', slots: [slot] }}
+            slot={slot}
+            programVars={{}}
+            previousOutcome={null}
+            resumeOutcome={mobilityResumeOutcome}
+            minimized={mobilityState === 'minimized'}
+            onMinimize={() => setMobilityState('minimized')}
+            onResume={() => setMobilityState('open')}
+            onCancel={() => {
+              setMobilityState('hidden')
+              setMobilityResumeOutcome(null)
+            }}
+            onComplete={handleMobilityRoutineComplete}
+            soundEnabled={mobilitySoundEnabled}
+            onSoundEnabledChange={mobilitySetSoundEnabled}
+            onSaveToRoutine={{
+              add: (name, index) => setMobilityRoutine(insertRoutineExercise(useMobilityStore.getState().routine, name, index)),
+              replace: (index, name) => setMobilityRoutine(replaceRoutineExercise(useMobilityStore.getState().routine, index, name)),
+            }}
+          />
+        )
+      })()}
 
-      {/* Scheduled mobility slot tracker — a `mobility` slot inside today's
-          plan day, as opposed to the standalone daily routine above */}
-      {mobilitySlotState !== 'hidden' && mobilitySlot && (
-        <MobilityTracker
-          today={today}
-          title={mobilitySlot.name || 'Mobility'}
-          routine={mobilitySlot.mobilityExercises ?? []}
-          activeSession={mobilitySlotSession}
-          soundEnabled={mobilitySoundEnabled}
-          setSoundEnabled={mobilitySetSoundEnabled}
-          startSession={(date, exerciseIds) => setMobilitySlotSession({
-            date,
-            exerciseIds,
-            currentIdx: 0,
-            currentSetIdx: 0,
-            completedIds: [],
-            completedSets: {},
-            totalElapsedSec: 0,
-            exElapsedSec: 0,
-          })}
-          saveCheckpoint={cp => setMobilitySlotSession(cp)}
-          clearSession={() => setMobilitySlotSession(null)}
-          onLogCompletion={({ completedAt, durationMin, completedExerciseIds, completedSets }) => {
-            mobilitySlotLoggedRef.current = true
-            handleMobilitySlotComplete(mobilitySlot, completedAt, durationMin, completedExerciseIds, completedSets)
-          }}
-          onClose={() => {
-            setMobilitySlotState('hidden')
-            if (!mobilitySlotLoggedRef.current) handleSegmentAbandoned()
-            mobilitySlotLoggedRef.current = false
-          }}
-          minimized={mobilitySlotState === 'minimized'}
-          onMinimize={() => setMobilitySlotState('minimized')}
-          onResume={() => setMobilitySlotState('open')}
-          onManageRoutine={() => {
-            setMobilitySlotState('hidden')
-            navigate(`/plans/${plan!.id}/edit`)
-          }}
-        />
-      )}
+      {/* Scheduled mobility slot — a `mobility` slot inside today's plan day,
+          as opposed to the standalone daily routine above */}
+      {mobilitySlotState !== 'hidden' && mobilitySlot && (() => {
+        const slot = mobilityRoutineToSlot(mobilitySlot.mobilityExercises, { id: mobilitySlot.id, name: mobilitySlot.name || 'Mobility' })
+        return (
+          <ActiveWorkoutTracker
+            variant="mobility"
+            planId={plan.id}
+            workoutInstanceId={mobilitySlotInstanceId}
+            planDay={primaryPlanDay}
+            slot={slot}
+            programVars={{}}
+            previousOutcome={null}
+            minimized={mobilitySlotState === 'minimized'}
+            onMinimize={() => setMobilitySlotState('minimized')}
+            onResume={() => setMobilitySlotState('open')}
+            onCancel={() => {
+              setMobilitySlotState('hidden')
+              handleSegmentAbandoned()
+            }}
+            onComplete={(logged, meta) => handleMobilitySlotComplete(mobilitySlot, logged, meta)}
+            soundEnabled={mobilitySoundEnabled}
+            onSoundEnabledChange={mobilitySetSoundEnabled}
+            onSaveToRoutine={{
+              add: (name, index) => updateMobilitySlotRoutine(r => insertRoutineExercise(r, name, index)),
+              replace: (index, name) => updateMobilitySlotRoutine(r => replaceRoutineExercise(r, index, name)),
+            }}
+          />
+        )
+      })()}
 
       {/* Plan progress detail — opened by tapping the ring in the habit summary row */}
       {showPlanProgressModal && (

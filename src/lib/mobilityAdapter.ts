@@ -9,8 +9,9 @@
 
 import type { WorkoutSlot } from '../types'
 import type { ExerciseSpec, SetSpec } from '../types/program'
-import type { LoggedExerciseActual, MobilityWorkoutActual } from '../modules/workout-outcomes/types'
-import { MOBILITY_LIBRARY, normalizeMobilityRoutine, type MobilityRoutineExercise, type MobilitySet } from './mobilityLibrary'
+import type { LoggedExerciseActual, MobilityWorkoutActual, WorkoutCompletionState, WorkoutOutcome } from '../modules/workout-outcomes/types'
+import { MOBILITY_LIBRARY, normalizeMobilityRoutine, singleTimedSet, type MobilityRoutineExercise, type MobilitySet } from './mobilityLibrary'
+import { nanoid } from './utils'
 
 /** Default hold for a custom exercise added mid-session that isn't in the library. */
 export const DEFAULT_MOBILITY_HOLD_SEC = 30
@@ -100,4 +101,71 @@ export function trackedToMobilityProgress(
     if (ex.sets.length > 0 && done.length === ex.sets.length) completedExerciseIds.push(id)
   })
   return { completedExerciseIds, completedSets }
+}
+
+// ── Saving picker changes back to a routine ────────────────────────────────
+
+/** A new routine entry for `name`: the library id + default hold when it's a library exercise. */
+export function routineExerciseFromName(name: string, existing: MobilityRoutineExercise[]): MobilityRoutineExercise {
+  const lib = MOBILITY_LIBRARY.find(e => e.name.toLowerCase() === name.trim().toLowerCase())
+  const id = lib && !existing.some(e => e.id === lib.id) ? lib.id : nanoid()
+  return { id, name: lib?.name ?? name.trim(), sets: singleTimedSet(lib?.durationSec ?? DEFAULT_MOBILITY_HOLD_SEC) }
+}
+
+export function insertRoutineExercise(
+  routine: MobilityRoutineExercise[],
+  name: string,
+  index: number,
+): MobilityRoutineExercise[] {
+  const at = Math.max(0, Math.min(index, routine.length))
+  return [...routine.slice(0, at), routineExerciseFromName(name, routine), ...routine.slice(at)]
+}
+
+/** Swap the exercise at `index` for `name`, keeping its dosing, rest, and notes. */
+export function replaceRoutineExercise(
+  routine: MobilityRoutineExercise[],
+  index: number,
+  name: string,
+): MobilityRoutineExercise[] {
+  if (!routine[index]) return routine
+  const others = routine.filter((_, i) => i !== index)
+  const { id, name: newName } = routineExerciseFromName(name, others)
+  return routine.map((ex, i) => (i === index ? { ...ex, id, name: newName } : ex))
+}
+
+// ── Reopening a logged routine ──────────────────────────────────────────────
+
+/**
+ * A logged daily-routine completion as a tracker resume outcome, so "finish
+ * the rest" reopens with the done sets already checked off and the time so far.
+ */
+export function mobilityCompletionToResumeOutcome(
+  completion: { completedAt: string; durationMin: number; completedExerciseIds: string[]; completedSets?: Record<string, number[]> },
+  routine: MobilityRoutineExercise[] | undefined | null,
+  workoutInstanceId: string,
+): WorkoutOutcome {
+  return {
+    workoutInstanceId,
+    completionState: 'partially_completed',
+    completedAt: completion.completedAt,
+    durationActualMin: completion.durationMin,
+    weightsActual: {
+      exercises: normalizeMobilityRoutine(routine).map(ex => {
+        const done = completion.completedSets?.[ex.id]
+          ?? (completion.completedExerciseIds.includes(ex.id) ? ex.sets.map((_, i) => i) : [])
+        return { exercise: ex.name, sets: ex.sets.map((_, i) => ({ completed: done.includes(i) })) }
+      }),
+    },
+  }
+}
+
+/** Completed when every routine exercise is done (or there are none), partial when some are. */
+export function mobilityCompletionState(
+  routine: MobilityRoutineExercise[] | undefined | null,
+  completedExerciseIds: string[],
+): WorkoutCompletionState {
+  const exercises = normalizeMobilityRoutine(routine)
+  if (exercises.length === 0 || exercises.every(ex => completedExerciseIds.includes(ex.id))) return 'completed'
+  // Any finished exercise counts, including ones added mid-session.
+  return completedExerciseIds.length > 0 ? 'partially_completed' : 'skipped'
 }
