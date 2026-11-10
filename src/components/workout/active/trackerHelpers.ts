@@ -107,6 +107,16 @@ export function missedTargetReps(set: Pick<SetTrackState, 'actualReps' | 'target
   return Number.isFinite(target) && set.actualReps < target
 }
 
+/**
+ * Planned length of a timed set in seconds: the (editable) actual value, else
+ * the target. Null for rep sets or when no positive duration is set.
+ */
+export function timedTargetSecs(set: Pick<SetTrackState, 'isTimed' | 'actualReps' | 'targetReps'>): number | null {
+  if (!set.isTimed) return null
+  const secs = set.actualReps ?? (typeof set.targetReps === 'number' ? set.targetReps : null)
+  return secs != null && secs > 0 ? secs : null
+}
+
 export function fmt(s: number): string {
   const m = Math.floor(s / 60)
   return `${m}:${(s % 60).toString().padStart(2, '0')}`

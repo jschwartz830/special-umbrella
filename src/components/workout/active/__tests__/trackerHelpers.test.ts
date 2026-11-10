@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { missedTargetReps, findNextSet, type SetTrackState } from '../trackerHelpers'
+import { missedTargetReps, findNextSet, timedTargetSecs, type SetTrackState } from '../trackerHelpers'
 
 describe('missedTargetReps', () => {
   it('flags a numeric target that was not reached', () => {
@@ -86,5 +86,18 @@ describe('findNextSet', () => {
 
   it('keeps a manual focus outside any superset', () => {
     expect(findNextSet([ex([set(false)]), ex([set(true), set(false)])], 1)).toEqual({ exIdx: 1, setIdx: 1 })
+  })
+})
+
+describe('timedTargetSecs', () => {
+  it('prefers the edited actual seconds, then the target', () => {
+    expect(timedTargetSecs({ isTimed: true, actualReps: 50, targetReps: 45 })).toBe(50)
+    expect(timedTargetSecs({ isTimed: true, actualReps: null, targetReps: 45 })).toBe(45)
+  })
+
+  it('is null for rep sets and missing or zero durations', () => {
+    expect(timedTargetSecs({ isTimed: false, actualReps: 10, targetReps: 10 })).toBeNull()
+    expect(timedTargetSecs({ isTimed: true, actualReps: null, targetReps: '30-45' })).toBeNull()
+    expect(timedTargetSecs({ isTimed: true, actualReps: 0, targetReps: 45 })).toBeNull()
   })
 })

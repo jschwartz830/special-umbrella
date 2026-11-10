@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { X, Pause, Play, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List, Target, AlertTriangle } from 'lucide-react'
+import { X, Pause, Play, ChevronDown, ChevronUp, Check, Trash2, Plus, ArrowLeftRight, Link2, Maximize2, List, Target, AlertTriangle, Volume2, VolumeX } from 'lucide-react'
 import type { WorkoutSlot, PlanDay } from '../../types'
 import { useLandscapeAutoFocus } from '../../hooks/useLandscapeAutoFocus'
 import type { ExerciseSpec } from '../../types/program'
@@ -12,11 +12,19 @@ import { usePlanStore } from '../../store/planStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useExerciseHistoryStore } from '../../store/exerciseHistoryStore'
 import { equipmentKindFor, generateWarmups, recentOneRepMax, snapToAchievable, stepAchievable, estimateOneRepMax, type EquipmentLocation } from '../../lib/equipment'
-import { type SetTrackState, type ExerciseTrackState, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, findNextSet, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
+import { type SetTrackState, type ExerciseTrackState, timedTargetSecs, parseWarmupPercentages, warmupRampObject, warmupRepsForIndex, resolveDoubleProgressionTarget, resolveActualReps, missedTargetReps, findNextSet, fmt, parseRestSecs, parseNumericLoad } from './active/trackerHelpers'
 import { NumberTextField, TimerCol } from './active/TrackerInputs'
 import { findSupersetMisalignments, conformSuperset, type ConformOption } from './active/supersetAlignment'
 import { applyPlatePlan, plateNoteFor, plateLineFor } from './active/platePlan'
-import { type ExercisePickerMode, ExercisePicker } from './active/ExercisePicker'
+import { type ExercisePickerMode, type PickerLibraryItem, ExercisePicker } from './active/ExercisePicker'
+import { CATEGORY_LABELS, isBilateralExercise, MOBILITY_LIBRARY } from '../../lib/mobilityLibrary'
+import { mobilityLibraryHoldSec } from '../../lib/mobilityAdapter'
+import { primeAudio, playExerciseEndSound, playSwitchSidesSound, playSessionCompleteSound } from '../../lib/timerSounds'
+
+const MOBILITY_PICKER_LIBRARY: PickerLibraryItem[] = MOBILITY_LIBRARY.map(ex => ({
+  name: ex.name,
+  detail: ex.categories.map(c => CATEGORY_LABELS[c]).join(', '),
+}))
 
 export interface WorkoutSessionMeta {
   startTime: string
@@ -39,6 +47,16 @@ interface Props {
   onResume: () => void
   onCancel: () => void
   onComplete: (exercises: LoggedExerciseActual[], meta: WorkoutSessionMeta) => void
+  /**
+   * 'mobility' runs a mobility routine (see lib/mobilityAdapter): no load
+   * column, no default rest, and timed holds count down, cue a side switch
+   * halfway on bilateral exercises, and log themselves when time is up.
+   */
+  variant?: 'strength' | 'mobility'
+  /** Mobility cue sounds (end-of-hold, switch sides, routine done). */
+  soundEnabled?: boolean
+  /** Shows a mute toggle in the header when provided. */
+  onSoundEnabledChange?: (enabled: boolean) => void
 }
 
 export function ActiveWorkoutTracker({
@@ -55,7 +73,11 @@ export function ActiveWorkoutTracker({
   onResume,
   onCancel,
   onComplete,
+  variant = 'strength',
+  soundEnabled = true,
+  onSoundEnabledChange,
 }: Props) {
+  const isMobility = variant === 'mobility'
   const draftStorageKey = `wpt_active_draft_${workoutInstanceId}`
   // Rep-ladder exercises get today's rung as concrete sets; everything else passes through.
   const ladderStates = useOutcomeStore(s => s.ladderStates)
@@ -90,6 +112,9 @@ export function ActiveWorkoutTracker({
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
   const workoutWallBaseRef = useRef<{ elapsed: number; time: number }>({ elapsed: 0, time: Date.now() })
   const restWallBaseRef = useRef<{ elapsed: number; time: number } | null>(null)
+  // Wall-clock anchor for set-timer ticks. Offset half a second so 1s interval
+  // ticks land mid-window and jitter never reads as 0 or 2 elapsed seconds.
+  const setTickBaseRef = useRef(Date.now() - 500)
   const swipeRowRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const activeDragRef = useRef<{ key: string; startX: number; startY: number; startOffset: number; committed: boolean } | null>(null)
 
@@ -113,6 +138,12 @@ export function ActiveWorkoutTracker({
   // instead of the plan's order). Falls back to the first incomplete set once this
   // exercise's own sets are all logged.
   const [manualFocusExIdx, setManualFocusExIdx] = useState<number | null>(null)
+  // Mobility: brief "Switch sides" banner, and which set (`exIdx-setIdx`) already got the cue.
+  const [showSwitchCue, setShowSwitchCue] = useState(false)
+  const switchCuedRef = useRef<string | null>(null)
+  const switchCueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Mobility moves straight on between sets unless the routine asks for rest.
+  const defaultRestSeconds = isMobility ? 0 : 90
 
   const hasVars = Object.keys(programVars).length > 0
   const evalCtx: EvalContext = { vars: programVars }
@@ -666,13 +697,18 @@ export function ActiveWorkoutTracker({
         setWorkoutElapsed(baseElapsed + Math.floor((Date.now() - baseTime) / 1000))
       }
 
+      // Whole seconds since the last tick, from the wall clock, so a set timer
+      // catches up after the browser throttles ticks in the background.
+      const now = Date.now()
+      const tickSecs = Math.max(0, Math.floor((now - setTickBaseRef.current) / 1000))
+      setTickBaseRef.current += tickSecs * 1000
       const activeSet = activeSetRef.current
-      if (workoutRunRef.current && !restRunRef.current && activeSet) {
+      if (workoutRunRef.current && !restRunRef.current && activeSet && tickSecs > 0) {
         setExercises(prev => prev.map((ex, ei) => (
           ei !== activeSet.exIdx ? ex : {
             ...ex,
             sets: ex.sets.map((set, si) => (
-              si !== activeSet.setIdx ? set : { ...set, setElapsedSeconds: set.setElapsedSeconds + 1 }
+              si !== activeSet.setIdx ? set : { ...set, setElapsedSeconds: set.setElapsedSeconds + tickSecs }
             )),
           }
         )))
@@ -925,6 +961,13 @@ export function ActiveWorkoutTracker({
     // Clear any countdown for a different set
     setSetTimerCountdown(null)
 
+    if (isMobility) {
+      // Warm the cue AudioContext from this gesture so end/switch cues can fire on iOS.
+      if (soundEnabled) primeAudio()
+      const target = timedTargetSecs(set)
+      if (target != null && set.setElapsedSeconds < target / 2) switchCuedRef.current = null
+    }
+
     if (startDelaySeconds > 0) {
       setSetTimerCountdown({ exIdx, setIdx, remaining: startDelaySeconds })
     } else {
@@ -939,9 +982,14 @@ export function ActiveWorkoutTracker({
     }
   }
 
-  function handleSetComplete(exIdx: number, setIdx: number) {
+  function handleSetComplete(exIdx: number, setIdx: number, opts?: { fromTimer?: boolean }) {
     const setToToggle = exercises[exIdx].sets[setIdx]
     const completing = !setToToggle.completed
+    // A mobility hold logs how long it was actually held when its timer ran
+    // (stopped early, or ran to the end); untimed check-offs keep the target.
+    const heldSecs = isMobility && completing && setToToggle.isTimed && setToToggle.setElapsedSeconds > 0
+      ? Math.min(setToToggle.setElapsedSeconds, timedTargetSecs(setToToggle) ?? setToToggle.setElapsedSeconds)
+      : null
 
     setExercises(prev => prev.map((ex, ei) => (
       ei !== exIdx ? ex : {
@@ -953,8 +1001,9 @@ export function ActiveWorkoutTracker({
             setElapsedSeconds: completing ? s.setElapsedSeconds : 0,
             actualRestSeconds: completing ? s.actualRestSeconds : null,
             actualReps: completing
-              ? resolveActualReps(s.actualReps, s.targetReps)
-              : s.actualReps,
+              ? (heldSecs ?? resolveActualReps(s.actualReps, s.targetReps))
+              // Undoing a mobility hold puts the planned duration back for a re-run.
+              : (isMobility && s.isTimed && typeof s.targetReps === 'number' ? s.targetReps : s.actualReps),
           }
         )),
       }
@@ -973,11 +1022,49 @@ export function ActiveWorkoutTracker({
       stopRest(false)
     }
 
+    if (!completing && switchCuedRef.current === `${exIdx}-${setIdx}`) switchCuedRef.current = null
+
     if (completing) {
+      if (isMobility && soundEnabled) {
+        const allDone = exercises.every((ex, ei) => ex.sets.every((st, si) => st.completed || (ei === exIdx && si === setIdx)))
+        if (allDone) playSessionCompleteSound()
+        else if (opts?.fromTimer) playExerciseEndSound()
+      }
       const missed = missedTargetReps({ ...setToToggle, actualReps: resolveActualReps(setToToggle.actualReps, setToToggle.targetReps) })
-      startRest((setToToggle.restSeconds ?? 90) + (missed ? missedRepsExtraRestSeconds : 0), { exIdx, setIdx })
+      const restSecs = (setToToggle.restSeconds ?? defaultRestSeconds) + (missed ? missedRepsExtraRestSeconds : 0)
+      if (restSecs > 0) startRest(restSecs, { exIdx, setIdx })
+      else stopRest()
     }
   }
+
+  // Mobility holds: cue a side switch halfway through bilateral exercises, and
+  // log the set once its countdown runs out.
+  useEffect(() => {
+    if (!isMobility || !activeSetTimer) return
+    const { exIdx, setIdx } = activeSetTimer
+    const ex = exercises[exIdx]
+    const s = ex?.sets[setIdx]
+    if (!ex || !s || s.completed || !s.isTimed) return
+    const target = timedTargetSecs(s)
+    if (target == null) return
+    if (s.setElapsedSeconds >= target) {
+      handleSetComplete(exIdx, setIdx, { fromTimer: true })
+      return
+    }
+    const key = `${exIdx}-${setIdx}`
+    if (s.setElapsedSeconds >= target / 2 && switchCuedRef.current !== key && isBilateralExercise({ id: '', name: ex.exercise })) {
+      switchCuedRef.current = key
+      if (soundEnabled) playSwitchSidesSound()
+      setShowSwitchCue(true)
+      if (switchCueTimerRef.current) clearTimeout(switchCueTimerRef.current)
+      switchCueTimerRef.current = setTimeout(() => setShowSwitchCue(false), 2200)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobility, activeSetTimer, exercises])
+
+  useEffect(() => () => {
+    if (switchCueTimerRef.current) clearTimeout(switchCueTimerRef.current)
+  }, [])
 
   function updateSet(exIdx: number, setIdx: number, patch: Partial<SetTrackState>) {
     // Reps edited during this set's rest: add/remove the missed-reps extra so
@@ -1011,6 +1098,7 @@ export function ActiveWorkoutTracker({
         restSeconds: lastSet?.restSeconds ?? null,
         actualRestSeconds: null,
         resolvedLoadLbs: lastSet?.resolvedLoadLbs ?? null,
+        ...(lastSet?.isTimed ? { isTimed: true } : {}),
       }
       return { ...ex, sets: [...ex.sets, newSet] }
     }))
@@ -1124,11 +1212,24 @@ export function ActiveWorkoutTracker({
   }
 
   function addExercise(name: string, insertAt: number) {
+    // Mobility: one timed hold at the library's default length.
+    const mobilityHold = isMobility ? mobilityLibraryHoldSec(name) : null
     const newEx: ExerciseTrackState = {
       exercise: name,
       isWarmup: false,
       addedDuringWorkout: true,
-      sets: Array.from({ length: 3 }, () => ({
+      sets: mobilityHold != null ? [{
+        setElapsedSeconds: 0,
+        completed: false,
+        actualReps: mobilityHold,
+        actualLoad: null,
+        targetReps: mobilityHold,
+        targetLoad: null,
+        restSeconds: null,
+        actualRestSeconds: null,
+        resolvedLoadLbs: null,
+        isTimed: true,
+      }] : Array.from({ length: 3 }, () => ({
         setElapsedSeconds: 0,
         completed: false,
         actualReps: null,
@@ -1230,9 +1331,14 @@ export function ActiveWorkoutTracker({
     }
   }
 
+  /** Set clock: elapsed time, or for mobility holds the time left. */
+  function setClock(s: SetTrackState): string {
+    const target = isMobility ? timedTargetSecs(s) : null
+    return fmt(target != null ? Math.max(0, target - s.setElapsedSeconds) : s.setElapsedSeconds)
+  }
+
   function setTimerDisplay(exIdx: number, setIdx: number): string {
-    const s = exercises[exIdx].sets[setIdx]
-    return fmt(s.setElapsedSeconds)
+    return setClock(exercises[exIdx].sets[setIdx])
   }
 
   function isActiveSet(exIdx: number, setIdx: number): boolean {
@@ -1240,9 +1346,8 @@ export function ActiveWorkoutTracker({
       && !exercises[exIdx].sets[setIdx].completed
   }
 
-  const activeSetValue = activeSetTimer
-    ? fmt(exercises[activeSetTimer.exIdx]?.sets[activeSetTimer.setIdx]?.setElapsedSeconds ?? 0)
-    : '—'
+  const activeSetTrack = activeSetTimer ? exercises[activeSetTimer.exIdx]?.sets[activeSetTimer.setIdx] : undefined
+  const activeSetValue = activeSetTrack ? setClock(activeSetTrack) : '—'
 
   function previousSetDisplay(ex: ExerciseTrackState, setIdx: number): string {
     const previous = ex.previousSets?.[setIdx]
@@ -1269,7 +1374,7 @@ export function ActiveWorkoutTracker({
     if (!cur) return
     const s = exercises[cur.exIdx]?.sets[cur.setIdx]
     if (!s) return
-    updateSet(cur.exIdx, cur.setIdx, { restSeconds: Math.max(15, (s.restSeconds ?? 90) + delta) })
+    updateSet(cur.exIdx, cur.setIdx, { restSeconds: Math.max(15, (s.restSeconds ?? defaultRestSeconds) + delta) })
   }
 
   function targetLabel(s: SetTrackState): string {
@@ -1313,6 +1418,7 @@ export function ActiveWorkoutTracker({
         restSeconds: s.restSeconds,
         actualRestSeconds: s.actualRestSeconds,
         ...(s.isWarmup ? { isWarmup: true } : {}),
+        ...(s.isTimed ? { isTimed: true } : {}),
       })),
     }))
 
@@ -1343,6 +1449,15 @@ export function ActiveWorkoutTracker({
       </div>
     )
   }
+
+  const switchCueBanner = showSwitchCue && (
+    <div className="fixed inset-x-0 top-1/3 z-[65] flex justify-center pointer-events-none" role="status">
+      <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-violet-500/90 text-white text-lg font-bold shadow-2xl">
+        <ArrowLeftRight size={20} />
+        Switch sides
+      </div>
+    </div>
+  )
 
   if (focusMode && exercises.length > 0) {
     const cur = findCurrentSet()
@@ -1377,6 +1492,7 @@ export function ActiveWorkoutTracker({
 
     return (
       <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col">
+        {switchCueBanner}
         {/* Header */}
         <div
           className="flex-shrink-0 flex items-center gap-3 px-4 pb-3 ls:pb-2 border-b border-slate-800"
@@ -1397,6 +1513,16 @@ export function ActiveWorkoutTracker({
             <h1 className="text-sm font-bold text-white truncate">{planDay.label}</h1>
             <p className="text-xs text-slate-500 truncate">{slot.name}</p>
           </div>
+          {onSoundEnabledChange && (
+            <button
+              onClick={() => onSoundEnabledChange(!soundEnabled)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-slate-800 transition-colors"
+              title={soundEnabled ? 'Mute cues' : 'Unmute cues'}
+              aria-label={soundEnabled ? 'Mute timer cues' : 'Unmute timer cues'}
+            >
+              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
+          )}
           <button
             onClick={() => setFocusMode(false)}
             className="p-1.5 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-slate-800 transition-colors"
@@ -1455,22 +1581,24 @@ export function ActiveWorkoutTracker({
             {/* Set data: last / target + entry */}
             <div className="ls:col-start-2 ls:row-start-2 ls:flex ls:flex-col ls:justify-center ls:min-h-0">
             {/* Last / Target */}
-            <div className="grid grid-cols-2 gap-3 mt-5 ls:mt-0">
+            <div className={`grid ${isMobility ? 'grid-cols-1' : 'grid-cols-2'} gap-3 mt-5 ls:mt-0`}>
+              {!isMobility && (
               <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-center">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Last</p>
                 <p className="text-sm text-slate-200 font-medium mt-1">{previousSetDisplay(curEx, cur.setIdx)}</p>
               </div>
+              )}
               <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-center">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Target</p>
                 <p className="text-sm text-sky-200 font-medium mt-1">{targetLabel(curSet)}</p>
-                {plateNoteFor(curSet) && (
+                {!isMobility && plateNoteFor(curSet) && (
                   <p className="text-xs text-orange-300/80 mt-0.5">{plateNoteFor(curSet)}</p>
                 )}
               </div>
             </div>
 
             {/* Data entry for current set */}
-            <div className="grid grid-cols-2 gap-3 mt-3">
+            <div className={`grid ${isMobility ? 'grid-cols-1' : 'grid-cols-2'} gap-3 mt-3`}>
               <div className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-3 ls:px-2 ls:py-2">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold text-center mb-2">{unitLabel}</p>
                 <div className="flex items-center gap-2 ls:gap-1">
@@ -1491,6 +1619,7 @@ export function ActiveWorkoutTracker({
                   >+</button>
                 </div>
               </div>
+              {!isMobility && (
               <div className="rounded-xl border border-slate-700 bg-slate-800/60 px-3 py-3 ls:px-2 ls:py-2">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold text-center mb-2">Lbs</p>
                 <div className="flex items-center gap-2 ls:gap-1">
@@ -1515,8 +1644,9 @@ export function ActiveWorkoutTracker({
                   >+</button>
                 </div>
               </div>
+              )}
             </div>
-            {(() => {
+            {!isMobility && (() => {
               const line = plateLineFor(curSet, equipmentKindFor(curEx.exercise), equipmentProfile)
               return line && (
                 <p className="mt-2 text-center text-xs text-slate-400 font-medium tabular-nums">{line}</p>
@@ -1545,7 +1675,7 @@ export function ActiveWorkoutTracker({
                 {isCountingDown ? (
                   <span className="text-4xl font-mono font-bold text-sky-100">{setTimerCountdown!.remaining}</span>
                 ) : setRunning ? (
-                  <span className="text-4xl font-mono font-bold text-amber-200">{fmt(curSet.setElapsedSeconds)}</span>
+                  <span className="text-4xl font-mono font-bold text-amber-200">{setClock(curSet)}</span>
                 ) : resting ? (
                   <span className={`text-4xl font-mono font-bold ${restOver ? 'text-red-200' : 'text-emerald-100'}`}>{fmt(restElapsed!)}</span>
                 ) : null}
@@ -1604,6 +1734,16 @@ export function ActiveWorkoutTracker({
           <h1 className="text-sm font-bold text-white truncate">{planDay.label}</h1>
           <p className="text-xs text-slate-500 truncate">{slot.name}</p>
         </div>
+        {onSoundEnabledChange && (
+          <button
+            onClick={() => onSoundEnabledChange(!soundEnabled)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-sky-300 hover:bg-slate-800 transition-colors"
+            title={soundEnabled ? 'Mute cues' : 'Unmute cues'}
+            aria-label={soundEnabled ? 'Mute timer cues' : 'Unmute timer cues'}
+          >
+            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
+        )}
         {exercises.length > 0 && (
           <button
             onClick={() => setFocusMode(true)}
@@ -1733,6 +1873,7 @@ export function ActiveWorkoutTracker({
                   {ex.ladderStatus && <p className="text-[10px] text-sky-400 mt-0.5 truncate">{ex.ladderStatus}</p>}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  {!isMobility && (
                   <button
                     onClick={() => setSupersetPicker(supersetPicker === exIdx ? null : exIdx)}
                     className={`p-1 rounded transition-colors ${ssInfo ? ssColors!.text + ' hover:bg-slate-700' : 'text-slate-600 hover:text-slate-300 hover:bg-slate-700'}`}
@@ -1740,6 +1881,7 @@ export function ActiveWorkoutTracker({
                   >
                     <Link2 size={13} />
                   </button>
+                  )}
                   <button
                     onClick={() => setExercisePicker({ mode: 'replace', exIdx })}
                     className="p-1 rounded text-slate-600 hover:text-slate-300 hover:bg-slate-700 transition-colors"
@@ -1793,11 +1935,11 @@ export function ActiveWorkoutTracker({
 
               <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 text-[9px] text-slate-600 uppercase tracking-wide px-0.5">
                 <span className="col-span-1 text-center">#</span>
-                <span className="col-span-3 text-center">Prev</span>
-                <span className="col-span-3 text-center">{isTimedExercise ? 'Secs' : 'Reps'}</span>
-                <span className="col-span-3 text-center">Lbs</span>
-                <span className="col-span-2 text-center">Time</span>
-                <span className="col-span-1 text-center">✓</span>
+                {!isMobility && <span className="col-span-3 text-center">Prev</span>}
+                <span className={`${isMobility ? 'col-span-6' : 'col-span-3'} text-center`}>{isTimedExercise ? 'Secs' : 'Reps'}</span>
+                {!isMobility && <span className="col-span-3 text-center">Lbs</span>}
+                <span className={`${isMobility ? 'col-span-4' : 'col-span-2'} text-center`}>{isMobility && isTimedExercise ? 'Left' : 'Time'}</span>
+                <span className={`${isMobility ? 'col-span-2' : 'col-span-1'} text-center`}>✓</span>
               </div>
 
               {ex.sets.map((s, setIdx) => {
@@ -1837,9 +1979,11 @@ export function ActiveWorkoutTracker({
                         workingSetNumber
                       )}
                     </span>
+                    {!isMobility && (
                     <span className="col-span-3 text-center text-slate-500 text-[10px]">
                       {previousSetDisplay(ex, setIdx)}
                     </span>
+                    )}
                     <NumberTextField
                       inputMode="numeric"
                       value={s.actualReps}
@@ -1847,8 +1991,9 @@ export function ActiveWorkoutTracker({
                       onFocusField={() => handleFieldFocus(exIdx, setIdx, 'reps')}
                       onBlurField={handleFieldBlur}
                       placeholder={String(s.targetReps ?? (s.isTimed ? 'secs' : 'reps'))}
-                      className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
+                      className={`${isMobility ? 'col-span-6' : 'col-span-3'} bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center`}
                     />
+                    {!isMobility && (
                     <NumberTextField
                       inputMode="decimal"
                       value={s.actualLoad}
@@ -1862,10 +2007,11 @@ export function ActiveWorkoutTracker({
                       }
                       className="col-span-3 bg-slate-700 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 text-center"
                     />
+                    )}
                     <button
                       onClick={() => handleSetTimerToggle(exIdx, setIdx)}
                       disabled={!active || s.completed || !workoutRunning}
-                      className={`col-span-2 h-7 flex items-center justify-center gap-1 rounded border font-mono text-[10px] transition-colors ${
+                      className={`${isMobility ? 'col-span-4' : 'col-span-2'} h-7 flex items-center justify-center gap-1 rounded border font-mono text-[10px] transition-colors ${
                         isCountingDown
                           ? 'bg-sky-500/20 border-sky-500/50 text-sky-200'
                           : timerRunning
@@ -1880,7 +2026,7 @@ export function ActiveWorkoutTracker({
                     </button>
                     <button
                       onClick={() => handleSetComplete(exIdx, setIdx)}
-                      className={`col-span-1 h-7 flex items-center justify-center rounded border transition-colors ${
+                      className={`${isMobility ? 'col-span-2' : 'col-span-1'} h-7 flex items-center justify-center rounded border transition-colors ${
                         s.completed
                           ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                           : 'bg-slate-700 border-slate-600 text-slate-400 hover:text-white'
@@ -1889,7 +2035,7 @@ export function ActiveWorkoutTracker({
                       <Check size={11} />
                     </button>
                     </div>
-                    {!s.completed && (() => {
+                    {!s.completed && !isMobility && (() => {
                       const line = plateLineFor(s, equipmentKindFor(ex.exercise), equipmentProfile)
                       const note = plateNoteFor(s)
                       return (line || note) && (
@@ -1954,6 +2100,8 @@ export function ActiveWorkoutTracker({
         </button>
       </div>
     </div>
+
+    {switchCueBanner}
 
     {focusedField && (
       <div
@@ -2034,9 +2182,13 @@ export function ActiveWorkoutTracker({
         mode={exercisePicker.mode}
         exerciseNames={exercises.map(ex => ex.exercise)}
         canSaveToTemplate={
-          exercisePicker.mode !== 'replace' ||
-          !exercises[exercisePicker.exIdx]?.addedDuringWorkout
+          // Plan templates store mobility routines elsewhere (mobilityExercises).
+          !isMobility && (
+            exercisePicker.mode !== 'replace' ||
+            !exercises[exercisePicker.exIdx]?.addedDuringWorkout
+          )
         }
+        library={isMobility ? MOBILITY_PICKER_LIBRARY : undefined}
         onSelect={handlePickerSelect}
         onClose={() => setExercisePicker(null)}
       />
