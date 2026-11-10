@@ -1,4 +1,4 @@
-import { CheckCircle2, Play, Plus, RotateCcw, Zap } from 'lucide-react'
+import { CheckCircle2, Play, Plus, RotateCcw, Settings2, Zap } from 'lucide-react'
 import type { MobilityCompletion, MobilityExercise } from '../../store/mobilityStore'
 import { totalTimedSec } from '../../lib/mobilityLibrary'
 
@@ -31,9 +31,19 @@ export function TodayMobilitySection({
   const doneCount = mobilityRoutine.length - remainingCount
   return (
     <section>
-      <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-        <Zap size={11} /> Mobility
-      </h2>
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+          <Zap size={11} /> Mobility
+        </h2>
+        {mobilityRoutine.length > 0 && (
+          <button
+            onClick={onNavigate}
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            <Settings2 size={12} /> Manage
+          </button>
+        )}
+      </div>
       {mobilityRoutine.length === 0 ? (
         <button
           onClick={onNavigate}
